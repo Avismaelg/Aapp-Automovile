@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Expo / builds
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Artefactos de pruebas locales
+.playwright-mcp/
+/*.png
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,631 @@
+export type Friend = {
+  id: string;
+  name: string;
+  username: string;
+  color: string;
+  car: string;
+  vehicleKind: VehicleKind;
+  online: boolean;
+  distanceKm?: number;
+  status?: string;
+};
+
+export type PartyMember = Friend & {
+  x: number;
+  y: number;
+  isHost?: boolean;
+  isTalking?: boolean;
+  battery?: number;
+  role?: 'host' | 'sweeper' | 'member';
+};
+
+export type VehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';
+export type FuelKind = 'gasoline' | 'diesel' | 'electric';
+export type EnergyKind = 'fuel' | 'electric';
+
+export type Vehicle = {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  nickname: string;
+  color: string;
+  odometerKm: number;
+  kind: VehicleKind;
+  fuel: FuelKind;
+  efficiency: number;
+  efficiencyUnit: 'km_l' | 'kwh_100km';
+  qrSlug: string;
+  qr: string;
+  isPrimary?: boolean;
+};
+
+export type ChallengeCategory = VehicleKind | 'mixed';
+
+export type ChallengeParticipant = {
+  id: string;
+  name: string;
+  username: string;
+  color: string;
+  vehicleKind: VehicleKind;
+  vehicle: string;
+  progress: number;
+  etaMin: number;
+  isMe?: boolean;
+  rank?: number;
+};
+
+export type Challenge = {
+  id: string;
+  code: string;
+  title: string;
+  fromLabel: string;
+  toLabel: string;
+  distanceKm: number;
+  category: ChallengeCategory;
+  status: 'pending' | 'live' | 'finished';
+  elapsedSeconds: number;
+  participants: ChallengeParticipant[];
+  note?: string;
+};
+
+export type ChallengeRoute = {
+  id: string;
+  fromLabel: string;
+  toLabel: string;
+  distanceKm: number;
+  etaMin: number;
+};
+
+export type FeedItem =
+  | {
+      id: string;
+      type: 'drive';
+      author: Friend;
+      createdAt: string;
+      title: string;
+      distanceKm: number;
+      durationMin: number;
+      avgSpeed: number;
+      likes: number;
+      comments: number;
+      note?: string;
+      routeSeed: number;
+    }
+  | {
+      id: string;
+      type: 'photo';
+      author: Friend;
+      createdAt: string;
+      caption: string;
+      likes: number;
+      comments: number;
+      gradient: [string, string];
+    }
+  | {
+      id: string;
+      type: 'party';
+      author: Friend;
+      createdAt: string;
+      title: string;
+      members: number;
+      distanceKm: number;
+      likes: number;
+      comments: number;
+    }
+  | {
+      id: string;
+      type: 'achievement';
+      author: Friend;
+      createdAt: string;
+      title: string;
+      subtitle: string;
+      likes: number;
+      comments: number;
+    };
+
+export type FuelLog = {
+  id: string;
+  vehicleId: string;
+  kind: EnergyKind;
+  date: string;
+  station: string;
+  /** Litros para gasolina/diésel; 0 en una carga eléctrica. */
+  liters: number;
+  /** kWh en una carga eléctrica. */
+  kwh?: number;
+  /** Precio por litro o por kWh. */
+  pricePerLiter: number;
+  total: number;
+  odometer: number;
+  fullTank: boolean;
+};
+
+export const currentUser = {
+  id: 'u_luis',
+  name: 'Luis Martínez',
+  username: 'luis_drives',
+  city: 'Santo Domingo, RD',
+  bio: 'Civic Si · rutas de domingo · DOP',
+  color: '#FF5A1F',
+  stats: {
+    drives: 128,
+    km: 12480,
+    hours: 214,
+    friends: 42,
+  },
+  car: {
+    id: 'v_civic',
+    make: 'Honda',
+    model: 'Civic Si',
+    year: 2020,
+    nickname: 'El Rojo',
+    color: '#C81D25',
+    odometerKm: 48210,
+    kind: 'car',
+    fuel: 'gasoline',
+    efficiency: 14.2,
+    efficiencyUnit: 'km_l',
+    qrSlug: 'civic-luis',
+    qr: 'https://caravana.app/v/civic-luis',
+    isPrimary: true,
+  } satisfies Vehicle,
+};
+
+export const vehicles: Vehicle[] = [
+  currentUser.car,
+  {
+    id: 'v_mt07',
+    make: 'Yamaha',
+    model: 'MT-07',
+    year: 2022,
+    nickname: 'La Moto',
+    color: '#C9FF4D',
+    odometerKm: 18400,
+    kind: 'motorcycle',
+    fuel: 'gasoline',
+    efficiency: 22.5,
+    efficiencyUnit: 'km_l',
+    qrSlug: 'mt07-luis',
+    qr: 'https://caravana.app/v/mt07-luis',
+  },
+  {
+    id: 'v_model3',
+    make: 'Tesla',
+    model: 'Model 3',
+    year: 2023,
+    nickname: 'Tess',
+    color: '#4DE1FF',
+    odometerKm: 12480,
+    kind: 'ev',
+    fuel: 'electric',
+    efficiency: 15.8,
+    efficiencyUnit: 'kwh_100km',
+    qrSlug: 'model3-luis',
+    qr: 'https://caravana.app/v/model3-luis',
+  },
+  {
+    id: 'v_ranger',
+    make: 'Ford',
+    model: 'Ranger Raptor',
+    year: 2022,
+    nickname: 'La Bestia',
+    color: '#FFB84D',
+    odometerKm: 36720,
+    kind: 'truck',
+    fuel: 'diesel',
+    efficiency: 10.5,
+    efficiencyUnit: 'km_l',
+    qrSlug: 'ranger-luis',
+    qr: 'https://caravana.app/v/ranger-luis',
+  },
+];
+
+export const friends: Friend[] = [
+  {
+    id: 'u_ana',
+    name: 'Ana Pérez',
+    username: 'ana.drives',
+    color: '#4DE1FF',
+    car: 'Mazda 3 2022',
+    vehicleKind: 'car',
+    online: true,
+    distanceKm: 1.2,
+    status: 'En ruta',
+  },
+  {
+    id: 'u_pedro',
+    name: 'Pedro Núñez',
+    username: 'pedro_rd',
+    color: '#C9FF4D',
+    car: 'Toyota Hilux 2021',
+    vehicleKind: 'truck',
+    online: true,
+    distanceKm: 3.4,
+    status: 'En ruta',
+  },
+  {
+    id: 'u_sofia',
+    name: 'Sofía Ramírez',
+    username: 'sofia.cars',
+    color: '#B98CFF',
+    car: 'Mini Cooper 2019',
+    vehicleKind: 'car',
+    online: true,
+    distanceKm: 0.8,
+    status: 'En ruta',
+  },
+  {
+    id: 'u_marco',
+    name: 'Marco Díaz',
+    username: 'marco_gti',
+    color: '#FFB84D',
+    car: 'VW Golf GTI 2018',
+    vehicleKind: 'car',
+    online: false,
+    status: 'Hace 2 h',
+  },
+  {
+    id: 'u_julia',
+    name: 'Julia Santos',
+    username: 'julia.s',
+    color: '#FF7AA8',
+    car: 'Jeep Wrangler 2023',
+    vehicleKind: 'car',
+    online: false,
+    status: 'Ayer',
+  },
+  {
+    id: 'u_kevin',
+    name: 'Kevin Rosario',
+    username: 'kevin.rides',
+    color: '#6EF0B5',
+    car: 'Yamaha MT-07 2022',
+    vehicleKind: 'motorcycle',
+    online: true,
+    distanceKm: 2.1,
+    status: 'En ruta',
+  },
+  {
+    id: 'u_valeria',
+    name: 'Valeria Cruz',
+    username: 'vale.ev',
+    color: '#9B8CFF',
+    car: 'Tesla Model 3 2023',
+    vehicleKind: 'ev',
+    online: true,
+    distanceKm: 4.7,
+    status: 'En ruta',
+  },
+];
+
+export const partyMembers: PartyMember[] = [
+  {
+    ...friends[0],
+    x: 62,
+    y: 28,
+    isHost: true,
+    isTalking: true,
+    battery: 78,
+    role: 'host',
+  },
+  {
+    ...friends[1],
+    x: 38,
+    y: 38,
+    battery: 54,
+    role: 'sweeper',
+  },
+  {
+    ...friends[2],
+    x: 74,
+    y: 22,
+    battery: 91,
+    role: 'member',
+  },
+  {
+    ...currentUser,
+    name: currentUser.name,
+    username: currentUser.username,
+    color: currentUser.color,
+    car: `${currentUser.car.make} ${currentUser.car.model}`,
+    vehicleKind: 'car',
+    online: true,
+    x: 22,
+    y: 32,
+    battery: 66,
+    role: 'member',
+    isTalking: false,
+  },
+];
+
+export const activeParty = {
+  id: 'p_ruta26',
+  code: 'RUTA26',
+  name: 'Ruta a la montaña',
+  destination: 'Constanza, La Vega',
+  distanceKm: 42.8,
+  elapsedSeconds: 38 * 60 + 12,
+  members: partyMembers,
+  etaMin: 54,
+  routeLabel: 'Av. Winston Churchill → Constanza',
+};
+
+export const challengeRoutes: ChallengeRoute[] = [
+  {
+    id: 'r_boca',
+    fromLabel: 'Parque Independencia, SD',
+    toLabel: 'Boca Chica',
+    distanceKm: 32,
+    etaMin: 38,
+  },
+  {
+    id: 'r_constanza',
+    fromLabel: 'Santo Domingo',
+    toLabel: 'Constanza',
+    distanceKm: 92,
+    etaMin: 104,
+  },
+  {
+    id: 'r_jarabacoa',
+    fromLabel: 'Santiago',
+    toLabel: 'Jarabacoa',
+    distanceKm: 48,
+    etaMin: 62,
+  },
+];
+
+export const activeChallenge: Challenge = {
+  id: 'c_domingo',
+  code: 'RETO26',
+  title: 'Domingo de curvas',
+  fromLabel: 'Santo Domingo',
+  toLabel: 'Constanza',
+  distanceKm: 92,
+  category: 'mixed',
+  status: 'live',
+  elapsedSeconds: 38 * 60 + 12,
+  note: 'Categoría mixta: cada vehículo corre con su propio ritmo. Gana quien llega primero respetando las normas.',
+  participants: [
+    {
+      id: 'u_kevin',
+      name: 'Kevin Rosario',
+      username: 'kevin.rides',
+      color: '#6EF0B5',
+      vehicleKind: 'motorcycle',
+      vehicle: 'Yamaha MT-07',
+      progress: 72,
+      etaMin: 18,
+    },
+    {
+      id: currentUser.id,
+      name: currentUser.name,
+      username: currentUser.username,
+      color: currentUser.color,
+      vehicleKind: 'car',
+      vehicle: 'Honda Civic Si',
+      progress: 64,
+      etaMin: 21,
+      isMe: true,
+    },
+    {
+      id: 'u_valeria',
+      name: 'Valeria Cruz',
+      username: 'vale.ev',
+      color: '#9B8CFF',
+      vehicleKind: 'ev',
+      vehicle: 'Tesla Model 3',
+      progress: 58,
+      etaMin: 24,
+    },
+    {
+      id: 'u_pedro',
+      name: 'Pedro Núñez',
+      username: 'pedro_rd',
+      color: '#C9FF4D',
+      vehicleKind: 'truck',
+      vehicle: 'Toyota Hilux',
+      progress: 51,
+      etaMin: 29,
+    },
+  ],
+};
+
+export const recentChallenges = [
+  {
+    id: 'c_past_1',
+    title: 'Reto a la playa',
+    fromLabel: 'Santo Domingo',
+    toLabel: 'Boca Chica',
+    distanceKm: 32,
+    category: 'car' as ChallengeCategory,
+    winner: 'Ana Pérez',
+    winnerColor: '#4DE1FF',
+    participants: 4,
+    time: '38 min',
+    date: 'Dom, 12 oct',
+  },
+  {
+    id: 'c_past_2',
+    title: 'Moto vs. EV',
+    fromLabel: 'Santiago',
+    toLabel: 'Jarabacoa',
+    distanceKm: 48,
+    category: 'mixed' as ChallengeCategory,
+    winner: 'Kevin Rosario',
+    winnerColor: '#6EF0B5',
+    participants: 3,
+    time: '54 min',
+    date: 'Sáb, 4 oct',
+  },
+];
+
+export const feed: FeedItem[] = [
+  {
+    id: 'f1',
+    type: 'drive',
+    author: friends[0],
+    createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    title: 'Ruta de domingo por la costa',
+    distanceKm: 34.6,
+    durationMin: 41,
+    avgSpeed: 50,
+    likes: 24,
+    comments: 6,
+    note: 'Salida 7:10 a. m. · carretera llena de curvas',
+    routeSeed: 1,
+  },
+  {
+    id: 'f2',
+    type: 'photo',
+    author: friends[2],
+    createdAt: new Date(Date.now() - 1000 * 60 * 94).toISOString(),
+    caption: 'Primera quedada del club. Gracias a todos los que llegaron temprano.',
+    likes: 41,
+    comments: 12,
+    gradient: ['#2A1B3D', '#FF5A1F'],
+  },
+  {
+    id: 'f3',
+    type: 'party',
+    author: friends[1],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    title: 'Caravana a la playa',
+    members: 7,
+    distanceKm: 62.3,
+    likes: 33,
+    comments: 9,
+  },
+  {
+    id: 'f4',
+    type: 'achievement',
+    author: friends[3],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    title: '10.000 km a bordo',
+    subtitle: 'Un año de rutas, quedadas y café.',
+    likes: 58,
+    comments: 14,
+  },
+];
+
+export const recentDrives = [
+  {
+    id: 'd1',
+    title: 'Santo Domingo → Boca Chica',
+    date: 'Hoy, 7:12 a. m.',
+    km: 32.4,
+    minutes: 38,
+    avgSpeed: 51,
+  },
+  {
+    id: 'd2',
+    title: 'Casa → Trabajo',
+    date: 'Ayer, 6:54 a. m.',
+    km: 14.8,
+    minutes: 27,
+    avgSpeed: 32,
+  },
+  {
+    id: 'd3',
+    title: 'Ruta a Constanza',
+    date: 'Dom, 8:05 a. m.',
+    km: 86.2,
+    minutes: 94,
+    avgSpeed: 55,
+  },
+];
+
+export const fuelLogs: FuelLog[] = [
+  {
+    id: 'fl1',
+    vehicleId: 'v_civic',
+    kind: 'fuel',
+    date: 'Hoy, 8:40 a. m.',
+    station: 'Shell Churchill',
+    liters: 22.86,
+    pricePerLiter: 77.56,
+    total: 1772,
+    odometer: 48210,
+    fullTank: true,
+  },
+  {
+    id: 'fl2',
+    vehicleId: 'v_civic',
+    kind: 'fuel',
+    date: '12 oct',
+    station: 'Sunix Núñez de Cáceres',
+    liters: 31.2,
+    pricePerLiter: 76.9,
+    total: 2399,
+    odometer: 47880,
+    fullTank: true,
+  },
+  {
+    id: 'fl3',
+    vehicleId: 'v_civic',
+    kind: 'fuel',
+    date: '28 sep',
+    station: 'Isla 27 de Febrero',
+    liters: 28.4,
+    pricePerLiter: 78.2,
+    total: 2221,
+    odometer: 47430,
+    fullTank: true,
+  },
+  {
+    id: 'fl4',
+    vehicleId: 'v_model3',
+    kind: 'electric',
+    date: 'Ayer, 7:20 p. m.',
+    station: 'Supercargador Bella Vista',
+    liters: 0,
+    kwh: 42.6,
+    pricePerLiter: 18.5,
+    total: 788,
+    odometer: 12480,
+    fullTank: true,
+  },
+  {
+    id: 'fl5',
+    vehicleId: 'v_model3',
+    kind: 'electric',
+    date: '3 oct',
+    station: 'Carga en casa',
+    liters: 0,
+    kwh: 36.2,
+    pricePerLiter: 16.9,
+    total: 612,
+    odometer: 12150,
+    fullTank: true,
+  },
+  {
+    id: 'fl6',
+    vehicleId: 'v_mt07',
+    kind: 'fuel',
+    date: 'Hoy, 7:05 a. m.',
+    station: 'Shell Churchill',
+    liters: 12.4,
+    pricePerLiter: 77.56,
+    total: 962,
+    odometer: 18400,
+    fullTank: true,
+  },
+  {
+    id: 'fl7',
+    vehicleId: 'v_ranger',
+    kind: 'fuel',
+    date: '6 oct',
+    station: 'Sunix Duarte',
+    liters: 68,
+    pricePerLiter: 71.8,
+    total: 4882,
+    odometer: 36720,
+    fullTank: true,
+  },
+];
+
+export const achievements = [
+  { id: 'a1', title: 'Madrugador', detail: '5 rutas antes de las 7 a. m.', icon: 'sunny' as const },
+  { id: 'a2', title: 'Explorador', detail: '12 carreteras nuevas este mes', icon: 'map' as const },
+  { id: 'a3', title: 'En caravana', detail: '3 parties en 30 días', icon: 'people' as const },
+];

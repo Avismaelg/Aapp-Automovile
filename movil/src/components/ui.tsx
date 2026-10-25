@@ -1,0 +1,608 @@
+import { Ionicons } from '@expo/vector-icons';
+import type { ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { colors, fonts, radius, shadows, spacing } from '@/src/theme';
+import { initials } from '@/src/lib/format';
+
+type TextVariant =
+  | 'display'
+  | 'h1'
+  | 'h2'
+  | 'h3'
+  | 'title'
+  | 'body'
+  | 'bodyStrong'
+  | 'caption'
+  | 'label'
+  | 'mono';
+
+export function AppText({
+  children,
+  variant = 'body',
+  color = colors.text,
+  style,
+  numberOfLines,
+  align,
+}: {
+  children: ReactNode;
+  variant?: TextVariant;
+  color?: string;
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+  align?: TextStyle['textAlign'];
+}) {
+  return (
+    <Text
+      numberOfLines={numberOfLines}
+      style={[styles[variant], { color, textAlign: align }, style]}
+    >
+      {children}
+    </Text>
+  );
+}
+
+export function Screen({
+  children,
+  scroll = true,
+  contentStyle,
+  backgroundColor = colors.bg,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  contentStyle?: StyleProp<ViewStyle>;
+  backgroundColor?: string;
+}) {
+  const content = (
+    <View style={[styles.screenContent, contentStyle]}>{children}</View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.screen, { backgroundColor }]} edges={['top']}>
+      {scroll ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
+    </SafeAreaView>
+  );
+}
+
+export function Card({
+  children,
+  style,
+  tone = 'surface',
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  tone?: 'surface' | 'elevated' | 'accent' | 'transparent';
+}) {
+  return (
+    <View
+      style={[
+        styles.card,
+        tone === 'elevated' && { backgroundColor: colors.surfaceAlt },
+        tone === 'accent' && { backgroundColor: colors.accent },
+        tone === 'transparent' && {
+          backgroundColor: 'transparent',
+          borderColor: colors.border,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  icon,
+  size = 'md',
+  full = true,
+  disabled,
+  loading,
+  style,
+}: {
+  label: string;
+  onPress?: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'lime';
+  icon?: keyof typeof Ionicons.glyphMap;
+  size?: 'sm' | 'md' | 'lg';
+  full?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const palette = {
+    primary: { bg: colors.accent, fg: '#120802', border: colors.accent },
+    lime: { bg: colors.lime, fg: '#101603', border: colors.lime },
+    secondary: {
+      bg: colors.surfaceHigh,
+      fg: colors.text,
+      border: colors.border,
+    },
+    ghost: { bg: 'transparent', fg: colors.text, border: colors.border },
+    danger: { bg: colors.danger, fg: '#1A0306', border: colors.danger },
+  }[variant];
+
+  return (
+    <Pressable
+      disabled={disabled || loading}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.button,
+        size === 'sm' && styles.buttonSm,
+        size === 'lg' && styles.buttonLg,
+        full && { alignSelf: 'stretch' },
+        {
+          backgroundColor: palette.bg,
+          borderColor: palette.border,
+          opacity: disabled ? 0.45 : pressed ? 0.82 : 1,
+        },
+        variant === 'primary' && shadows.accent,
+        style,
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator color={palette.fg} />
+      ) : (
+        <>
+          {icon ? (
+            <Ionicons
+              name={icon}
+              size={size === 'sm' ? 16 : 19}
+              color={palette.fg}
+            />
+          ) : null}
+          <AppText
+            variant={size === 'sm' ? 'label' : 'bodyStrong'}
+            color={palette.fg}
+            style={{ letterSpacing: 0.2 }}
+          >
+            {label}
+          </AppText>
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+export function IconButton({
+  icon,
+  onPress,
+  size = 42,
+  tone = 'surface',
+  color = colors.text,
+  badge,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress?: () => void;
+  size?: number;
+  tone?: 'surface' | 'accent' | 'ghost';
+  color?: string;
+  badge?: boolean;
+}) {
+  const toneStyle = {
+    surface: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+    accent: { backgroundColor: colors.accent, borderColor: colors.accent },
+    ghost: { backgroundColor: 'transparent', borderColor: colors.border },
+  }[tone];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconButton,
+        toneStyle,
+        { width: size, height: size, opacity: pressed ? 0.75 : 1 },
+      ]}
+    >
+      <Ionicons name={icon} size={size * 0.46} color={color} />
+      {badge ? <View style={styles.badge} /> : null}
+    </Pressable>
+  );
+}
+
+export function Avatar({
+  name,
+  color,
+  size = 44,
+  uri,
+  ring,
+  online,
+}: {
+  name: string;
+  color: string;
+  size?: number;
+  uri?: string;
+  ring?: string;
+  online?: boolean;
+}) {
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.avatar,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+            borderColor: ring ?? 'rgba(255,255,255,0.12)',
+            borderWidth: ring ? 2 : 1,
+          },
+        ]}
+      >
+        {uri ? (
+          <Image
+            source={{ uri }}
+            style={{ width: size, height: size, borderRadius: size / 2 }}
+          />
+        ) : (
+          <AppText
+            variant="bodyStrong"
+            color="#0B0F14"
+            style={{ fontSize: size * 0.34 }}
+          >
+            {initials(name)}
+          </AppText>
+        )}
+      </View>
+      {online ? (
+        <View
+          style={[
+            styles.onlineDot,
+            {
+              width: size * 0.26,
+              height: size * 0.26,
+              borderRadius: size * 0.13,
+              borderWidth: size * 0.05,
+            },
+          ]}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+export function Pill({
+  label,
+  tone = 'neutral',
+  icon,
+  style,
+}: {
+  label: string;
+  tone?: 'neutral' | 'accent' | 'lime' | 'danger' | 'dark';
+  icon?: keyof typeof Ionicons.glyphMap;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const palette = {
+    neutral: { bg: colors.surfaceHigh, fg: colors.textSoft, border: colors.border },
+    accent: { bg: colors.accentSoft, fg: colors.accent, border: 'rgba(255,90,31,0.3)' },
+    lime: { bg: colors.limeSoft, fg: colors.lime, border: 'rgba(201,255,77,0.28)' },
+    danger: { bg: 'rgba(255,77,94,0.14)', fg: colors.danger, border: 'rgba(255,77,94,0.3)' },
+    dark: { bg: 'rgba(0,0,0,0.55)', fg: colors.white, border: 'rgba(255,255,255,0.12)' },
+  }[tone];
+
+  return (
+    <View
+      style={[
+        styles.pill,
+        { backgroundColor: palette.bg, borderColor: palette.border },
+        style,
+      ]}
+    >
+      {icon ? <Ionicons name={icon} size={12} color={palette.fg} /> : null}
+      <AppText variant="label" color={palette.fg} style={{ fontSize: 10 }}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+export function Stat({
+  value,
+  label,
+  accent,
+  align = 'left',
+}: {
+  value: string;
+  label: string;
+  accent?: string;
+  align?: 'left' | 'center';
+}) {
+  return (
+    <View style={{ alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+      <AppText variant="h2" color={accent ?? colors.text} style={{ fontSize: 24 }}>
+        {value}
+      </AppText>
+      <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+export function SectionHeader({
+  title,
+  action,
+  onAction,
+}: {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <AppText variant="title">{title}</AppText>
+      {action ? (
+        <Pressable onPress={onAction} hitSlop={8}>
+          <AppText variant="label" color={colors.accent}>
+            {action}
+          </AppText>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.divider, style]} />;
+}
+
+export function Input({
+  label,
+  rightSlot,
+  style,
+  ...props
+}: TextInputProps & {
+  label?: string;
+  rightSlot?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={style}>
+      {label ? (
+        <AppText variant="label" color={colors.muted} style={{ marginBottom: 7 }}>
+          {label}
+        </AppText>
+      ) : null}
+      <View style={styles.inputWrap}>
+        <TextInput
+          placeholderTextColor={colors.dim}
+          {...props}
+          style={styles.input}
+        />
+        {rightSlot}
+      </View>
+    </View>
+  );
+}
+
+export function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name={icon} size={24} color={colors.accent} />
+      </View>
+      <AppText variant="title" align="center">
+        {title}
+      </AppText>
+      <AppText variant="caption" align="center" color={colors.muted}>
+        {description}
+      </AppText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120,
+  },
+  screenContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+  },
+  display: {
+    fontFamily: fonts.display,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -1,
+  },
+  h1: {
+    fontFamily: fonts.display,
+    fontSize: 30,
+    lineHeight: 34,
+    letterSpacing: -0.6,
+  },
+  h2: {
+    fontFamily: fonts.display,
+    fontSize: 26,
+    lineHeight: 30,
+    letterSpacing: -0.4,
+  },
+  h3: {
+    fontFamily: fonts.heading,
+    fontSize: 21,
+    lineHeight: 26,
+    letterSpacing: -0.2,
+  },
+  title: {
+    fontFamily: fonts.heading,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.1,
+  },
+  body: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  bodyStrong: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  caption: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  label: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  mono: {
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+  button: {
+    minHeight: 50,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonSm: {
+    minHeight: 38,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
+  buttonLg: {
+    minHeight: 58,
+    borderRadius: radius.xl,
+  },
+  iconButton: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: 8,
+    right: 9,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: colors.bg,
+  },
+  avatar: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.green,
+    borderColor: colors.bg,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing['2xl'],
+    marginBottom: spacing.md,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.borderSoft,
+    marginVertical: spacing.md,
+  },
+  inputWrap: {
+    minHeight: 50,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgElevated,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15,
+    paddingVertical: 12,
+  },
+  empty: {
+    alignItems: 'center',
+    gap: 8,
+    padding: spacing['3xl'],
+  },
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+});
