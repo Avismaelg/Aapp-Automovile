@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Avatar, Button, Card, IconButton, Pill } from '@/src/components/ui';
@@ -15,7 +15,8 @@ export default function JoinPartyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <View style={styles.header}>
         <IconButton icon="close" onPress={() => router.back()} />
         <Pill label="Invitación" tone="accent" icon="mail-open" />
         <View style={{ width: 42 }} />
@@ -109,11 +110,12 @@ export default function JoinPartyScreen() {
         </AppText>
       </Card>
 
-      <View style={styles.footer}>
-        <AppText variant="caption" color={colors.dim} align="center">
-          ¿No esperabas esta invitación? Bloquea al host desde su perfil.
-        </AppText>
-      </View>
+        <View style={styles.footer}>
+          <AppText variant="caption" color={colors.dim} align="center">
+            ¿No esperabas esta invitación? Bloquea al host desde su perfil.
+          </AppText>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -122,8 +124,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
-    paddingHorizontal: spacing.xl,
   },
+  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -197,5 +199,5 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: spacing.lg,
   },
-  footer: { marginTop: 'auto', paddingBottom: spacing.lg },
+  footer: { marginTop: spacing.lg, paddingBottom: spacing.sm },
 });

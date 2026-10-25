@@ -26,7 +26,7 @@ export default function ScanScreen() {
   const lock = useRef(false);
 
   useEffect(() => {
-    if (Platform.OS !== 'web' && permission && !permission.granted) {
+    if (Platform.OS !== 'web' && permission === null) {
       requestPermission();
     }
   }, [permission, requestPermission]);

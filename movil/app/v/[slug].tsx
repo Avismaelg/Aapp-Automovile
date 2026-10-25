@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Share, StyleSheet, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -58,7 +58,8 @@ export default function PublicVehicleScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <Pill label="Vehículo verificado por QR" tone="lime" icon="shield-checkmark" />
         <IconButton icon="share-social-outline" onPress={share} />
@@ -171,12 +172,14 @@ export default function PublicVehicleScreen() {
           </AppText>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.xl },
+  container: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

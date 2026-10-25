@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Share, StyleSheet, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -44,7 +44,11 @@ export default function PublicProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
+      >
+        <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <Pill label="Perfil verificado por QR" tone="lime" icon="shield-checkmark" />
         <IconButton icon="share-social-outline" onPress={share} />
@@ -158,6 +162,7 @@ export default function PublicProfileScreen() {
           </AppText>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
