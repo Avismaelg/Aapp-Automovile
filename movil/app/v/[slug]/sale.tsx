@@ -15,10 +15,10 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { maintenanceForVehicle } from '@/src/data/maintenance';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFuelLogs } from '@/src/hooks/useFuelLogs';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
+import { useMaintenance } from '@/src/hooks/useMaintenance';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import { exportVehicleSaleReport } from '@/src/lib/pdf';
 import { vehicleUrl } from '@/src/lib/qr';
@@ -69,6 +69,7 @@ export default function VehicleSaleScreen() {
   const { logs: fuelHistory } = useFuelLogs(vehicles);
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const vehicle = vehicles.find((item) => item.qrSlug === slug);
+  const { records } = useMaintenance(vehicle?.id);
   const [sharing, setSharing] = useState(false);
 
   if (isLoading) {
@@ -116,7 +117,6 @@ export default function VehicleSaleScreen() {
   }
 
   const meta = vehicleKindMeta[vehicle.kind];
-  const records = maintenanceForVehicle(vehicle.id);
   const summary = maintenanceSummary(vehicle, records);
   const usage = vehicleUsage(vehicle, fuelHistory);
   const totalMaintenance = maintenanceTotal(records);
@@ -276,6 +276,16 @@ export default function VehicleSaleScreen() {
               ))}
             </View>
           )}
+          <Button
+            label="Añadir mantenimiento"
+            icon="add-circle-outline"
+            variant="secondary"
+            size="sm"
+            onPress={() =>
+              router.push(`/vehicle/maintenance/new?vehicleId=${vehicle.id}`)
+            }
+            style={{ marginTop: spacing.md }}
+          />
         </Card>
 
         <SectionHeader title="Energía y consumo" action={usage.fillups ? `${usage.fillups} registros` : undefined} />

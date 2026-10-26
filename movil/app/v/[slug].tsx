@@ -15,8 +15,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { maintenanceForVehicle } from '@/src/data/maintenance';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useMaintenance } from '@/src/hooks/useMaintenance';
 import { usePublicVehicle } from '@/src/hooks/usePublicVehicle';
 import { formatMoney } from '@/src/lib/format';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
@@ -63,6 +63,12 @@ export default function PublicVehicleScreen() {
   const me = useCurrentUser();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { vehicle, isLoading } = usePublicVehicle(slug);
+  const isOwner = Boolean(
+    vehicle &&
+      (vehicle.ownerId === me.id ||
+        (vehicle.ownerUsername ? vehicle.ownerUsername === me.username : false)),
+  );
+  const { records } = useMaintenance(vehicle?.id, isOwner);
 
   if (isLoading) {
     return (
@@ -100,15 +106,12 @@ export default function PublicVehicleScreen() {
 
   const meta = vehicleKindMeta[vehicle.kind];
   const electric = vehicle.kind === 'ev';
-  const records = maintenanceForVehicle(vehicle.id);
   const summary = maintenanceSummary(vehicle, records);
-  const isOwner =
-    vehicle.ownerId === me.id ||
-    (vehicle.ownerUsername ? vehicle.ownerUsername === me.username : false);
   const ownerName = vehicle.ownerName ?? me.name;
   const ownerUsername = vehicle.ownerUsername ?? me.username;
-  const maintenanceTone =
-    summary.status === 'due'
+  const maintenanceTone = !isOwner
+    ? colors.dim
+    : summary.status === 'due'
       ? colors.danger
       : summary.status === 'soon'
         ? colors.accent
@@ -263,18 +266,39 @@ export default function PublicVehicleScreen() {
                 <Ionicons name="shield-checkmark-outline" size={22} color={maintenanceTone} />
               </View>
               <View style={{ flex: 1 }}>
-                <AppText variant="bodyStrong">{summary.label}</AppText>
+                <AppText variant="bodyStrong">
+                  {isOwner ? summary.label : 'Historial privado'}
+                </AppText>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-                  {summary.detail}
+                  {isOwner
+                    ? summary.detail
+                    : 'El dueño decide si comparte los mantenimientos completos.'}
                 </AppText>
               </View>
               <Pill
-                label={summary.status === 'ok' ? 'Al día' : summary.status === 'soon' ? 'Próximo' : 'Pendiente'}
-                tone={summary.status === 'ok' ? 'lime' : summary.status === 'soon' ? 'accent' : 'danger'}
+                label={
+                  isOwner
+                    ? summary.status === 'ok'
+                      ? 'Al día'
+                      : summary.status === 'soon'
+                        ? 'Próximo'
+                        : 'Pendiente'
+                    : 'Privado'
+                }
+                tone={
+                  isOwner
+                    ? summary.status === 'ok'
+                      ? 'lime'
+                      : summary.status === 'soon'
+                        ? 'accent'
+                        : 'danger'
+                    : 'neutral'
+                }
               />
             </View>
 
-            <View style={styles.maintenanceMeta}>
+            {isOwner ? (
+              <View style={styles.maintenanceMeta}>
               <View style={styles.maintenanceMetaItem}>
                 <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>ÚLTIMO SERVICIO</AppText>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
@@ -297,7 +321,8 @@ export default function PublicVehicleScreen() {
                   </AppText>
                 </View>
               ) : null}
-            </View>
+              </View>
+            ) : null}
 
             {isOwner ? (
               <View style={styles.historyList}>
@@ -323,6 +348,16 @@ export default function PublicVehicleScreen() {
                     </View>
                   ))
                 )}
+                <Button
+                  label="Añadir mantenimiento"
+                  icon="add-circle-outline"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() =>
+                    router.push(`/vehicle/maintenance/new?vehicleId=${vehicle.id}`)
+                  }
+                  style={{ marginTop: spacing.md }}
+                />
               </View>
             ) : (
               <View style={styles.privateHistory}>

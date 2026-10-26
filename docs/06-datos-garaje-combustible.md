@@ -132,8 +132,8 @@ vehículos o se necesita reportería más estricta, conviene añadir una columna
 
 ## 6. Pendiente
 
-- Añadir tabla `vehicle_maintenance`, RLS y alta/edición de servicios para que
-  los mantenimientos reales alimenten la ficha de venta.
+- Editar/eliminar mantenimientos y adjuntar factura/foto del servicio.
+- Añadir recordatorios de mantenimiento por push.
 - Editar y eliminar vehículos.
 - Subir foto del vehículo a Storage.
 - Persistir el historial de repostajes en modo demo.

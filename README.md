@@ -29,11 +29,11 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Retos / emparejamiento | ✅ 1v1 programado + **reto al momento con 2+ pilotos**, emparejamiento y simulación local; falta backend Realtime y anti-trampas |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
-| Perfil público por usuario y vehículo | ✅ datos técnicos, mantenimiento de ejemplo e historial de venta PDF; 🟡 falta persistir mantenimientos reales en Supabase |
+| Perfil público por usuario y vehículo | ✅ datos técnicos, mantenimiento real en Supabase e historial de venta PDF; falta editar/eliminar mantenimientos |
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth, perfil, amigos, garaje, combustible y feed de texto probados; 🟡 retos siguen mock, advisors de seguridad/performance pendientes |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones `init_caravana`, fix de `search_path` y `vehicle_maintenance` aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento y feed de texto probados; 🟡 retos siguen mock, advisors pendientes |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |

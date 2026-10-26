@@ -15,7 +15,7 @@
 - Feed de texto real con visibilidad y likes en Supabase; publicar desde Home. Faltan fotos, comentarios y moderación.
 - Retos punto A → B: modo programado 1v1 y **reto al momento con 2+ pilotos**, categorías coche/moto/EV/camión y simulación local.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
-- Ficha de vehículo con datos técnicos, mantenimiento de ejemplo e historial de venta en PDF.
+- Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.
 - Party con mapa real de OpenStreetMap y ubicación GPS del usuario en vivo (web y móvil).
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
@@ -34,7 +34,7 @@
 |---|---|---|---|
 | 1 | ✅ Crear proyecto Supabase y aplicar migración | Dev | Hecho |
 | 2 | ✅ Auth email y perfil editable probados; 🟡 añadir Apple/Google, recuperación, avatar y borrado de cuenta | Dev | 3–4 días |
-| 3 | 🟡 Perfil, amigos, garaje, combustible y feed de texto reales; faltan fotos/comentarios y retos en Supabase | Dev | 4–5 días |
+| 3 | 🟡 Perfil, amigos, garaje, combustible, mantenimiento y feed de texto reales; faltan fotos/comentarios y retos en Supabase | Dev | 4–5 días |
 | 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
@@ -177,7 +177,7 @@
 - Los retos son una simulación local; no hay invitaciones ni Realtime reales.
 - El QR apunta a `caravana.app`, que aún no está desplegado.
 - El Modo conducción es una pantalla móvil; la proyección nativa CarPlay/Android Auto requiere entitlement, aprobación y build nativo.
-- Los mantenimientos de la ficha de venta son datos de ejemplo; falta su tabla y CRUD en Supabase.
+- Los mantenimientos ya se guardan en Supabase; faltan edición, borrado y adjuntar facturas.
 - El PDF funciona en nativo/web, pero el historial no persiste entre sesiones.
 - No hay push, moderación ni analítica.
 - Supabase reporta advisors pendientes: funciones `SECURITY DEFINER` expuestas por RPC y mejoras de índices/RLS. No bloquean el MVP, pero deben revisarse antes de producción.
