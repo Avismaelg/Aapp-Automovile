@@ -1,13 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { FeedCard } from '@/src/components/FeedCard';
+import { PostCard } from '@/src/components/PostCard';
 import {
   AppText,
   Avatar,
+  Button,
+  Card,
   IconButton,
   Pill,
   Screen,
@@ -16,6 +27,7 @@ import {
 } from '@/src/components/ui';
 import { activeChallenge, feed, friends } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useFeed, useToggleLike } from '@/src/hooks/useFeed';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useSession } from '@/src/store/session';
 import { colors, radius, spacing } from '@/src/theme';
@@ -70,6 +82,8 @@ function greeting() {
 export default function HomeScreen() {
   const router = useRouter();
   const me = useCurrentUser();
+  const { posts, isDemo: feedIsDemo, isLoading: feedLoading, isError: feedError, refetch: refetchFeed } = useFeed();
+  const toggleLike = useToggleLike();
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const firstName = me.name.split(' ')[0];
@@ -276,10 +290,62 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      <SectionHeader title="Actividad" action="Filtrar" />
-      {feed.map((item) => (
-        <FeedCard key={item.id} item={item} />
-      ))}
+      <SectionHeader
+        title="Actividad"
+        action="Publicar"
+        onAction={() => router.push('/post/new')}
+      />
+      {feedIsDemo ? (
+        feed.map((item) => <FeedCard key={item.id} item={item} />)
+      ) : feedLoading ? (
+        <View style={styles.feedState}>
+          <ActivityIndicator color={colors.accent} />
+          <AppText variant="caption" color={colors.muted}>Cargando actividad…</AppText>
+        </View>
+      ) : feedError ? (
+        <Card style={styles.feedEmpty}>
+          <AppText variant="bodyStrong">No pudimos cargar el feed</AppText>
+          <AppText variant="caption" color={colors.muted}>
+            Revisa tu conexión y vuelve a intentarlo.
+          </AppText>
+          <Button
+            label="Reintentar"
+            variant="secondary"
+            onPress={() => refetchFeed()}
+            style={{ marginTop: spacing.sm }}
+          />
+        </Card>
+      ) : posts.length === 0 ? (
+        <Card style={styles.feedEmpty}>
+          <View style={styles.feedEmptyIcon}>
+            <Ionicons name="sparkles-outline" size={24} color={colors.accent} />
+          </View>
+          <AppText variant="title" align="center">Sé el primero en compartir</AppText>
+          <AppText variant="caption" color={colors.muted} align="center">
+            Publica una ruta, una foto o una idea para arrancar tu caravana.
+          </AppText>
+          <Button
+            label="Crear publicación"
+            icon="create-outline"
+            onPress={() => router.push('/post/new')}
+            style={{ marginTop: spacing.md }}
+          />
+        </Card>
+      ) : (
+        posts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            liking={toggleLike.isPending}
+            onToggleLike={() =>
+              void toggleLike.mutateAsync({
+                postId: post.id,
+                liked: post.likedByMe,
+              })
+            }
+          />
+        ))
+      )}
 
       <View style={styles.footer}>
         <Ionicons name="shield-checkmark" size={13} color={colors.dim} />
@@ -421,6 +487,25 @@ const styles = StyleSheet.create({
   },
   friendLiveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green },
   friendBottom: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+  feedState: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: spacing['2xl'],
+  },
+  feedEmpty: {
+    alignItems: 'center',
+    paddingVertical: spacing['2xl'],
+    marginBottom: spacing.md,
+  },
+  feedEmptyIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

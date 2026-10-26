@@ -98,6 +98,10 @@ export default function RootLayout() {
             />
             <Stack.Screen name="friends" />
             <Stack.Screen
+              name="post/new"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
               name="drive"
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}
             />

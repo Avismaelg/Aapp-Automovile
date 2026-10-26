@@ -24,7 +24,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Perfil editable + público | ✅ nombre, bio, ciudad y privacidad reales en Supabase; perfil público por `@usuario` y vehículos públicos |
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
-| Home / feed social | ✅ con datos mock |
+| Feed social | 🟡 publicaciones de texto, likes y visibilidad reales en Supabase; fotos, comentarios y guardados pendientes; demo con feed de ejemplo |
 | Party / mapa en vivo | ✅ mapa real OSM + GPS; PTT simulado |
 | Retos / emparejamiento | ✅ 1v1 programado + **reto al momento con 2+ pilotos**, emparejamiento y simulación local; falta backend Realtime y anti-trampas |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
@@ -33,12 +33,12 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth, perfil editable, perfil público, amigos, garaje y combustible probados; 🟡 feed/retos siguen mock, advisors de seguridad/performance pendientes |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth, perfil, amigos, garaje, combustible y feed de texto probados; 🟡 retos siguen mock, advisors de seguridad/performance pendientes |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
-**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
+**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Publicar, Amigos, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
 
 ### Capturas
 
@@ -222,7 +222,7 @@ app de auto/
 ## Lo que falta para producción
 
 - Conectar el proyecto Supabase y probar altas reales de vehículos y repostajes (la capa ya está escrita).
-- Pasar feed y retos de mocks a consultas reales.
+- Añadir fotos, comentarios, guardados y moderación al feed; pasar retos a Supabase Realtime.
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
 - Publicar posiciones reales de la party por Supabase Realtime; hoy los otros miembros son demo.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
