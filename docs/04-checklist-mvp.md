@@ -13,7 +13,7 @@
 - Perfil editable en Supabase (nombre, bio, ciudad, privacidad) y perfil público con vehículos públicos.
 - Amigos reales: búsqueda, solicitudes, aceptar/rechazar, eliminar y estado en el perfil público.
 - Feed de texto real con visibilidad y likes en Supabase; publicar desde Home. Faltan fotos, comentarios y moderación.
-- Retos punto A → B: modo programado 1v1 y **reto al momento con 2+ pilotos**, categorías coche/moto/EV/camión y simulación local.
+- Retos punto A → B: modo programado e instantáneo con invitación, aceptación, inicio, finalización e historial reales en Supabase + Realtime; demo local con simulación.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.
 - Party con mapa real de OpenStreetMap y ubicación GPS del usuario en vivo (web y móvil).
@@ -34,11 +34,11 @@
 |---|---|---|---|
 | 1 | ✅ Crear proyecto Supabase y aplicar migración | Dev | Hecho |
 | 2 | ✅ Auth email y perfil editable probados; 🟡 añadir Apple/Google, recuperación, avatar y borrado de cuenta | Dev | 3–4 días |
-| 3 | 🟡 Perfil, amigos, garaje, combustible, mantenimiento y feed de texto reales; faltan fotos/comentarios y retos en Supabase | Dev | 4–5 días |
+| 3 | 🟡 Perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos reales; faltan fotos/comentarios, progreso GPS y anti-trampas | Dev | 4–5 días |
 | 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
-| 7 | Retos en Realtime: invitación, aceptación, salida/meta, progreso y anti-trampas | Dev | 5–7 días |
+| 7 | Progreso de retos en Realtime por GPS: salida/meta, distancia, llegada y anti-trampas | Dev | 5–7 días |
 | 8 | Builds de desarrollo y beta (EAS) en Android/iOS | Dev | 2–3 días |
 | 9 | Pruebas de campo: batería, túneles, reconexión y voz | Dev + testers | 1 semana |
 | 10 | Privacidad, términos y política de datos | Fundador/legal | 1–2 días |
@@ -72,7 +72,8 @@
 - Probar Auth email en un proyecto real; activar Apple/Google y recuperación.
 - Perfil editable, QR y subida de fotos.
 - Garaje y repostajes ya usan hooks con Supabase (`useGarage`, `useFuelLogs`).
-- Pasar feed y retos a TanStack Query + Supabase Realtime.
+- Feed de texto y retos ya usan TanStack Query + Supabase; falta Realtime de party
+  y progreso GPS de retos.
 
 ### Semana 2 — Social
 - Amigos (solicitudes/aceptar/bloquear).
@@ -99,7 +100,8 @@
 - Manejo de interrupciones (llamadas, Bluetooth, CarPlay).
 
 ### Semana 6 — Retos + combustible + beta
-- Retos: invitaciones, aceptación, salida, meta y clasificación en Realtime.
+- Retos: invitación, aceptación, inicio y finalización ya reales; falta progreso
+  por GPS y anti-trampas en Realtime.
 - Verificación de llegada por geocerca + revisión de fraude (velocidad, saltos, ubicación falsa).
 - Categorías separadas para coche, moto, EV y camión; modo mixto con aviso.
 - Persistencia de repostajes/cargas y PDF con datos reales.
@@ -169,7 +171,8 @@
 ## 8. Limitaciones conocidas del prototipo
 
 - El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real.
-- Garaje y repostajes ya leen/escriben Supabase en cuentas reales; perfil, feed, amigos y retos siguen usando mocks.
+- Garaje, repostajes, perfil, feed, amigos y retos ya leen/escriben Supabase en
+  cuentas reales; quedan fotos, comentarios y progreso GPS de retos.
 - El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.
 - El mapa de Party es real (OSM/Leaflet) y usa el GPS del usuario; los otros miembros y la ruta son de demo hasta conectar Realtime y un motor de ruteo.
 - El PTT es una simulación visual; no transmite audio.

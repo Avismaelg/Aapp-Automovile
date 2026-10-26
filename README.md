@@ -15,7 +15,7 @@ Prototipo funcional de una app móvil que combina lo mejor de Wheelz con cuatro 
 
 ## Estado actual
 
-Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan el backend Realtime de party/retos, LiveKit y el build nativo.
+Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real, los retos y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan el backend Realtime/Presence de party, LiveKit, progreso de retos por GPS y el build nativo.
 
 | Módulo | Estado |
 |---|---|
@@ -26,14 +26,14 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Feed social | 🟡 publicaciones de texto, likes y visibilidad reales en Supabase; fotos, comentarios y guardados pendientes; demo con feed de ejemplo |
 | Party / mapa en vivo | ✅ mapa real OSM + GPS; PTT simulado |
-| Retos / emparejamiento | ✅ 1v1 programado + **reto al momento con 2+ pilotos**, emparejamiento y simulación local; falta backend Realtime y anti-trampas |
+| Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
 | Perfil público por usuario y vehículo | ✅ datos técnicos, mantenimiento real en Supabase e historial de venta PDF; falta editar/eliminar mantenimientos |
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones `init_caravana`, fix de `search_path` y `vehicle_maintenance` aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento y feed de texto probados; 🟡 retos siguen mock, advisors pendientes |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones `init_caravana`, fix de `search_path`, `vehicle_maintenance` y `challenge_mode` aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos probados; 🟡 advisors de seguridad/performance pendientes |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
@@ -77,8 +77,9 @@ npx expo start
 - Con Supabase configurado, la app arranca en bienvenida y exige sesión para las
   pestañas. Los enlaces públicos de perfil, vehículo y reto siguen abriendo sin
   cuenta.
-- **Reto al momento:** Retos → elige ruta, categoría y “Elegir 2 aleatorios” →
-  *Salir ahora*. También puedes seleccionar los pilotos manualmente.
+- **Retos:** Retos → elige ruta, categoría y modo → selecciona un amigo o usa
+  “Elegir 2 aleatorios”. Con cuenta real, la invitación se guarda en Supabase,
+  el amigo la acepta y el anfitrión inicia la salida. En demo se simula localmente.
 - **Ficha de venta:** Garaje → abre un vehículo → *Preparar ficha de venta*.
 - **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
 - **Mapa real:** Party → mapa OpenStreetMap con tu GPS en vivo. Si no das
@@ -108,10 +109,12 @@ npx expo-doctor
 ## Supabase del proyecto
 
 - Proyecto: `ecmqmgpruxclmpnnpgzv` (`https://ecmqmgpruxclmpnnpgzv.supabase.co`).
-- Migraciones aplicadas: `init_caravana` y `fix_set_updated_at_search_path`.
-- 25 tablas en `public` con RLS activado.
-- Auth email probado con un usuario temporal, ya eliminado.
-- Garaje y repostaje reales probados con Supabase.
+- Migraciones aplicadas: `init_caravana`, `fix_set_updated_at_search_path`,
+  `vehicle_maintenance` y `challenge_mode`.
+- 26 tablas en `public` con RLS activado.
+- Auth email probado con usuarios temporales, ya eliminados.
+- Garaje, repostaje, mantenimiento, amigos, feed de texto y retos reales
+  probados con Supabase.
 - `movil/.env` contiene la URL y la anon key; está ignorado por Git.
 - **No** guardar la `service_role` en ninguna variable `EXPO_PUBLIC_*`.
 
@@ -185,7 +188,8 @@ app de auto/
 │  ├─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
 │  ├─ 07-carplay-android-auto.md # modo conducción y proyección nativa
 │  ├─ 08-mapa-tiempo-real.md   # mapa OSM y GPS en vivo
-│  └─ 09-graphhopper.md        # rutas por carretera con GraphHopper
+│  ├─ 09-graphhopper.md        # rutas por carretera con GraphHopper
+│  └─ 10-retos.md              # flujo real de retos, RLS y Realtime
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/

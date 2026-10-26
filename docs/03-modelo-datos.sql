@@ -1112,6 +1112,7 @@ create table if not exists public.challenges (
   title text not null check (char_length(title) between 1 and 100),
   category public.challenge_category not null default 'mixed',
   status public.challenge_status not null default 'pending',
+  mode text not null default 'scheduled' check (mode in ('instant', 'scheduled')),
   from_label text not null check (char_length(from_label) between 1 and 160),
   to_label text not null check (char_length(to_label) between 1 and 160),
   start_point extensions.geography(Point, 4326),

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,15 +27,27 @@ import {
 import {
   activeChallenge,
   challengeRoutes,
-  friends,
   recentChallenges,
   type Challenge,
   type ChallengeCategory,
-  type Friend,
 } from '@/src/data/mock';
+import {
+  useChallengeFriends,
+  useChallenges,
+  useCreateChallenge,
+  useFinishChallenge,
+  useRespondChallenge,
+  useStartChallenge,
+} from '@/src/hooks/useChallenges';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
-import { formatClock } from '@/src/lib/format';
+import {
+  emptyChallenge,
+  realChallengeToChallenge,
+  type ChallengeFriend,
+} from '@/src/lib/challenge-db';
+import { formatClock, timeAgo } from '@/src/lib/format';
+import { profileColor } from '@/src/lib/profile-db';
 import { challengeUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 import {
@@ -134,25 +147,43 @@ function RouteMini({
 }
 
 export default function ChallengesScreen() {
+  const router = useRouter();
   const me = useCurrentUser();
   const { vehicles: garageVehicles } = useGarageVehicles();
-  const [active, setActive] = useState<Challenge>(activeChallenge);
+  const {
+    friends: challengeFriends,
+    isLoading: friendsLoading,
+  } = useChallengeFriends();
+  const {
+    active: realActive,
+    history: realHistory,
+    isDemo,
+    isLoading: challengesLoading,
+    isError: challengesError,
+    refetch: refetchChallenges,
+  } = useChallenges();
+  const createChallenge = useCreateChallenge();
+  const respondChallenge = useRespondChallenge();
+  const startRealChallenge = useStartChallenge();
+  const finishRealChallenge = useFinishChallenge();
+  const [localActive, setLocalActive] = useState<Challenge>(activeChallenge);
   const [selectedRouteId, setSelectedRouteId] = useState(challengeRoutes[1].id);
   const [category, setCategory] = useState<ChallengeCategory>('mixed');
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>('instant');
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const [instantSelectedIds, setInstantSelectedIds] = useState<string[]>([]);
-  const [matchedFriend, setMatchedFriend] = useState<Friend | null>(null);
+  const [matchedFriend, setMatchedFriend] = useState<ChallengeFriend | null>(null);
   const [matching, setMatching] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const route = challengeRoutes.find((item) => item.id === selectedRouteId) ?? challengeRoutes[1];
   const filteredFriends = useMemo(
     () =>
       category === 'mixed'
-        ? friends
-        : friends.filter((friend) => friend.vehicleKind === category),
-    [category],
+        ? challengeFriends
+        : challengeFriends.filter((friend) => friend.vehicleKind === category),
+    [category, challengeFriends],
   );
   const selectedFriend =
     filteredFriends.find((friend) => friend.id === selectedFriendId) ?? null;
@@ -167,22 +198,62 @@ export default function ChallengesScreen() {
         garageVehicles[0] ??
         me.car;
 
+  const active = isDemo
+    ? localActive
+    : realActive
+      ? realChallengeToChallenge(realActive, now)
+      : emptyChallenge();
+  const hasActive = isDemo || Boolean(realActive);
+  const activeIsInvite = Boolean(
+    !isDemo &&
+      realActive &&
+      !realActive.isHost &&
+      realActive.myStatus === 'invited',
+  );
+  const activeIsHost = isDemo || Boolean(realActive?.isHost);
+  const activeIsWaiting =
+    Boolean(!isDemo && realActive?.status === 'pending' && !realActive.isHost) &&
+    !activeIsInvite;
+  const activeHostReady = isDemo
+    ? true
+    : Boolean(
+        realActive?.isHost &&
+          realActive.participants.every(
+            (participant) => participant.isHost || participant.status !== 'invited',
+          ),
+      );
+  const activeReadyToStart = isDemo
+    ? true
+    : Boolean(
+        realActive &&
+          realActive.participants.filter(
+            (participant) =>
+              participant.status === 'accepted' || participant.status === 'finished',
+          ).length >= 2,
+      );
+
   const standings = useMemo(
     () => [...active.participants].sort((a, b) => b.progress - a.progress),
     [active.participants],
   );
 
   useEffect(() => {
-    if (active.status !== 'live') return;
+    if (!isDemo || localActive.status !== 'live') return;
     const timer = setInterval(() => {
-      setActive((previous) =>
+      setLocalActive((previous) =>
         previous.status === 'live'
           ? { ...previous, elapsedSeconds: previous.elapsedSeconds + 1 }
           : previous,
       );
     }, 1000);
     return () => clearInterval(timer);
-  }, [active.status]);
+  }, [isDemo, localActive.status]);
+
+  useEffect(() => {
+    if (isDemo || realActive?.status !== 'live') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [isDemo, realActive?.id, realActive?.status]);
 
   const chooseCategory = (next: ChallengeCategory) => {
     setCategory(next);
@@ -215,11 +286,69 @@ export default function ChallengesScreen() {
     }, 1400);
   };
 
-  const sendChallenge = () => {
+  const ensureRealVehicle = () => {
+    if (isDemo) return true;
+    if (garageVehicles.length === 0) {
+      Alert.alert(
+        'Añade un vehículo',
+        'Para crear un reto real necesitas un vehículo en tu garaje.',
+      );
+      return false;
+    }
+    if (category !== 'mixed' && myVehicle.kind !== category) {
+      Alert.alert(
+        'Categoría sin vehículo',
+        `No tienes un vehículo de categoría ${vehicleCategoryLabel(category)}. Cambia la categoría o añade uno al garaje.`,
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const sendChallenge = async () => {
     if (!rival) {
       Alert.alert('Elige un rival', 'Toca un amigo o usa el emparejamiento rápido.');
       return;
     }
+    if (!ensureRealVehicle()) return;
+
+    if (!isDemo) {
+      try {
+        const result = await createChallenge.mutateAsync({
+          title: `Reto ${route.fromLabel.split(',')[0]} → ${route.toLabel}`,
+          category,
+          mode: 'scheduled',
+          fromLabel: route.fromLabel,
+          toLabel: route.toLabel,
+          distanceKm: route.distanceKm,
+          rules:
+            category === 'mixed'
+              ? 'Categoría mixta. Gana quien llegue primero respetando las normas de tránsito.'
+              : `Categoría ${vehicleCategoryLabel(category)}. Solo compiten vehículos de la misma clase.`,
+          hostVehicleId: myVehicle.id,
+          hostVehicleKind: myVehicle.kind,
+          invitees: [
+            {
+              userId: rival.id,
+              vehicleId: rival.vehicleId,
+              vehicleKind: rival.vehicleKind,
+            },
+          ],
+        });
+        setSentTo(rival.name);
+        Alert.alert(
+          'Reto enviado',
+          `${rival.name.split(' ')[0]} recibió la invitación. Código ${result.code}. Cuando la acepte, podrás iniciar la salida.`,
+        );
+      } catch (error) {
+        Alert.alert(
+          'No pudimos enviar el reto',
+          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        );
+      }
+      return;
+    }
+
     const newChallenge: Challenge = {
       id: challengeId('c'),
       code: challengeCode('R'),
@@ -259,7 +388,7 @@ export default function ChallengesScreen() {
         },
       ],
     };
-    setActive(newChallenge);
+    setLocalActive(newChallenge);
     setSentTo(rival.name);
     Alert.alert(
       'Reto enviado',
@@ -295,11 +424,46 @@ export default function ChallengesScreen() {
     setSentTo(null);
   };
 
-  const startInstantChallenge = () => {
+  const startInstantChallenge = async () => {
     if (selectedInstantFriends.length === 0) {
       Alert.alert('Elige al menos un piloto', 'Un reto al momento necesita 2+ personas: tú y al menos otro piloto.');
       return;
     }
+    if (!ensureRealVehicle()) return;
+
+    if (!isDemo) {
+      try {
+        const result = await createChallenge.mutateAsync({
+          title: `Sala rápida · ${route.toLabel}`,
+          category,
+          mode: 'instant',
+          fromLabel: route.fromLabel,
+          toLabel: route.toLabel,
+          distanceKm: route.distanceKm,
+          rules:
+            'Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.',
+          hostVehicleId: myVehicle.id,
+          hostVehicleKind: myVehicle.kind,
+          invitees: selectedInstantFriends.map((friend) => ({
+            userId: friend.id,
+            vehicleId: friend.vehicleId,
+            vehicleKind: friend.vehicleKind,
+          })),
+        });
+        setSentTo(null);
+        Alert.alert(
+          'Sala creada',
+          `${selectedInstantFriends.length + 1} pilotos invitados hacia ${route.toLabel}. Código ${result.code}. Compártelo para que se unan.`,
+        );
+      } catch (error) {
+        Alert.alert(
+          'No pudimos crear la sala',
+          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        );
+      }
+      return;
+    }
+
     const code = challengeCode('S');
     const participants = [
       {
@@ -325,7 +489,7 @@ export default function ChallengesScreen() {
       })),
     ];
 
-    setActive({
+    setLocalActive({
       id: challengeId('c_instant'),
       code,
       title: `Sala rápida · ${route.toLabel}`,
@@ -353,7 +517,7 @@ export default function ChallengesScreen() {
       return;
     }
     if (Platform.OS === 'web') {
-      startInstantChallenge();
+      void startInstantChallenge();
       return;
     }
     Alert.alert(
@@ -363,13 +527,42 @@ export default function ChallengesScreen() {
       } saldrán inmediatamente hacia ${route.toLabel}. El reto mide llegada, no velocidad.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Salir ahora', onPress: startInstantChallenge },
+        { text: 'Salir ahora', onPress: () => void startInstantChallenge() },
       ],
     );
   };
 
-  const startChallenge = () => {
-    setActive((previous) => ({
+  const startChallenge = async () => {
+    if (!isDemo) {
+      if (!realActive) {
+        Alert.alert('Sin reto', 'Crea o acepta un reto antes de iniciarlo.');
+        return;
+      }
+      if (!realActive.isHost) {
+        Alert.alert('Solo el anfitrión', 'El anfitrión del reto es quien puede iniciar la salida.');
+        return;
+      }
+      if (!activeReadyToStart) {
+        Alert.alert(
+          'Faltan pilotos',
+          'Necesitas al menos un rival que haya aceptado el reto para iniciar la salida.',
+        );
+        return;
+      }
+      try {
+        await startRealChallenge.mutateAsync(realActive.id);
+        setSentTo(null);
+        Alert.alert('Reto iniciado', 'La salida está en marcha. Comparte el código con los pilotos.');
+      } catch (error) {
+        Alert.alert(
+          'No pudimos iniciar el reto',
+          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        );
+      }
+      return;
+    }
+
+    setLocalActive((previous) => ({
       ...previous,
       status: 'live',
       elapsedSeconds: 0,
@@ -381,8 +574,26 @@ export default function ChallengesScreen() {
     setSentTo(null);
   };
 
-  const finishChallenge = () => {
-    setActive((previous) => ({ ...previous, status: 'finished' }));
+  const finishChallenge = async () => {
+    if (!isDemo) {
+      if (!realActive) return;
+      if (!realActive.isHost) {
+        Alert.alert('Solo el anfitrión', 'El anfitrión es quien puede cerrar el reto.');
+        return;
+      }
+      try {
+        await finishRealChallenge.mutateAsync(realActive.id);
+        Alert.alert('Reto finalizado', 'El resultado quedó guardado en el historial.');
+      } catch (error) {
+        Alert.alert(
+          'No pudimos finalizar el reto',
+          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        );
+      }
+      return;
+    }
+
+    setLocalActive((previous) => ({ ...previous, status: 'finished' }));
     const winner = standings[0];
     Alert.alert(
       'Reto finalizado',
@@ -392,7 +603,26 @@ export default function ChallengesScreen() {
     );
   };
 
+  const respondToChallenge = async (accept: boolean) => {
+    if (!realActive) return;
+    try {
+      await respondChallenge.mutateAsync({ challengeId: realActive.id, accept });
+      Alert.alert(
+        accept ? 'Estás dentro' : 'Invitación rechazada',
+        accept
+          ? 'El anfitrión ya puede iniciar la salida. Te avisaremos cuando el reto esté en vivo.'
+          : 'La invitación quedó rechazada. No se notificará a los demás pilotos.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'No pudimos responder',
+        error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+      );
+    }
+  };
+
   const shareChallenge = async () => {
+    if (!hasActive) return;
     const label = active.mode === 'instant' ? 'Sala rápida de Caravana' : 'Reto de Caravana';
     await Share.share({
       message: `${label}: ${active.fromLabel} → ${active.toLabel} (${active.distanceKm} km). Únete con ${challengeUrl(active.code)}`,
@@ -411,6 +641,28 @@ export default function ChallengesScreen() {
             ? 'Motos: categoría propia. Equipo completo y conducción defensiva.'
             : 'Coches: categoría propia. Gana quien llega primero respetando las normas.';
 
+  const recentResults = isDemo
+    ? recentChallenges
+    : realHistory.map((challenge) => {
+        const winner = challenge.participants.find(
+          (participant) => participant.finishRank === 1,
+        );
+        return {
+          id: challenge.id,
+          title: challenge.title,
+          category: challenge.category,
+          fromLabel: challenge.fromLabel,
+          toLabel: challenge.toLabel,
+          distanceKm: Math.max(0, Math.round(challenge.distanceM / 100) / 10),
+          winner: winner?.profile.displayName ?? 'Sin ganador registrado',
+          winnerColor: winner
+            ? profileColor(winner.profile.username)
+            : colors.dim,
+          time: challenge.finishedAt ? timeAgo(challenge.finishedAt) : 'Finalizado',
+          date: `${challenge.participants.length} pilotos`,
+        };
+      });
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -420,6 +672,29 @@ export default function ChallengesScreen() {
         </View>
         <IconButton icon="trophy-outline" tone="surface" />
       </View>
+
+      {challengesLoading ? (
+        <View style={styles.syncRow}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <AppText variant="caption" color={colors.muted}>Cargando tus retos…</AppText>
+        </View>
+      ) : null}
+
+      {challengesError ? (
+        <Card style={styles.errorCard}>
+          <AppText variant="bodyStrong">No pudimos cargar tus retos</AppText>
+          <AppText variant="caption" color={colors.muted}>
+            Revisa tu conexión y vuelve a intentarlo.
+          </AppText>
+          <Button
+            label="Reintentar"
+            size="sm"
+            variant="secondary"
+            onPress={() => void refetchChallenges()}
+            style={{ marginTop: spacing.sm }}
+          />
+        </Card>
+      ) : null}
 
       <View style={styles.matchmakingPillRow}>
         <Pill
@@ -460,98 +735,207 @@ export default function ChallengesScreen() {
         })}
       </View>
 
-      <LinearGradient
-        colors={['#2A170F', '#17181D', '#0E1217']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.liveCard}
-      >
-        <View style={styles.liveGlow} />
-        <View style={styles.liveTop}>
-          <Pill
-            label={active.status === 'live' ? 'Reto en vivo' : active.status === 'pending' ? 'Invitación pendiente' : 'Reto finalizado'}
-            tone={active.status === 'live' ? 'danger' : active.status === 'pending' ? 'accent' : 'neutral'}
-            icon={active.status === 'live' ? 'radio' : active.status === 'pending' ? 'mail-unread' : 'checkmark-circle'}
-          />
-          <Pill
-            label={active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
-            tone="dark"
-          />
-        </View>
-
-        <AppText variant="h2" style={{ marginTop: spacing.lg }}>{active.title}</AppText>
-        <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
-          {active.status === 'live'
-            ? `${active.mode === 'instant' ? 'Sala rápida' : 'En curso'} · ${standings.length} participantes · código ${active.code}`
-            : active.status === 'pending'
-              ? 'Esperando que tu rival acepte el reto'
-              : 'Resultado final del reto'}
-        </AppText>
-
-        <RouteMini
-          fromLabel={active.fromLabel}
-          toLabel={active.toLabel}
-          distanceKm={active.distanceKm}
-        />
-
-        <View style={styles.liveStats}>
-          <View style={[styles.liveStat, styles.liveStatTime]}>
-            <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>TIEMPO</AppText>
-            <AppText
-              variant="mono"
-              color={colors.accent}
-              numberOfLines={1}
-              style={{ fontSize: 15 }}
-            >
-              {formatClock(active.elapsedSeconds)}
-            </AppText>
+      {hasActive ? (
+        <LinearGradient
+          colors={['#2A170F', '#17181D', '#0E1217']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.liveCard}
+        >
+          <View style={styles.liveGlow} />
+          <View style={styles.liveTop}>
+            <Pill
+              label={
+                active.status === 'live'
+                  ? 'Reto en vivo'
+                  : active.status === 'pending'
+                    ? activeIsInvite
+                      ? 'Invitación recibida'
+                      : activeIsWaiting
+                        ? 'Esperando salida'
+                        : 'Invitación pendiente'
+                    : 'Reto finalizado'
+              }
+              tone={
+                active.status === 'live'
+                  ? 'danger'
+                  : active.status === 'pending'
+                    ? 'accent'
+                    : 'neutral'
+              }
+              icon={
+                active.status === 'live'
+                  ? 'radio'
+                  : active.status === 'pending'
+                    ? activeIsWaiting
+                      ? 'time-outline'
+                      : 'mail-unread'
+                    : 'checkmark-circle'
+              }
+            />
+            <Pill
+              label={active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
+              tone="dark"
+            />
           </View>
-          <View style={styles.liveDivider} />
-          <View style={styles.liveStat}>
-            <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>DISTANCIA</AppText>
-            <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-              {active.distanceKm} km
-            </AppText>
-          </View>
-          <View style={styles.liveDivider} />
-          <View style={styles.liveStat}>
-            <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>LÍDER</AppText>
-            <AppText variant="h3" color={colors.lime} numberOfLines={1} style={{ fontSize: 18 }}>
-              {standings[0]?.isMe ? 'Tú' : standings[0]?.name.split(' ')[0] ?? '—'}
-            </AppText>
-          </View>
-          <View style={styles.liveDivider} />
-          <View style={styles.liveStat}>
-            <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>CATEGORÍA</AppText>
-            <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-              {active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
-            </AppText>
-          </View>
-        </View>
 
-        <View style={styles.liveActions}>
-          <Button
-            label={active.status === 'pending' ? 'Iniciar reto' : active.status === 'live' ? 'Finalizar reto' : 'Compartir resultado'}
-            icon={active.status === 'pending' ? 'flag' : active.status === 'live' ? 'stop-circle-outline' : 'share-outline'}
-            onPress={
-              active.status === 'pending'
-                ? startChallenge
-                : active.status === 'live'
-                  ? finishChallenge
-                  : shareChallenge
-            }
-            style={{ flex: 1 }}
+          <AppText variant="h2" style={{ marginTop: spacing.lg }}>{active.title}</AppText>
+          <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
+            {active.status === 'live'
+              ? activeIsInvite
+                ? 'Sala en marcha. Acepta para unirte a la salida.'
+                : `${active.mode === 'instant' ? 'Sala rápida' : 'En curso'} · ${standings.length} participantes · código ${active.code}`
+              : active.status === 'pending'
+                ? activeIsInvite
+                  ? 'Te invitaron a este reto. Acepta para unirte.'
+                  : activeIsWaiting
+                    ? 'Estás dentro. El anfitrión iniciará la salida.'
+                    : activeReadyToStart
+                      ? 'Ya hay rivales listos. Puedes iniciar la salida.'
+                      : activeHostReady
+                        ? 'No hay rivales aceptados. Invita a otro piloto.'
+                        : 'Esperando que tus rivales acepten el reto'
+                : 'Resultado final del reto'}
+          </AppText>
+
+          <RouteMini
+            fromLabel={active.fromLabel}
+            toLabel={active.toLabel}
+            distanceKm={active.distanceKm}
           />
-          <Button
-            label="Compartir"
-            icon="share-social-outline"
-            variant="secondary"
-            full={false}
-            onPress={shareChallenge}
-            style={{ paddingHorizontal: 16 }}
-          />
-        </View>
-      </LinearGradient>
+
+          <View style={styles.liveStats}>
+            <View style={[styles.liveStat, styles.liveStatTime]}>
+              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>TIEMPO</AppText>
+              <AppText
+                variant="mono"
+                color={colors.accent}
+                numberOfLines={1}
+                style={{ fontSize: 15 }}
+              >
+                {formatClock(active.elapsedSeconds)}
+              </AppText>
+            </View>
+            <View style={styles.liveDivider} />
+            <View style={styles.liveStat}>
+              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>DISTANCIA</AppText>
+              <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
+                {active.distanceKm} km
+              </AppText>
+            </View>
+            <View style={styles.liveDivider} />
+            <View style={styles.liveStat}>
+              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>LÍDER</AppText>
+              <AppText variant="h3" color={colors.lime} numberOfLines={1} style={{ fontSize: 18 }}>
+                {standings[0]?.isMe ? 'Tú' : standings[0]?.name.split(' ')[0] ?? '—'}
+              </AppText>
+            </View>
+            <View style={styles.liveDivider} />
+            <View style={styles.liveStat}>
+              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>CATEGORÍA</AppText>
+              <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
+                {active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.liveActions}>
+            {activeIsInvite ? (
+              <>
+                <Button
+                  label="Aceptar reto"
+                  icon="checkmark-circle-outline"
+                  loading={respondChallenge.isPending}
+                  onPress={() => void respondToChallenge(true)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Rechazar"
+                  icon="close"
+                  variant="secondary"
+                  full={false}
+                  onPress={() => void respondToChallenge(false)}
+                  style={{ paddingHorizontal: 16 }}
+                />
+              </>
+            ) : active.status === 'pending' && activeIsWaiting ? (
+              <>
+                <Button
+                  label="Esperando al anfitrión"
+                  icon="time-outline"
+                  disabled
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Compartir"
+                  icon="share-social-outline"
+                  variant="secondary"
+                  full={false}
+                  onPress={shareChallenge}
+                  style={{ paddingHorizontal: 16 }}
+                />
+              </>
+            ) : active.status === 'pending' ? (
+              <>
+                <Button
+                  label="Iniciar reto"
+                  icon="flag"
+                  loading={startRealChallenge.isPending}
+                  disabled={!isDemo && !activeReadyToStart}
+                  onPress={() => void startChallenge()}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Compartir"
+                  icon="share-social-outline"
+                  variant="secondary"
+                  full={false}
+                  onPress={shareChallenge}
+                  style={{ paddingHorizontal: 16 }}
+                />
+              </>
+            ) : active.status === 'live' ? (
+              <>
+                <Button
+                  label={activeIsHost ? 'Finalizar reto' : 'Compartir reto'}
+                  icon={activeIsHost ? 'stop-circle-outline' : 'share-social-outline'}
+                  loading={activeIsHost ? finishRealChallenge.isPending : false}
+                  onPress={() => void (activeIsHost ? finishChallenge() : shareChallenge())}
+                  style={{ flex: 1 }}
+                />
+                {activeIsHost ? (
+                  <Button
+                    label="Compartir"
+                    icon="share-social-outline"
+                    variant="secondary"
+                    full={false}
+                    onPress={shareChallenge}
+                    style={{ paddingHorizontal: 16 }}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <Button
+                label="Compartir resultado"
+                icon="share-outline"
+                onPress={shareChallenge}
+                style={{ flex: 1 }}
+              />
+            )}
+          </View>
+        </LinearGradient>
+      ) : (
+        <Card style={styles.emptyActive}>
+          <View style={styles.emptyActiveIcon}>
+            <Ionicons name="flag-outline" size={24} color={colors.accent} />
+          </View>
+          <AppText variant="h2" align="center">Tu próximo reto empieza abajo</AppText>
+          <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
+            Elige una ruta, una categoría y un piloto. La invitación se guarda en Supabase y
+            llega a tu amigo al instante.
+          </AppText>
+        </Card>
+      )}
 
       {sentTo ? (
         <Card style={styles.sentCard}>
@@ -568,8 +952,10 @@ export default function ChallengesScreen() {
         </Card>
       ) : null}
 
-      <SectionHeader title="Clasificación" action={active.status === 'live' ? 'En vivo' : undefined} />
-      <Card style={styles.standingsCard}>
+      {hasActive ? (
+        <>
+          <SectionHeader title="Clasificación" action={active.status === 'live' ? 'En vivo' : undefined} />
+          <Card style={styles.standingsCard}>
         {standings.map((participant, index) => {
           const kind = vehicleKindMeta[participant.vehicleKind];
           return (
@@ -621,7 +1007,9 @@ export default function ChallengesScreen() {
             </View>
           );
         })}
-      </Card>
+          </Card>
+        </>
+      ) : null}
 
       <SectionHeader
         title={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
@@ -745,12 +1133,29 @@ export default function ChallengesScreen() {
           </Pressable>
         </View>
 
-        {filteredFriends.length === 0 ? (
+        {friendsLoading ? (
+          <View style={styles.noRivals}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <AppText variant="caption" color={colors.muted}>
+              Cargando tus amigos y vehículos…
+            </AppText>
+          </View>
+        ) : filteredFriends.length === 0 ? (
           <View style={styles.noRivals}>
             <Ionicons name="people-outline" size={22} color={colors.dim} />
             <AppText variant="caption" color={colors.muted}>
               No tienes amigos con {vehicleCategoryLabel(category).toLowerCase()}. Invita a uno o cambia de categoría.
             </AppText>
+            {!isDemo && challengeFriends.length === 0 ? (
+              <Button
+                label="Buscar amigos"
+                size="sm"
+                variant="secondary"
+                icon="person-add-outline"
+                onPress={() => router.push('/friends')}
+                style={{ marginTop: spacing.sm }}
+              />
+            ) : null}
           </View>
         ) : (
           <ScrollView
@@ -880,31 +1285,43 @@ export default function ChallengesScreen() {
         )}
       </Card>
 
-      <SectionHeader title="Resultados recientes" action="Ver todos" />
-      {recentChallenges.map((item) => (
-        <Card key={item.id} style={styles.recentCard}>
-          <View style={[styles.recentIcon, { backgroundColor: `${item.winnerColor}1A` }]}>
-            <Ionicons name="trophy" size={18} color={item.winnerColor} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.recentTop}>
-              <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>{item.title}</AppText>
-              <Pill label={vehicleCategoryLabel(item.category)} tone="neutral" />
-            </View>
-            <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-              {item.fromLabel} → {item.toLabel} · {item.distanceKm} km
-            </AppText>
-            <View style={styles.recentBottom}>
-              <Ionicons name="trophy-outline" size={11} color={item.winnerColor} />
-              <AppText variant="caption" color={item.winnerColor}>Ganó {item.winner}</AppText>
-              <View style={styles.metaDot} />
-              <AppText variant="caption" color={colors.dim}>{item.time}</AppText>
-              <View style={styles.metaDot} />
-              <AppText variant="caption" color={colors.dim}>{item.date}</AppText>
-            </View>
-          </View>
+      <SectionHeader
+        title="Resultados recientes"
+        action={isDemo ? 'Ver todos' : recentResults.length ? `${recentResults.length}` : undefined}
+      />
+      {recentResults.length === 0 ? (
+        <Card style={styles.emptyHistory}>
+          <Ionicons name="trophy-outline" size={21} color={colors.dim} />
+          <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
+            Aún no hay retos finalizados. Cuando cierres uno, el resultado quedará aquí.
+          </AppText>
         </Card>
-      ))}
+      ) : (
+        recentResults.map((item) => (
+          <Card key={item.id} style={styles.recentCard}>
+            <View style={[styles.recentIcon, { backgroundColor: `${item.winnerColor}1A` }]}>
+              <Ionicons name="trophy" size={18} color={item.winnerColor} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.recentTop}>
+                <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>{item.title}</AppText>
+                <Pill label={vehicleCategoryLabel(item.category)} tone="neutral" />
+              </View>
+              <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
+                {item.fromLabel} → {item.toLabel} · {item.distanceKm} km
+              </AppText>
+              <View style={styles.recentBottom}>
+                <Ionicons name="trophy-outline" size={11} color={item.winnerColor} />
+                <AppText variant="caption" color={item.winnerColor}>Ganó {item.winner}</AppText>
+                <View style={styles.metaDot} />
+                <AppText variant="caption" color={colors.dim}>{item.time}</AppText>
+                <View style={styles.metaDot} />
+                <AppText variant="caption" color={colors.dim}>{item.date}</AppText>
+              </View>
+            </View>
+          </Card>
+        ))
+      )}
 
       <Card style={styles.safetyCard}>
         <View style={styles.safetyIcon}>
@@ -934,6 +1351,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.md,
+  },
+  errorCard: {
+    gap: spacing.xs,
     marginTop: spacing.md,
   },
   matchmakingPillRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
@@ -976,6 +1403,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,90,31,0.25)',
     padding: spacing.xl,
     overflow: 'hidden',
+  },
+  emptyActive: {
+    marginTop: spacing.lg,
+    alignItems: 'center',
+    paddingVertical: spacing['2xl'],
+    paddingHorizontal: spacing.xl,
+  },
+  emptyActiveIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
   liveGlow: {
     position: 'absolute',
@@ -1210,6 +1652,12 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: 8,
     paddingVertical: 13,
+  },
+  emptyHistory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: 8,
   },
   recentIcon: {
     width: 42,
