@@ -33,7 +33,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones `init_caravana`, fix de `search_path`, `vehicle_maintenance` y `challenge_mode` aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos probados; 🟡 advisors de seguridad/performance pendientes |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones de esquema, mantenimiento, modo de reto e índices aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |

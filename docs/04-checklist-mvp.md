@@ -183,7 +183,10 @@
 - Los mantenimientos ya se guardan en Supabase; faltan edición, borrado y adjuntar facturas.
 - El PDF funciona en nativo/web, pero el historial no persiste entre sesiones.
 - No hay push, moderación ni analítica.
-- Supabase reporta advisors pendientes: funciones `SECURITY DEFINER` expuestas por RPC y mejoras de índices/RLS. No bloquean el MVP, pero deben revisarse antes de producción.
+- Supabase: se añadieron 20 índices de claves foráneas y se cerraron las RPC
+  internas (`generate_username`, `handle_new_user`) y `join_party` para anon.
+  Quedan `auth_rls_initplan`, políticas permisivas duplicadas y 10/11 funciones
+  `SECURITY DEFINER` de RLS que son intencionales; revisar antes de producción.
 
 ---
 
