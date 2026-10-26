@@ -33,7 +33,7 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
 | Supabase | 🟡 esquema SQL + RLS + Auth listos; garaje y repostajes ya tienen capa de datos real; falta crear el proyecto, aplicar la migración y conectar perfil/feed/retos |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
-| Mapas reales | ⏳ mapa estilizado SVG; falta Mapbox/MapLibre |
+| Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
 **Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
@@ -51,6 +51,10 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Modo conducción | Ficha de venta del vehículo |
 |---|---|
 | ![Modo conducción](docs/screenshots/drive-mode-landscape.png) | ![Ficha de venta](docs/screenshots/vehicle-sale.png) |
+
+| Party con mapa real y GPS |
+|---|
+| ![Mapa real](docs/screenshots/party-map-real.png) |
 
 ---
 
@@ -75,6 +79,12 @@ npx expo start
   *Salir ahora*. También puedes seleccionar los pilotos manualmente.
 - **Ficha de venta:** Garaje → abre un vehículo → *Preparar ficha de venta*.
 - **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
+- **Mapa real:** Party → mapa OpenStreetMap con tu GPS en vivo. Si no das
+  permiso de ubicación, usa Santo Domingo como ubicación de demo. En web puedes
+  conceder el permiso desde el navegador.
+- **GraphHopper:** configura `EXPO_PUBLIC_GRAPHHOPPER_URL` o
+  `EXPO_PUBLIC_GRAPHHOPPER_API_KEY` para rutas por carretera. Sin motor, la app
+  usa una línea directa y lo indica en Party.
 - El tracking en segundo plano y la cámara requieren un **development build**, no Expo Go:
   ```bash
   npx expo run:android
@@ -123,6 +133,28 @@ combustible está documentada en
 
 ---
 
+## Conectar GraphHopper
+
+Para rutas por carretera reales:
+
+```env
+# Servidor propio
+EXPO_PUBLIC_GRAPHHOPPER_URL=http://localhost:8989
+EXPO_PUBLIC_GRAPHHOPPER_PROFILE=car
+```
+
+o, usando la API cloud:
+
+```env
+EXPO_PUBLIC_GRAPHHOPPER_API_KEY=tu_api_key
+```
+
+El servidor local está en `infra/graphhopper/`; instrucciones completas en
+[`docs/09-graphhopper.md`](docs/09-graphhopper.md). Si no hay motor configurado,
+Party muestra una ruta directa y sigue funcionando.
+
+---
+
 ## Estructura
 
 ```
@@ -134,7 +166,11 @@ app de auto/
 │  ├─ 04-checklist-mvp.md     # qué falta para lanzar
 │  ├─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
 │  ├─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
-│  └─ 07-carplay-android-auto.md # modo conducción y proyección nativa
+│  ├─ 07-carplay-android-auto.md # modo conducción y proyección nativa
+│  ├─ 08-mapa-tiempo-real.md   # mapa OSM y GPS en vivo
+│  └─ 09-graphhopper.md        # rutas por carretera con GraphHopper
+├─ infra/
+│  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
 │  ├─ app/                    # Expo Router (pantallas)
 │  │  ├─ (auth)/              # Bienvenida, login y registro
@@ -171,7 +207,8 @@ app de auto/
 - Conectar el proyecto Supabase y probar altas reales de vehículos y repostajes (la capa ya está escrita).
 - Pasar perfil editable, feed, amigos y retos de mocks a consultas reales.
 - Apple/Google, recuperación de contraseña, edición de perfil y borrado de cuenta.
-- Mapbox/MapLibre + ubicación en vivo por Realtime Broadcast.
+- Publicar posiciones reales de la party por Supabase Realtime; hoy los otros miembros son demo.
+- Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
 - LiveKit Cloud + Edge Function para tokens + PTT nativo.
 - Retos en Supabase Realtime: invitaciones, salas al momento, salida/meta, progreso y anti-trampas.
 - Detección de viajes con revisión/edición (unir, dividir, descartar).

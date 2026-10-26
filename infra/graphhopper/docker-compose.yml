@@ -1,0 +1,11 @@
+services:
+  graphhopper:
+    build: .
+    container_name: caravana-graphhopper
+    ports:
+      - "8989:8989"
+    volumes:
+      - ./data:/data
+    environment:
+      JAVA_OPTS: "-Xmx4g -Xms2g"
+    restart: unless-stopped

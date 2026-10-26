@@ -13,6 +13,7 @@
 - Retos punto A → B: modo programado 1v1 y **reto al momento con 2+ pilotos**, categorías coche/moto/EV/camión y simulación local.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimiento de ejemplo e historial de venta en PDF.
+- Party con mapa real de OpenStreetMap y ubicación GPS del usuario en vivo (web y móvil).
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
@@ -30,7 +31,7 @@
 | 1 | Crear proyecto Supabase y aplicar migración | Dev | 0,5 día |
 | 2 | Conectar proyecto Supabase y probar Auth email; añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
 | 3 | Completar datos reales (perfil editable, feed, amigos, retos); garaje y combustible ya tienen capa base | Dev | 4–5 días |
-| 4 | Mapbox o MapLibre + ubicación en vivo con Realtime Broadcast/Presence | Dev | 4–5 días |
+| 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
 | 7 | Retos en Realtime: invitación, aceptación, salida/meta, progreso y anti-trampas | Dev | 5–7 días |
@@ -81,9 +82,10 @@
 - Subida a Supabase y timeline.
 
 ### Semana 4 — Party + mapa
-- Mapbox/MapLibre.
+- Base OSM/Leaflet ya integrada.
 - Crear/unirse por código o link.
-- Broadcast de ubicación cada 3–5 s; Presence para miembros.
+- Publicar posiciones reales cada 3–5 s por Supabase Realtime; Presence para miembros.
+- Ruta por carretera (OSRM/Valhalla) y proveedor de teselas para producción.
 - Chat de texto y persistencia de última ubicación.
 
 ### Semana 5 — Voz
@@ -127,6 +129,8 @@
 - [ ] Reto mixto: aviso de seguridad y llegada verificada, sin ranking de velocidad.
 - [ ] Ficha de venta: PDF con datos, mantenimientos y repostajes; sin placa ni ubicación.
 - [ ] Modo conducción en horizontal y vertical, sin controles pequeños.
+- [ ] Mapa OSM: permiso concedido, marcador “Tú” y actualización cada 5 s.
+- [ ] Mapa OSM: permiso denegado y fallback de demo con reintento.
 - [ ] CarPlay Simulator y Android Auto DHU muestran la pantalla de Caravana.
 - [ ] Cuenta eliminada: se borran perfil, viajes, fotos y tokens.
 
@@ -163,7 +167,7 @@
 - El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real.
 - Garaje y repostajes ya leen/escriben Supabase en cuentas reales; perfil, feed, amigos y retos siguen usando mocks.
 - El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.
-- El mapa es SVG decorativo, no geográfico.
+- El mapa de Party es real (OSM/Leaflet) y usa el GPS del usuario; los otros miembros y la ruta son de demo hasta conectar Realtime y un motor de ruteo.
 - El PTT es una simulación visual; no transmite audio.
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
 - Los retos son una simulación local; no hay invitaciones ni Realtime reales.

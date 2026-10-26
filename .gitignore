@@ -16,6 +16,7 @@ web-build/
 .playwright-mcp/
 /*.png
 *.log
+movil/supabase/.temp/
 
 # Sistema
 .DS_Store

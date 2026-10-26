@@ -1,0 +1,7 @@
+# Datos locales de GraphHopper (no se suben al repo)
+*.pbf
+*.osm
+*.xml
+graph-cache/
+logs/
+!README.md

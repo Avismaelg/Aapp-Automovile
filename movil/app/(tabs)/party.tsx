@@ -2,16 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LiveMap } from '@/src/components/LiveMap';
 import { PTTButton } from '@/src/components/PTTButton';
+import { WorldMap } from '@/src/components/WorldMap';
 import { AppText, Avatar, IconButton, Pill } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
+import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { formatClock } from '@/src/lib/format';
+import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -19,8 +22,46 @@ export default function PartyScreen() {
   const router = useRouter();
   const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();
+  const live = useLiveLocation();
   const [talking, setTalking] = useState(false);
   const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
+  const [recenterToken, setRecenterToken] = useState(0);
+
+  const mapMembers = useMemo(
+    () =>
+      partyMembers
+        .filter((member) => member.username !== currentUser.username)
+        .map((member) => ({
+          id: member.id,
+          name: member.name,
+          color: member.color,
+          latitude: member.latitude,
+          longitude: member.longitude,
+          isTalking: member.isTalking,
+          battery: member.battery,
+        })),
+    [currentUser.username],
+  );
+
+  const destination = useMemo(
+    () => ({
+      latitude: activeParty.destinationLatitude,
+      longitude: activeParty.destinationLongitude,
+      label: activeParty.destination.split(',')[0],
+    }),
+    [],
+  );
+
+  const graphHopper = useGraphHopperRoute({
+    origin: live.location,
+    destination,
+  });
+  const routeDistance = graphHopper.route
+    ? formatRouteDistance(graphHopper.route.distanceM)
+    : `${activeParty.distanceKm} km`;
+  const routeDuration = graphHopper.route
+    ? formatRouteTime(graphHopper.route.timeMs)
+    : `${activeParty.etaMin} min`;
 
   const startTalking = () => {
     setTalking(true);
@@ -34,22 +75,36 @@ export default function PartyScreen() {
 
   return (
     <View style={styles.container}>
-      <LiveMap members={partyMembers} height={900} compact />
+      <WorldMap
+        members={mapMembers}
+        destination={destination}
+        location={live.location}
+        route={graphHopper.route}
+        recenterToken={recenterToken}
+        style={StyleSheet.absoluteFill}
+      />
 
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
           <IconButton icon="chevron-down" size={40} onPress={() => router.replace('/(tabs)')} />
           <Pill label="Party en vivo" tone="danger" icon="radio" />
-          <IconButton
-            icon="ellipsis-horizontal"
-            size={40}
-            onPress={() =>
-              Share.share({
-                message: `Únete a mi party en Caravana: ${partyUrl(activeParty.code)}`,
-                url: partyUrl(activeParty.code),
-              })
-            }
-          />
+          <View style={styles.topActions}>
+            <IconButton
+              icon="locate"
+              size={40}
+              onPress={() => setRecenterToken((value) => value + 1)}
+            />
+            <IconButton
+              icon="ellipsis-horizontal"
+              size={40}
+              onPress={() =>
+                Share.share({
+                  message: `Únete a mi party en Caravana: ${partyUrl(activeParty.code)}`,
+                  url: partyUrl(activeParty.code),
+                })
+              }
+            />
+          </View>
         </View>
 
         <View style={styles.titleBlock}>
@@ -57,7 +112,52 @@ export default function PartyScreen() {
           <View style={styles.destinationRow}>
             <Ionicons name="location" size={13} color={colors.accent} />
             <AppText variant="caption" color={colors.textSoft}>
-              {activeParty.destination} · ETA {activeParty.etaMin} min
+              {activeParty.destination} · ETA {routeDuration}
+            </AppText>
+          </View>
+          <View style={styles.gpsRow}>
+            <View
+              style={[
+                styles.gpsDot,
+                { backgroundColor: live.isLive ? colors.lime : colors.accent },
+              ]}
+            />
+            <AppText
+              variant="caption"
+              color={colors.textSoft}
+              numberOfLines={1}
+              style={{ flexShrink: 1 }}
+            >
+              {live.message}
+            </AppText>
+            {live.status === 'denied' || live.status === 'error' || live.status === 'demo' ? (
+              <Pressable onPress={live.retry} hitSlop={8}>
+                <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
+                  REINTENTAR
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.routeEngineRow}>
+            <Ionicons
+              name={graphHopper.source === 'graphhopper' ? 'git-network-outline' : 'git-branch-outline'}
+              size={13}
+              color={graphHopper.source === 'graphhopper' ? colors.lime : colors.muted}
+            />
+            <AppText
+              variant="caption"
+              color={graphHopper.error ? colors.accent : colors.muted}
+              numberOfLines={1}
+              style={{ flexShrink: 1 }}
+            >
+              {graphHopper.isLoading
+                ? 'Calculando ruta con GraphHopper…'
+                : graphHopper.error
+                  ? 'GraphHopper no disponible · ruta directa'
+                  : graphHopper.source === 'graphhopper'
+                    ? `GraphHopper · ${routeDistance} · ${routeDuration}`
+                    : 'Ruta directa · configura GraphHopper'}
             </AppText>
           </View>
         </View>
@@ -77,7 +177,7 @@ export default function PartyScreen() {
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
-                {activeParty.distanceKm} km
+                {routeDistance}
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
@@ -181,6 +281,15 @@ export default function PartyScreen() {
             <AppText variant="caption" color={colors.danger}>Salir</AppText>
           </Pressable>
         </View>
+
+        <Pressable
+          onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
+          style={styles.attribution}
+        >
+          <AppText variant="caption" color={colors.dim} style={{ fontSize: 9 }}>
+            © OpenStreetMap contributors
+          </AppText>
+        </Pressable>
       </View>
 
       <LinearGradient
@@ -206,8 +315,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   titleBlock: { marginTop: spacing.lg },
   destinationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  gpsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(6,8,11,0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    maxWidth: '100%',
+  },
+  gpsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  routeEngineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingLeft: 2,
+  },
+  attribution: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+  },
   sheet: {
     position: 'absolute',
     left: 0,

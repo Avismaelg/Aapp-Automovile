@@ -13,6 +13,8 @@ export type Friend = {
 export type PartyMember = Friend & {
   x: number;
   y: number;
+  latitude: number;
+  longitude: number;
   isHost?: boolean;
   isTalking?: boolean;
   battery?: number;
@@ -347,6 +349,8 @@ export const partyMembers: PartyMember[] = [
     ...friends[0],
     x: 62,
     y: 28,
+    latitude: 18.4671,
+    longitude: -69.938,
     isHost: true,
     isTalking: true,
     battery: 78,
@@ -356,6 +360,8 @@ export const partyMembers: PartyMember[] = [
     ...friends[1],
     x: 38,
     y: 38,
+    latitude: 18.493,
+    longitude: -69.92,
     battery: 54,
     role: 'sweeper',
   },
@@ -363,6 +369,8 @@ export const partyMembers: PartyMember[] = [
     ...friends[2],
     x: 74,
     y: 22,
+    latitude: 18.475,
+    longitude: -69.95,
     battery: 91,
     role: 'member',
   },
@@ -376,6 +384,8 @@ export const partyMembers: PartyMember[] = [
     online: true,
     x: 22,
     y: 32,
+    latitude: 18.4861,
+    longitude: -69.9312,
     battery: 66,
     role: 'member',
     isTalking: false,
@@ -387,6 +397,8 @@ export const activeParty = {
   code: 'RUTA26',
   name: 'Ruta a la montaña',
   destination: 'Constanza, La Vega',
+  destinationLatitude: 18.9095,
+  destinationLongitude: -70.743,
   distanceKm: 42.8,
   elapsedSeconds: 38 * 60 + 12,
   members: partyMembers,
