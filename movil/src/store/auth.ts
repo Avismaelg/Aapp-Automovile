@@ -42,6 +42,7 @@ type AuthState = {
   signUp: (input: SignUpInput) => Promise<AuthResult>;
   continueAsDemo: () => Promise<void>;
   signOut: () => Promise<void>;
+  signOutLocal: () => Promise<void>;
   syncAccount: (
     partial: Partial<Pick<Account, 'displayName' | 'username' | 'avatarUrl'>>,
   ) => void;
@@ -325,6 +326,35 @@ export const useAuth = create<AuthState>((set) => ({
 
     if (supabase) {
       await supabase.auth.signOut().catch(() => undefined);
+    }
+
+    set({
+      status: 'unauthenticated',
+      account: null,
+      busy: false,
+      error: null,
+    });
+  },
+
+  signOutLocal: async () => {
+    set({ busy: true });
+    await AsyncStorage.setItem(DEMO_KEY, '0');
+
+    if (supabase) {
+      // La cuenta ya fue borrada: no llamamos /logout (daría 403).
+      // Solo limpiamos la sesión persistida y el refresco automático.
+      supabase.auth.stopAutoRefresh();
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const authKeys = keys.filter(
+          (key) => key.startsWith('sb-') && key.endsWith('-auth-token'),
+        );
+        if (authKeys.length > 0) {
+          await AsyncStorage.multiRemove(authKeys);
+        }
+      } catch {
+        // El estado local igualmente queda cerrado.
+      }
     }
 
     set({

@@ -140,7 +140,7 @@
 - [ ] Mapa OSM: permiso concedido, marcador “Tú” y actualización cada 5 s.
 - [ ] Mapa OSM: permiso denegado y fallback de demo con reintento.
 - [ ] CarPlay Simulator y Android Auto DHU muestran la pantalla de Caravana.
-- [ ] Cuenta eliminada: se borran perfil, viajes, fotos y tokens.
+- [x] Cuenta eliminada: se borran perfil, publicaciones, fotos de Storage, datos y tokens.
 
 ---
 
@@ -148,7 +148,7 @@
 
 - [ ] Justificación de ubicación en segundo plano (video demo para Apple).
 - [ ] Permiso de ubicación “Always” explicado antes del diálogo del sistema.
-- [ ] Borrado de cuenta in-app.
+- [x] Borrado de cuenta in-app (pantalla, Edge Function y cascada).
 - [ ] Política de privacidad y términos.
 - [ ] Edad mínima y contenido generado por usuarios (moderación).
 - [ ] Sin leaderboards de velocidad ni fomento de carreras.

@@ -21,6 +21,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 |---|---|
 | Diseño dark + design system | ✅ |
 | Autenticación email/contraseña | ✅ UI, validación, sesión persistida, rutas protegidas y registro real probado; faltan Apple/Google y recuperación |
+| Eliminar cuenta y datos | ✅ confirmación `ELIMINAR`, Edge Function con `service_role`, borrado de Storage y cascada en Supabase; probado |
 | Perfil editable + público | ✅ nombre, bio, ciudad y privacidad reales en Supabase; perfil público por `@usuario` y vehículos públicos |
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
@@ -33,7 +34,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto, retos y party probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed con fotos, retos, party y borrado de cuenta probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | 🟡 SDK web/nativo, 3 canales por party, Edge Function de tokens y PTT push-to-talk integrados; faltan secretos LiveKit y prueba de audio en dispositivos |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo y posiciones de los miembros; ✅ rutas con GraphHopper (cloud o self-hosted) y fallback; 🟡 tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
@@ -200,7 +201,8 @@ app de auto/
 │  ├─ 10-retos.md              # flujo real de retos, RLS y Realtime
 │  ├─ 11-party.md              # party real, posiciones, chat y RLS
 │  ├─ 12-livekit-voz.md        # LiveKit, 3 canales y PTT real
-│  └─ 13-feed.md               # feed de texto, likes y comentarios
+│  ├─ 13-feed.md               # feed de texto/foto, likes y comentarios
+│  └─ 14-eliminar-cuenta.md    # borrado de cuenta, Storage y cascada
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
@@ -237,7 +239,7 @@ app de auto/
 ## Lo que falta para producción
 
 - Añadir guardados y moderación al feed.
-- Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
+- Apple/Google, recuperación de contraseña, cambio de `@usuario` y avatar.
 - Añadir Presence y reconexión explícita a la party; las posiciones ya se sincronizan por Realtime.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
 - LiveKit Cloud + Edge Function de tokens: ya integrados; faltan secretos y

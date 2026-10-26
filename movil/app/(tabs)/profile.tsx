@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Alert, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -367,6 +367,25 @@ export default function ProfileScreen() {
             style={{ marginTop: spacing.lg }}
           />
 
+          {!isDemo ? (
+            <>
+              <Button
+                label="Eliminar cuenta y datos"
+                icon="trash-outline"
+                variant="danger"
+                onPress={() => router.push('/account/delete' as Href)}
+                style={{ marginTop: spacing.sm }}
+              />
+              <AppText
+                variant="caption"
+                color={colors.dim}
+                align="center"
+                style={{ marginTop: 8 }}
+              >
+                Borra permanentemente perfil, publicaciones, fotos, vehículos y actividad.
+              </AppText>
+            </>
+          ) : null}
           <View style={styles.footer}>
             <Pill label="Caravana v0.1 · MVP" tone="neutral" />
             <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 10 }}>
