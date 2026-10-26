@@ -22,11 +22,16 @@ import { WorldMap } from '@/src/components/WorldMap';
 import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useActiveParty, useLeaveParty, usePartyLocation } from '@/src/hooks/useParty';
+import { useActiveParty, useLeaveParty, usePartyLocation, useSetVoiceChannel } from '@/src/hooks/useParty';
+import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { formatClock } from '@/src/lib/format';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
+import {
+  partyVoiceChannels,
+  type PartyVoiceChannelSlug,
+} from '@/src/lib/party';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -39,6 +44,7 @@ type DisplayMember = {
   isTalking: boolean;
   isMe?: boolean;
   lastSeenAt?: string | null;
+  voiceChannelSlug?: PartyVoiceChannelSlug;
 };
 
 export default function PartyScreen() {
@@ -48,7 +54,16 @@ export default function PartyScreen() {
   const live = useLiveLocation();
   const { party, isDemo, isLoading: partyLoading, isError: partyError, refetch } = useActiveParty();
   const leaveParty = useLeaveParty();
+  const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<PartyVoiceChannelSlug | null>(null);
+  const myMember = party?.members.find((member) => member.isMe);
+  const voiceChannel = selectedChannel ?? myMember?.voiceChannelSlug ?? 'convoy';
+  const voice = useVoiceRoom({
+    partyId: party?.id,
+    channelSlug: voiceChannel,
+    enabled: Boolean(party) && !isDemo,
+  });
   const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
   const [now, setNow] = useState(() => Date.now());
   const [recenterToken, setRecenterToken] = useState(0);
@@ -74,10 +89,11 @@ export default function PartyScreen() {
 
   const displayMembers = useMemo<DisplayMember[]>(() => {
     if (isDemo) {
-      return partyMembers.map((member) => ({
+      return partyMembers.map((member, index) => ({
         ...member,
         isTalking: member.isTalking ?? false,
         isMe: member.username === currentUser.username,
+        voiceChannelSlug: partyVoiceChannels[index % partyVoiceChannels.length].slug,
       }));
     }
     return (party?.members ?? []).map((member) => ({
@@ -85,11 +101,20 @@ export default function PartyScreen() {
       name: member.profile.displayName,
       username: member.profile.username,
       color: member.color,
-      isTalking: false,
+      isTalking: member.isMe
+        ? voice.talking
+        : voice.activeSpeakerIds.includes(member.userId),
       isMe: member.isMe,
       lastSeenAt: member.lastSeenAt,
+      voiceChannelSlug: member.voiceChannelSlug,
     }));
-  }, [currentUser.username, isDemo, party]);
+  }, [
+    currentUser.username,
+    isDemo,
+    party,
+    voice.activeSpeakerIds,
+    voice.talking,
+  ]);
 
   const mapMembers = useMemo(
     () =>
@@ -168,6 +193,23 @@ export default function PartyScreen() {
     ? activeParty.destination
     : party?.destinationLabel ?? 'Destino por definir';
   const memberCount = displayMembers.length;
+  const channelCount = (slug: PartyVoiceChannelSlug) =>
+    displayMembers.filter((member) => member.voiceChannelSlug === slug).length;
+  const isTalkingNow = isDemo ? talking : voice.talking;
+
+  const switchChannel = async (slug: PartyVoiceChannelSlug) => {
+    if (slug === voiceChannel) return;
+    setSelectedChannel(slug);
+    if (isDemo || !party) return;
+    try {
+      await setVoiceChannel.mutateAsync({ partyId: party.id, channelSlug: slug });
+    } catch (error) {
+      Alert.alert(
+        'No pudimos cambiar de canal',
+        error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+      );
+    }
+  };
 
   const shareParty = () =>
     Share.share({
@@ -245,13 +287,29 @@ export default function PartyScreen() {
     return <PartyLobby />;
   }
 
-  const startTalking = () => {
-    setTalking(true);
+  const startTalking = async () => {
+    if (!isDemo) {
+      if (voice.status !== 'connected') {
+        Alert.alert(
+          'Voz no disponible',
+          voice.error ??
+            'La voz todavía se está conectando. Espera un momento e inténtalo de nuevo.',
+        );
+        return;
+      }
+      await voice.setTalking(true);
+    } else {
+      setTalking(true);
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
   };
 
-  const stopTalking = () => {
-    setTalking(false);
+  const stopTalking = async () => {
+    if (!isDemo) {
+      await voice.setTalking(false);
+    } else {
+      setTalking(false);
+    }
     Haptics.selectionAsync().catch(() => {});
   };
 
@@ -424,10 +482,87 @@ export default function PartyScreen() {
           </View>
         </View>
 
+        <View style={styles.voiceSection}>
+          <View style={styles.voiceHeader}>
+            <AppText variant="label" color={colors.muted}>CANALES DE VOZ · 3</AppText>
+            <Pill
+              label={
+                isDemo
+                  ? 'Demo'
+                  : voice.status === 'connected'
+                    ? `Voz ${voice.participantCount}`
+                    : voice.status === 'connecting'
+                      ? 'Conectando'
+                      : voice.status === 'error'
+                        ? 'Sin configurar'
+                        : 'Inactivo'
+              }
+              tone={
+                voice.status === 'connected'
+                  ? 'lime'
+                  : voice.status === 'error'
+                    ? 'danger'
+                    : 'neutral'
+              }
+              icon="mic-outline"
+            />
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.channelRow}
+          >
+            {partyVoiceChannels.map((channel) => {
+              const selected = channel.slug === voiceChannel;
+              return (
+                <Pressable
+                  key={channel.slug}
+                  onPress={() => void switchChannel(channel.slug)}
+                  style={[styles.channelChip, selected && styles.channelChipActive]}
+                >
+                  <Ionicons
+                    name={
+                      channel.slug === 'convoy'
+                        ? 'radio-outline'
+                        : channel.slug === 'route'
+                          ? 'navigate-outline'
+                          : 'chatbubbles-outline'
+                    }
+                    size={15}
+                    color={selected ? colors.accent : colors.muted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="caption" color={selected ? colors.text : colors.textSoft}>
+                      {channel.name}
+                    </AppText>
+                    <AppText variant="label" color={selected ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
+                      {channelCount(channel.slug)} EN CANAL
+                    </AppText>
+                  </View>
+                  {selected ? <View style={styles.channelDot} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {voice.error && !isDemo ? (
+            <AppText variant="caption" color={colors.accent} numberOfLines={2}>
+              {voice.error}
+            </AppText>
+          ) : (
+            <AppText variant="caption" color={colors.dim} numberOfLines={1}>
+              {isDemo
+                ? 'Voz de ejemplo en modo demo.'
+                : voice.status === 'connected'
+                  ? `PTT real en ${partyVoiceChannels.find((channel) => channel.slug === voiceChannel)?.name ?? 'Convoy'}.`
+                  : 'Conectando el PTT de voz de la party…'}
+            </AppText>
+          )}
+        </View>
+
         <PTTButton
-          talking={talking}
-          onPressIn={startTalking}
-          onPressOut={stopTalking}
+          talking={isTalkingNow}
+          onPressIn={() => void startTalking()}
+          onPressOut={() => void stopTalking()}
         />
 
         <View style={styles.bottomActions}>
@@ -591,6 +726,41 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  voiceSection: {
+    marginTop: spacing.sm,
+    gap: 7,
+  },
+  voiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  channelRow: {
+    gap: 7,
+    paddingRight: spacing.lg,
+  },
+  channelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    minWidth: 116,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  channelChipActive: {
+    borderColor: 'rgba(255,90,31,0.42)',
+    backgroundColor: colors.accentSoft,
+  },
+  channelDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.lime,
   },
   routeCard: {
     flexDirection: 'row',

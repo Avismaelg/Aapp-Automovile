@@ -25,7 +25,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Feed social | 🟡 publicaciones de texto, likes y visibilidad reales en Supabase; fotos, comentarios y guardados pendientes; demo con feed de ejemplo |
-| Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, mapa OSM + GPS; PTT simulado hasta LiveKit |
+| Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OSM + GPS; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
 | Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
@@ -34,7 +34,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
 | Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto, retos y party probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
-| Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
+| Voz real (LiveKit) | 🟡 SDK web/nativo, 3 canales por party, Edge Function de tokens y PTT push-to-talk integrados; faltan secretos LiveKit y prueba de audio en dispositivos |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo y posiciones de los miembros; ✅ rutas con GraphHopper (cloud o self-hosted) y fallback; 🟡 tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
@@ -84,7 +84,11 @@ npx expo start
 - **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
 - **Party real:** Party → crea una caravana con destino o únete con el código
   de un amigo. Las posiciones de los miembros y el chat se sincronizan por
-  Supabase Realtime. El PTT sigue siendo una simulación hasta LiveKit.
+  Supabase Realtime. Hay 3 canales de voz: Convoy, Ruta y Charla.
+- **Voz real:** configura `LIVEKIT_URL`, `LIVEKIT_API_KEY` y
+  `LIVEKIT_API_SECRET` como secretos de Supabase y despliega
+  `livekit-token`. LiveKit requiere un development build/EAS, no Expo Go.
+  Ver [`docs/12-livekit-voz.md`](docs/12-livekit-voz.md).
 - **Mapa real:** Party → mapa OpenStreetMap con tu GPS en vivo. Si no das
   permiso de ubicación, usa Santo Domingo como ubicación de demo. En web puedes
   conceder el permiso desde el navegador.
@@ -113,9 +117,9 @@ npx expo-doctor
 
 - Proyecto: `ecmqmgpruxclmpnnpgzv` (`https://ecmqmgpruxclmpnnpgzv.supabase.co`).
 - Migraciones aplicadas: `init_caravana`, `fix_set_updated_at_search_path`,
-  `vehicle_maintenance`, `challenge_mode`, `indexes_and_function_hardening` y
-  `party_presence`.
-- 26 tablas en `public` con RLS activado.
+  `vehicle_maintenance`, `challenge_mode`, `indexes_and_function_hardening`,
+  `party_presence` y `party_voice_channels`.
+- 27 tablas en `public` con RLS activado.
 - Auth email probado con usuarios temporales, ya eliminados.
 - Garaje, repostaje, mantenimiento, amigos, feed de texto, retos y party reales
   probados con Supabase.
@@ -194,7 +198,8 @@ app de auto/
 │  ├─ 08-mapa-tiempo-real.md   # mapa OSM y GPS en vivo
 │  ├─ 09-graphhopper.md        # rutas por carretera con GraphHopper
 │  ├─ 10-retos.md              # flujo real de retos, RLS y Realtime
-│  └─ 11-party.md              # party real, posiciones, chat y RLS
+│  ├─ 11-party.md              # party real, posiciones, chat y RLS
+│  └─ 12-livekit-voz.md        # LiveKit, 3 canales y PTT real
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
@@ -234,7 +239,8 @@ app de auto/
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
 - Añadir Presence y reconexión explícita a la party; las posiciones ya se sincronizan por Realtime.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
-- LiveKit Cloud + Edge Function para tokens + PTT nativo.
+- LiveKit Cloud + Edge Function de tokens: ya integrados; faltan secretos y
+  prueba de audio real en dos dispositivos.
 - Progreso de retos por GPS: salida/meta, distancia, llegada y anti-trampas.
 - Detección de viajes con revisión/edición (unir, dividir, descartar).
 - CarPlay/Android Auto nativos: entitlement de Apple, categoría de Android Auto, build nativo y aprobación de tiendas.

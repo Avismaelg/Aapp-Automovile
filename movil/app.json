@@ -11,7 +11,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.caravana.mobile",
       "infoPlist": {
-        "UIBackgroundModes": ["location", "audio"]
+        "UIBackgroundModes": [
+          "location",
+          "audio"
+        ],
+        "NSMicrophoneUsageDescription": "Caravana usa el micrófono para el walkie-talkie de voz de las parties."
       }
     },
     "android": {
@@ -84,7 +88,9 @@
           "photosPermission": "Caravana accede a tus fotos para la foto de perfil, el garaje y las publicaciones.",
           "cameraPermission": "Caravana usa la cámara para la foto de perfil y el garaje."
         }
-      ]
+      ],
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
+import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
   mapProfileRow,
   PROFILE_COLUMNS,
@@ -24,6 +25,7 @@ export type PartyMemberView = {
   lastSeenAt: string | null;
   isMuted: boolean;
   isMe: boolean;
+  voiceChannelSlug: PartyVoiceChannelSlug;
 };
 
 export type PartyView = {
@@ -68,6 +70,7 @@ type PartyMemberRow = {
   last_lng: number | null;
   last_seen_at: string | null;
   is_muted: boolean;
+  voice_channel_slug: PartyVoiceChannelSlug;
 };
 
 function demoMode(mode: string | undefined) {
@@ -94,7 +97,7 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
 
   const { data: memberRows, error } = await supabase
     .from('party_members')
-    .select('party_id, user_id, role, last_lat, last_lng, last_seen_at, is_muted')
+    .select('party_id, user_id, role, last_lat, last_lng, last_seen_at, is_muted, voice_channel_slug')
     .eq('party_id', party.id)
     .is('left_at', null);
 
@@ -138,6 +141,7 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
         lastSeenAt: member.last_seen_at,
         isMuted: member.is_muted,
         isMe: member.user_id === accountId,
+        voiceChannelSlug: member.voice_channel_slug,
       };
     }),
   };
@@ -328,6 +332,36 @@ export function useLeaveParty() {
           .eq('id', partyId)
           .eq('host_id', account.id);
       }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['party'] });
+    },
+  });
+}
+
+export function useSetVoiceChannel() {
+  const queryClient = useQueryClient();
+  const account = useAuth((state) => state.account);
+  const demo = demoMode(account?.mode);
+
+  return useMutation({
+    mutationFn: async ({
+      partyId,
+      channelSlug,
+    }: {
+      partyId: string;
+      channelSlug: PartyVoiceChannelSlug;
+    }) => {
+      if (demo) return;
+      if (!supabase || !account) throw new Error('Inicia sesión para cambiar de canal.');
+
+      const { error } = await supabase
+        .from('party_members')
+        .update({ voice_channel_slug: channelSlug })
+        .eq('party_id', partyId)
+        .eq('user_id', account.id);
+
+      if (error) throw new Error('No pudimos cambiar el canal de voz.');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['party'] });

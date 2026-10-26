@@ -16,7 +16,7 @@
 - Retos punto A → B: modo programado e instantáneo con invitación, aceptación, inicio, finalización e historial reales en Supabase + Realtime; demo local con simulación.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.
-- Party con crear/unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo y mapa OpenStreetMap; PTT simulado hasta LiveKit.
+- Party con crear/unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OpenStreetMap; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos.
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
@@ -36,7 +36,7 @@
 | 2 | ✅ Auth email y perfil editable probados; 🟡 añadir Apple/Google, recuperación, avatar y borrado de cuenta | Dev | 3–4 días |
 | 3 | 🟡 Perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos reales; faltan fotos/comentarios, progreso GPS y anti-trampas | Dev | 4–5 días |
 | 4 | Desplegar GraphHopper, añadir Presence/reconexión a party y elegir proveedor de teselas para producción | Dev | 4–5 días |
-| 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
+| 5 | LiveKit: configurar secretos, probar audio real entre dispositivos y validar audio en segundo plano | Dev | 2–3 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
 | 7 | Progreso de retos en Realtime por GPS: salida/meta, distancia, llegada y anti-trampas | Dev | 5–7 días |
 | 8 | Builds de desarrollo y beta (EAS) en Android/iOS | Dev | 2–3 días |
@@ -95,7 +95,8 @@
 - Chat de texto y persistencia de última ubicación.
 
 ### Semana 5 — Voz
-- LiveKit Cloud + Edge Function `livekit-token`.
+- LiveKit Cloud + Edge Function `livekit-token` ya integrados; falta configurar
+  secretos y probar audio en dispositivos.
 - Permisos de micrófono y audio en segundo plano.
 - PTT: unirse muteado, activar micrófono al pulsar, desactivar al soltar.
 - Manejo de interrupciones (llamadas, Bluetooth, CarPlay).
@@ -175,8 +176,8 @@
 - Garaje, repostajes, perfil, feed, amigos y retos ya leen/escriben Supabase en
   cuentas reales; quedan fotos, comentarios y progreso GPS de retos.
 - El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.
-- El mapa de Party es real (OSM/Leaflet), usa el GPS del usuario y sincroniza
-  miembros/posiciones y chat por Supabase Realtime; el PTT de voz sigue pendiente.
+- La party ya tiene mapa, miembros, chat y 3 canales de voz; el PTT usa LiveKit,
+  pero falta configurar secretos y probar el audio en dispositivos.
 - El PTT es una simulación visual; no transmite audio.
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
 - Los retos y la party ya tienen invitaciones, aceptación, inicio y persistencia

@@ -1,8 +1,20 @@
 # Party en tiempo real
 
 Party es la caravana en vivo: varias personas comparten una sala, ven sus
-posiciones en el mapa y coordinan por chat. La voz PTT real se conectará con
-LiveKit; hasta entonces el botón de PTT es una simulación visual y háptica.
+posiciones en el mapa, coordinan por chat y hablan por PTT en uno de los tres
+canales de voz. La voz real usa LiveKit; sin secretos configurados la app muestra
+un error controlado y no activa el micrófono.
+
+## Canales de voz
+
+Cada party crea automáticamente tres canales:
+
+- **Convoy** (`convoy`): coordinación general.
+- **Ruta** (`route`): tráfico, paradas y navegación.
+- **Charla** (`chat`): conversación distendida.
+
+El canal activo se guarda en `party_members.voice_channel_slug`. Al cambiar de
+canal, el cliente reconecta LiveKit a la sala `<voice_room>_<slug>`.
 
 ## Flujo
 
@@ -22,10 +34,14 @@ LiveKit; hasta entonces el botón de PTT es una simulación visual y háptica.
 
 - `parties`: nombre, código, estado, destino (`destination_label`,
   `destination_lat`, `destination_lng`), inicio/fin, aforo y sala de voz.
-- `party_members`: rol, `left_at`, `last_lat`, `last_lng`, `last_seen_at` y
-  `is_muted`.
+- `party_members`: rol, `left_at`, `last_lat`, `last_lng`, `last_seen_at`,
+  `is_muted` y `voice_channel_slug`.
+- `party_voice_channels`: tres canales fijos por party.
 - `party_messages`: mensajes de hasta 500 caracteres.
-- Migración: `movil/supabase/migrations/20261026080000_party_presence.sql`.
+- Migraciones: `20261026080000_party_presence.sql` y
+  `20261026090000_party_voice_channels.sql`.
+- Voz: `supabase/functions/livekit-token/index.ts` y
+  [`12-livekit-voz.md`](12-livekit-voz.md).
 
 ## Privacidad y RLS
 
@@ -41,11 +57,12 @@ LiveKit; hasta entonces el botón de PTT es una simulación visual y háptica.
 ## Cliente
 
 - `movil/src/hooks/useParty.ts`: consulta, Realtime, crear/unirse/salir, presencia
-  de ubicación y chat.
+  de ubicación, cambio de canal y chat.
+- `movil/src/hooks/useVoiceRoom.ts`: token, conexión LiveKit y micrófono PTT.
 - `movil/src/components/PartyLobby.tsx`: crear party o unirse por código.
-- `movil/app/(tabs)/party.tsx`: mapa, miembros, posiciones, PTT simulado y salida.
+- `movil/app/(tabs)/party.tsx`: mapa, miembros, 3 canales, PTT real y salida.
 - `movil/app/party/chat.tsx`: chat de la caravana.
-- `movil/app/party/[code].tsx`: invitación pública por enlace.
+- `movil/app/party/[code].tsx`: invitación por enlace.
 
 ## Probado
 
@@ -54,11 +71,15 @@ LiveKit; hasta entonces el botón de PTT es una simulación visual y háptica.
 - Cuenta B abrió el enlace, se unió y apareció en el mapa y la lista.
 - B envió un mensaje y quedó guardado en `party_messages`.
 - B salió: `left_at` se marcó y dejó de ver la party.
+- El trigger de party creó los 3 canales y la UI los muestra.
+- Cambiar de canal persiste `voice_channel_slug`.
+- La Edge Function `livekit-token` está desplegada; sin secretos devuelve error
+  controlado y no se activa el micrófono.
 - Cuentas, party, miembros y mensajes de prueba eliminados.
 
 ## Pendiente
 
-- LiveKit Cloud + Edge Function de tokens para PTT de voz real.
+- Configurar secretos de LiveKit y probar audio real entre dos dispositivos.
 - Presence explícita y reconexión de la sala para redes inestables.
 - Historial de posiciones/rutas y caducidad automática de parties.
 - Notificaciones push de invitación y mensajes.

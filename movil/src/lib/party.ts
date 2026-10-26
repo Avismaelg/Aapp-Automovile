@@ -5,6 +5,35 @@ export type PartyDestination = {
   longitude: number;
 };
 
+export type PartyVoiceChannelSlug = 'convoy' | 'route' | 'chat';
+
+export const partyVoiceChannels: {
+  slug: PartyVoiceChannelSlug;
+  name: string;
+  shortName: string;
+  description: string;
+}[] = [
+  {
+    slug: 'convoy',
+    name: 'Convoy',
+    shortName: 'Convoy',
+    description: 'Coordinación general de la caravana.',
+  },
+  {
+    slug: 'route',
+    name: 'Ruta',
+    shortName: 'Ruta',
+    description: 'Avisos de tráfico, paradas y navegación.',
+  },
+  {
+    slug: 'chat',
+    name: 'Charla',
+    shortName: 'Charla',
+    description: 'Conversación distendida del grupo.',
+  },
+];
+
+
 export const partyDestinations: PartyDestination[] = [
   {
     id: 'constanza',

@@ -388,11 +388,48 @@ create table if not exists public.party_members (
   last_heading numeric(5,2),
   last_seen_at timestamptz,
   is_muted boolean not null default false,
+  voice_channel_slug text not null default 'convoy' check (voice_channel_slug in ('convoy', 'route', 'chat')),
   primary key (party_id, user_id)
 );
 
 create index if not exists party_members_user_idx on public.party_members (user_id);
 create index if not exists party_members_party_seen_idx on public.party_members (party_id, last_seen_at desc);
+
+-- Tres canales de voz fijos por party.
+create table if not exists public.party_voice_channels (
+  id uuid primary key default gen_random_uuid(),
+  party_id uuid not null references public.parties(id) on delete cascade,
+  slug text not null check (slug in ('convoy', 'route', 'chat')),
+  name text not null check (char_length(name) between 1 and 40),
+  position integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (party_id, slug)
+);
+
+create index if not exists party_voice_channels_party_idx
+  on public.party_voice_channels (party_id, position);
+
+create or replace function public.create_party_voice_channels()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.party_voice_channels (party_id, slug, name, position)
+  values
+    (new.id, 'convoy', 'Convoy', 0),
+    (new.id, 'route', 'Ruta', 1),
+    (new.id, 'chat', 'Charla', 2)
+  on conflict (party_id, slug) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists parties_create_voice_channels on public.parties;
+create trigger parties_create_voice_channels
+after insert on public.parties
+for each row execute function public.create_party_voice_channels();
 
 create or replace function public.is_party_member(p_party_id uuid)
 returns boolean
@@ -909,6 +946,16 @@ create policy party_messages_insert on public.party_messages
 drop policy if exists party_messages_delete on public.party_messages;
 create policy party_messages_delete on public.party_messages
   for delete using (user_id = auth.uid() or public.is_party_host(party_id));
+
+-- Canales de voz de party
+alter table public.party_voice_channels enable row level security;
+
+drop policy if exists party_voice_channels_select on public.party_voice_channels;
+create policy party_voice_channels_select on public.party_voice_channels
+  for select using (
+    public.is_party_member(party_id)
+    or public.is_party_host(party_id)
+  );
 
 -- Combustible
 drop policy if exists fuel_logs_all on public.fuel_logs;
