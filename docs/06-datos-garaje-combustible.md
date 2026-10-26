@@ -2,7 +2,8 @@
 
 > Estado: capa de datos escrita para vehículos y repostajes. En modo demo usa
 > almacenamiento local; con Supabase consulta y escribe las tablas reales.
-> Todavía no se ha probado contra un proyecto Supabase desplegado.
+> Estado: garaje, repostajes y mantenimiento probados contra el proyecto Supabase
+> desplegado. Quedan edición/borrado y fotos de vehículo.
 
 ---
 

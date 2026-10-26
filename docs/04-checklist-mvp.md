@@ -172,7 +172,7 @@
 
 ## 8. Limitaciones conocidas del prototipo
 
-- El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real.
+- El login email/contraseña está probado contra el proyecto Supabase real, incluyendo registro, sesión persistida y cierre de sesión.
 - Garaje, repostajes, perfil, feed, amigos y retos ya leen/escriben Supabase en
   cuentas reales; quedan fotos, comentarios y progreso GPS de retos.
 - El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.

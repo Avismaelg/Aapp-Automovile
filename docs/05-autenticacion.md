@@ -162,12 +162,10 @@ proyecto; los errores más comunes se traducen en `src/store/auth.ts`.
 - Inicio de sesión con Apple y Google.
 - Subida y recorte de avatar.
 - Cambio de `@usuario` con validación de disponibilidad.
-- Borrado de cuenta in-app y borrado de datos asociados.
 - Rate limiting y captcha en Auth.
 - Verificación de edad y términos aceptados.
-- Conectar edición de perfil, feed, amigos y retos a datos reales. El garaje y
-  los repostajes ya cuentan con capa de lectura/escritura Supabase; el resto de
-  pantallas sigue usando mocks.
+- Perfil, feed, amigos, retos, party, garaje y mantenimiento ya usan Supabase;
+  quedan avatares, fotos de vehículo y datos 3D.
 
 ---
 
