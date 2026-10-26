@@ -12,7 +12,7 @@
 - Autenticación email/contraseña con Supabase: validación, sesión persistida, rutas protegidas y modo demo local.
 - Perfil editable en Supabase (nombre, bio, ciudad, privacidad) y perfil público con vehículos públicos.
 - Amigos reales: búsqueda, solicitudes, aceptar/rechazar, eliminar y estado en el perfil público.
-- Feed de texto real con visibilidad, likes y comentarios en Supabase; publicar desde Home y abrir el detalle de cada post. Faltan fotos, guardados y moderación.
+- Feed de texto y foto reales con likes y comentarios en Supabase; publicar desde Home, adjuntar foto y abrir el detalle de cada post. Faltan guardados y moderación.
 - Retos punto A → B: modo programado e instantáneo con invitación, aceptación, inicio, finalización e historial reales en Supabase + Realtime; demo local con simulación.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.

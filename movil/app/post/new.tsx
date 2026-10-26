@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -44,6 +47,7 @@ export default function NewPostScreen() {
   const isDemo = account?.mode === 'demo';
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState<FeedVisibility>('friends');
+  const [image, setImage] = useState<{ uri: string; mimeType: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const goBack = () => {
@@ -51,15 +55,47 @@ export default function NewPostScreen() {
     else router.replace('/(tabs)');
   };
 
+  const pickImage = async () => {
+    setError(null);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Permiso de fotos',
+          'Caravana necesita acceso a tus fotos para adjuntar una imagen al post.',
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      setImage({
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+      });
+    } catch {
+      setError('No pudimos abrir la galería.');
+    }
+  };
+
   const publish = async () => {
     setError(null);
-    if (caption.trim().length === 0) {
-      setError('Escribe algo antes de publicar.');
+    if (caption.trim().length === 0 && !image) {
+      setError('Escribe algo o añade una foto antes de publicar.');
       return;
     }
 
     try {
-      await createPost.mutateAsync({ caption, visibility });
+      await createPost.mutateAsync({
+        caption,
+        visibility,
+        image: image ?? undefined,
+      });
       goBack();
     } catch (publishError) {
       setError(
@@ -107,7 +143,11 @@ export default function NewPostScreen() {
               <AppText variant="bodyStrong">{me.name}</AppText>
               <AppText variant="caption" color={colors.muted}>@{me.username}</AppText>
             </View>
-            <Pill label="Texto" tone="neutral" icon="text-outline" />
+            <Pill
+              label={image ? 'Foto' : 'Texto'}
+              tone="neutral"
+              icon={image ? 'image-outline' : 'text-outline'}
+            />
           </Card>
 
           <Input
@@ -129,6 +169,32 @@ export default function NewPostScreen() {
           >
             {caption.length}/500
           </AppText>
+
+          {image ? (
+            <View style={styles.imagePreview}>
+              <Image source={{ uri: image.uri }} style={styles.previewImage} resizeMode="cover" />
+              <Pressable
+                style={styles.removeImage}
+                onPress={() => setImage(null)}
+                hitSlop={8}
+              >
+                <Ionicons name="close" size={16} color="#120802" />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.addPhoto} onPress={() => void pickImage()}>
+              <View style={styles.addPhotoIcon}>
+                <Ionicons name="image-outline" size={20} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">Añadir una foto</AppText>
+                <AppText variant="caption" color={colors.muted}>
+                  JPG, PNG o WebP · máximo 5 MB
+                </AppText>
+              </View>
+              <Ionicons name="add-circle-outline" size={20} color={colors.muted} />
+            </Pressable>
+          )}
 
           <AppText variant="label" color={colors.muted} style={{ marginTop: spacing.lg }}>
             ¿Quién puede verlo?
@@ -168,7 +234,7 @@ export default function NewPostScreen() {
             icon="send-outline"
             size="lg"
             loading={createPost.isPending}
-            disabled={isDemo || !caption.trim()}
+            disabled={isDemo || (!caption.trim() && !image)}
             onPress={publish}
             style={{ marginTop: spacing.xl }}
           />
@@ -212,6 +278,49 @@ const styles = StyleSheet.create({
   captionInput: {
     minHeight: 150,
     textAlignVertical: 'top',
+  },
+  imagePreview: {
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    position: 'relative',
+  },
+  previewImage: {
+    width: '100%',
+    height: 210,
+  },
+  removeImage: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhoto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    backgroundColor: colors.surface,
+  },
+  addPhotoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   visibilityRow: {
     flexDirection: 'row',

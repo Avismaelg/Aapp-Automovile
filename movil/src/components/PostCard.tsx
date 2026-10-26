@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar, Card, Pill } from '@/src/components/ui';
 import type { FeedPost } from '@/src/hooks/useFeed';
@@ -60,9 +60,13 @@ export function PostCard({
       ) : null}
 
       {post.kind === 'photo' ? (
-        <LinearGradient colors={['#2A1B3D', '#FF5A1F']} style={styles.photo}>
-          <Ionicons name="car-sport" size={54} color="rgba(255,255,255,0.22)" />
-        </LinearGradient>
+        post.mediaUrl ? (
+          <Image source={{ uri: post.mediaUrl }} style={styles.photo} resizeMode="cover" />
+        ) : (
+          <LinearGradient colors={['#2A1B3D', '#FF5A1F']} style={styles.photo}>
+            <Ionicons name="car-sport" size={54} color="rgba(255,255,255,0.22)" />
+          </LinearGradient>
+        )
       ) : null}
 
       <View style={styles.footer}>

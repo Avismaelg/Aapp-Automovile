@@ -24,7 +24,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Perfil editable + público | ✅ nombre, bio, ciudad y privacidad reales en Supabase; perfil público por `@usuario` y vehículos públicos |
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
-| Feed social | ✅ publicaciones de texto, likes y comentarios reales con visibilidad y Realtime; faltan fotos, guardados y moderación; demo con feed de ejemplo |
+| Feed social | ✅ publicaciones de texto y foto, likes, comentarios y visibilidad reales con Realtime; faltan guardados y moderación; demo con feed de ejemplo |
 | Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OSM + GPS; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
 | Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
@@ -118,7 +118,7 @@ npx expo-doctor
 - Proyecto: `ecmqmgpruxclmpnnpgzv` (`https://ecmqmgpruxclmpnnpgzv.supabase.co`).
 - Migraciones aplicadas: `init_caravana`, `fix_set_updated_at_search_path`,
   `vehicle_maintenance`, `challenge_mode`, `indexes_and_function_hardening`,
-  `party_presence` y `party_voice_channels`.
+  `party_presence`, `party_voice_channels` y `post_media_storage`.
 - 27 tablas en `public` con RLS activado.
 - Auth email probado con usuarios temporales, ya eliminados.
 - Garaje, repostaje, mantenimiento, amigos, feed de texto, retos y party reales
@@ -236,7 +236,7 @@ app de auto/
 
 ## Lo que falta para producción
 
-- Añadir fotos, guardados y moderación al feed.
+- Añadir guardados y moderación al feed.
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
 - Añadir Presence y reconexión explícita a la party; las posiciones ya se sincronizan por Realtime.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.

@@ -20,6 +20,7 @@ export type FeedPost = {
   createdAt: string;
   author: UserProfile;
   vehicleLabel?: string;
+  mediaUrl?: string;
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
@@ -65,19 +66,27 @@ export function useFeed() {
       ];
       const postIds = posts.map((post) => post.id);
 
-      const [profilesResult, vehiclesResult, likesResult, commentsResult] = await Promise.all([
-        supabase.from('profiles').select(PROFILE_COLUMNS).in('id', userIds),
-        vehicleIds.length
-          ? supabase.from('vehicles').select('id, make, model').in('id', vehicleIds)
-          : Promise.resolve({ data: [], error: null }),
-        supabase.from('likes').select('post_id, user_id').in('post_id', postIds),
-        supabase.from('comments').select('post_id').in('post_id', postIds),
-      ]);
+      const [profilesResult, vehiclesResult, likesResult, commentsResult, mediaResult] =
+        await Promise.all([
+          supabase.from('profiles').select(PROFILE_COLUMNS).in('id', userIds),
+          vehicleIds.length
+            ? supabase.from('vehicles').select('id, make, model').in('id', vehicleIds)
+            : Promise.resolve({ data: [], error: null }),
+          supabase.from('likes').select('post_id, user_id').in('post_id', postIds),
+          supabase.from('comments').select('post_id').in('post_id', postIds),
+          supabase
+            .from('post_media')
+            .select('post_id, url, type, position')
+            .in('post_id', postIds)
+            .eq('type', 'image')
+            .order('position', { ascending: true }),
+        ]);
 
       if (profilesResult.error) throw new Error(profilesResult.error.message);
       if (vehiclesResult.error) throw new Error(vehiclesResult.error.message);
       if (likesResult.error) throw new Error(likesResult.error.message);
       if (commentsResult.error) throw new Error(commentsResult.error.message);
+      if (mediaResult.error) throw new Error(mediaResult.error.message);
 
       const profileMap = new Map(
         ((profilesResult.data ?? []) as ProfileRow[]).map((row) => [
@@ -92,11 +101,28 @@ export function useFeed() {
       );
       const likeRows = (likesResult.data ?? []) as { post_id: string; user_id: string }[];
       const commentRows = (commentsResult.data ?? []) as { post_id: string }[];
+      const mediaRows = (mediaResult.data ?? []) as {
+        post_id: string;
+        url: string;
+        type: string;
+        position: number;
+      }[];
+      const mediaPaths = [...new Set(mediaRows.map((row) => row.url))];
+      const signedMap = new Map<string, string>();
+      if (mediaPaths.length > 0) {
+        const { data: signed } = await supabase.storage
+          .from('posts')
+          .createSignedUrls(mediaPaths, 3600);
+        for (const item of signed ?? []) {
+          if (item.path && item.signedUrl) signedMap.set(item.path, item.signedUrl);
+        }
+      }
 
       return posts.flatMap((post) => {
         const author = profileMap.get(post.user_id);
         if (!author) return [];
         const postLikes = likeRows.filter((like) => like.post_id === post.id);
+        const media = mediaRows.find((row) => row.post_id === post.id);
         return [
           {
             id: post.id,
@@ -108,6 +134,7 @@ export function useFeed() {
             vehicleLabel: post.vehicle_id
               ? vehicleMap.get(post.vehicle_id)
               : undefined,
+            mediaUrl: media ? signedMap.get(media.url) : undefined,
             likeCount: postLikes.length,
             commentCount: commentRows.filter((comment) => comment.post_id === post.id).length,
             likedByMe: postLikes.some((like) => like.user_id === account.id),
@@ -147,7 +174,7 @@ export function usePost(postId: string | undefined) {
       if (!row) return null;
       const post = row as PostRow;
 
-      const [profileResult, vehicleResult, likesResult, commentsResult] =
+      const [profileResult, vehicleResult, likesResult, commentsResult, mediaResult] =
         await Promise.all([
           supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', post.user_id).maybeSingle(),
           post.vehicle_id
@@ -159,18 +186,34 @@ export function usePost(postId: string | undefined) {
             : Promise.resolve({ data: null, error: null }),
           supabase.from('likes').select('user_id').eq('post_id', post.id),
           supabase.from('comments').select('id').eq('post_id', post.id),
+          supabase
+            .from('post_media')
+            .select('url, type, position')
+            .eq('post_id', post.id)
+            .eq('type', 'image')
+            .order('position', { ascending: true })
+            .limit(1),
         ]);
 
       if (profileResult.error) throw new Error(profileResult.error.message);
       if (vehicleResult.error) throw new Error(vehicleResult.error.message);
       if (likesResult.error) throw new Error(likesResult.error.message);
       if (commentsResult.error) throw new Error(commentsResult.error.message);
+      if (mediaResult.error) throw new Error(mediaResult.error.message);
       if (!profileResult.data) return null;
 
       const likes = (likesResult.data ?? []) as { user_id: string }[];
       const vehicle = vehicleResult.data as
         | { id: string; make: string; model: string }
         | null;
+      const media = (mediaResult.data ?? [])[0] as { url: string } | undefined;
+      let mediaUrl: string | undefined;
+      if (media) {
+        const { data: signed } = await supabase.storage
+          .from('posts')
+          .createSignedUrl(media.url, 3600);
+        mediaUrl = signed?.signedUrl;
+      }
 
       return {
         id: post.id,
@@ -180,6 +223,7 @@ export function usePost(postId: string | undefined) {
         createdAt: post.created_at,
         author: mapProfileRow(profileResult.data as ProfileRow),
         vehicleLabel: vehicle ? `${vehicle.make} ${vehicle.model}` : undefined,
+        mediaUrl,
         likeCount: likes.length,
         commentCount: (commentsResult.data ?? []).length,
         likedByMe: likes.some((like) => like.user_id === account.id),
@@ -205,6 +249,7 @@ export function useCreatePost() {
     mutationFn: async (input: {
       caption: string;
       visibility: FeedVisibility;
+      image?: { uri: string; mimeType: string };
     }) => {
       if (demo) {
         throw new Error('Publicar en el feed requiere una cuenta real.');
@@ -212,19 +257,61 @@ export function useCreatePost() {
       if (!supabase || !account) {
         throw new Error('Inicia sesión para publicar.');
       }
-      if (!input.caption.trim()) {
-        throw new Error('Escribe algo antes de publicar.');
+      if (!input.caption.trim() && !input.image) {
+        throw new Error('Escribe algo o añade una foto antes de publicar.');
       }
 
-      const { error } = await supabase.from('posts').insert({
-        user_id: account.id,
-        kind: 'text',
-        caption: input.caption.trim(),
-        visibility: input.visibility,
-      });
+      const { data: post, error } = await supabase
+        .from('posts')
+        .insert({
+          user_id: account.id,
+          kind: input.image ? 'photo' : 'text',
+          caption: input.caption.trim() || null,
+          visibility: input.visibility,
+        })
+        .select('id')
+        .single();
 
-      if (error) {
+      if (error || !post) {
         throw new Error('No pudimos publicar. Inténtalo de nuevo.');
+      }
+
+      if (input.image) {
+        try {
+          const response = await fetch(input.image.uri);
+          const buffer = await response.arrayBuffer();
+          const extension = input.image.mimeType.includes('png')
+            ? 'png'
+            : input.image.mimeType.includes('webp')
+              ? 'webp'
+              : 'jpg';
+          const path = `${post.id as string}/${Date.now()}.${extension}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('posts')
+            .upload(path, buffer, {
+              contentType: input.image.mimeType,
+              upsert: false,
+            });
+
+          if (uploadError) throw new Error(uploadError.message);
+
+          const { error: mediaError } = await supabase.from('post_media').insert({
+            post_id: post.id,
+            url: path,
+            type: 'image',
+            position: 0,
+          });
+
+          if (mediaError) throw new Error(mediaError.message);
+        } catch (mediaError) {
+          await supabase.from('posts').delete().eq('id', post.id);
+          throw new Error(
+            mediaError instanceof Error
+              ? `No pudimos subir la foto: ${mediaError.message}`
+              : 'No pudimos subir la foto.',
+          );
+        }
       }
     },
     onSuccess: () => {
