@@ -102,6 +102,7 @@ export default function RootLayout() {
               name="post/new"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+            <Stack.Screen name="post/[id]" />
             <Stack.Screen
               name="vehicle/maintenance/new"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

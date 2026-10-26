@@ -20,10 +20,12 @@ export function PostCard({
   post,
   liking,
   onToggleLike,
+  onPressComment,
 }: {
   post: FeedPost;
   liking?: boolean;
   onToggleLike: () => void;
+  onPressComment?: () => void;
 }) {
   return (
     <Card style={styles.card}>
@@ -79,10 +81,15 @@ export function PostCard({
             {post.likeCount}
           </AppText>
         </Pressable>
-        <View style={styles.action}>
+        <Pressable
+          style={styles.action}
+          onPress={onPressComment}
+          disabled={!onPressComment}
+          hitSlop={6}
+        >
           <Ionicons name="chatbubble-outline" size={17} color={colors.muted} />
           <AppText variant="caption" color={colors.muted}>{post.commentCount}</AppText>
-        </View>
+        </Pressable>
         <View style={{ flex: 1 }} />
         <Ionicons name="paper-plane-outline" size={17} color={colors.muted} />
       </View>

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -337,6 +337,7 @@ export default function HomeScreen() {
             key={post.id}
             post={post}
             liking={toggleLike.isPending}
+            onPressComment={() => router.push(`/post/${post.id}` as Href)}
             onToggleLike={() =>
               void toggleLike.mutateAsync({
                 postId: post.id,

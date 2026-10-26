@@ -127,6 +127,75 @@ export function useFeed() {
   };
 }
 
+export function usePost(postId: string | undefined) {
+  const account = useAuth((state) => state.account);
+  const demo = demoMode(account?.mode);
+
+  const query = useQuery({
+    queryKey: ['post', postId ?? 'none', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
+    enabled: Boolean(postId) && Boolean(account) && !demo,
+    queryFn: async (): Promise<FeedPost | null> => {
+      if (!postId || !account || !supabase) return null;
+
+      const { data: row, error } = await supabase
+        .from('posts')
+        .select('id, user_id, vehicle_id, kind, caption, visibility, created_at')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!row) return null;
+      const post = row as PostRow;
+
+      const [profileResult, vehicleResult, likesResult, commentsResult] =
+        await Promise.all([
+          supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', post.user_id).maybeSingle(),
+          post.vehicle_id
+            ? supabase
+                .from('vehicles')
+                .select('id, make, model')
+                .eq('id', post.vehicle_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+          supabase.from('likes').select('user_id').eq('post_id', post.id),
+          supabase.from('comments').select('id').eq('post_id', post.id),
+        ]);
+
+      if (profileResult.error) throw new Error(profileResult.error.message);
+      if (vehicleResult.error) throw new Error(vehicleResult.error.message);
+      if (likesResult.error) throw new Error(likesResult.error.message);
+      if (commentsResult.error) throw new Error(commentsResult.error.message);
+      if (!profileResult.data) return null;
+
+      const likes = (likesResult.data ?? []) as { user_id: string }[];
+      const vehicle = vehicleResult.data as
+        | { id: string; make: string; model: string }
+        | null;
+
+      return {
+        id: post.id,
+        kind: post.kind,
+        caption: post.caption ?? '',
+        visibility: post.visibility,
+        createdAt: post.created_at,
+        author: mapProfileRow(profileResult.data as ProfileRow),
+        vehicleLabel: vehicle ? `${vehicle.make} ${vehicle.model}` : undefined,
+        likeCount: likes.length,
+        commentCount: (commentsResult.data ?? []).length,
+        likedByMe: likes.some((like) => like.user_id === account.id),
+      };
+    },
+  });
+
+  return {
+    post: demo ? null : query.data ?? null,
+    isLoading: demo ? false : query.isLoading,
+    isError: demo ? false : query.isError,
+    refetch: query.refetch,
+    isDemo: demo,
+  };
+}
+
 export function useCreatePost() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);

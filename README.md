@@ -24,7 +24,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Perfil editable + público | ✅ nombre, bio, ciudad y privacidad reales en Supabase; perfil público por `@usuario` y vehículos públicos |
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
-| Feed social | 🟡 publicaciones de texto, likes y visibilidad reales en Supabase; fotos, comentarios y guardados pendientes; demo con feed de ejemplo |
+| Feed social | ✅ publicaciones de texto, likes y comentarios reales con visibilidad y Realtime; faltan fotos, guardados y moderación; demo con feed de ejemplo |
 | Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OSM + GPS; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
 | Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
@@ -199,7 +199,8 @@ app de auto/
 │  ├─ 09-graphhopper.md        # rutas por carretera con GraphHopper
 │  ├─ 10-retos.md              # flujo real de retos, RLS y Realtime
 │  ├─ 11-party.md              # party real, posiciones, chat y RLS
-│  └─ 12-livekit-voz.md        # LiveKit, 3 canales y PTT real
+│  ├─ 12-livekit-voz.md        # LiveKit, 3 canales y PTT real
+│  └─ 13-feed.md               # feed de texto, likes y comentarios
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
@@ -235,7 +236,7 @@ app de auto/
 
 ## Lo que falta para producción
 
-- Añadir fotos, comentarios, guardados y moderación al feed.
+- Añadir fotos, guardados y moderación al feed.
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
 - Añadir Presence y reconexión explícita a la party; las posiciones ya se sincronizan por Realtime.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
