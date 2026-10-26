@@ -27,7 +27,7 @@
 |---|---|---|---|
 | 1 | Crear proyecto Supabase y aplicar migración | Dev | 0,5 día |
 | 2 | Conectar proyecto Supabase y probar Auth email; añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
-| 3 | Reemplazar mocks por consultas reales (perfil, garaje, feed, combustible) | Dev | 4–5 días |
+| 3 | Completar datos reales (perfil editable, feed, amigos, retos); garaje y combustible ya tienen capa base | Dev | 4–5 días |
 | 4 | Mapbox o MapLibre + ubicación en vivo con Realtime Broadcast/Presence | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
@@ -63,8 +63,9 @@
 ### Semana 1 — Datos reales
 - Supabase + migración + buckets.
 - Probar Auth email en un proyecto real; activar Apple/Google y recuperación.
-- Perfil, garaje, QR y subida de fotos.
-- Reemplazar `src/data/mock.ts` por hooks de TanStack Query.
+- Perfil editable, QR y subida de fotos.
+- Garaje y repostajes ya usan hooks con Supabase (`useGarage`, `useFuelLogs`).
+- Pasar feed y retos a TanStack Query + Supabase Realtime.
 
 ### Semana 2 — Social
 - Amigos (solicitudes/aceptar/bloquear).
@@ -153,7 +154,9 @@
 
 ## 8. Limitaciones conocidas del prototipo
 
-- El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real; el resto de datos sigue siendo mock.
+- El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real.
+- Garaje y repostajes ya leen/escriben Supabase en cuentas reales; perfil, feed, amigos y retos siguen usando mocks.
+- El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.
 - El mapa es SVG decorativo, no geográfico.
 - El PTT es una simulación visual; no transmite audio.
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
@@ -169,5 +172,6 @@
 1. Decidir nombre/dominio y mercado inicial.
 2. Crear Supabase, LiveKit y Mapbox.
 3. Aplicar la migración, configurar Email Auth y probar registro/login reales.
-4. Probar la app en un Android real con development build.
+4. Probar alta de vehículo y guardado de repostaje contra Supabase.
+5. Probar la app en un Android real con development build.
 5. Cerrar la primera party de prueba con 3 coches.

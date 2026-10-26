@@ -25,12 +25,12 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Home / feed social | ✅ con datos mock |
 | Party / mapa en vivo | ✅ UI + PTT simulado |
 | Retos / emparejamiento | ✅ UI + simulación local; falta backend Realtime y anti-trampas |
-| Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR por vehículo |
+| Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
 | Perfil público por usuario y vehículo | ✅ |
-| Combustible y energía | ✅ gasolina/diésel + EV, PDF e historial local |
+| Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | 🟡 esquema SQL + RLS + Auth listos; falta crear el proyecto, aplicar la migración y sustituir los mocks por consultas reales |
+| Supabase | 🟡 esquema SQL + RLS + Auth listos; garaje y repostajes ya tienen capa de datos real; falta crear el proyecto, aplicar la migración y conectar perfil/feed/retos |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapas reales | ⏳ mapa estilizado SVG; falta Mapbox/MapLibre |
 | 3D garage / clubs / meets | ⏳ fase 2 |
@@ -108,7 +108,9 @@ npx expo-doctor
 El cliente está en `movil/src/lib/supabase.ts` y el estado de sesión en
 `movil/src/store/auth.ts`. Si no hay variables de entorno, la app usa el modo
 demo y sigue funcionando. El detalle del flujo, validaciones y pendientes está en
-[`docs/05-autenticacion.md`](docs/05-autenticacion.md).
+[`docs/05-autenticacion.md`](docs/05-autenticacion.md). La capa de garaje y
+combustible está documentada en
+[`docs/06-datos-garaje-combustible.md`](docs/06-datos-garaje-combustible.md).
 
 ---
 
@@ -121,7 +123,8 @@ app de auto/
 │  ├─ 02-arquitectura.md      # stack, flujos, seguridad, costes
 │  ├─ 03-modelo-datos.sql     # esquema Supabase + RLS + Realtime
 │  ├─ 04-checklist-mvp.md     # qué falta para lanzar
-│  └─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
+│  ├─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
+│  └─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
 ├─ movil/
 │  ├─ app/                    # Expo Router (pantallas)
 │  │  ├─ (auth)/              # Bienvenida, login y registro
@@ -153,7 +156,8 @@ app de auto/
 
 ## Lo que falta para producción
 
-- Conectar el proyecto Supabase, probar altas reales y pasar perfil/garaje/feed/combustible de mocks a consultas.
+- Conectar el proyecto Supabase y probar altas reales de vehículos y repostajes (la capa ya está escrita).
+- Pasar perfil editable, feed, amigos y retos de mocks a consultas reales.
 - Apple/Google, recuperación de contraseña, edición de perfil y borrado de cuenta.
 - Mapbox/MapLibre + ubicación en vivo por Realtime Broadcast.
 - LiveKit Cloud + Edge Function para tokens + PTT nativo.

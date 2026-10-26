@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, Share, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -10,14 +10,16 @@ import {
   AppText,
   Button,
   Card,
+  EmptyState,
   IconButton,
   Pill,
   Screen,
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { vehicles, type Vehicle } from '@/src/data/mock';
+import { type Vehicle } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import {
   isElectric,
@@ -48,10 +50,11 @@ function CarSilhouette() {
 export default function GarageScreen() {
   const router = useRouter();
   const me = useCurrentUser();
-  const [selectedId, setSelectedId] = useState(me.car.id);
-  const vehicle = vehicles.find((item) => item.id === selectedId) ?? me.car;
-  const meta = vehicleKindMeta[vehicle.kind];
-  const electric = isElectric(vehicle);
+  const { vehicles: garageVehicles, isLoading, isError, refetch } = useGarageVehicles();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const vehicle = garageVehicles.find((item) => item.id === selectedId) ?? garageVehicles[0];
+  const meta = vehicle ? vehicleKindMeta[vehicle.kind] : null;
+  const electric = vehicle ? isElectric(vehicle) : false;
 
   const shareQr = async () => {
     await Share.share({
@@ -69,17 +72,52 @@ export default function GarageScreen() {
     });
   };
 
+  const openNewVehicle = () => router.push('/vehicle/new');
+
+  const header = (
+    <View style={styles.header}>
+      <View>
+        <AppText variant="label" color={colors.accent}>GARAJE</AppText>
+        <AppText variant="h1" style={{ marginTop: 4 }}>Mis vehículos</AppText>
+      </View>
+      <IconButton icon="add" tone="accent" color="#120802" onPress={openNewVehicle} />
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <Screen>
+        {header}
+        <View style={styles.loadingState}>
+          <ActivityIndicator color={colors.accent} />
+          <AppText variant="caption" color={colors.muted}>
+            Cargando tu garaje…
+          </AppText>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Screen>
+        {header}
+        <EmptyState
+          icon="cloud-offline-outline"
+          title="No pudimos cargar el garaje"
+          description="Revisa tu conexión y vuelve a intentarlo. Tus vehículos siguen guardados."
+        />
+        <Button label="Reintentar" variant="secondary" onPress={() => refetch()} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
-      <View style={styles.header}>
-        <View>
-          <AppText variant="label" color={colors.accent}>GARAJE</AppText>
-          <AppText variant="h1" style={{ marginTop: 4 }}>Mis vehículos</AppText>
-        </View>
-        <IconButton icon="add" tone="accent" color="#120802" />
-      </View>
+      {header}
 
-      <LinearGradient
+      {vehicle && meta ? (
+        <LinearGradient
         colors={
           electric
             ? ['#0A1D21', '#131A20', '#10151B']
@@ -122,9 +160,9 @@ export default function GarageScreen() {
             label={electric ? 'kWh/100' : 'km/L'}
           />
           <View style={styles.carDivider} />
-          <Stat value="128" label="rutas" />
+          <Stat value={vehicle.odometerKm.toLocaleString('es-DO')} label="km" />
           <View style={styles.carDivider} />
-          <Stat value="42.810" label="km" />
+          <Stat value="Activo" label="QR público" accent={meta.color} />
         </View>
         <View style={styles.carActions}>
           <Button label="Editar" variant="secondary" icon="create-outline" size="sm" onPress={() => {}} />
@@ -137,6 +175,26 @@ export default function GarageScreen() {
           />
         </View>
       </LinearGradient>
+      ) : (
+        <Card style={styles.emptyGarage}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="car-sport-outline" size={30} color={colors.accent} />
+          </View>
+          <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
+            Tu garaje está vacío
+          </AppText>
+          <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
+            Añade tu primer coche, moto, EV o camión para empezar a registrar
+            rutas, consumo y su QR.
+          </AppText>
+          <Button
+            label="Añadir mi primer vehículo"
+            icon="add"
+            onPress={openNewVehicle}
+            style={{ marginTop: spacing.lg }}
+          />
+        </Card>
+      )}
 
       <SectionHeader title="Mi identidad Caravana" action="Compartir" onAction={shareQr} />
       <View style={styles.qrRow}>
@@ -172,10 +230,10 @@ export default function GarageScreen() {
         </View>
       </View>
 
-      <SectionHeader title="Vehículos" action="Añadir" />
-      {vehicles.map((item) => {
+      <SectionHeader title="Vehículos" action="Añadir" onAction={openNewVehicle} />
+      {garageVehicles.map((item) => {
         const itemMeta = vehicleKindMeta[item.kind];
-        const active = item.id === selectedId;
+        const active = item.id === vehicle?.id;
         return (
           <Pressable
             key={item.id}
@@ -214,17 +272,22 @@ export default function GarageScreen() {
         );
       })}
 
-      <Card style={styles.addVehicle}>
-        <View style={styles.addIcon}>
-          <Ionicons name="add" size={22} color={colors.accent} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText variant="bodyStrong">Añadir coche, moto, EV o camión</AppText>
-          <AppText variant="caption" color={colors.muted}>
-            Cada vehículo tiene su propio historial, consumo y QR.
-          </AppText>
-        </View>
-      </Card>
+      {garageVehicles.length > 0 ? (
+        <Pressable onPress={openNewVehicle} style={({ pressed }) => [{ opacity: pressed ? 0.82 : 1 }]}>
+          <Card style={styles.addVehicle}>
+            <View style={styles.addIcon}>
+              <Ionicons name="add" size={22} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyStrong">Añadir coche, moto, EV o camión</AppText>
+              <AppText variant="caption" color={colors.muted}>
+                Cada vehículo tiene su propio historial, consumo y QR.
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+          </Card>
+        </Pressable>
+      ) : null}
 
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={colors.dim} />
@@ -262,6 +325,26 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginTop: spacing.md,
+  },
+  loadingState: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: spacing['4xl'],
+  },
+  emptyGarage: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
+    paddingVertical: spacing['3xl'],
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,31,0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   carCard: {
     marginTop: spacing.lg,

@@ -1,13 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import {
   AppText,
   Button,
   Card,
+  EmptyState,
   IconButton,
   Input,
   Pill,
@@ -15,8 +24,9 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { fuelLogs, vehicles, type FuelLog, type Vehicle } from '@/src/data/mock';
-import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { type FuelLog, type Vehicle } from '@/src/data/mock';
+import { useAddFuelLog, useFuelLogs } from '@/src/hooks/useFuelLogs';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import {
   calculateElectric,
@@ -152,9 +162,59 @@ function VehiclePill({
 }
 
 export default function FuelScreen() {
-  const me = useCurrentUser();
-  const [selectedVehicleId, setSelectedVehicleId] = useState(me.car.id);
-  const vehicle = vehicles.find((item) => item.id === selectedVehicleId) ?? me.car;
+  const router = useRouter();
+  const { vehicles: garageVehicles, isLoading, isError, refetch } = useGarageVehicles();
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <View style={styles.stateBox}>
+          <ActivityIndicator color={colors.accent} />
+          <AppText variant="caption" color={colors.muted}>
+            Cargando tu garaje…
+          </AppText>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="cloud-offline-outline"
+          title="No pudimos cargar tus vehículos"
+          description="Revisa tu conexión y vuelve a intentarlo."
+        />
+        <Button label="Reintentar" variant="secondary" onPress={() => refetch()} />
+      </Screen>
+    );
+  }
+
+  if (garageVehicles.length === 0) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="car-sport-outline"
+          title="Primero añade un vehículo"
+          description="El consumo real empieza con tu primer coche, moto, EV o camión."
+        />
+        <Button
+          label="Añadir vehículo"
+          icon="add"
+          onPress={() => router.push('/vehicle/new')}
+        />
+      </Screen>
+    );
+  }
+
+  return <FuelDashboard availableVehicles={garageVehicles} />;
+}
+
+function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) {
+  const [selectedVehicleId, setSelectedVehicleId] = useState(availableVehicles[0].id);
+  const vehicle =
+    availableVehicles.find((item) => item.id === selectedVehicleId) ?? availableVehicles[0];
   const electric = isElectric(vehicle);
   const meta = vehicleKindMeta[vehicle.kind];
 
@@ -164,7 +224,18 @@ export default function FuelScreen() {
   const [efficiencyUnit, setEfficiencyUnit] = useState<EfficiencyUnit>('km_l');
   const [electricUnit, setElectricUnit] = useState<ElectricEfficiencyUnit>('kwh_100km');
   const [priceUnit, setPriceUnit] = useState<PriceUnit>('gal');
-  const [logs, setLogs] = useState<FuelLog[]>(fuelLogs);
+  const { logs: savedLogs } = useFuelLogs(availableVehicles);
+  const addFuelLog = useAddFuelLog();
+  const [pendingLogs, setPendingLogs] = useState<FuelLog[]>([]);
+
+  const logs = useMemo(() => {
+    const seen = new Set<string>();
+    return [...pendingLogs, ...savedLogs].filter((log) => {
+      if (seen.has(log.id)) return false;
+      seen.add(log.id);
+      return true;
+    });
+  }, [pendingLogs, savedLogs]);
 
   const vehicleLogs = logs.filter((log) => log.vehicleId === vehicle.id);
 
@@ -255,35 +326,43 @@ export default function FuelScreen() {
     setPrice(formatNumber(converted, 2));
   };
 
-  const saveFillup = () => {
+  const saveFillup = async () => {
     if (resultEnergy <= 0) {
       Alert.alert('Faltan datos', 'Completa la distancia, el consumo y el precio.');
       return;
     }
-    const newLog: FuelLog = {
-      id: `fl_${Date.now()}`,
-      vehicleId: vehicle.id,
-      kind: electric ? 'electric' : 'fuel',
-      date: 'Ahora',
-      station: electric ? 'Carga registrada' : 'Repostaje registrado',
-      liters: electric ? 0 : Number(liquidResult.liters.toFixed(2)),
-      kwh: electric ? Number(electricResult.kwh.toFixed(2)) : undefined,
-      pricePerLiter: electric
-        ? Number(price.replace(',', '.')) || 0
-        : Number(liquidResult.pricePerLiter.toFixed(2)),
-      total: Number(resultCost.toFixed(0)),
-      odometer:
-        (vehicleLogs[0]?.odometer ?? vehicle.odometerKm) + (Number(distance.replace(',', '.')) || 0),
-      fullTank: true,
-    };
-    setLogs((current) => [newLog, ...current]);
-    Alert.alert(
-      electric ? 'Carga guardada' : 'Repostaje guardado',
-      `${formatNumber(resultEnergy, 2)} ${electric ? 'kWh' : 'L'} · ${formatMoney(
-        newLog.total,
-        'DOP',
-      )}. El consumo se recalcula en el próximo registro.`,
-    );
+
+    const odometer =
+      (vehicleLogs[0]?.odometer ?? vehicle.odometerKm) +
+      (Number(distance.replace(',', '.')) || 0);
+
+    try {
+      const saved = await addFuelLog.mutateAsync({
+        vehicle,
+        volume: electric ? electricResult.kwh : liquidResult.liters,
+        pricePerUnit: electric
+          ? Number(price.replace(',', '.')) || 0
+          : liquidResult.pricePerLiter,
+        total: resultCost,
+        odometer,
+        station: electric ? 'Carga registrada' : 'Repostaje registrado',
+        fullTank: true,
+      });
+
+      setPendingLogs((current) => [saved, ...current]);
+      Alert.alert(
+        electric ? 'Carga guardada' : 'Repostaje guardado',
+        `${formatNumber(resultEnergy, 2)} ${electric ? 'kWh' : 'L'} · ${formatMoney(
+          saved.total,
+          'DOP',
+        )}. El consumo se recalcula en el próximo registro.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        'No pudimos guardar el registro',
+        error instanceof Error ? error.message : 'Revisa tu conexión e inténtalo de nuevo.',
+      );
+    }
   };
 
   const exportPdf = async () => {
@@ -318,7 +397,7 @@ export default function FuelScreen() {
         style={styles.vehicleScroll}
         contentContainerStyle={styles.vehicleRow}
       >
-        {vehicles.map((item) => (
+        {availableVehicles.map((item) => (
           <VehiclePill
             key={item.id}
             vehicle={item}
@@ -520,6 +599,7 @@ export default function FuelScreen() {
         <Button
           label={electric ? 'Guardar carga' : 'Guardar repostaje'}
           icon={electric ? 'flash-outline' : 'add-circle-outline'}
+          loading={addFuelLog.isPending}
           onPress={saveFillup}
           style={{ marginTop: spacing.lg }}
         />
@@ -630,6 +710,11 @@ export default function FuelScreen() {
 }
 
 const styles = StyleSheet.create({
+  stateBox: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: spacing['4xl'],
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',

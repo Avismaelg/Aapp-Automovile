@@ -163,8 +163,9 @@ proyecto; los errores más comunes se traducen en `src/store/auth.ts`.
 - Borrado de cuenta in-app y borrado de datos asociados.
 - Rate limiting y captcha en Auth.
 - Verificación de edad y términos aceptados.
-- Conectar perfil, garaje, combustible y retos a datos reales (hoy la mayoría
-  sigue usando mocks).
+- Conectar edición de perfil, feed, amigos y retos a datos reales. El garaje y
+  los repostajes ya cuentan con capa de lectura/escritura Supabase; el resto de
+  pantallas sigue usando mocks.
 
 ---
 
