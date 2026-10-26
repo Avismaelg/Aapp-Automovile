@@ -84,6 +84,7 @@ export default function RootLayout() {
               name="party/[code]"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+            <Stack.Screen name="party/chat" />
             <Stack.Screen
               name="vehicle/new"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

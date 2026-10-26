@@ -1,17 +1,37 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthNotice } from '@/src/components/auth';
 import { AppText, Avatar, Button, Card, IconButton, Pill } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
+import { useJoinParty } from '@/src/hooks/useParty';
+import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
 
 export default function JoinPartyScreen() {
   const router = useRouter();
   const { code } = useLocalSearchParams<{ code: string }>();
+  const account = useAuth((state) => state.account);
+  const isDemo = account?.mode === 'demo';
+  const joinParty = useJoinParty();
+  const [error, setError] = useState<string | null>(null);
   const inviteCode = (code || activeParty.code).toUpperCase();
+
+  const join = async () => {
+    setError(null);
+    try {
+      await joinParty.mutateAsync(inviteCode);
+      router.replace('/(tabs)/party');
+    } catch (joinError) {
+      setError(
+        joinError instanceof Error ? joinError.message : 'No pudimos unirnos a la party.',
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -21,6 +41,8 @@ export default function JoinPartyScreen() {
         <Pill label="Invitación" tone="accent" icon="mail-open" />
         <View style={{ width: 42 }} />
       </View>
+
+      {error ? <AuthNotice message={error} /> : null}
 
       <LinearGradient
         colors={['#2B160F', '#151A21', '#0B0F14']}
@@ -36,12 +58,12 @@ export default function JoinPartyScreen() {
           TE INVITAN A UNA PARTY
         </AppText>
         <AppText variant="h1" align="center" style={{ marginTop: 6 }}>
-          {activeParty.name}
+          {isDemo ? activeParty.name : 'Party de Caravana'}
         </AppText>
         <View style={styles.destination}>
           <Ionicons name="location" size={14} color={colors.textSoft} />
           <AppText variant="caption" color={colors.textSoft}>
-            {activeParty.destination}
+            {isDemo ? activeParty.destination : 'La ubicación se comparte al entrar'}
           </AppText>
         </View>
 
@@ -52,33 +74,39 @@ export default function JoinPartyScreen() {
           </AppText>
         </View>
 
-        <View style={styles.members}>
-          {partyMembers.slice(0, 4).map((member, index) => (
-            <View key={member.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
-              <Avatar
-                name={member.name}
-                color={member.color}
-                size={38}
-                ring={colors.bgElevated}
-              />
-            </View>
-          ))}
-          <AppText variant="caption" color={colors.muted} style={{ marginLeft: 8 }}>
-            {partyMembers.length} personas ya están en ruta
+        {isDemo ? (
+          <View style={styles.members}>
+            {partyMembers.slice(0, 4).map((member, index) => (
+              <View key={member.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
+                <Avatar
+                  name={member.name}
+                  color={member.color}
+                  size={38}
+                  ring={colors.bgElevated}
+                />
+              </View>
+            ))}
+            <AppText variant="caption" color={colors.muted} style={{ marginLeft: 8 }}>
+              {partyMembers.length} personas ya están en ruta
+            </AppText>
+          </View>
+        ) : (
+          <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: spacing.md }}>
+            Al unirte compartirás tu ubicación con los miembros y podrás usar el chat.
           </AppText>
-        </View>
+        )}
 
         <View style={styles.metaGrid}>
           <View style={styles.metaCell}>
             <Ionicons name="car-sport" size={18} color={colors.accent} />
-            <AppText variant="h3">{activeParty.distanceKm} km</AppText>
-            <AppText variant="caption" color={colors.muted}>recorridos</AppText>
+            <AppText variant="h3">{isDemo ? `${activeParty.distanceKm} km` : 'En vivo'}</AppText>
+            <AppText variant="caption" color={colors.muted}>caravana</AppText>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaCell}>
             <Ionicons name="time-outline" size={18} color={colors.lime} />
-            <AppText variant="h3">{activeParty.etaMin} min</AppText>
-            <AppText variant="caption" color={colors.muted}>para el destino</AppText>
+            <AppText variant="h3">{isDemo ? `${activeParty.etaMin} min` : 'GPS'}</AppText>
+            <AppText variant="caption" color={colors.muted}>posiciones</AppText>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaCell}>
@@ -89,9 +117,13 @@ export default function JoinPartyScreen() {
         </View>
 
         <Button
-          label="Unirme a la party"
+          label={joinParty.isPending ? 'Uniéndome…' : 'Unirme a la party'}
           icon="radio"
-          onPress={() => router.replace('/(tabs)/party')}
+          loading={joinParty.isPending}
+          onPress={() => {
+            if (isDemo) router.replace('/(tabs)/party');
+            else void join();
+          }}
           style={{ marginTop: spacing.xl }}
         />
         <Button

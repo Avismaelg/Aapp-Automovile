@@ -15,7 +15,7 @@ Prototipo funcional de una app móvil que combina lo mejor de Wheelz con cuatro 
 
 ## Estado actual
 
-Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real, los retos y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan el backend Realtime/Presence de party, LiveKit, progreso de retos por GPS y el build nativo.
+Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real, las parties, los retos y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan LiveKit, progreso de retos por GPS y el build nativo.
 
 | Módulo | Estado |
 |---|---|
@@ -25,7 +25,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Feed social | 🟡 publicaciones de texto, likes y visibilidad reales en Supabase; fotos, comentarios y guardados pendientes; demo con feed de ejemplo |
-| Party / mapa en vivo | ✅ mapa real OSM + GPS; PTT simulado |
+| Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, mapa OSM + GPS; PTT simulado hasta LiveKit |
 | Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
@@ -33,9 +33,9 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migraciones de esquema, mantenimiento, modo de reto e índices aplicadas; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed de texto, retos y party probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
-| Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
+| Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo y posiciones de los miembros; ✅ rutas con GraphHopper (cloud o self-hosted) y fallback; 🟡 tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
 **Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Publicar, Amigos, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
@@ -82,6 +82,9 @@ npx expo start
   el amigo la acepta y el anfitrión inicia la salida. En demo se simula localmente.
 - **Ficha de venta:** Garaje → abre un vehículo → *Preparar ficha de venta*.
 - **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
+- **Party real:** Party → crea una caravana con destino o únete con el código
+  de un amigo. Las posiciones de los miembros y el chat se sincronizan por
+  Supabase Realtime. El PTT sigue siendo una simulación hasta LiveKit.
 - **Mapa real:** Party → mapa OpenStreetMap con tu GPS en vivo. Si no das
   permiso de ubicación, usa Santo Domingo como ubicación de demo. En web puedes
   conceder el permiso desde el navegador.
@@ -110,10 +113,11 @@ npx expo-doctor
 
 - Proyecto: `ecmqmgpruxclmpnnpgzv` (`https://ecmqmgpruxclmpnnpgzv.supabase.co`).
 - Migraciones aplicadas: `init_caravana`, `fix_set_updated_at_search_path`,
-  `vehicle_maintenance` y `challenge_mode`.
+  `vehicle_maintenance`, `challenge_mode`, `indexes_and_function_hardening` y
+  `party_presence`.
 - 26 tablas en `public` con RLS activado.
 - Auth email probado con usuarios temporales, ya eliminados.
-- Garaje, repostaje, mantenimiento, amigos, feed de texto y retos reales
+- Garaje, repostaje, mantenimiento, amigos, feed de texto, retos y party reales
   probados con Supabase.
 - `movil/.env` contiene la URL y la anon key; está ignorado por Git.
 - **No** guardar la `service_role` en ninguna variable `EXPO_PUBLIC_*`.
@@ -189,7 +193,8 @@ app de auto/
 │  ├─ 07-carplay-android-auto.md # modo conducción y proyección nativa
 │  ├─ 08-mapa-tiempo-real.md   # mapa OSM y GPS en vivo
 │  ├─ 09-graphhopper.md        # rutas por carretera con GraphHopper
-│  └─ 10-retos.md              # flujo real de retos, RLS y Realtime
+│  ├─ 10-retos.md              # flujo real de retos, RLS y Realtime
+│  └─ 11-party.md              # party real, posiciones, chat y RLS
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
@@ -225,13 +230,12 @@ app de auto/
 
 ## Lo que falta para producción
 
-- Conectar el proyecto Supabase y probar altas reales de vehículos y repostajes (la capa ya está escrita).
-- Añadir fotos, comentarios, guardados y moderación al feed; pasar retos a Supabase Realtime.
+- Añadir fotos, comentarios, guardados y moderación al feed.
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
-- Publicar posiciones reales de la party por Supabase Realtime; hoy los otros miembros son demo.
+- Añadir Presence y reconexión explícita a la party; las posiciones ya se sincronizan por Realtime.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.
 - LiveKit Cloud + Edge Function para tokens + PTT nativo.
-- Retos en Supabase Realtime: invitaciones, salas al momento, salida/meta, progreso y anti-trampas.
+- Progreso de retos por GPS: salida/meta, distancia, llegada y anti-trampas.
 - Detección de viajes con revisión/edición (unir, dividir, descartar).
 - CarPlay/Android Auto nativos: entitlement de Apple, categoría de Android Auto, build nativo y aprobación de tiendas.
 - Push notifications, moderación y analítica.

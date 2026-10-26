@@ -16,7 +16,7 @@
 - Retos punto A → B: modo programado e instantáneo con invitación, aceptación, inicio, finalización e historial reales en Supabase + Realtime; demo local con simulación.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.
-- Party con mapa real de OpenStreetMap y ubicación GPS del usuario en vivo (web y móvil).
+- Party con crear/unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo y mapa OpenStreetMap; PTT simulado hasta LiveKit.
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
@@ -35,7 +35,7 @@
 | 1 | ✅ Crear proyecto Supabase y aplicar migración | Dev | Hecho |
 | 2 | ✅ Auth email y perfil editable probados; 🟡 añadir Apple/Google, recuperación, avatar y borrado de cuenta | Dev | 3–4 días |
 | 3 | 🟡 Perfil, amigos, garaje, combustible, mantenimiento, feed de texto y retos reales; faltan fotos/comentarios, progreso GPS y anti-trampas | Dev | 4–5 días |
-| 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
+| 4 | Desplegar GraphHopper, añadir Presence/reconexión a party y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
 | 7 | Progreso de retos en Realtime por GPS: salida/meta, distancia, llegada y anti-trampas | Dev | 5–7 días |
@@ -72,7 +72,7 @@
 - Probar Auth email en un proyecto real; activar Apple/Google y recuperación.
 - Perfil editable, QR y subida de fotos.
 - Garaje y repostajes ya usan hooks con Supabase (`useGarage`, `useFuelLogs`).
-- Feed de texto y retos ya usan TanStack Query + Supabase; falta Realtime de party
+- Feed de texto, retos y party ya usan TanStack Query + Supabase; falta Presence
   y progreso GPS de retos.
 
 ### Semana 2 — Social
@@ -89,7 +89,8 @@
 ### Semana 4 — Party + mapa
 - Base OSM/Leaflet ya integrada.
 - Crear/unirse por código o link.
-- Publicar posiciones reales cada 3–5 s por Supabase Realtime; Presence para miembros.
+- Posiciones de party y chat ya publicados por Supabase Realtime; falta Presence
+  explícita, reconexión y limpieza de inactivos.
 - Ruta por carretera (OSRM/Valhalla) y proveedor de teselas para producción.
 - Chat de texto y persistencia de última ubicación.
 
@@ -174,10 +175,12 @@
 - Garaje, repostajes, perfil, feed, amigos y retos ya leen/escriben Supabase en
   cuentas reales; quedan fotos, comentarios y progreso GPS de retos.
 - El garaje demo se conserva en el dispositivo; los repostajes demo solo viven mientras la pantalla está abierta.
-- El mapa de Party es real (OSM/Leaflet) y usa el GPS del usuario; los otros miembros y la ruta son de demo hasta conectar Realtime y un motor de ruteo.
+- El mapa de Party es real (OSM/Leaflet), usa el GPS del usuario y sincroniza
+  miembros/posiciones y chat por Supabase Realtime; el PTT de voz sigue pendiente.
 - El PTT es una simulación visual; no transmite audio.
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
-- Los retos son una simulación local; no hay invitaciones ni Realtime reales.
+- Los retos y la party ya tienen invitaciones, aceptación, inicio y persistencia
+  reales; falta progreso GPS/anti-trampas y PTT de voz.
 - El QR apunta a `caravana.app`, que aún no está desplegado.
 - El Modo conducción es una pantalla móvil; la proyección nativa CarPlay/Android Auto requiere entitlement, aprobación y build nativo.
 - Los mantenimientos ya se guardan en Supabase; faltan edición, borrado y adjuntar facturas.

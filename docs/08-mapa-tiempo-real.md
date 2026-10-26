@@ -1,8 +1,9 @@
 # Caravana — Mapa real y ubicación en tiempo real
 
 > Estado: la pantalla de Party usa un mapa real de OpenStreetMap con la ubicación
-> GPS del usuario actualizada cada 5 segundos. Los otros miembros de la party
-> siguen usando coordenadas de ejemplo hasta conectar Supabase Realtime.
+> GPS del usuario actualizada cada 5 segundos. Los miembros y sus posiciones se
+> sincronizan por Supabase Realtime; el chat también es real. El PTT de voz sigue
+> pendiente de LiveKit.
 
 ---
 
@@ -41,17 +42,20 @@ Party
        ├─ getLastKnownPositionAsync()
        ├─ watchPositionAsync(cada 5 s / 5 m)
        └─ fallback Santo Domingo si falla
+  └─ usePartyLocation()
+       └─ publica last_lat/last_lng/last_seen_at si el GPS está en vivo
 
 WorldMap
   ├─ WebView / iframe con el HTML del mapa
   ├─ marcador "Tú" con la ubicación actual
   ├─ círculo de precisión
-  ├─ miembros de la party (demo)
+  ├─ miembros reales de la party con Realtime
   └─ destino + línea punteada
 ```
 
 La ubicación del usuario se envía al mapa por `postMessage`; el HTML no se
-recarga con cada actualización.
+recarga con cada actualización. Las coordenadas de los miembros se guardan en
+Supabase mientras la party está activa y se limpian al salir.
 
 ---
 
@@ -59,16 +63,22 @@ recarga con cada actualización.
 
 - La ubicación se solicita solo al abrir Party/mapa.
 - No se comparte con otros usuarios fuera de la party.
-- No se guarda en el HTML ni se envía a un servidor en esta versión.
+- Mientras hay una party activa, las coordenadas se guardan en Supabase y solo
+  las pueden leer el anfitrión y los miembros.
+- Al salir se borran `last_lat`/`last_lng` del miembro; el anfitrión puede cerrar
+  la party.
 - El QR público no contiene ubicación.
-- Si el usuario niega el permiso, la app sigue funcionando con ubicación demo.
+- Si el usuario niega el permiso, la app sigue funcionando con ubicación demo,
+  pero **no publica** esa ubicación de demo en la party.
 
 ---
 
 ## 4. Límites actuales
 
-- Los otros miembros de la party están **simulados**; falta publicar/consumir
-  posiciones con Supabase Realtime + Presence.
+- Las posiciones se sincronizan por Supabase Realtime; falta Presence explícita
+  y reconexión para redes inestables.
+- Las posiciones pueden quedar obsoletas si un miembro pierde conexión; falta
+  mostrar la antigüedad y limpiar miembros inactivos.
 - La ruta por carretera depende de GraphHopper configurado. Sin motor o si falla,
   se usa una línea recta geodésica y se avisa en Party.
 - Las teselas se cargan directamente de `tile.openstreetmap.org`. Para una app
@@ -89,8 +99,8 @@ Antes de lanzar:
    - servidor propio con OpenMapTiles/MapLibre.
 2. Respetar atribución y límites del proveedor.
 3. Evaluar MapLibre React Native para mapas vectoriales nativos.
-4. Añadir ruteo real y navegación turn-by-turn.
-5. Publicar posiciones de party por Supabase Realtime/Presence.
+4. Añadir navegación turn-by-turn.
+5. Añadir Presence explícita y limpieza de miembros inactivos.
 6. Probar batería, túneles, reconexión y precisión en dispositivos reales.
 
 ---

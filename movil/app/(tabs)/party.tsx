@@ -2,15 +2,27 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PartyLobby } from '@/src/components/PartyLobby';
 import { PTTButton } from '@/src/components/PTTButton';
 import { WorldMap } from '@/src/components/WorldMap';
-import { AppText, Avatar, IconButton, Pill } from '@/src/components/ui';
+import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useActiveParty, useLeaveParty, usePartyLocation } from '@/src/hooks/useParty';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { formatClock } from '@/src/lib/format';
@@ -18,50 +30,220 @@ import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
+type DisplayMember = {
+  id: string;
+  name: string;
+  username: string;
+  color: string;
+  battery?: number;
+  isTalking: boolean;
+  isMe?: boolean;
+  lastSeenAt?: string | null;
+};
+
 export default function PartyScreen() {
   const router = useRouter();
   const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();
   const live = useLiveLocation();
+  const { party, isDemo, isLoading: partyLoading, isError: partyError, refetch } = useActiveParty();
+  const leaveParty = useLeaveParty();
   const [talking, setTalking] = useState(false);
   const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
+  const [now, setNow] = useState(() => Date.now());
   const [recenterToken, setRecenterToken] = useState(0);
+
+  usePartyLocation(
+    party?.id,
+    live.location,
+    Boolean(party) && !isDemo && live.isLive,
+  );
+
+  useEffect(() => {
+    if (isDemo) {
+      const timer = setInterval(() => setElapsed((value) => value + 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isDemo]);
+
+  useEffect(() => {
+    if (isDemo || !party?.id) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [isDemo, party?.id]);
+
+  const displayMembers = useMemo<DisplayMember[]>(() => {
+    if (isDemo) {
+      return partyMembers.map((member) => ({
+        ...member,
+        isTalking: member.isTalking ?? false,
+        isMe: member.username === currentUser.username,
+      }));
+    }
+    return (party?.members ?? []).map((member) => ({
+      id: member.userId,
+      name: member.profile.displayName,
+      username: member.profile.username,
+      color: member.color,
+      isTalking: false,
+      isMe: member.isMe,
+      lastSeenAt: member.lastSeenAt,
+    }));
+  }, [currentUser.username, isDemo, party]);
 
   const mapMembers = useMemo(
     () =>
-      partyMembers
-        .filter((member) => member.username !== currentUser.username)
-        .map((member) => ({
-          id: member.id,
-          name: member.name,
-          color: member.color,
-          latitude: member.latitude,
-          longitude: member.longitude,
-          isTalking: member.isTalking,
-          battery: member.battery,
-        })),
-    [currentUser.username],
+      isDemo
+        ? partyMembers
+            .filter((member) => member.username !== currentUser.username)
+            .map((member) => ({
+              id: member.id,
+              name: member.name,
+              color: member.color,
+              latitude: member.latitude,
+              longitude: member.longitude,
+              isTalking: member.isTalking,
+              battery: member.battery,
+            }))
+        : (party?.members ?? [])
+            .filter(
+              (member) =>
+                !member.isMe && member.lastLat != null && member.lastLng != null,
+            )
+            .map((member) => ({
+              id: member.userId,
+              name: member.profile.displayName,
+              color: member.color,
+              latitude: member.lastLat as number,
+              longitude: member.lastLng as number,
+              isTalking: false,
+            })),
+    [currentUser.username, isDemo, party],
   );
 
-  const destination = useMemo(
-    () => ({
-      latitude: activeParty.destinationLatitude,
-      longitude: activeParty.destinationLongitude,
-      label: activeParty.destination.split(',')[0],
-    }),
-    [],
-  );
+  const destination = useMemo(() => {
+    if (isDemo) {
+      return {
+        latitude: activeParty.destinationLatitude,
+        longitude: activeParty.destinationLongitude,
+        label: activeParty.destination.split(',')[0],
+      };
+    }
+    if (party?.destinationLat != null && party.destinationLng != null) {
+      return {
+        latitude: party.destinationLat,
+        longitude: party.destinationLng,
+        label: party.destinationLabel ?? 'Destino',
+      };
+    }
+    return null;
+  }, [isDemo, party]);
 
   const graphHopper = useGraphHopperRoute({
     origin: live.location,
-    destination,
+    destination:
+      destination ?? {
+        latitude: live.location.latitude,
+        longitude: live.location.longitude,
+        label: 'Sin destino',
+      },
+    enabled: Boolean(destination),
   });
   const routeDistance = graphHopper.route
     ? formatRouteDistance(graphHopper.route.distanceM)
-    : `${activeParty.distanceKm} km`;
+    : destination
+      ? 'Calculando…'
+      : '—';
   const routeDuration = graphHopper.route
     ? formatRouteTime(graphHopper.route.timeMs)
-    : `${activeParty.etaMin} min`;
+    : '—';
+  const displayElapsed = isDemo
+    ? elapsed
+    : party?.startsAt
+      ? Math.max(0, Math.floor((now - Date.parse(party.startsAt)) / 1000))
+      : 0;
+  const partyName = isDemo ? activeParty.name : party?.name ?? 'Party';
+  const partyCode = isDemo ? activeParty.code : party?.code ?? '';
+  const partyDestination = isDemo
+    ? activeParty.destination
+    : party?.destinationLabel ?? 'Destino por definir';
+  const memberCount = displayMembers.length;
+
+  const shareParty = () =>
+    Share.share({
+      message: `Únete a mi party en Caravana: ${partyUrl(partyCode)}`,
+      url: partyUrl(partyCode),
+    });
+
+  const leave = async () => {
+    if (isDemo) {
+      router.replace('/(tabs)');
+      return;
+    }
+    if (!party) return;
+    const perform = async () => {
+      try {
+        await leaveParty.mutateAsync({ partyId: party.id, isHost: party.isHost });
+        router.replace('/(tabs)');
+      } catch (error) {
+        Alert.alert(
+          'No pudimos salir',
+          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        );
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      await perform();
+      return;
+    }
+
+    Alert.alert(
+      party.isHost ? 'Terminar party' : 'Salir de la party',
+      party.isHost
+        ? 'Como anfitrión, terminarás la caravana para todos.'
+        : 'Dejarás de compartir tu ubicación y el chat.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: party.isHost ? 'Terminar' : 'Salir', style: 'destructive', onPress: () => void perform() },
+      ],
+    );
+  };
+
+  if (!isDemo && partyLoading) {
+    return (
+      <Screen>
+        <View style={styles.state}>
+          <ActivityIndicator color={colors.accent} />
+          <AppText variant="caption" color={colors.muted}>Cargando party…</AppText>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!isDemo && partyError) {
+    return (
+      <Screen>
+        <View style={styles.state}>
+          <Ionicons name="radio-outline" size={32} color={colors.dim} />
+          <AppText variant="h2" align="center">No pudimos cargar la party</AppText>
+          <AppText variant="caption" color={colors.muted} align="center">
+            Revisa tu conexión y vuelve a intentarlo.
+          </AppText>
+          <Button
+            label="Reintentar"
+            variant="secondary"
+            onPress={() => void refetch()}
+            style={{ marginTop: spacing.md }}
+          />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!isDemo && !party) {
+    return <PartyLobby />;
+  }
 
   const startTalking = () => {
     setTalking(true);
@@ -97,22 +279,17 @@ export default function PartyScreen() {
             <IconButton
               icon="ellipsis-horizontal"
               size={40}
-              onPress={() =>
-                Share.share({
-                  message: `Únete a mi party en Caravana: ${partyUrl(activeParty.code)}`,
-                  url: partyUrl(activeParty.code),
-                })
-              }
+              onPress={() => void shareParty()}
             />
           </View>
         </View>
 
         <View style={styles.titleBlock}>
-          <AppText variant="h2">{activeParty.name}</AppText>
+          <AppText variant="h2">{partyName}</AppText>
           <View style={styles.destinationRow}>
             <Ionicons name="location" size={13} color={colors.accent} />
             <AppText variant="caption" color={colors.textSoft}>
-              {activeParty.destination} · ETA {routeDuration}
+              {partyDestination} · ETA {routeDuration}
             </AppText>
           </View>
           <View style={styles.gpsRow}>
@@ -151,13 +328,15 @@ export default function PartyScreen() {
               numberOfLines={1}
               style={{ flexShrink: 1 }}
             >
-              {graphHopper.isLoading
-                ? 'Calculando ruta con GraphHopper…'
-                : graphHopper.error
-                  ? 'GraphHopper no disponible · ruta directa'
-                  : graphHopper.source === 'graphhopper'
-                    ? `GraphHopper · ${routeDistance} · ${routeDuration}`
-                    : 'Ruta directa · configura GraphHopper'}
+              {!destination
+                ? 'Sin destino · comparte solo la caravana en vivo'
+                : graphHopper.isLoading
+                  ? 'Calculando ruta con GraphHopper…'
+                  : graphHopper.error
+                    ? 'GraphHopper no disponible · ruta directa'
+                    : graphHopper.source === 'graphhopper'
+                      ? `GraphHopper · ${routeDistance} · ${routeDuration}`
+                      : 'Ruta directa · configura GraphHopper'}
             </AppText>
           </View>
         </View>
@@ -173,7 +352,7 @@ export default function PartyScreen() {
             </AppText>
             <View style={styles.metaRow}>
               <AppText variant="mono" color={colors.text} style={{ fontSize: 17 }}>
-                {formatClock(elapsed)}
+                {formatClock(displayElapsed)}
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
@@ -181,18 +360,13 @@ export default function PartyScreen() {
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
-                4 coches
+                {memberCount} {memberCount === 1 ? 'piloto' : 'pilotos'}
               </AppText>
             </View>
           </View>
           <Pressable
             style={styles.inviteButton}
-            onPress={() =>
-              Share.share({
-                message: `Únete a mi party en Caravana: ${partyUrl(activeParty.code)}`,
-                url: partyUrl(activeParty.code),
-              })
-            }
+            onPress={() => void shareParty()}
           >
             <Ionicons name="person-add" size={15} color={colors.accent} />
             <AppText variant="label" color={colors.accent}>Invitar</AppText>
@@ -204,7 +378,7 @@ export default function PartyScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.memberRow}
         >
-          {partyMembers.map((member) => (
+          {displayMembers.map((member) => (
             <View key={member.id} style={styles.member}>
               <Avatar
                 name={member.name}
@@ -215,17 +389,19 @@ export default function PartyScreen() {
               />
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-                  {member.username === currentUser.username
-                    ? 'Tú'
-                    : member.name.split(' ')[0]}
+                  {member.isMe ? 'Tú' : member.name.split(' ')[0]}
                 </AppText>
                 <AppText variant="label" color={member.isTalking ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
-                  {member.isTalking ? 'HABLANDO' : `${member.battery}%`}
+                  {member.isTalking
+                    ? 'HABLANDO'
+                    : member.battery != null
+                      ? `${member.battery}%`
+                      : 'EN VIVO'}
                 </AppText>
               </View>
             </View>
           ))}
-          <Pressable style={styles.addMember} onPress={() => setElapsed((v) => v + 1)}>
+          <Pressable style={styles.addMember} onPress={() => void shareParty()}>
             <Ionicons name="add" size={20} color={colors.muted} />
           </Pressable>
         </ScrollView>
@@ -235,7 +411,7 @@ export default function PartyScreen() {
             <View style={[styles.routeDot, { backgroundColor: colors.lime }]} />
             <View style={{ flex: 1 }}>
               <AppText variant="caption" color={colors.muted}>Salida</AppText>
-              <AppText variant="bodyStrong" numberOfLines={1}>Av. Winston Churchill</AppText>
+              <AppText variant="bodyStrong" numberOfLines={1}>Tu ubicación en vivo</AppText>
             </View>
           </View>
           <Ionicons name="arrow-forward" size={14} color={colors.dim} />
@@ -243,7 +419,7 @@ export default function PartyScreen() {
             <View style={[styles.routeDot, { backgroundColor: colors.accent }]} />
             <View style={{ flex: 1 }}>
               <AppText variant="caption" color={colors.muted}>Destino</AppText>
-              <AppText variant="bodyStrong" numberOfLines={1}>Constanza</AppText>
+              <AppText variant="bodyStrong" numberOfLines={1}>{partyDestination}</AppText>
             </View>
           </View>
         </View>
@@ -255,19 +431,14 @@ export default function PartyScreen() {
         />
 
         <View style={styles.bottomActions}>
-          <Pressable style={styles.bottomAction}>
+          <Pressable style={styles.bottomAction} onPress={() => router.push('/party/chat')}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
             <AppText variant="caption" color={colors.textSoft}>Chat</AppText>
             <View style={styles.unread} />
           </Pressable>
           <Pressable
             style={styles.bottomAction}
-            onPress={() =>
-              Share.share({
-                message: `Únete a mi party en Caravana: ${partyUrl(activeParty.code)}`,
-                url: partyUrl(activeParty.code),
-              })
-            }
+            onPress={() => void shareParty()}
           >
             <Ionicons name="share-social-outline" size={20} color={colors.text} />
             <AppText variant="caption" color={colors.textSoft}>Compartir</AppText>
@@ -276,7 +447,7 @@ export default function PartyScreen() {
             <Ionicons name="flag-outline" size={19} color={colors.lime} />
             <AppText variant="caption" color={colors.lime}>Retar</AppText>
           </Pressable>
-          <Pressable style={styles.leaveAction} onPress={() => router.replace('/(tabs)')}>
+          <Pressable style={styles.leaveAction} onPress={() => void leave()}>
             <Ionicons name="exit-outline" size={18} color={colors.danger} />
             <AppText variant="caption" color={colors.danger}>Salir</AppText>
           </Pressable>
@@ -303,6 +474,13 @@ export default function PartyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  state: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing['3xl'],
+  },
   topOverlay: {
     position: 'absolute',
     top: 0,

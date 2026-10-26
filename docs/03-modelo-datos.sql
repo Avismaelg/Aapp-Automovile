@@ -354,6 +354,8 @@ create table if not exists public.parties (
   voice_room text not null unique default 'party_' || replace(gen_random_uuid()::text, '-', ''),
   destination extensions.geography(Point, 4326),
   destination_label text,
+  destination_lat double precision,
+  destination_lng double precision,
   route extensions.geography(LineString, 4326),
   starts_at timestamptz,
   ends_at timestamptz,
@@ -380,6 +382,8 @@ create table if not exists public.party_members (
   joined_at timestamptz not null default now(),
   left_at timestamptz,
   last_location extensions.geography(Point, 4326),
+  last_lat double precision,
+  last_lng double precision,
   last_speed_kmh numeric(6,2),
   last_heading numeric(5,2),
   last_seen_at timestamptz,
@@ -388,6 +392,7 @@ create table if not exists public.party_members (
 );
 
 create index if not exists party_members_user_idx on public.party_members (user_id);
+create index if not exists party_members_party_seen_idx on public.party_members (party_id, last_seen_at desc);
 
 create or replace function public.is_party_member(p_party_id uuid)
 returns boolean
