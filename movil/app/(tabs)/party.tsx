@@ -22,7 +22,7 @@ import { WorldMap } from '@/src/components/WorldMap';
 import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useActiveParty, useLeaveParty, usePartyLocation, useSetVoiceChannel } from '@/src/hooks/useParty';
+import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
@@ -67,12 +67,6 @@ export default function PartyScreen() {
   const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
   const [now, setNow] = useState(() => Date.now());
   const [recenterToken, setRecenterToken] = useState(0);
-
-  usePartyLocation(
-    party?.id,
-    live.location,
-    Boolean(party) && !isDemo && live.isLive,
-  );
 
   useEffect(() => {
     if (isDemo) {

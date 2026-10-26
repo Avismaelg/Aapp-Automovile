@@ -1,518 +1,459 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { useCallback, useMemo, useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FeedCard } from '@/src/components/FeedCard';
-import { PostCard } from '@/src/components/PostCard';
-import {
-  AppText,
-  Avatar,
-  Button,
-  Card,
-  IconButton,
-  Pill,
-  Screen,
-  SectionHeader,
-  Stat,
-} from '@/src/components/ui';
-import { activeChallenge, feed, friends } from '@/src/data/mock';
+import { WorldMap } from '@/src/components/WorldMap';
+import { AppText, Avatar, IconButton } from '@/src/components/ui';
+import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useFeed, useToggleLike } from '@/src/hooks/useFeed';
-import { startTracking, stopTracking } from '@/src/lib/tracking';
-import { useSession } from '@/src/store/session';
-import { colors, radius, spacing } from '@/src/theme';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
+import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
+import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useActiveParty, usePartyLocation } from '@/src/hooks/useParty';
+import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
+import type {
+  WorldMapDestination,
+  WorldMapMember,
+  WorldMapMode,
+} from '@/src/lib/map-html';
+import { colors, radius, shadows, spacing } from '@/src/theme';
+
+const GLASS = 'rgba(6,8,11,0.74)';
 
 const quickActions = [
-  { label: 'Party', icon: 'radio' as const, color: colors.accent, href: '/party' },
-  { label: 'Retos', icon: 'flag' as const, color: colors.lime, href: '/challenges' },
-  { label: 'Repostaje', icon: 'water' as const, color: colors.cyan, href: '/fuel' },
-  { label: 'Mi QR', icon: 'qr-code' as const, color: '#B98CFF', href: '/scan' },
-  { label: 'Garaje', icon: 'car-sport' as const, color: '#FFB84D', href: '/garage' },
-  { label: 'Conducir', icon: 'navigate' as const, color: colors.cyan, href: '/drive' },
+  { label: 'Party', icon: 'radio' as const, color: colors.accent, href: '/(tabs)/party' },
+  { label: 'Retos', icon: 'flag' as const, color: colors.lime, href: '/(tabs)/challenges' },
+  { label: 'Repostar', icon: 'water' as const, color: colors.cyan, href: '/(tabs)/fuel' },
+  { label: 'Conducir', icon: 'navigate' as const, color: '#FFB84D', href: '/drive' },
 ];
 
-function HeroRoute() {
-  return (
-    <Svg
-      width={210}
-      height={170}
-      viewBox="0 0 210 170"
-      style={styles.heroRoute}
-      pointerEvents="none"
-    >
-      <Path
-        d="M8 150 C 40 120, 52 132, 74 100 S 92 52, 122 48 S 160 70, 178 34 S 196 18, 208 8"
-        stroke={colors.accent}
-        strokeWidth={2}
-        fill="none"
-        opacity={0.35}
-        strokeDasharray="4 5"
-      />
-      <Path
-        d="M8 150 C 40 120, 52 132, 74 100 S 92 52, 122 48 S 160 70, 178 34 S 196 18, 208 8"
-        stroke={colors.accent}
-        strokeWidth={8}
-        fill="none"
-        opacity={0.07}
-      />
-      <Path d="M0 88 C 40 80, 66 96, 104 86 S 160 66, 210 74" stroke="#1C2631" strokeWidth={1} fill="none" />
-      <Path d="M34 0 C 42 54, 28 104, 44 170" stroke="#1C2631" strokeWidth={1} fill="none" />
-      <Path d="M140 0 C 132 56, 150 120, 136 170" stroke="#1C2631" strokeWidth={1} fill="none" />
-    </Svg>
-  );
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Buenos días';
-  if (hour < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
-export default function HomeScreen() {
+export default function MapScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const me = useCurrentUser();
-  const { posts, isDemo: feedIsDemo, isLoading: feedLoading, isError: feedError, refetch: refetchFeed } = useFeed();
-  const toggleLike = useToggleLike();
-  const trackingEnabled = useSession((state) => state.trackingEnabled);
-  const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
-  const firstName = me.name.split(' ')[0];
+  const live = useLiveLocation();
+  const { party, isDemo } = useActiveParty();
+  const { vehicles } = useGarageVehicles();
+  const [mode, setMode] = useState<WorldMapMode>('3d');
+  const [following, setFollowing] = useState(true);
+  const [recenterToken, setRecenterToken] = useState(0);
+  const [mapKey, setMapKey] = useState(0);
+  const [mapError, setMapError] = useState<string | null>(null);
 
-  const toggleTracking = async (next: boolean) => {
-    if (Platform.OS === 'web') {
-      setTrackingEnabled(next);
-      Alert.alert(
-        next ? 'Tracking activado' : 'Tracking en pausa',
-        'En la web es una simulación. En el móvil se usa el GPS en segundo plano con tu permiso.',
-      );
-      return;
+  usePartyLocation(party?.id, live.location, Boolean(party) && !isDemo && live.isLive);
+
+  const mapMembers = useMemo<WorldMapMember[]>(() => {
+    if (isDemo) {
+      return partyMembers
+        .filter((member) => member.username !== me.username)
+        .map((member) => ({
+          id: member.id,
+          name: member.name,
+          color: member.color,
+          latitude: member.latitude,
+          longitude: member.longitude,
+          isTalking: member.isTalking,
+          battery: member.battery,
+        }));
     }
-    try {
-      if (next) await startTracking();
-      else await stopTracking();
-      setTrackingEnabled(next);
-    } catch (error) {
-      Alert.alert(
-        'No se pudo cambiar el tracking',
-        error instanceof Error ? error.message : 'Revisa los permisos de ubicación.',
-      );
+    return (party?.members ?? [])
+      .filter((member) => !member.isMe && member.lastLat != null && member.lastLng != null)
+      .map((member) => ({
+        id: member.userId,
+        name: member.profile.displayName,
+        color: member.color,
+        latitude: member.lastLat as number,
+        longitude: member.lastLng as number,
+        isTalking: false,
+      }));
+  }, [isDemo, me.username, party]);
+
+  const destination = useMemo<WorldMapDestination | null>(() => {
+    if (isDemo) {
+      return {
+        latitude: activeParty.destinationLatitude,
+        longitude: activeParty.destinationLongitude,
+        label: activeParty.destination.split(',')[0],
+      };
     }
+    if (party?.destinationLat != null && party.destinationLng != null) {
+      return {
+        latitude: party.destinationLat,
+        longitude: party.destinationLng,
+        label: party.destinationLabel ?? 'Destino',
+      };
+    }
+    return null;
+  }, [isDemo, party]);
+
+  const route = useGraphHopperRoute({
+    origin: live.location,
+    destination: destination ?? live.location,
+    enabled: Boolean(destination),
+  });
+
+  const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
+  const vehicleLabel = primaryVehicle
+    ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
+    : 'Añade tu vehículo';
+  const speedLabel =
+    live.location.speedKmh == null ? '--' : String(Math.round(live.location.speedKmh));
+  const inParty = Boolean(party) || isDemo;
+  const partyName = isDemo ? activeParty.name : (party?.name ?? 'Party');
+  const crewCount = isDemo ? partyMembers.length : (party?.members.length ?? 0);
+  const routeLine = route.route
+    ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
+    : null;
+  const partySubtitle = [
+    destination?.label ?? 'Sin destino',
+    routeLine,
+    `${crewCount} ${crewCount === 1 ? 'piloto' : 'pilotos'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
+  const handleMapError = useCallback((message: string) => setMapError(message), []);
+
+  const recenter = () => {
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
   };
 
-  const openTrackingOptions = () => {
-    Alert.alert(
-      'Tracking automático',
-      trackingEnabled
-        ? 'Caravana detecta tus viajes y los guarda en tu perfil. Puedes pausarlo cuando quieras.'
-        : 'El tracking está en pausa. Actívalo para registrar tus rutas automáticamente.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: trackingEnabled ? 'Pausar' : 'Activar',
-          onPress: () => toggleTracking(!trackingEnabled),
-        },
-        {
-          text: 'Ajustes',
-          onPress: () => router.push('/(tabs)/profile'),
-        },
-      ],
-    );
+  const toggleMode = () => setMode((value) => (value === '3d' ? '2d' : '3d'));
+
+  const retryMap = () => {
+    setMapError(null);
+    setFollowing(true);
+    setMapKey((value) => value + 1);
   };
 
   return (
-    <Screen contentStyle={{ paddingTop: spacing.sm }}>
-      <View style={styles.header}>
-        <View>
-          <View style={styles.brandRow}>
-            <View style={styles.brandDot} />
-            <AppText variant="label" color={colors.accent} style={{ letterSpacing: 2 }}>
-              CARAVANA
+    <View style={styles.root}>
+      <WorldMap
+        key={mapKey}
+        members={mapMembers}
+        destination={destination}
+        location={live.location}
+        route={route.route}
+        mode={mode}
+        recenterToken={recenterToken}
+        onFollowChange={handleFollowChange}
+        onError={handleMapError}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.overlay,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
+        ]}
+      >
+        <View style={styles.topRow}>
+          <Pressable onPress={() => router.push('/(tabs)/profile')} hitSlop={6}>
+            <Avatar
+              name={me.name}
+              color={me.color}
+              size={42}
+              uri={me.avatarUrl}
+              ring={colors.border}
+              online={live.isLive}
+            />
+          </Pressable>
+          <Pressable style={styles.vehiclePill} onPress={() => router.push('/(tabs)/garage')}>
+            <Ionicons name="car-sport" size={16} color={colors.accent} />
+            <AppText variant="bodyStrong" numberOfLines={1} style={styles.vehicleText}>
+              {vehicleLabel}
             </AppText>
-          </View>
-          <AppText variant="h1" style={{ marginTop: 6 }}>
-            {greeting()},{'\n'}{firstName}.
-          </AppText>
-        </View>
-        <View style={styles.headerActions}>
-          <IconButton icon="notifications-outline" badge />
-          <Avatar
-            name={me.name}
-            color={me.color}
-            size={44}
-            uri={me.avatarUrl}
-            ring={colors.border}
-            online
+            <Ionicons name="chevron-down" size={14} color={colors.muted} />
+          </Pressable>
+          <IconButton
+            icon="newspaper-outline"
+            size={42}
+            onPress={() => router.push('/actividad' as Href)}
           />
         </View>
-      </View>
 
-      <Pressable style={styles.trackingBar} onPress={openTrackingOptions}>
-        <View style={[styles.liveDot, !trackingEnabled && styles.liveDotPaused]} />
-        <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-          {trackingEnabled ? 'Tracking automático activo' : 'Tracking automático en pausa'}
-        </AppText>
-        <Pill
-          label={trackingEnabled ? 'Listo' : 'Pausa'}
-          tone={trackingEnabled ? 'lime' : 'neutral'}
-          icon={trackingEnabled ? 'flash' : 'pause'}
-        />
-      </Pressable>
-
-      <LinearGradient
-        colors={['#2A170F', '#151A21', '#10151B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <HeroRoute />
-        <View style={styles.heroTop}>
-          <Pill label="Tu mes en la carretera" tone="accent" icon="flag" />
-          <Pill label="+12 %" tone="lime" icon="trending-up" />
-        </View>
-        <View style={styles.heroValueRow}>
-          <AppText variant="display" style={{ fontSize: 42 }}>
-            1.284
-          </AppText>
-          <AppText variant="h3" color={colors.textSoft} style={{ marginBottom: 8, marginLeft: 6 }}>
-            km
-          </AppText>
-        </View>
-        <AppText variant="caption" color={colors.muted}>
-          128 rutas · 214 horas al volante
-        </AppText>
-
-        <View style={styles.heroStats}>
-          <Stat value="128" label="rutas" />
-          <View style={styles.heroDivider} />
-          <Stat value="214 h" label="conduciendo" />
-          <View style={styles.heroDivider} />
-          <Stat value="42" label="amigos" />
-        </View>
-
-        <View style={styles.heroActions}>
-          <Pressable style={styles.heroPrimary} onPress={() => router.push('/(tabs)/party')}>
-            <Ionicons name="radio" size={18} color="#120802" />
-            <AppText variant="bodyStrong" color="#120802">Salir en party</AppText>
-          </Pressable>
-          <Pressable style={styles.heroSecondary} onPress={() => router.push('/(tabs)/fuel')}>
-            <Ionicons name="water-outline" size={18} color={colors.text} />
-            <AppText variant="bodyStrong">Repostar</AppText>
-          </Pressable>
-        </View>
-      </LinearGradient>
-
-      <View style={styles.quickGrid}>
-        {quickActions.map((action) => (
-          <Pressable
-            key={action.label}
-            style={({ pressed }) => [styles.quickItem, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push(action.href as never)}
-          >
-            <View style={[styles.quickIcon, { backgroundColor: `${action.color}1F`, borderColor: `${action.color}40` }]}>
-              <Ionicons name={action.icon} size={21} color={action.color} />
-            </View>
-            <AppText variant="caption" color={colors.textSoft}>{action.label}</AppText>
-          </Pressable>
-        ))}
-      </View>
-
-      <Pressable
-        style={({ pressed }) => [styles.challengeBanner, pressed && { opacity: 0.85 }]}
-        onPress={() => router.push('/(tabs)/challenges')}
-      >
-        <View style={styles.challengeIcon}>
-          <Ionicons name="flag" size={20} color={colors.lime} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>
-            RETO EN CURSO · {activeChallenge.participants.length} PARTICIPANTES
-          </AppText>
-          <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
-            {activeChallenge.title}
-          </AppText>
-          <AppText variant="caption" color={colors.muted} style={{ marginTop: 1 }}>
-            {activeChallenge.fromLabel} → {activeChallenge.toLabel} ·{' '}
-            {activeChallenge.participants[0].name.split(' ')[0]} lidera
-          </AppText>
-        </View>
-        <View style={styles.challengeCta}>
-          <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>VER</AppText>
-          <Ionicons name="chevron-forward" size={13} color={colors.textSoft} />
-        </View>
-      </Pressable>
-
-      <SectionHeader title="En la carretera" action="Ver mapa" onAction={() => router.push('/(tabs)/party')} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 10, paddingRight: spacing.xl }}
-      >
-        {friends.map((friend) => (
-          <Pressable
-            key={friend.id}
-            onPress={() => router.push('/(tabs)/party')}
-            style={({ pressed }) => [styles.friendCard, pressed && { opacity: 0.8 }]}
-          >
-            <View style={styles.friendTop}>
-              <Avatar name={friend.name} color={friend.color} size={42} online={friend.online} />
-              {friend.online ? (
-                <View style={styles.friendLive}>
-                  <View style={styles.friendLiveDot} />
-                  <AppText variant="label" color={colors.green} style={{ fontSize: 8 }}>
-                    LIVE
-                  </AppText>
-                </View>
-              ) : null}
-            </View>
-            <AppText variant="bodyStrong" numberOfLines={1} style={{ marginTop: 10 }}>
-              {friend.name.split(' ')[0]}
+        {!live.isLive ? (
+          <View style={styles.banner}>
+            <View style={styles.bannerDot} />
+            <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+              {live.message}
             </AppText>
-            <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-              {friend.car}
+            {live.status !== 'locating' ? (
+              <Pressable onPress={live.retry} hitSlop={8}>
+                <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                  REINTENTAR
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {mapError ? (
+          <View style={[styles.banner, styles.bannerError]}>
+            <Ionicons name="warning-outline" size={16} color={colors.accent} />
+            <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+              {mapError}
             </AppText>
-            <View style={styles.friendBottom}>
-              <Ionicons name="navigate" size={11} color={colors.accent} />
-              <AppText variant="caption" color={colors.accent}>
-                {friend.distanceKm ? `${friend.distanceKm} km` : friend.status}
+            <Pressable onPress={retryMap} hitSlop={8}>
+              <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                REINTENTAR
+              </AppText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.spacer} pointerEvents="none" />
+
+        <View style={styles.sideRow}>
+          <View style={styles.speedHud}>
+            <AppText variant="display" style={styles.speedValue}>
+              {speedLabel}
+            </AppText>
+            <View style={styles.speedMeta}>
+              <View style={[styles.liveDot, !live.isLive && styles.liveDotOff]} />
+              <AppText variant="label" color={colors.muted} style={styles.speedUnit}>
+                km/h · {live.isLive ? 'GPS' : 'DEMO'}
               </AppText>
             </View>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <SectionHeader
-        title="Actividad"
-        action="Publicar"
-        onAction={() => router.push('/post/new')}
-      />
-      {feedIsDemo ? (
-        feed.map((item) => <FeedCard key={item.id} item={item} />)
-      ) : feedLoading ? (
-        <View style={styles.feedState}>
-          <ActivityIndicator color={colors.accent} />
-          <AppText variant="caption" color={colors.muted}>Cargando actividad…</AppText>
-        </View>
-      ) : feedError ? (
-        <Card style={styles.feedEmpty}>
-          <AppText variant="bodyStrong">No pudimos cargar el feed</AppText>
-          <AppText variant="caption" color={colors.muted}>
-            Revisa tu conexión y vuelve a intentarlo.
-          </AppText>
-          <Button
-            label="Reintentar"
-            variant="secondary"
-            onPress={() => refetchFeed()}
-            style={{ marginTop: spacing.sm }}
-          />
-        </Card>
-      ) : posts.length === 0 ? (
-        <Card style={styles.feedEmpty}>
-          <View style={styles.feedEmptyIcon}>
-            <Ionicons name="sparkles-outline" size={24} color={colors.accent} />
           </View>
-          <AppText variant="title" align="center">Sé el primero en compartir</AppText>
-          <AppText variant="caption" color={colors.muted} align="center">
-            Publica una ruta, una foto o una idea para arrancar tu caravana.
-          </AppText>
-          <Button
-            label="Crear publicación"
-            icon="create-outline"
-            onPress={() => router.push('/post/new')}
-            style={{ marginTop: spacing.md }}
-          />
-        </Card>
-      ) : (
-        posts.map((post) => (
-          <PostCard
-            key={post.id}
-            post={post}
-            liking={toggleLike.isPending}
-            onPressComment={() => router.push(`/post/${post.id}` as Href)}
-            onToggleLike={() =>
-              void toggleLike.mutateAsync({
-                postId: post.id,
-                liked: post.likedByMe,
-              })
-            }
-          />
-        ))
-      )}
 
-      <View style={styles.footer}>
-        <Ionicons name="shield-checkmark" size={13} color={colors.dim} />
-        <AppText variant="caption" color={colors.dim}>
-          Tu ubicación solo se comparte dentro de una party.
-        </AppText>
+          <View style={styles.controls}>
+            <Pressable
+              style={styles.roundControl}
+              onPress={toggleMode}
+              accessibilityRole="button"
+              accessibilityLabel={mode === '3d' ? 'Cambiar a vista 2D' : 'Cambiar a vista 3D'}
+            >
+              <AppText variant="label" color={colors.text} style={styles.modeText}>
+                {mode === '3d' ? '3D' : '2D'}
+              </AppText>
+            </Pressable>
+            {!following ? (
+              <Pressable
+                style={[styles.roundControl, styles.roundControlAccent]}
+                onPress={recenter}
+                accessibilityRole="button"
+                accessibilityLabel="Recentrar mapa"
+              >
+                <Ionicons name="navigate" size={20} color="#120802" />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.bottomCard}>
+          <Pressable style={styles.partyRow} onPress={() => router.push('/(tabs)/party')}>
+            <View style={[styles.partyIcon, !inParty && styles.partyIconEmpty]}>
+              <Ionicons
+                name={inParty ? 'radio' : 'add'}
+                size={18}
+                color={inParty ? '#120802' : colors.accent}
+              />
+            </View>
+            <View style={styles.partyText}>
+              <AppText variant="label" color={colors.muted} style={styles.partyLabel}>
+                {inParty ? 'Party en vivo' : 'Sin party activa'}
+              </AppText>
+              <AppText variant="bodyStrong" numberOfLines={1}>
+                {inParty ? partyName : 'Crea o únete a una caravana'}
+              </AppText>
+              <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                {inParty ? partySubtitle : 'Invita a tus amigos con un código'}
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
+
+          <View style={styles.quickRow}>
+            {quickActions.map((action) => (
+              <Pressable
+                key={action.label}
+                style={({ pressed }) => [styles.quickItem, pressed && { opacity: 0.7 }]}
+                onPress={() => router.push(action.href as Href)}
+              >
+                <View
+                  style={[
+                    styles.quickIcon,
+                    { backgroundColor: `${action.color}1F`, borderColor: `${action.color}40` },
+                  ]}
+                >
+                  <Ionicons name={action.icon} size={18} color={action.color} />
+                </View>
+                <AppText variant="caption" color={colors.textSoft}>
+                  {action.label}
+                </AppText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <Pressable
+          style={styles.attribution}
+          hitSlop={6}
+          onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
+        >
+          <AppText variant="caption" color={colors.dim} style={styles.attributionText}>
+            © OpenFreeMap · © OpenMapTiles · © OpenStreetMap · Relieve Mapzen
+          </AppText>
+        </Pressable>
       </View>
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
+  root: { flex: 1, backgroundColor: colors.bg },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: spacing.lg,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brandDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  trackingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    marginTop: spacing.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.green,
-    shadowColor: colors.green,
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  liveDotPaused: { backgroundColor: colors.dim, shadowOpacity: 0 },
-  hero: {
-    marginTop: spacing.lg,
-    borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.25)',
-    padding: spacing.xl,
-    overflow: 'hidden',
-  },
-  heroRoute: { position: 'absolute', right: -10, top: 20, opacity: 0.9 },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroValueRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing.lg },
-  heroStats: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    gap: spacing.sm,
   },
-  heroDivider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: spacing.lg },
-  heroActions: { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
-  heroPrimary: {
+  vehiclePill: {
     flex: 1,
-    minHeight: 48,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  heroSecondary: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    gap: spacing.sm,
+    minHeight: 42,
+    backgroundColor: GLASS,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+  },
+  vehicleText: { flex: 1 },
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  quickGrid: {
+  bannerError: { borderColor: 'rgba(255,90,31,0.4)' },
+  bannerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  bannerText: { flex: 1 },
+  retryText: { fontSize: 9 },
+  spacer: { flex: 1 },
+  sideRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginTop: spacing.xl,
-    gap: 6,
+    marginBottom: spacing.md,
   },
-  quickItem: { flex: 1, alignItems: 'center', gap: 7 },
-  challengeBanner: {
+  speedHud: {
+    minWidth: 128,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  speedValue: { fontSize: 40, lineHeight: 44 },
+  speedMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: spacing.lg,
-    backgroundColor: 'rgba(201,255,77,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(201,255,77,0.2)',
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    gap: 6,
+    marginTop: 2,
   },
-  challengeIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.limeSoft,
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.green,
+  },
+  liveDotOff: { backgroundColor: colors.dim },
+  speedUnit: { fontSize: 9 },
+  controls: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  roundControl: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  challengeCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  quickIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.lg,
+    backgroundColor: GLASS,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  friendCard: {
-    width: 132,
-    backgroundColor: colors.surface,
+  roundControlAccent: {
+    backgroundColor: colors.lime,
+    borderColor: colors.lime,
+  },
+  modeText: { fontSize: 11 },
+  bottomCard: {
+    backgroundColor: 'rgba(11,15,20,0.94)',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    borderRadius: radius['2xl'],
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadows.card,
   },
-  friendTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  friendLive: {
+  partyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(46,230,168,0.1)',
+    gap: spacing.md,
   },
-  friendLiveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green },
-  friendBottom: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  feedState: {
+  partyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.accent,
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: spacing['2xl'],
+    justifyContent: 'center',
   },
-  feedEmpty: {
-    alignItems: 'center',
-    paddingVertical: spacing['2xl'],
-    marginBottom: spacing.md,
-  },
-  feedEmptyIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  partyIconEmpty: {
     backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,31,0.3)',
   },
-  footer: {
+  partyText: { flex: 1 },
+  partyLabel: { fontSize: 9 },
+  quickRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
   },
+  attribution: {
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+  },
+  attributionText: { fontSize: 9 },
 });

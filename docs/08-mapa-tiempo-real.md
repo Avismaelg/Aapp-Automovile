@@ -1,111 +1,193 @@
-# Caravana — Mapa real y ubicación en tiempo real
+# Caravana — Mapa 3D y ubicación en tiempo real
 
-> Estado: la pantalla de Party usa un mapa real de OpenStreetMap con la ubicación
-> GPS del usuario actualizada cada 5 segundos. Los miembros y sus posiciones se
-> sincronizan por Supabase Realtime; el chat también es real. El PTT de voz sigue
-> pendiente de LiveKit.
+> Estado: la pestaña **Mapa** es la pantalla inicial de la app. Usa MapLibre GL
+> en 3D sobre datos de OpenStreetMap/OpenFreeMap, muestra edificios y relieve y
+> sigue la posición y el rumbo del vehículo. La Party reutiliza el mismo motor
+> para enseñar la caravana. Probado en web con GPS real del navegador y
+> ubicaciones simuladas; falta la prueba en dispositivos físicos.
 
 ---
 
 ## 1. Qué se implementó
 
-- Mapa real gratuito con teselas de **OpenStreetMap** y renderizado **Leaflet**.
-- Sin API key ni cuenta de mapas.
-- Ubicación del usuario en vivo con `expo-location`:
-  - permiso de ubicación en primer plano;
-  - actualización cada 5 s o cada 5 m;
-  - precisión y rumbo cuando el dispositivo los entrega.
-- Fallback a Santo Domingo si el permiso se deniega o no hay GPS.
-- Marcadores de la party con color, inicial y nombre.
-- Destino y ruta A → B.
-- Motor de rutas **GraphHopper** (cloud o self-hosted) con fallback a línea
-  directa. Ver [`09-graphhopper.md`](09-graphhopper.md).
-- Botón de recentrado sobre la posición del usuario.
-- Atribución visible a OpenStreetMap.
-- Funciona en web, iOS y Android:
-  - web: `iframe` con Leaflet;
-  - móvil: `WebView` con el mismo HTML.
-- Tema oscuro mediante filtro CSS sobre las teselas de OSM.
+- Mapa vectorial 3D con **MapLibre GL JS 5.24.0**.
+  - Estilo oscuro de **OpenFreeMap** (`tiles.openfreemap.org/styles/dark`), sin
+    API key.
+  - Edificios en 3D por extrusión (`fill-extrusion`) con `render_height` y
+    `render_min_height`.
+  - Relieve real con teselas **Terrarium** de AWS (Mapzen/NASA/USGS) y
+    exageración 1.
+  - Atribución obligatoria en la interfaz: OpenFreeMap, OpenMapTiles,
+    OpenStreetMap y relieve Mapzen.
+- **Pantalla inicial**: `app/(tabs)/index.tsx`. El antiguo dashboard pasó a
+  `app/actividad.tsx`, accesible desde el botón de actividad del mapa.
+- Vehículo con flecha de navegación:
+  - halo naranja y flecha orientada al rumbo;
+  - la cámara se centra en el vehículo con inclinación de 60° y zoom 16,5;
+  - el rumbo del GPS gira la cámara (heading-up) cuando el vehículo se mueve;
+  - el marcador conserva su orientación cuando el vehículo está parado.
+- Controles:
+  - **3D/2D**: 2D mantiene el seguimiento y el rumbo, pero con inclinación 0;
+  - **recentrar**: solo aparece si el usuario movió el mapa;
+  - arrastrar, rotar o inclinar el mapa suelta el seguimiento;
+  - el botón de recentrar vuelve a seguirlo con zoom 16,5.
+- Marcadores de la party con inicial, color, nombre y pulso al hablar.
+- Destino con bandera y etiqueta.
+- Ruta con casing oscuro:
+  - naranja para GraphHopper;
+  - lima para la ruta directa de fallback.
+- HUD con velocidad (`coords.speed`), estado GPS/demo y botones rápidos a Party,
+  Retos, Repostar y Conducir.
+- Aviso de permiso/error con **REINTENTAR** y aviso de error del mapa con
+  reintento que remonta el WebView/iframe.
 
-Archivo principal: `movil/src/lib/map-html.ts`.
-Componentes: `WorldMap.tsx` (nativo) y `WorldMap.web.tsx` (web).
-Hook GPS: `src/hooks/useLiveLocation.ts`.
+Archivos principales:
+
+| Archivo | Función |
+|---|---|
+| `movil/src/lib/map-html.ts` | HTML estático del mapa, estilo, capas 3D, cámara y protocolo |
+| `movil/src/components/WorldMap.tsx` | WebView nativo y envío de comandos |
+| `movil/src/components/WorldMap.web.tsx` | iframe web y envío de comandos |
+| `movil/src/hooks/useLiveLocation.ts` | suscripción GPS compartida |
+| `movil/src/hooks/useGraphHopperRoute.ts` | ruta compartida y deduplicada |
+| `movil/src/hooks/useParty.ts` | publicación de posición en la party |
+| `movil/app/(tabs)/index.tsx` | pantalla inicial del mapa |
+| `movil/app/(tabs)/party.tsx` | mapa de la party con el mismo motor |
 
 ---
 
-## 2. Flujo de ubicación
+## 2. Arquitectura del mapa
+
+El HTML se construye una sola vez y **no se recarga** con cada actualización.
+React Native y el mapa se comunican con `postMessage`:
 
 ```
-Party
-  └─ useLiveLocation()
+React Native / web
+  ├─ location     posición, rumbo, precisión y velocidad
+  ├─ members      miembros de la party
+  ├─ destination  destino de la party
+  ├─ route        coordenadas, distancia, tiempo y motor
+  ├─ mode         "2d" | "3d"
+  └─ recenter     volver a seguir el vehículo
+
+Mapa
+  ├─ ready        el estilo y las capas están listos
+  ├─ follow       el usuario soltó o recuperó el seguimiento
+  └─ error        WebGL, red o tiempo de carga
+```
+
+- Cada comando lleva un `seq` para ignorar mensajes duplicados (Android e iOS
+  pueden entregar `postMessage` por `document` y por `window`).
+- Al recibir `ready`, el componente envía el estado completo; así no se pierde
+  ninguna actualización temprana.
+- En nativo se usa `react-native-webview` con `androidLayerType="hardware"`.
+- En web se usa un `iframe` con `srcDoc`.
+- `WorldMap` mantiene la misma API en Party y en Mapa: `members`, `destination`,
+  `location`, `route`, `mode`, `recenterToken`, `onFollowChange` y `onError`.
+
+### Cámara
+
+- `easeTo` mueve centro, rumbo e inclinación; el zoom solo cambia al iniciar o
+  recentrar.
+- `map.setPadding({ top: 90, bottom: 220 })` deja el coche por encima de la
+  tarjeta inferior y del HUD, no debajo de ellos.
+- Los eventos `dragstart`, `rotatestart` y `pitchstart` con `originalEvent`
+  desactivan el seguimiento; los movimientos programáticos no.
+- Los marcadores se reproyectan cuando carga el terreno (`sourcedata`), porque
+  el DEM cambia la altura de la cámara sin emitir `move`. Sin esto el vehículo
+  quedaba unos 140 px desplazado al arrancar.
+
+---
+
+## 3. Flujo de ubicación
+
+```
+App (mapa inicial)
+  └─ useLiveLocation()               ← una sola suscripción GPS
        ├─ requestForegroundPermissionsAsync()
        ├─ getLastKnownPositionAsync()
-       ├─ watchPositionAsync(cada 5 s / 5 m)
-       └─ fallback Santo Domingo si falla
-  └─ usePartyLocation()
-       └─ publica last_lat/last_lng/last_seen_at si el GPS está en vivo
+       ├─ watchPositionAsync(2 s / 3 m, Accuracy.High)
+       ├─ normaliza heading y speed (null/-1 → null)
+       └─ fallback Santo Domingo a los 8 s sin GPS
 
-WorldMap
-  ├─ WebView / iframe con el HTML del mapa
-  ├─ marcador "Tú" con la ubicación actual
-  ├─ círculo de precisión
-  ├─ miembros reales de la party con Realtime
-  └─ destino + línea punteada
+Mapa
+  └─ usePartyLocation(partyId, location, party && live)
+       └─ publica last_lat/last_lng/last_seen_at cada 5 s
 ```
 
-La ubicación del usuario se envía al mapa por `postMessage`; el HTML no se
-recarga con cada actualización. Las coordenadas de los miembros se guardan en
-Supabase mientras la party está activa y se limpian al salir.
+- La suscripción es un **store de módulo con contador de referencias**: mapa y
+  Party comparten el mismo GPS y solo se cierra cuando ninguna pantalla lo usa.
+- `usePartyLocation` lee siempre la última posición desde un `ref` y escribe cada
+  5 s. Así el mapa puede refrescarse cada 2 s sin multiplicar escrituras.
+- Solo hay un publicador de posición: el mapa inicial. La pestaña Party ya no
+  escribe, para evitar dos escritores con la misma cuenta.
+- Si el permiso se deniega o falla el GPS se muestra Santo Domingo y se avisa.
+- La ubicación de demo **nunca** se publica en Supabase.
+- Al salir de la party se limpian `last_lat`/`last_lng` del miembro.
+
+### Rutas compartidas
+
+`useGraphHopperRoute` usa un store de módulo y una única petición:
+
+- debounce de 700 ms;
+- recalcula si cambia el destino, si el origen se movió más de 250 m o si pasaron
+  más de 2 minutos;
+- si mapa y Party están montados, comparten la misma ruta y no duplican llamadas;
+- sin GraphHopper o si falla, usa `fallbackRoute` y pinta la línea en lima.
+- La respuesta de GraphHopper llega como `[longitud, latitud]`; la app la guarda
+  como `[latitud, longitud]` y el mapa la convierte a `[longitud, latitud]` para
+  MapLibre.
 
 ---
 
-## 3. Privacidad
+## 4. Privacidad
 
-- La ubicación se solicita solo al abrir Party/mapa.
-- No se comparte con otros usuarios fuera de la party.
+- La ubicación se pide al abrir la app, porque el mapa es la pantalla inicial.
+- No se comparte fuera de una party.
 - Mientras hay una party activa, las coordenadas se guardan en Supabase y solo
-  las pueden leer el anfitrión y los miembros.
-- Al salir se borran `last_lat`/`last_lng` del miembro; el anfitrión puede cerrar
-  la party.
+  las leen el anfitrión y los miembros (RLS).
 - El QR público no contiene ubicación.
-- Si el usuario niega el permiso, la app sigue funcionando con ubicación demo,
-  pero **no publica** esa ubicación de demo en la party.
+- El tracking en segundo plano es independiente del mapa y solo se activa desde
+  la pantalla Actividad.
 
 ---
 
-## 4. Límites actuales
+## 5. Límites actuales
 
-- Las posiciones se sincronizan por Supabase Realtime; falta Presence explícita
-  y reconexión para redes inestables.
-- Las posiciones pueden quedar obsoletas si un miembro pierde conexión; falta
-  mostrar la antigüedad y limpiar miembros inactivos.
-- La ruta por carretera depende de GraphHopper configurado. Sin motor o si falla,
-  se usa una línea recta geodésica y se avisa en Party.
-- Las teselas se cargan directamente de `tile.openstreetmap.org`. Para una app
-  con tráfico real hay que usar un proveedor de teselas o autohospedar OSM y
-  respetar su política de uso.
-- Leaflet se carga desde unpkg; en producción conviene empaquetarlo localmente.
-- `react-native-webview` requiere un development build/EAS Build, no Expo Go.
-- El tracking en segundo plano es independiente del mapa de Party.
+- El mapa usa WebView + WebGL; en equipos de gama baja puede consumir batería y
+  memoria. Existe vista 2D y un aviso si WebGL no está disponible.
+- La pestaña Party monta un segundo mapa 3D mientras está abierta. Al volver al
+  mapa principal se conserva el primero.
+- MapLibre se carga desde unpkg y el estilo/teselas desde OpenFreeMap. Son
+  servicios públicos gratuitos: para producción hay que fijar versión, tener un
+  plan de teselas y cachear.
+- No hay mapas offline ni caché de teselas.
+- No hay navegación giro a giro ni CarPlay/Android Auto nativos.
+- El relieve puede mostrar un aviso interno de `maxzoom` de elevación; no rompe
+  el mapa.
+- Falta probar en iPhone/Android reales: rendimiento, batería, permisos, túneles,
+  reconexión y precisión del rumbo.
+- El tracking en segundo plano sigue siendo un servicio aparte; el mapa no
+  promete seguimiento con la app cerrada.
 
 ---
 
-## 5. Producción de mapas
+## 6. Producción
 
 Antes de lanzar:
 
-1. Elegir proveedor de teselas:
-   - MapTiler, Mapbox o Stadia para vector tiles;
-   - servidor propio con OpenMapTiles/MapLibre.
-2. Respetar atribución y límites del proveedor.
-3. Evaluar MapLibre React Native para mapas vectoriales nativos.
-4. Añadir navegación turn-by-turn.
-5. Añadir Presence explícita y limpieza de miembros inactivos.
-6. Probar batería, túneles, reconexión y precisión en dispositivos reales.
+1. Elegir proveedor de teselas vectoriales (MapTiler, Stadia, Mapbox o
+   OpenMapTiles/MapLibre autohospedado) y revisar su licencia y cuota.
+2. Empaquetar MapLibre y el estilo en el bundle en vez de depender de unpkg.
+3. Evaluar `@maplibre/maplibre-react-native` para render nativo y mejor batería.
+4. Probar en dispositivos reales con EAS development build.
+5. Añadir caché/offline y reconexión de teselas.
+6. Añadir Presence explícita y limpieza de miembros inactivos en la party.
+7. Considerar navegación turn-by-turn y avisos de tráfico.
 
 ---
 
-## 6. Pruebas
+## 7. Pruebas
 
 ```bash
 cd movil
@@ -115,14 +197,25 @@ npx expo-doctor
 npx expo export --platform web
 ```
 
-Prueba manual:
+Prueba manual/web realizada:
 
-1. Abrir Party.
-2. Conceder permiso de ubicación.
-3. Comprobar el mensaje “Ubicación en vivo · se actualiza cada 5 s”.
-4. Moverse o simular ubicación y verificar que el marcador “Tú” se mueve.
-5. Pulsar el botón de recentrar.
-6. Denegar el permiso: debe aparecer el fallback de demo y “REINTENTAR”.
-7. Verificar la atribución de OpenStreetMap.
+1. Abrir la app en demo: el mapa es la pantalla inicial.
+2. Comprobar `ready`, inclinación 60°, relieve activo, capa
+   `caravana-buildings-3d` y capa de ruta.
+3. Enviar rumbo 90° y velocidad 40 km/h: la cámara gira a 90°, se centra en la
+   nueva posición y mantiene la inclinación.
+4. Enviar rumbo 200°: MapLibre lo normaliza a −160°, el mismo rumbo.
+5. Arrastrar con el ratón: `data-follow=off`, el mapa se mueve y aparece
+   *Recentrar mapa*.
+6. Pulsar recentrar: `data-follow=on`, zoom 16,5 y centro sobre el vehículo.
+7. Cambiar a 2D: `data-mode=2d` y `pitch=0`.
+8. Actualizar miembros/destino/ruta por mensaje: marcadores, pulso de hablando,
+   etiqueta escapada y ruta convertida a `[lng, lat]`.
+9. Abrir Party y volver: conviven dos mapas 3D, cada uno con su estado, sin
+   errores de consola.
+10. Recargar: el vehículo queda alineado con el centro con relleno (410 px =
+    410 px).
+11. Abrir `/actividad` y volver: regresa al mapa, que sigue listo.
 
-![Party con mapa real](screenshots/party-map-real.png)
+Resultado: `tsc`, `eslint`, `expo-doctor` (20/20) y export web correctos.
+Consola sin errores; solo avisos internos de MapLibre.

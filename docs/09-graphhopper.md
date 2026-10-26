@@ -87,13 +87,15 @@ firewall. Para Android Emulator, usa `http://10.0.2.2:8989`.
 | Archivo | Función |
 |---|---|
 | `src/lib/graphhopper.ts` | Construye `/route`, valida la respuesta y convierte coordenadas |
-| `src/hooks/useGraphHopperRoute.ts` | Recalcula con debounce y límites de distancia/tiempo |
-| `src/lib/map-html.ts` | Dibuja la polilínea y el casing de la ruta |
+| `src/hooks/useGraphHopperRoute.ts` | Petición compartida entre mapa y Party, con debounce y límites de distancia/tiempo |
+| `src/lib/map-html.ts` | Dibuja la polilínea y el casing en MapLibre |
 | `WorldMap.tsx` / `WorldMap.web.tsx` | Envían la ruta al mapa por `postMessage` |
+| `app/(tabs)/index.tsx` | Dibuja la ruta de la party en el mapa inicial |
 | `app/(tabs)/party.tsx` | Muestra estado, distancia y tiempo del motor |
 
 La respuesta de GraphHopper usa `[longitud, latitud]`; la app la convierte a
-`[latitud, longitud]` antes de pasarla a Leaflet.
+`[latitud, longitud]` y el mapa la vuelve a convertir a `[longitud, latitud]`
+para MapLibre.
 
 ---
 
@@ -101,9 +103,9 @@ La respuesta de GraphHopper usa `[longitud, latitud]`; la app la convierte a
 
 Sin GraphHopper:
 
-- el mapa sigue mostrando OpenStreetMap;
-- la ruta es una línea punteada directa;
-- Party muestra **“Ruta directa · configura GraphHopper”**;
+- el mapa 3D sigue mostrando OpenFreeMap/OpenStreetMap;
+- la ruta es una línea directa en color lima;
+- el mapa y Party muestran **“Ruta directa · configura GraphHopper”**;
 - el resto de la party, el PTT y la ubicación GPS funcionan igual.
 
 Si el motor falla durante una petición, se conserva una ruta directa y se muestra

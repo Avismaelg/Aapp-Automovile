@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { type StyleProp, type ViewStyle } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import {
-  buildMapHtml,
+  encodeWorldMapCommand,
+  parseWorldMapEvent,
+  WORLD_MAP_HTML,
+  type WorldMapCommand,
   type WorldMapDestination,
   type WorldMapLocation,
   type WorldMapMember,
+  type WorldMapMode,
   type WorldMapRoute,
 } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
@@ -16,68 +20,119 @@ type WorldMapProps = {
   destination?: WorldMapDestination | null;
   location: WorldMapLocation;
   route?: WorldMapRoute | null;
+  mode?: WorldMapMode;
   recenterToken?: number;
+  onFollowChange?: (following: boolean) => void;
+  onError?: (message: string) => void;
   style?: StyleProp<ViewStyle>;
 };
 
+type WebViewHandle = { postMessage: (message: string) => void };
+
+const MAP_SOURCE = { html: WORLD_MAP_HTML };
+
 export function WorldMap({
   members,
-  destination,
+  destination = null,
   location,
-  route,
+  route = null,
+  mode = '3d',
   recenterToken = 0,
+  onFollowChange,
+  onError,
   style,
 }: WorldMapProps) {
-  const webviewRef = useRef<any>(null);
-  const locationRef = useRef(location);
-  const routeRef = useRef(route);
-  const [initialLocation] = useState(location);
-  const html = useMemo(
-    () => buildMapHtml({ members, destination, initialLocation }),
-    [members, destination, initialLocation],
-  );
+  const webviewRef = useRef<WebViewHandle | null>(null);
+  const setWebview = useCallback((node: WebViewHandle | null) => {
+    webviewRef.current = node;
+  }, []);
+  const readyRef = useRef(false);
+  const seqRef = useRef(0);
+  const latestRef = useRef({ members, destination, location, route, mode });
+  const callbacksRef = useRef({ onFollowChange, onError });
 
-  const post = useCallback((payload: object) => {
-    webviewRef.current?.postMessage(JSON.stringify(payload));
+  useEffect(() => {
+    latestRef.current = { members, destination, location, route, mode };
+    callbacksRef.current = { onFollowChange, onError };
+  }, [members, destination, location, route, mode, onFollowChange, onError]);
+
+  const send = useCallback((command: WorldMapCommand) => {
+    if (!readyRef.current) return;
+    seqRef.current += 1;
+    webviewRef.current?.postMessage(encodeWorldMapCommand(seqRef.current, command));
   }, []);
 
-  const sendLocation = useCallback(() => {
-    post({ type: 'location', ...locationRef.current });
-  }, [post]);
-
-  const sendRoute = useCallback(() => {
-    post({ type: 'route', route: routeRef.current });
-  }, [post]);
-
-  useEffect(() => {
-    locationRef.current = location;
-    post({ type: 'location', ...location });
-  }, [location, post]);
+  const flush = useCallback(() => {
+    const latest = latestRef.current;
+    send({ type: 'location', payload: latest.location });
+    send({ type: 'members', payload: latest.members });
+    send({ type: 'destination', payload: latest.destination });
+    send({ type: 'route', payload: latest.route });
+    send({ type: 'mode', payload: latest.mode });
+  }, [send]);
 
   useEffect(() => {
-    routeRef.current = route;
-    post({ type: 'route', route });
-  }, [post, route]);
+    send({ type: 'location', payload: location });
+  }, [location, send]);
 
   useEffect(() => {
-    if (recenterToken > 0) post({ type: 'recenter' });
-  }, [post, recenterToken]);
+    send({ type: 'members', payload: members });
+  }, [members, send]);
+
+  useEffect(() => {
+    send({ type: 'destination', payload: destination });
+  }, [destination, send]);
+
+  useEffect(() => {
+    send({ type: 'route', payload: route });
+  }, [route, send]);
+
+  useEffect(() => {
+    send({ type: 'mode', payload: mode });
+  }, [mode, send]);
+
+  useEffect(() => {
+    if (recenterToken > 0) send({ type: 'recenter' });
+  }, [recenterToken, send]);
+
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      const message = parseWorldMapEvent(event.nativeEvent.data);
+      if (!message) return;
+
+      if (message.type === 'ready') {
+        readyRef.current = true;
+        flush();
+        return;
+      }
+      if (message.type === 'follow') {
+        callbacksRef.current.onFollowChange?.(message.value);
+        return;
+      }
+      callbacksRef.current.onError?.(message.message);
+    },
+    [flush],
+  );
+
+  const handleLoadStart = useCallback(() => {
+    readyRef.current = false;
+  }, []);
 
   return (
     <WebView
-      ref={webviewRef}
-      source={{ html }}
+      ref={setWebview}
+      source={MAP_SOURCE}
       originWhitelist={['*']}
       javaScriptEnabled
       domStorageEnabled
       cacheEnabled
       scrollEnabled={false}
+      bounces={false}
       setSupportMultipleWindows={false}
       allowsBackForwardNavigationGestures={false}
-      onLoadEnd={() => {
-        sendLocation();
-        sendRoute();
-      }}
+      androidLayerType="hardware"
+      onLoadStart={handleLoadStart}
+      onMessage={handleMessage}
       style={[{ flex: 1, backgroundColor: colors.bg }, style]}
       containerStyle={{ backgroundColor: colors.bg }}
     />

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
@@ -374,23 +374,29 @@ export function usePartyLocation(
   location: LiveLocation,
   enabled: boolean,
 ) {
-  const account = useAuth((state) => state.account);
+  const accountId = useAuth((state) => state.account?.id);
+  const latestRef = useRef(location);
+
+  useEffect(() => {
+    latestRef.current = location;
+  }, [location]);
 
   useEffect(() => {
     const client = supabase;
-    if (!partyId || !enabled || !account || !client) return;
+    if (!partyId || !enabled || !accountId || !client) return;
 
     const pushLocation = async () => {
+      const { latitude, longitude } = latestRef.current;
       try {
         await client
           .from('party_members')
           .update({
-            last_lat: location.latitude,
-            last_lng: location.longitude,
+            last_lat: latitude,
+            last_lng: longitude,
             last_seen_at: new Date().toISOString(),
           })
           .eq('party_id', partyId)
-          .eq('user_id', account.id);
+          .eq('user_id', accountId);
       } catch {
         // La siguiente actualización reintenta; no bloqueamos el mapa.
       }
@@ -399,7 +405,7 @@ export function usePartyLocation(
     void pushLocation();
     const timer = setInterval(() => void pushLocation(), 5_000);
     return () => clearInterval(timer);
-  }, [partyId, enabled, account, location.latitude, location.longitude]);
+  }, [partyId, enabled, accountId]);
 }
 
 export type PartyMessageView = {

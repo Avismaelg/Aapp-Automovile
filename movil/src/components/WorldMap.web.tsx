@@ -1,83 +1,140 @@
-import { createElement, useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { createElement, useCallback, useEffect, useId, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import {
-  buildMapHtml,
+  encodeWorldMapCommand,
+  parseWorldMapEvent,
+  WORLD_MAP_HTML,
+  type WorldMapCommand,
   type WorldMapDestination,
   type WorldMapLocation,
   type WorldMapMember,
+  type WorldMapMode,
   type WorldMapRoute,
 } from '@/src/lib/map-html';
+import { colors } from '@/src/theme';
 
 type WorldMapProps = {
   members: WorldMapMember[];
   destination?: WorldMapDestination | null;
   location: WorldMapLocation;
   route?: WorldMapRoute | null;
+  mode?: WorldMapMode;
   recenterToken?: number;
+  onFollowChange?: (following: boolean) => void;
+  onError?: (message: string) => void;
   style?: StyleProp<ViewStyle>;
 };
 
 export function WorldMap({
   members,
-  destination,
+  destination = null,
   location,
-  route,
+  route = null,
+  mode = '3d',
   recenterToken = 0,
+  onFollowChange,
+  onError,
   style,
 }: WorldMapProps) {
   const reactId = useId();
-  const mapId = `caravana-map-${reactId.replace(/:/g, '')}`;
-  const [initialLocation] = useState(location);
-  const [loaded, setLoaded] = useState(false);
-  const html = useMemo(
-    () => buildMapHtml({ members, destination, initialLocation }),
-    [members, destination, initialLocation],
-  );
+  const frameId = `caravana-map-${reactId.replace(/:/g, '')}`;
+  const readyRef = useRef(false);
+  const seqRef = useRef(0);
+  const latestRef = useRef({ members, destination, location, route, mode });
+  const callbacksRef = useRef({ onFollowChange, onError });
 
-  const post = useCallback(
-    (payload: object) => {
-      const doc = (globalThis as { document?: Document }).document;
-      const frame = doc?.getElementById(mapId) as HTMLIFrameElement | null;
-      frame?.contentWindow?.postMessage(payload, '*');
+  useEffect(() => {
+    latestRef.current = { members, destination, location, route, mode };
+    callbacksRef.current = { onFollowChange, onError };
+  }, [members, destination, location, route, mode, onFollowChange, onError]);
+
+  const getContentWindow = useCallback(() => {
+    const doc = (globalThis as { document?: Document }).document;
+    const frame = doc?.getElementById(frameId) as HTMLIFrameElement | null | undefined;
+    return frame?.contentWindow ?? null;
+  }, [frameId]);
+
+  const send = useCallback(
+    (command: WorldMapCommand) => {
+      if (!readyRef.current) return;
+      seqRef.current += 1;
+      getContentWindow()?.postMessage(encodeWorldMapCommand(seqRef.current, command), '*');
     },
-    [mapId],
+    [getContentWindow],
   );
 
-  useEffect(() => {
-    if (!loaded) return;
-    post({ type: 'location', ...location });
-  }, [loaded, location, post]);
+  const flush = useCallback(() => {
+    const latest = latestRef.current;
+    send({ type: 'location', payload: latest.location });
+    send({ type: 'members', payload: latest.members });
+    send({ type: 'destination', payload: latest.destination });
+    send({ type: 'route', payload: latest.route });
+    send({ type: 'mode', payload: latest.mode });
+  }, [send]);
 
   useEffect(() => {
-    if (!loaded) return;
-    post({ type: 'route', route });
-  }, [loaded, post, route]);
+    send({ type: 'location', payload: location });
+  }, [location, send]);
 
   useEffect(() => {
-    if (loaded && recenterToken > 0) post({ type: 'recenter' });
-  }, [loaded, post, recenterToken]);
+    send({ type: 'members', payload: members });
+  }, [members, send]);
+
+  useEffect(() => {
+    send({ type: 'destination', payload: destination });
+  }, [destination, send]);
+
+  useEffect(() => {
+    send({ type: 'route', payload: route });
+  }, [route, send]);
+
+  useEffect(() => {
+    send({ type: 'mode', payload: mode });
+  }, [mode, send]);
+
+  useEffect(() => {
+    if (recenterToken > 0) send({ type: 'recenter' });
+  }, [recenterToken, send]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const contentWindow = getContentWindow();
+      if (!contentWindow || event.source !== contentWindow) return;
+
+      const message = parseWorldMapEvent(event.data);
+      if (!message) return;
+
+      if (message.type === 'ready') {
+        readyRef.current = true;
+        flush();
+        return;
+      }
+      if (message.type === 'follow') {
+        callbacksRef.current.onFollowChange?.(message.value);
+        return;
+      }
+      callbacksRef.current.onError?.(message.message);
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [flush, getContentWindow]);
 
   const resolvedStyle = StyleSheet.flatten(style) ?? {};
-  const iframeStyle = {
-    border: 'none',
-    width: '100%',
-    height: '100%',
-    display: 'block',
-    backgroundColor: '#080B0F',
-    ...resolvedStyle,
-  };
 
   return createElement('iframe', {
-    id: mapId,
+    id: frameId,
     title: 'Mapa Caravana',
-    srcDoc: html,
-    onLoad: () => {
-      setLoaded(true);
-      post({ type: 'location', ...location });
-      post({ type: 'route', route });
-    },
-    style: iframeStyle,
+    srcDoc: WORLD_MAP_HTML,
     allow: 'fullscreen',
+    style: {
+      border: 'none',
+      width: '100%',
+      height: '100%',
+      display: 'block',
+      backgroundColor: colors.bg,
+      ...resolvedStyle,
+    },
   } as never);
 }

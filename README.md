@@ -15,7 +15,7 @@ Prototipo funcional de una app móvil que combina lo mejor de Wheelz con cuatro 
 
 ## Estado actual
 
-Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real, las parties, los retos y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan LiveKit, progreso de retos por GPS y el build nativo.
+Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real 3D, las parties, los retos y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan LiveKit, progreso de retos por GPS y el build nativo.
 
 | Módulo | Estado |
 |---|---|
@@ -26,7 +26,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Feed social | ✅ publicaciones de texto y foto, likes, comentarios y visibilidad reales con Realtime; faltan guardados y moderación; demo con feed de ejemplo |
-| Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OSM + GPS; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
+| Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa 3D compartido; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
 | Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
@@ -36,16 +36,16 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
 | Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed con fotos, retos, party y borrado de cuenta probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | 🟡 SDK web/nativo, 3 canales por party, Edge Function de tokens y PTT push-to-talk integrados; faltan secretos LiveKit y prueba de audio en dispositivos |
-| Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo y posiciones de los miembros; ✅ rutas con GraphHopper (cloud o self-hosted) y fallback; 🟡 tiles pendientes de proveedor para producción |
+| Mapa 3D + GPS | ✅ pantalla inicial con MapLibre GL 3D, edificios y relieve, cámara que sigue posición y rumbo, vista 2D/3D y recentrar; posiciones de la party y rutas GraphHopper con fallback; 🟡 teselas vectoriales pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
-**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Publicar, Amigos, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
+**Pantallas:** Bienvenida, Registro, Inicio de sesión, Mapa 3D, Actividad, Publicar, Amigos, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
 
 ### Capturas
 
-| Inicio | Party en vivo | Retos |
+| Actividad | Party en vivo | Retos |
 |---|---|---|
-| ![Inicio](docs/screenshots/home.png) | ![Party](docs/screenshots/party.png) | ![Retos](docs/screenshots/challenges.png) |
+| ![Actividad](docs/screenshots/home.png) | ![Party](docs/screenshots/party.png) | ![Retos](docs/screenshots/challenges.png) |
 
 | Garaje multi-vehículo | Combustible y EV | Bienvenida |
 |---|---|---|
@@ -55,9 +55,9 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 |---|---|
 | ![Modo conducción](docs/screenshots/drive-mode-landscape.png) | ![Ficha de venta](docs/screenshots/vehicle-sale.png) |
 
-| Party con mapa real y GPS |
+| Mapa 3D con seguimiento del vehículo |
 |---|
-| ![Mapa real](docs/screenshots/party-map-real.png) |
+| ![Mapa 3D](docs/screenshots/map-3d.png) |
 
 ---
 
@@ -82,7 +82,7 @@ npx expo start
   “Elegir 2 aleatorios”. Con cuenta real, la invitación se guarda en Supabase,
   el amigo la acepta y el anfitrión inicia la salida. En demo se simula localmente.
 - **Ficha de venta:** Garaje → abre un vehículo → *Preparar ficha de venta*.
-- **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
+- **Modo conducción:** Mapa → *Conducir* (funciona en horizontal y vertical).
 - **Party real:** Party → crea una caravana con destino o únete con el código
   de un amigo. Las posiciones de los miembros y el chat se sincronizan por
   Supabase Realtime. Hay 3 canales de voz: Convoy, Ruta y Charla.
@@ -90,12 +90,14 @@ npx expo start
   `LIVEKIT_API_SECRET` como secretos de Supabase y despliega
   `livekit-token`. LiveKit requiere un development build/EAS, no Expo Go.
   Ver [`docs/12-livekit-voz.md`](docs/12-livekit-voz.md).
-- **Mapa real:** Party → mapa OpenStreetMap con tu GPS en vivo. Si no das
-  permiso de ubicación, usa Santo Domingo como ubicación de demo. En web puedes
-  conceder el permiso desde el navegador.
+- **Mapa 3D:** es la pantalla inicial. Muestra edificios y relieve, y la cámara
+  sigue la posición y el rumbo del vehículo. Botones **3D/2D** y **recentrar**;
+  al arrastrar el mapa se suelta el seguimiento. La Party usa el mismo motor 3D.
+  Si no das permiso de ubicación, usa Santo Domingo como ubicación de demo. En
+  web puedes conceder el permiso desde el navegador.
 - **GraphHopper:** configura `EXPO_PUBLIC_GRAPHHOPPER_URL` o
   `EXPO_PUBLIC_GRAPHHOPPER_API_KEY` para rutas por carretera. Sin motor, la app
-  usa una línea directa y lo indica en Party.
+  usa una línea directa y lo indica en el mapa y en Party.
 - El tracking en segundo plano y la cámara requieren un **development build**, no Expo Go:
   ```bash
   npx expo run:android
@@ -196,7 +198,7 @@ app de auto/
 │  ├─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
 │  ├─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
 │  ├─ 07-carplay-android-auto.md # modo conducción y proyección nativa
-│  ├─ 08-mapa-tiempo-real.md   # mapa OSM y GPS en vivo
+│  ├─ 08-mapa-tiempo-real.md   # mapa 3D, cámara, GPS y party en vivo
 │  ├─ 09-graphhopper.md        # rutas por carretera con GraphHopper
 │  ├─ 10-retos.md              # flujo real de retos, RLS y Realtime
 │  ├─ 11-party.md              # party real, posiciones, chat y RLS

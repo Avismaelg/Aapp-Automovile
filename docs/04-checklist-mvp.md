@@ -16,7 +16,7 @@
 - Retos punto A → B: modo programado e instantáneo con invitación, aceptación, inicio, finalización e historial reales en Supabase + Realtime; demo local con simulación.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimientos reales en Supabase e historial de venta en PDF.
-- Party con crear/unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa OpenStreetMap; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos.
+- Party con crear/unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa 3D MapLibre; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos.
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
@@ -61,7 +61,7 @@
 | EAS (Expo) | Free/Starter | Builds iOS/Android | $0 → $99/mes |
 | Dominio + email | Anual | `caravana.app`, enlaces QR | ~$20–50/año |
 
-**Alternativa sin coste de mapas:** MapLibre + OpenStreetMap (más trabajo de estilo y geocoding).
+**Mapa actual sin coste:** MapLibre GL 3D + OpenFreeMap/OpenStreetMap. Para producción hay que elegir proveedor de teselas vectoriales y revisar su cuota y licencia.
 
 ---
 
@@ -87,11 +87,13 @@
 - Subida a Supabase y timeline.
 
 ### Semana 4 — Party + mapa
-- Base OSM/Leaflet ya integrada.
+- Mapa 3D MapLibre integrado como pantalla inicial, con edificios, relieve y
+  cámara que sigue posición y rumbo.
 - Crear/unirse por código o link.
 - Posiciones de party y chat ya publicados por Supabase Realtime; falta Presence
   explícita, reconexión y limpieza de inactivos.
-- Ruta por carretera (OSRM/Valhalla) y proveedor de teselas para producción.
+- Rutas GraphHopper con fallback; falta elegir proveedor de teselas vectoriales
+  para producción.
 - Chat de texto y persistencia de última ubicación.
 
 ### Semana 5 — Voz

@@ -98,6 +98,7 @@ export default function RootLayout() {
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen name="friends" />
+            <Stack.Screen name="actividad" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen
               name="post/new"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

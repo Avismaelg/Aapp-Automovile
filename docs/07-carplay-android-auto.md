@@ -17,7 +17,7 @@
   - acciones grandes para abrir party o clasificación;
   - salida rápida del modo.
 - Diseño adaptativo: dos columnas en horizontal y una columna en vertical.
-- Acceso desde Inicio → **Conducir**.
+- Acceso desde Mapa → **Conducir**.
 - Sin formularios, sin feed y sin interacciones pequeñas.
 - Se mantiene la regla de seguridad: se mide llegada, no velocidad.
 
