@@ -14,7 +14,8 @@ import {
   Pill,
   Stat,
 } from '@/src/components/ui';
-import { currentUser, vehicles } from '@/src/data/mock';
+import { vehicles } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import {
   vehicleEfficiency,
@@ -25,13 +26,14 @@ import { colors, radius, spacing } from '@/src/theme';
 
 export default function PublicVehicleScreen() {
   const router = useRouter();
+  const me = useCurrentUser();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const vehicle = vehicles.find((item) => item.qrSlug === slug);
 
   const share = async () => {
     if (!vehicle) return;
     await Share.share({
-      message: `${vehicle.make} ${vehicle.model} de @${currentUser.username} en Caravana: ${vehicleUrl(
+      message: `${vehicle.make} ${vehicle.model} de @${me.username} en Caravana: ${vehicleUrl(
         vehicle.qrSlug,
       )}`,
       url: vehicleUrl(vehicle.qrSlug),
@@ -107,12 +109,12 @@ export default function PublicVehicleScreen() {
 
       <View style={styles.body}>
         <Card style={styles.ownerCard}>
-          <Avatar name={currentUser.name} color={currentUser.color} size={46} ring={colors.border} online />
+          <Avatar name={me.name} color={me.color} size={46} ring={colors.border} online />
           <View style={{ flex: 1 }}>
             <AppText variant="caption" color={colors.muted}>Pertenece a</AppText>
-            <AppText variant="bodyStrong">{currentUser.name}</AppText>
+            <AppText variant="bodyStrong">{me.name}</AppText>
             <AppText variant="caption" color={colors.accent} style={{ marginTop: 1 }}>
-              @{currentUser.username}
+              @{me.username}
             </AppText>
           </View>
           <Button
@@ -120,7 +122,7 @@ export default function PublicVehicleScreen() {
             variant="secondary"
             size="sm"
             full={false}
-            onPress={() => router.push(`/u/${currentUser.username}`)}
+            onPress={() => router.push(`/u/${me.username}`)}
             style={{ paddingHorizontal: 14 }}
           />
         </Card>
@@ -168,7 +170,7 @@ export default function PublicVehicleScreen() {
 
         <View style={styles.footer}>
           <AppText variant="caption" color={colors.dim} align="center">
-            Perfil público de Caravana · {profileUrl(currentUser.username)}
+            Perfil público de Caravana · {profileUrl(me.username)}
           </AppText>
         </View>
       </View>

@@ -376,11 +376,13 @@ export function Input({
   label,
   rightSlot,
   style,
+  error,
   ...props
 }: TextInputProps & {
   label?: string;
   rightSlot?: ReactNode;
   style?: StyleProp<ViewStyle>;
+  error?: string;
 }) {
   return (
     <View style={style}>
@@ -389,14 +391,20 @@ export function Input({
           {label}
         </AppText>
       ) : null}
-      <View style={styles.inputWrap}>
+      <View style={[styles.inputWrap, error ? styles.inputWrapError : null]}>
         <TextInput
           placeholderTextColor={colors.dim}
+          selectionColor={colors.accent}
           {...props}
           style={styles.input}
         />
         {rightSlot}
       </View>
+      {error ? (
+        <AppText variant="caption" color={colors.danger} style={styles.inputError}>
+          {error}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -584,12 +592,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  inputWrapError: {
+    borderColor: 'rgba(255,77,94,0.62)',
+  },
   input: {
     flex: 1,
     color: colors.text,
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     paddingVertical: 12,
+  },
+  inputError: {
+    marginTop: 5,
+    marginLeft: 2,
   },
   empty: {
     alignItems: 'center',

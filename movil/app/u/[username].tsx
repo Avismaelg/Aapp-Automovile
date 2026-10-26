@@ -14,25 +14,28 @@ import {
   Pill,
   Stat,
 } from '@/src/components/ui';
-import { currentUser, friends } from '@/src/data/mock';
+import { friends } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { profileUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
 export default function PublicProfileScreen() {
   const router = useRouter();
+  const me = useCurrentUser();
   const { username } = useLocalSearchParams<{ username: string }>();
-  const handle = (username || currentUser.username).replace('@', '');
-  const isMe = handle === currentUser.username;
+  const handle = (username || me.username).replace('@', '');
+  const isMe = handle === me.username;
   const friend = friends.find((item) => item.username === handle);
+  const knownProfile = isMe || Boolean(friend);
 
-  const name = isMe ? currentUser.name : friend?.name ?? 'Luis Martínez';
-  const color = isMe ? currentUser.color : friend?.color ?? colors.accent;
+  const name = isMe ? me.name : friend?.name ?? '';
+  const color = isMe ? me.color : friend?.color ?? colors.accent;
   const car = isMe
-    ? `${currentUser.car.make} ${currentUser.car.model} ${currentUser.car.year}`
-    : friend?.car ?? 'Honda Civic Si 2020';
-  const city = isMe ? currentUser.city : 'Santo Domingo, RD';
+    ? `${me.car.make} ${me.car.model} ${me.car.year}`
+    : friend?.car ?? '';
+  const city = isMe ? me.city : 'Santo Domingo, RD';
   const bio = isMe
-    ? currentUser.bio
+    ? me.bio
     : 'Rutas de fin de semana, café y buenas curvas. Siempre en caravana.';
 
   const share = async () => {
@@ -41,6 +44,38 @@ export default function PublicProfileScreen() {
       url: profileUrl(handle),
     });
   };
+
+  if (!knownProfile) {
+    return (
+      <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
+        <IconButton
+          icon="arrow-back"
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/');
+          }}
+        />
+        <View style={styles.notFoundBody}>
+          <View style={styles.notFoundIcon}>
+            <Ionicons name="person-circle-outline" size={36} color={colors.accent} />
+          </View>
+          <AppText variant="h2" align="center" style={{ marginTop: spacing.lg }}>
+            Este perfil no está disponible
+          </AppText>
+          <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 7 }}>
+            Puede que el enlace esté incompleto o que el usuario haya cambiado su
+            privacidad. Los QR de Caravana no muestran datos personales.
+          </AppText>
+          <Button
+            label="Volver al inicio"
+            variant="secondary"
+            onPress={() => router.replace('/')}
+            style={{ marginTop: spacing.xl }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -64,7 +99,7 @@ export default function PublicProfileScreen() {
           <View style={styles.heroLine} />
         </LinearGradient>
         <View style={styles.heroContent}>
-          <Avatar name={name} color={color} size={88} ring={colors.bg} />
+          <Avatar name={name} color={color} size={88} uri={isMe ? me.avatarUrl : undefined} ring={colors.bg} />
           <AppText variant="h1" align="center" style={{ marginTop: spacing.md }}>
             {name}
           </AppText>
@@ -187,6 +222,29 @@ function PressableRow({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  notFound: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+  notFoundBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing['4xl'],
+  },
+  notFoundIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,31,0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

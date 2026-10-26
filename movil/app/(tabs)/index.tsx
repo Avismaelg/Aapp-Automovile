@@ -14,7 +14,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { activeChallenge, currentUser, feed, friends } from '@/src/data/mock';
+import { activeChallenge, feed, friends } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useSession } from '@/src/store/session';
 import { colors, radius, spacing } from '@/src/theme';
@@ -58,10 +59,19 @@ function HeroRoute() {
   );
 }
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Buenos días';
+  if (hour < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 export default function HomeScreen() {
   const router = useRouter();
+  const me = useCurrentUser();
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
+  const firstName = me.name.split(' ')[0];
 
   const toggleTracking = async (next: boolean) => {
     if (Platform.OS === 'web') {
@@ -115,12 +125,19 @@ export default function HomeScreen() {
             </AppText>
           </View>
           <AppText variant="h1" style={{ marginTop: 6 }}>
-            Buenas noches,{'\n'}Luis.
+            {greeting()},{'\n'}{firstName}.
           </AppText>
         </View>
         <View style={styles.headerActions}>
           <IconButton icon="notifications-outline" badge />
-          <Avatar name={currentUser.name} color={currentUser.color} size={44} ring={colors.border} online />
+          <Avatar
+            name={me.name}
+            color={me.color}
+            size={44}
+            uri={me.avatarUrl}
+            ring={colors.border}
+            online
+          />
         </View>
       </View>
 

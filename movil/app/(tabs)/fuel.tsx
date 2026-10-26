@@ -15,13 +15,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import {
-  currentUser,
-  fuelLogs,
-  vehicles,
-  type FuelLog,
-  type Vehicle,
-} from '@/src/data/mock';
+import { fuelLogs, vehicles, type FuelLog, type Vehicle } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import {
   calculateElectric,
@@ -157,8 +152,9 @@ function VehiclePill({
 }
 
 export default function FuelScreen() {
-  const [selectedVehicleId, setSelectedVehicleId] = useState(currentUser.car.id);
-  const vehicle = vehicles.find((item) => item.id === selectedVehicleId) ?? currentUser.car;
+  const me = useCurrentUser();
+  const [selectedVehicleId, setSelectedVehicleId] = useState(me.car.id);
+  const vehicle = vehicles.find((item) => item.id === selectedVehicleId) ?? me.car;
   const electric = isElectric(vehicle);
   const meta = vehicleKindMeta[vehicle.kind];
 

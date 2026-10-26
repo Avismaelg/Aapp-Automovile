@@ -15,9 +15,11 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { achievements, currentUser, friends } from '@/src/data/mock';
+import { achievements, friends } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
+import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -31,13 +33,18 @@ const settings = [
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const me = useCurrentUser();
+  const account = useAuth((state) => state.account);
+  const signOut = useAuth((state) => state.signOut);
+  const busy = useAuth((state) => state.busy);
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
+  const isDemo = account?.mode === 'demo';
 
   const shareProfile = async () => {
     await Share.share({
-      message: `Mi perfil de Caravana: ${profileUrl(currentUser.username)}`,
-      url: profileUrl(currentUser.username),
+      message: `Mi perfil de Caravana: ${profileUrl(me.username)}`,
+      url: profileUrl(me.username),
     });
   };
 
@@ -56,6 +63,34 @@ export default function ProfileScreen() {
         error instanceof Error ? error.message : 'Revisa los permisos de ubicación.',
       );
     }
+  };
+
+  const leaveSession = async () => {
+    await signOut();
+  };
+
+  const confirmSignOut = () => {
+    if (Platform.OS === 'web') {
+      void leaveSession();
+      return;
+    }
+
+    Alert.alert(
+      isDemo ? 'Salir del modo demo' : 'Cerrar sesión',
+      isDemo
+        ? 'Volverás a la pantalla de bienvenida. Los datos de la demo siguen en este dispositivo.'
+        : 'Tendrás que iniciar sesión de nuevo para acceder a tus rutas y tu garaje.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: isDemo ? 'Salir' : 'Cerrar sesión',
+          style: 'destructive',
+          onPress: () => {
+            void leaveSession();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -88,7 +123,7 @@ export default function ProfileScreen() {
       <View style={styles.body}>
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
-            <Avatar name={currentUser.name} color={currentUser.color} size={86} ring={colors.bg} />
+            <Avatar name={me.name} color={me.color} size={86} uri={me.avatarUrl} ring={colors.bg} />
             <View style={styles.carBadge}>
               <Ionicons name="car-sport" size={13} color="#120802" />
             </View>
@@ -107,33 +142,33 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.identity}>
-          <AppText variant="h1">{currentUser.name}</AppText>
+          <AppText variant="h1">{me.name}</AppText>
           <View style={styles.usernameRow}>
-            <AppText variant="caption" color={colors.accent}>@{currentUser.username}</AppText>
+            <AppText variant="caption" color={colors.accent}>@{me.username}</AppText>
             <View style={styles.metaDot} />
             <Ionicons name="location-outline" size={12} color={colors.muted} />
-            <AppText variant="caption" color={colors.muted}>{currentUser.city}</AppText>
+            <AppText variant="caption" color={colors.muted}>{me.city}</AppText>
           </View>
           <AppText variant="body" color={colors.textSoft} style={{ marginTop: 8 }}>
-            {currentUser.bio}
+            {me.bio}
           </AppText>
         </View>
 
         <Card style={styles.statsCard}>
           <View style={styles.statItem}>
-            <Stat value={String(currentUser.stats.drives)} label="rutas" align="center" />
+            <Stat value={String(me.stats.drives)} label="rutas" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={`${(currentUser.stats.km / 1000).toFixed(1)}k`} label="kilómetros" align="center" />
+            <Stat value={`${(me.stats.km / 1000).toFixed(1)}k`} label="kilómetros" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={`${currentUser.stats.hours} h`} label="al volante" align="center" />
+            <Stat value={`${me.stats.hours} h`} label="al volante" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={String(currentUser.stats.friends)} label="amigos" accent={colors.lime} align="center" />
+            <Stat value={String(me.stats.friends)} label="amigos" accent={colors.lime} align="center" />
           </View>
         </Card>
 
@@ -141,9 +176,9 @@ export default function ProfileScreen() {
           <SectionHeader title="Mi QR" action="Compartir" onAction={shareProfile} />
           <View style={styles.qrWrap}>
             <QRCard
-              value={profileUrl(currentUser.username)}
+              value={profileUrl(me.username)}
               label="PERFIL"
-              caption={`@${currentUser.username}`}
+              caption={`@${me.username}`}
               size={148}
             />
             <View style={styles.qrActions}>
@@ -193,6 +228,49 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          <SectionHeader title="Cuenta" />
+          <Card style={styles.settingsCard}>
+            <View style={styles.settingRow}>
+              <View
+                style={[
+                  styles.settingIcon,
+                  isDemo ? { backgroundColor: colors.limeSoft } : { backgroundColor: 'rgba(46,230,168,0.12)' },
+                ]}
+              >
+                <Ionicons
+                  name={isDemo ? 'flask-outline' : 'cloud-done-outline'}
+                  size={17}
+                  color={isDemo ? colors.lime : colors.green}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">
+                  {isDemo ? 'Modo demo' : 'Cuenta conectada'}
+                </AppText>
+                <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                  {account?.email ?? 'Sesión local'}
+                </AppText>
+              </View>
+              <Pill
+                label={isDemo ? 'Local' : 'Sync'}
+                tone={isDemo ? 'neutral' : 'lime'}
+                icon={isDemo ? 'phone-portrait-outline' : 'cloud-outline'}
+              />
+            </View>
+            {isDemo ? (
+              <>
+                <View style={styles.settingDivider} />
+                <View style={styles.demoHint}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+                  <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
+                    Estás explorando con datos locales. Crea una cuenta para conservar
+                    tu perfil, garaje y rutas en la nube.
+                  </AppText>
+                </View>
+              </>
+            ) : null}
+          </Card>
+
           <SectionHeader title="Ajustes" />
           <Card style={styles.settingsCard}>
             <View style={styles.settingRow}>
@@ -231,10 +309,11 @@ export default function ProfileScreen() {
           </Card>
 
           <Button
-            label="Cerrar sesión"
+            label={isDemo ? 'Salir del modo demo' : 'Cerrar sesión'}
             icon="log-out-outline"
             variant="ghost"
-            onPress={() => {}}
+            loading={busy}
+            onPress={confirmSignOut}
             style={{ marginTop: spacing.lg }}
           />
 
@@ -359,5 +438,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   settingDivider: { height: 1, backgroundColor: colors.borderSoft, marginLeft: 42 },
+  demoHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: spacing.md,
+    paddingLeft: 42,
+  },
   footer: { alignItems: 'center', marginTop: spacing['2xl'], marginBottom: spacing.xl },
 });

@@ -16,7 +16,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { currentUser, vehicles, type Vehicle } from '@/src/data/mock';
+import { vehicles, type Vehicle } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import {
   isElectric,
@@ -46,21 +47,22 @@ function CarSilhouette() {
 
 export default function GarageScreen() {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState(currentUser.car.id);
-  const vehicle = vehicles.find((item) => item.id === selectedId) ?? currentUser.car;
+  const me = useCurrentUser();
+  const [selectedId, setSelectedId] = useState(me.car.id);
+  const vehicle = vehicles.find((item) => item.id === selectedId) ?? me.car;
   const meta = vehicleKindMeta[vehicle.kind];
   const electric = isElectric(vehicle);
 
   const shareQr = async () => {
     await Share.share({
-      message: `Mi perfil de Caravana: ${profileUrl(currentUser.username)}`,
-      url: profileUrl(currentUser.username),
+      message: `Mi perfil de Caravana: ${profileUrl(me.username)}`,
+      url: profileUrl(me.username),
     });
   };
 
   const shareVehicle = async (item: Vehicle) => {
     await Share.share({
-      message: `${item.make} ${item.model} de @${currentUser.username} en Caravana: ${vehicleUrl(
+      message: `${item.make} ${item.model} de @${me.username} en Caravana: ${vehicleUrl(
         item.qrSlug,
       )}`,
       url: vehicleUrl(item.qrSlug),
@@ -139,9 +141,9 @@ export default function GarageScreen() {
       <SectionHeader title="Mi identidad Caravana" action="Compartir" onAction={shareQr} />
       <View style={styles.qrRow}>
         <QRCard
-          value={profileUrl(currentUser.username)}
+          value={profileUrl(me.username)}
           label="PERFIL"
-          caption={`@${currentUser.username}`}
+          caption={`@${me.username}`}
           size={132}
         />
         <View style={styles.qrSide}>

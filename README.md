@@ -15,11 +15,13 @@ Prototipo funcional de una app móvil que combina lo mejor de Wheelz con cuatro 
 
 ## Estado actual
 
-Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están construidas las pantallas y la lógica base; faltan las integraciones de producción (auth real, mapas reales, LiveKit y build nativo).
+Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están construidas las pantallas, la autenticación y la lógica base; faltan las integraciones de producción (proyecto Supabase real, mapas reales, LiveKit y build nativo).
 
 | Módulo | Estado |
 |---|---|
 | Diseño dark + design system | ✅ |
+| Autenticación email/contraseña | ✅ UI, validación, sesión persistida y rutas protegidas; 🟡 falta conectar un proyecto Supabase |
+| Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Home / feed social | ✅ con datos mock |
 | Party / mapa en vivo | ✅ UI + PTT simulado |
 | Retos / emparejamiento | ✅ UI + simulación local; falta backend Realtime y anti-trampas |
@@ -28,12 +30,12 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Perfil público por usuario y vehículo | ✅ |
 | Combustible y energía | ✅ gasolina/diésel + EV, PDF e historial local |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | 🟡 esquema SQL + RLS listos, cliente preparado; falta conectar auth y datos |
+| Supabase | 🟡 esquema SQL + RLS + Auth listos; falta crear el proyecto, aplicar la migración y sustituir los mocks por consultas reales |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapas reales | ⏳ mapa estilizado SVG; falta Mapbox/MapLibre |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
-**Pantallas:** Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación a party, invitación a reto, perfil público y perfil público de vehículo.
+**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación a party, invitación a reto, perfil público y perfil público de vehículo.
 
 ### Capturas
 
@@ -41,9 +43,9 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 |---|---|---|
 | ![Inicio](docs/screenshots/home.png) | ![Party](docs/screenshots/party.png) | ![Retos](docs/screenshots/challenges.png) |
 
-| Garaje multi-vehículo | Combustible y EV |
-|---|---|
-| ![Garaje](docs/screenshots/garage.png) | ![Combustible](docs/screenshots/fuel.png) |
+| Garaje multi-vehículo | Combustible y EV | Bienvenida |
+|---|---|---|
+| ![Garaje](docs/screenshots/garage.png) | ![Combustible](docs/screenshots/fuel.png) | ![Bienvenida](docs/screenshots/auth-welcome.png) |
 
 ---
 
@@ -59,6 +61,11 @@ npx expo start
 
 - `w` → abre la versión web (útil para revisar el diseño).
 - Escanea el QR de la terminal con **Expo Go** para verlo en el móvil.
+- **Sin variables de entorno**, la app entra directo en modo demo. Para ver la
+  bienvenida y los formularios: Perfil → Cuenta → *Salir del modo demo*.
+- Con Supabase configurado, la app arranca en bienvenida y exige sesión para las
+  pestañas. Los enlaces públicos de perfil, vehículo y reto siguen abriendo sin
+  cuenta.
 - El tracking en segundo plano y la cámara requieren un **development build**, no Expo Go:
   ```bash
   npx expo run:android
@@ -77,24 +84,31 @@ npx expo-doctor
 
 ---
 
-## Conectar Supabase (siguiente paso)
+## Conectar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. Copia `.env.example` a `.env` y rellena:
+2. Copia `movil/.env.example` a `movil/.env` y rellena:
    ```env
    EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
    ```
 3. Aplica el esquema:
    ```bash
+   cd movil
    npx supabase link --project-ref TU_REF
    npx supabase db push
    ```
    O pega `docs/03-modelo-datos.sql` en el SQL Editor.
-4. Activa Auth (email + Apple + Google) y crea los buckets `avatars`, `vehicles`, `posts`, `receipts`.
-5. El esquema ya incluye RLS, PostGIS, funciones de amistad/party, feed, combustible y QR.
+4. Activa **Authentication → Providers → Email**. Para el MVP, desactiva
+   **Confirm email** o configura la **Site URL** si vas a probar la confirmación
+   en web. Apple y Google quedan para la siguiente fase.
+5. Crea los buckets `avatars`, `vehicles`, `posts` y `receipts`.
+6. Reinicia con `npx expo start --clear`.
 
-El cliente está en `movil/src/lib/supabase.ts`. Si no hay variables de entorno, la app usa datos mock y sigue funcionando.
+El cliente está en `movil/src/lib/supabase.ts` y el estado de sesión en
+`movil/src/store/auth.ts`. Si no hay variables de entorno, la app usa el modo
+demo y sigue funcionando. El detalle del flujo, validaciones y pendientes está en
+[`docs/05-autenticacion.md`](docs/05-autenticacion.md).
 
 ---
 
@@ -106,14 +120,18 @@ app de auto/
 │  ├─ 01-producto.md          # visión, personas, alcance, roadmap, monetización
 │  ├─ 02-arquitectura.md      # stack, flujos, seguridad, costes
 │  ├─ 03-modelo-datos.sql     # esquema Supabase + RLS + Realtime
-│  └─ 04-checklist-mvp.md     # qué falta para lanzar
+│  ├─ 04-checklist-mvp.md     # qué falta para lanzar
+│  └─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
 ├─ movil/
 │  ├─ app/                    # Expo Router (pantallas)
+│  │  ├─ (auth)/              # Bienvenida, login y registro
 │  │  ├─ (tabs)/challenges.tsx # Retos + emparejamiento
 │  │  ├─ challenge/[code].tsx  # Invitación a reto
 │  │  └─ v/[slug].tsx          # Perfil público de vehículo
-│  ├─ src/components/         # UI, mapa, QR, PTT, feed
+│  ├─ src/components/         # UI, mapa, QR, PTT, feed, auth
+│  ├─ src/hooks/              # perfil conectado
 │  ├─ src/lib/                # Supabase, QR, combustible/EV, PDF, tracking
+│  ├─ src/store/              # sesión, tracking y autenticación
 │  ├─ src/data/mock.ts        # datos de la demo
 │  ├─ scripts/generate_icons.py
 │  └─ supabase/migrations/    # migración lista para `supabase db push`
@@ -135,7 +153,8 @@ app de auto/
 
 ## Lo que falta para producción
 
-- Auth y onboarding reales (email/Apple/Google) + borrado de cuenta.
+- Conectar el proyecto Supabase, probar altas reales y pasar perfil/garaje/feed/combustible de mocks a consultas.
+- Apple/Google, recuperación de contraseña, edición de perfil y borrado de cuenta.
 - Mapbox/MapLibre + ubicación en vivo por Realtime Broadcast.
 - LiveKit Cloud + Edge Function para tokens + PTT nativo.
 - Retos en Supabase Realtime: invitaciones, salida/meta, progreso y anti-trampas.

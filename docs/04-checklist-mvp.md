@@ -8,7 +8,8 @@
 
 - App Expo/React Native con Expo Router y TypeScript.
 - Design system dark, iconos y splash generados.
-- Pantallas: Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación, perfil público y perfil de vehículo.
+- Pantallas: Bienvenida, Registro, Login, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación, perfil público y perfil de vehículo.
+- Autenticación email/contraseña con Supabase: validación, sesión persistida, rutas protegidas y modo demo local.
 - Retos punto A → B con modo emparejamiento, categorías coche/moto/EV/camión y simulación local.
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
@@ -25,7 +26,7 @@
 | # | Tarea | Responsable | Estimación |
 |---|---|---|---|
 | 1 | Crear proyecto Supabase y aplicar migración | Dev | 0,5 día |
-| 2 | Auth email + Apple + Google; onboarding y borrado de cuenta | Dev | 3–4 días |
+| 2 | Conectar proyecto Supabase y probar Auth email; añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
 | 3 | Reemplazar mocks por consultas reales (perfil, garaje, feed, combustible) | Dev | 4–5 días |
 | 4 | Mapbox o MapLibre + ubicación en vivo con Realtime Broadcast/Presence | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
@@ -61,7 +62,7 @@
 
 ### Semana 1 — Datos reales
 - Supabase + migración + buckets.
-- Auth y onboarding.
+- Probar Auth email en un proyecto real; activar Apple/Google y recuperación.
 - Perfil, garaje, QR y subida de fotos.
 - Reemplazar `src/data/mock.ts` por hooks de TanStack Query.
 
@@ -111,6 +112,9 @@
 - [ ] Avión/tren: no se registra un viaje falso.
 - [ ] Teléfono bloqueado 30 min: el tracking sigue y la batería baja < 10 %.
 - [ ] Android gama media (Xiaomi/Samsung) con ahorro de batería agresivo.
+- [ ] Registro, cierre de sesión y login conservan el perfil correcto.
+- [ ] Enlace de perfil desconocido no muestra datos de otra cuenta.
+- [ ] Enlaces públicos `/u`, `/v` y `/challenge` abren sin sesión.
 - [ ] Escaneo de QR con la cámara del sistema y con la app.
 - [ ] Perfil privado: el QR no filtra ubicación ni teléfono.
 - [ ] Repostaje parcial + lleno: el consumo se calcula bien.
@@ -149,7 +153,7 @@
 
 ## 8. Limitaciones conocidas del prototipo
 
-- Los datos son mock; no hay login real.
+- El login email/contraseña está implementado, pero aún no se ha probado contra un proyecto Supabase real; el resto de datos sigue siendo mock.
 - El mapa es SVG decorativo, no geográfico.
 - El PTT es una simulación visual; no transmite audio.
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
@@ -164,6 +168,6 @@
 
 1. Decidir nombre/dominio y mercado inicial.
 2. Crear Supabase, LiveKit y Mapbox.
-3. Aplicar la migración y conectar auth.
+3. Aplicar la migración, configurar Email Auth y probar registro/login reales.
 4. Probar la app en un Android real con development build.
 5. Cerrar la primera party de prueba con 3 coches.

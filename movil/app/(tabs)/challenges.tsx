@@ -25,7 +25,6 @@ import {
 import {
   activeChallenge,
   challengeRoutes,
-  currentUser,
   friends,
   recentChallenges,
   vehicles,
@@ -33,6 +32,7 @@ import {
   type ChallengeCategory,
   type Friend,
 } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { formatClock } from '@/src/lib/format';
 import { challengeUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
@@ -108,6 +108,7 @@ function RouteMini({
 }
 
 export default function ChallengesScreen() {
+  const me = useCurrentUser();
   const [active, setActive] = useState<Challenge>(activeChallenge);
   const [selectedRouteId, setSelectedRouteId] = useState(challengeRoutes[1].id);
   const [category, setCategory] = useState<ChallengeCategory>('mixed');
@@ -177,8 +178,8 @@ export default function ChallengesScreen() {
     }
     const myVehicle =
       category === 'mixed'
-        ? currentUser.car
-        : vehicles.find((vehicle) => vehicle.kind === category) ?? currentUser.car;
+        ? me.car
+        : vehicles.find((vehicle) => vehicle.kind === category) ?? me.car;
     const newChallenge: Challenge = {
       id: `c_${Date.now()}`,
       code: `R${Math.floor(1000 + Math.random() * 9000)}`,
@@ -195,10 +196,10 @@ export default function ChallengesScreen() {
           : `Categoría ${vehicleCategoryLabel(category)}. Solo compiten vehículos de la misma clase.`,
       participants: [
         {
-          id: currentUser.id,
-          name: currentUser.name,
-          username: currentUser.username,
-          color: currentUser.color,
+          id: me.id,
+          name: me.name,
+          username: me.username,
+          color: me.color,
           vehicleKind: myVehicle.kind,
           vehicle: `${myVehicle.make} ${myVehicle.model}`,
           progress: 0,

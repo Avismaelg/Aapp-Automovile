@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -36,18 +37,26 @@ export default function RootLayout() {
     Inter_700Bold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const authStatus = useAuth((state) => state.status);
+  const initializeAuth = useAuth((state) => state.initialize);
+  const ready = loaded && authStatus !== 'loading';
+  const isAuthenticated = authStatus === 'authenticated';
 
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    void initializeAuth();
+  }, [initializeAuth]);
+
+  useEffect(() => {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [ready]);
 
-  if (!loaded) return null;
+  if (!ready) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -60,16 +69,26 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="scan"
-            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen
-            name="party/[code]"
-            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-          />
+          {/* Enlaces públicos: perfil, vehículo e invitación abren sin cuenta. */}
           <Stack.Screen name="u/[username]" />
+          <Stack.Screen name="v/[slug]" />
+          <Stack.Screen name="challenge/[code]" />
+
+          <Stack.Protected guard={isAuthenticated} redirectTo="/welcome">
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="scan"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="party/[code]"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+          </Stack.Protected>
+
+          <Stack.Protected guard={!isAuthenticated} redirectTo="/">
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

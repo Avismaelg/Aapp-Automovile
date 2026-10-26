@@ -138,12 +138,22 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  desired_username text;
 begin
+  -- El username elegido en la app se usa si es válido y está libre.
+  desired_username := lower(coalesce(new.raw_user_meta_data->>'username', ''));
+
+  if desired_username !~ '^[a-z0-9_]{3,24}$'
+     or exists (select 1 from public.profiles where username = desired_username) then
+    desired_username := public.generate_username();
+  end if;
+
   insert into public.profiles (id, username, display_name, avatar_url)
   values (
     new.id,
-    public.generate_username(),
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(coalesce(new.email, 'driver'), '@', 1)),
+    desired_username,
+    left(coalesce(new.raw_user_meta_data->>'display_name', split_part(coalesce(new.email, 'driver'), '@', 1)), 60),
     new.raw_user_meta_data->>'avatar_url'
   )
   on conflict (id) do nothing;
