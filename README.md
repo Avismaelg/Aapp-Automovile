@@ -15,15 +15,15 @@ Prototipo funcional de una app móvil que combina lo mejor de Wheelz con cuatro 
 
 ## Estado actual
 
-Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están construidas las pantallas, la autenticación y la lógica base; faltan las integraciones de producción (proyecto Supabase real, mapas reales, LiveKit y build nativo).
+Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantallas, la autenticación, el mapa real y la capa de garaje/combustible ya están construidas; Supabase está conectado y migrado. Faltan el backend Realtime de party/retos, LiveKit y el build nativo.
 
 | Módulo | Estado |
 |---|---|
 | Diseño dark + design system | ✅ |
-| Autenticación email/contraseña | ✅ UI, validación, sesión persistida y rutas protegidas; 🟡 falta conectar un proyecto Supabase |
+| Autenticación email/contraseña | ✅ UI, validación, sesión persistida, rutas protegidas y registro real probado; faltan Apple/Google y recuperación |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Home / feed social | ✅ con datos mock |
-| Party / mapa en vivo | ✅ UI + PTT simulado |
+| Party / mapa en vivo | ✅ mapa real OSM + GPS; PTT simulado |
 | Retos / emparejamiento | ✅ 1v1 programado + **reto al momento con 2+ pilotos**, emparejamiento y simulación local; falta backend Realtime y anti-trampas |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
@@ -31,7 +31,7 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | 🟡 esquema SQL + RLS + Auth listos; garaje y repostajes ya tienen capa de datos real; falta crear el proyecto, aplicar la migración y conectar perfil/feed/retos |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth email y garaje/combustible probados; 🟡 feed/retos siguen mock, advisors de seguridad/performance pendientes |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
@@ -100,6 +100,21 @@ npx tsc --noEmit
 npx eslint .
 npx expo-doctor
 ```
+
+---
+
+## Supabase del proyecto
+
+- Proyecto: `ecmqmgpruxclmpnnpgzv` (`https://ecmqmgpruxclmpnnpgzv.supabase.co`).
+- Migraciones aplicadas: `init_caravana` y `fix_set_updated_at_search_path`.
+- 25 tablas en `public` con RLS activado.
+- Auth email probado con un usuario temporal, ya eliminado.
+- Garaje y repostaje reales probados con Supabase.
+- `movil/.env` contiene la URL y la anon key; está ignorado por Git.
+- **No** guardar la `service_role` en ninguna variable `EXPO_PUBLIC_*`.
+
+El proyecto de Supabase está vinculado también al MCP de OpenCode para futuras
+migraciones y consultas.
 
 ---
 

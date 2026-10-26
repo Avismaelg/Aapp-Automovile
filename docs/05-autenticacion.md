@@ -1,6 +1,6 @@
 # Caravana — Autenticación y cuentas
 
-> Estado: flujo de email/contraseña implementado en la app, con modo demo local. Falta conectar un proyecto Supabase real para probar altas y sesiones de extremo a extremo.
+> Estado: flujo de email/contraseña implementado y probado contra el proyecto Supabase `ecmqmgpruxclmpnnpgzv`. El trigger crea el perfil automáticamente y Auth funciona de extremo a extremo. Apple/Google y recuperación de contraseña siguen pendientes.
 
 ---
 

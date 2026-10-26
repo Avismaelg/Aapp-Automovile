@@ -18,7 +18,8 @@
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
 - Servicio base de tracking en segundo plano (`expo-location` + `expo-task-manager`).
-- Esquema Supabase completo con RLS, PostGIS, funciones y Realtime.
+- Esquema Supabase completo con RLS, PostGIS, funciones y Realtime, aplicado al proyecto `ecmqmgpruxclmpnnpgzv`.
+- Auth email probada de extremo a extremo; trigger de perfil, alta de vehículo y repostaje reales verificados.
 - Cliente Supabase opcional (la app corre con mocks si no hay `.env`).
 - Lint, typecheck y Expo Doctor en verde.
 
@@ -28,9 +29,9 @@
 
 | # | Tarea | Responsable | Estimación |
 |---|---|---|---|
-| 1 | Crear proyecto Supabase y aplicar migración | Dev | 0,5 día |
-| 2 | Conectar proyecto Supabase y probar Auth email; añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
-| 3 | Completar datos reales (perfil editable, feed, amigos, retos); garaje y combustible ya tienen capa base | Dev | 4–5 días |
+| 1 | ✅ Crear proyecto Supabase y aplicar migración | Dev | Hecho |
+| 2 | ✅ Auth email probado; 🟡 añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
+| 3 | 🟡 Garaje y combustible reales; falta perfil editable, feed, amigos y retos en Supabase | Dev | 4–5 días |
 | 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |
@@ -176,6 +177,7 @@
 - Los mantenimientos de la ficha de venta son datos de ejemplo; falta su tabla y CRUD en Supabase.
 - El PDF funciona en nativo/web, pero el historial no persiste entre sesiones.
 - No hay push, moderación ni analítica.
+- Supabase reporta advisors pendientes: funciones `SECURITY DEFINER` expuestas por RPC y mejoras de índices/RLS. No bloquean el MVP, pero deben revisarse antes de producción.
 
 ---
 
