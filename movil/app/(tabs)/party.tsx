@@ -10,12 +10,14 @@ import { LiveMap } from '@/src/components/LiveMap';
 import { PTTButton } from '@/src/components/PTTButton';
 import { AppText, Avatar, IconButton, Pill } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { formatClock } from '@/src/lib/format';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
 export default function PartyScreen() {
   const router = useRouter();
+  const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();
   const [talking, setTalking] = useState(false);
   const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
@@ -113,7 +115,9 @@ export default function PartyScreen() {
               />
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-                  {member.isHost ? 'Tú' : member.name.split(' ')[0]}
+                  {member.username === currentUser.username
+                    ? 'Tú'
+                    : member.name.split(' ')[0]}
                 </AppText>
                 <AppText variant="label" color={member.isTalking ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
                   {member.isTalking ? 'HABLANDO' : `${member.battery}%`}

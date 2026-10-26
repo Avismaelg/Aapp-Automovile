@@ -1,9 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import { vehicles as seedVehicles, type Vehicle } from '@/src/data/mock';
+import {
+  currentUser,
+  vehicles as seedVehicles,
+  type Vehicle,
+} from '@/src/data/mock';
 
 const STORAGE_KEY = 'caravana.demo.vehicles';
+
+function normalizeStoredVehicle(vehicle: Vehicle): Vehicle {
+  const seed = seedVehicles.find((item) => item.id === vehicle.id);
+
+  return {
+    ...vehicle,
+    ownerId: vehicle.ownerId ?? seed?.ownerId ?? currentUser.id,
+    ownerUsername: vehicle.ownerUsername ?? seed?.ownerUsername ?? currentUser.username,
+    ownerName: vehicle.ownerName ?? seed?.ownerName ?? currentUser.name,
+    acquiredAt: vehicle.acquiredAt ?? seed?.acquiredAt ?? new Date().toISOString(),
+  };
+}
 
 type DemoGarageState = {
   vehicles: Vehicle[];
@@ -27,7 +43,10 @@ export const useDemoGarage = create<DemoGarageState>((set, get) => ({
       if (raw) {
         const stored = JSON.parse(raw);
         if (Array.isArray(stored)) {
-          set({ vehicles: stored as Vehicle[], hydrated: true });
+          set({
+            vehicles: (stored as Vehicle[]).map(normalizeStoredVehicle),
+            hydrated: true,
+          });
           return;
         }
       }

@@ -26,6 +26,7 @@ const quickActions = [
   { label: 'Repostaje', icon: 'water' as const, color: colors.cyan, href: '/fuel' },
   { label: 'Mi QR', icon: 'qr-code' as const, color: '#B98CFF', href: '/scan' },
   { label: 'Garaje', icon: 'car-sport' as const, color: '#FFB84D', href: '/garage' },
+  { label: 'Conducir', icon: 'navigate' as const, color: colors.cyan, href: '/drive' },
 ];
 
 function HeroRoute() {

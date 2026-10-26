@@ -77,14 +77,16 @@ export function PTTButton({
   onPressIn,
   onPressOut,
   disabled,
+  compact,
 }: {
   talking: boolean;
   onPressIn: () => void;
   onPressOut: () => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, compact && styles.wrapCompact]}>
       <View style={styles.stage}>
         <Ring delay={0} active={talking} />
         <Ring delay={350} active={talking} />
@@ -109,16 +111,20 @@ export function PTTButton({
         </Pressable>
       </View>
       <AppText
-        variant="title"
+        variant={compact ? 'bodyStrong' : 'title'}
         color={talking ? colors.accent : colors.text}
-        style={{ marginTop: spacing.sm }}
+        style={{ marginTop: compact ? 4 : spacing.sm }}
       >
         {talking ? 'Hablando…' : 'Mantén para hablar'}
       </AppText>
-      <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-        {talking ? 'Tu voz se está compartiendo con la party' : 'Walkie-talkie con tu grupo'}
-      </AppText>
-      <Waveform active={talking} />
+      {!compact ? (
+        <>
+          <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
+            {talking ? 'Tu voz se está compartiendo con la party' : 'Walkie-talkie con tu grupo'}
+          </AppText>
+          <Waveform active={talking} />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -127,6 +133,9 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     paddingBottom: spacing.sm,
+  },
+  wrapCompact: {
+    paddingBottom: 0,
   },
   stage: {
     width: 96,

@@ -16,6 +16,13 @@ export type VehicleRow = {
   odometer_km: number | string;
   is_primary: boolean;
   qr_slug: string;
+  created_at?: string;
+};
+
+export type VehicleOwner = {
+  id: string;
+  username: string;
+  name: string;
 };
 
 export type FuelLogRow = {
@@ -84,7 +91,7 @@ function fallbackEfficiency(kind: VehicleKind) {
   return kind === 'ev' ? 15.8 : 12;
 }
 
-export function mapVehicleRow(row: VehicleRow): Vehicle {
+export function mapVehicleRow(row: VehicleRow, owner?: VehicleOwner): Vehicle {
   const kind = row.kind ?? 'car';
   const efficiency = Number(row.efficiency ?? fallbackEfficiency(kind));
 
@@ -103,6 +110,10 @@ export function mapVehicleRow(row: VehicleRow): Vehicle {
     qrSlug: row.qr_slug,
     qr: vehicleUrl(row.qr_slug),
     isPrimary: row.is_primary,
+    ownerId: owner?.id,
+    ownerUsername: owner?.username,
+    ownerName: owner?.name,
+    acquiredAt: row.created_at,
   };
 }
 

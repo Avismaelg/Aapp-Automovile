@@ -88,6 +88,14 @@ export default function RootLayout() {
               name="vehicle/new"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+            <Stack.Screen
+              name="v/[slug]/sale"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="drive"
+              options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+            />
           </Stack.Protected>
 
           <Stack.Protected guard={!isAuthenticated} redirectTo="/">

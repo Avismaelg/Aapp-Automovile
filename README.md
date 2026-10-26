@@ -24,18 +24,19 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Home / feed social | ✅ con datos mock |
 | Party / mapa en vivo | ✅ UI + PTT simulado |
-| Retos / emparejamiento | ✅ UI + simulación local; falta backend Realtime y anti-trampas |
+| Retos / emparejamiento | ✅ 1v1 programado + **reto al momento con 2+ pilotos**, emparejamiento y simulación local; falta backend Realtime y anti-trampas |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; falta edición y fotos |
 | Escáner QR | ✅ cámara nativa + fallback web |
-| Perfil público por usuario y vehículo | ✅ |
+| Perfil público por usuario y vehículo | ✅ datos técnicos, mantenimiento de ejemplo e historial de venta PDF; 🟡 falta persistir mantenimientos reales en Supabase |
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
+| Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
 | Supabase | 🟡 esquema SQL + RLS + Auth listos; garaje y repostajes ya tienen capa de datos real; falta crear el proyecto, aplicar la migración y conectar perfil/feed/retos |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapas reales | ⏳ mapa estilizado SVG; falta Mapbox/MapLibre |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
-**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación a party, invitación a reto, perfil público y perfil público de vehículo.
+**Pantallas:** Bienvenida, Registro, Inicio de sesión, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.
 
 ### Capturas
 
@@ -46,6 +47,10 @@ Esto es un **MVP visual y funcional en local**, no una app publicada. Ya están 
 | Garaje multi-vehículo | Combustible y EV | Bienvenida |
 |---|---|---|
 | ![Garaje](docs/screenshots/garage.png) | ![Combustible](docs/screenshots/fuel.png) | ![Bienvenida](docs/screenshots/auth-welcome.png) |
+
+| Modo conducción | Ficha de venta del vehículo |
+|---|---|
+| ![Modo conducción](docs/screenshots/drive-mode-landscape.png) | ![Ficha de venta](docs/screenshots/vehicle-sale.png) |
 
 ---
 
@@ -66,6 +71,10 @@ npx expo start
 - Con Supabase configurado, la app arranca en bienvenida y exige sesión para las
   pestañas. Los enlaces públicos de perfil, vehículo y reto siguen abriendo sin
   cuenta.
+- **Reto al momento:** Retos → elige ruta, categoría y “Elegir 2 aleatorios” →
+  *Salir ahora*. También puedes seleccionar los pilotos manualmente.
+- **Ficha de venta:** Garaje → abre un vehículo → *Preparar ficha de venta*.
+- **Modo conducción:** Inicio → *Conducir* (funciona en horizontal y vertical).
 - El tracking en segundo plano y la cámara requieren un **development build**, no Expo Go:
   ```bash
   npx expo run:android
@@ -124,13 +133,16 @@ app de auto/
 │  ├─ 03-modelo-datos.sql     # esquema Supabase + RLS + Realtime
 │  ├─ 04-checklist-mvp.md     # qué falta para lanzar
 │  ├─ 05-autenticacion.md     # flujo de cuentas, Supabase y pendientes
-│  └─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
+│  ├─ 06-datos-garaje-combustible.md # capa de datos de garaje y energía
+│  └─ 07-carplay-android-auto.md # modo conducción y proyección nativa
 ├─ movil/
 │  ├─ app/                    # Expo Router (pantallas)
 │  │  ├─ (auth)/              # Bienvenida, login y registro
-│  │  ├─ (tabs)/challenges.tsx # Retos + emparejamiento
+│  │  ├─ (tabs)/challenges.tsx # Retos programados + reto al momento
 │  │  ├─ challenge/[code].tsx  # Invitación a reto
-│  │  └─ v/[slug].tsx          # Perfil público de vehículo
+│  │  ├─ drive.tsx             # Modo conducción
+│  │  ├─ v/[slug].tsx          # Perfil público de vehículo
+│  │  └─ v/[slug]/sale.tsx     # Ficha de venta con historial
 │  ├─ src/components/         # UI, mapa, QR, PTT, feed, auth
 │  ├─ src/hooks/              # perfil conectado
 │  ├─ src/lib/                # Supabase, QR, combustible/EV, PDF, tracking
@@ -161,8 +173,9 @@ app de auto/
 - Apple/Google, recuperación de contraseña, edición de perfil y borrado de cuenta.
 - Mapbox/MapLibre + ubicación en vivo por Realtime Broadcast.
 - LiveKit Cloud + Edge Function para tokens + PTT nativo.
-- Retos en Supabase Realtime: invitaciones, salida/meta, progreso y anti-trampas.
+- Retos en Supabase Realtime: invitaciones, salas al momento, salida/meta, progreso y anti-trampas.
 - Detección de viajes con revisión/edición (unir, dividir, descartar).
+- CarPlay/Android Auto nativos: entitlement de Apple, categoría de Android Auto, build nativo y aprobación de tiendas.
 - Push notifications, moderación y analítica.
 - Builds iOS/Android, TestFlight/Play Internal y 20–50 beta testers.
 

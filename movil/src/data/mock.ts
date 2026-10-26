@@ -38,6 +38,10 @@ export type Vehicle = {
   qrSlug: string;
   qr: string;
   isPrimary?: boolean;
+  ownerId?: string;
+  ownerUsername?: string;
+  ownerName?: string;
+  acquiredAt?: string;
 };
 
 export type ChallengeCategory = VehicleKind | 'mixed';
@@ -64,6 +68,7 @@ export type Challenge = {
   distanceKm: number;
   category: ChallengeCategory;
   status: 'pending' | 'live' | 'finished';
+  mode?: 'scheduled' | 'instant';
   elapsedSeconds: number;
   participants: ChallengeParticipant[];
   note?: string;
@@ -141,6 +146,28 @@ export type FuelLog = {
   fullTank: boolean;
 };
 
+export type MaintenanceKind =
+  | 'oil'
+  | 'tires'
+  | 'brakes'
+  | 'battery'
+  | 'filters'
+  | 'inspection'
+  | 'other';
+
+export type MaintenanceRecord = {
+  id: string;
+  vehicleId: string;
+  kind: MaintenanceKind;
+  title: string;
+  date: string;
+  odometerKm: number;
+  cost: number;
+  shop: string;
+  notes?: string;
+  nextKm?: number;
+};
+
 export const currentUser = {
   id: 'u_luis',
   name: 'Luis Martínez',
@@ -169,6 +196,10 @@ export const currentUser = {
     qrSlug: 'civic-luis',
     qr: 'https://caravana.app/v/civic-luis',
     isPrimary: true,
+    ownerId: 'u_luis',
+    ownerUsername: 'luis_drives',
+    ownerName: 'Luis Martínez',
+    acquiredAt: '2021-03-12',
   } satisfies Vehicle,
 };
 
@@ -188,6 +219,10 @@ export const vehicles: Vehicle[] = [
     efficiencyUnit: 'km_l',
     qrSlug: 'mt07-luis',
     qr: 'https://caravana.app/v/mt07-luis',
+    ownerId: 'u_luis',
+    ownerUsername: 'luis_drives',
+    ownerName: 'Luis Martínez',
+    acquiredAt: '2022-09-03',
   },
   {
     id: 'v_model3',
@@ -203,6 +238,10 @@ export const vehicles: Vehicle[] = [
     efficiencyUnit: 'kwh_100km',
     qrSlug: 'model3-luis',
     qr: 'https://caravana.app/v/model3-luis',
+    ownerId: 'u_luis',
+    ownerUsername: 'luis_drives',
+    ownerName: 'Luis Martínez',
+    acquiredAt: '2023-06-20',
   },
   {
     id: 'v_ranger',
@@ -218,6 +257,10 @@ export const vehicles: Vehicle[] = [
     efficiencyUnit: 'km_l',
     qrSlug: 'ranger-luis',
     qr: 'https://caravana.app/v/ranger-luis',
+    ownerId: 'u_luis',
+    ownerUsername: 'luis_drives',
+    ownerName: 'Luis Martínez',
+    acquiredAt: '2022-11-05',
   },
 ];
 

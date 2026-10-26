@@ -109,6 +109,11 @@ La columna `volume_l` guarda:
 - litros para gasolina y diésel;
 - kWh para vehículos eléctricos.
 
+La ficha de venta usa estos registros, los mantenimientos y los datos del
+vehículo para generar un PDF compartible:
+
+![Ficha de venta](screenshots/vehicle-sale.png)
+
 El significado se deduce de `vehicles.fuel_kind`. Si en el futuro se mezclan
 vehículos o se necesita reportería más estricta, conviene añadir una columna
 `energy_kind` o `volume_kwh`.
@@ -127,10 +132,13 @@ vehículos o se necesita reportería más estricta, conviene añadir una columna
 
 ## 6. Pendiente
 
+- Añadir tabla `vehicle_maintenance`, RLS y alta/edición de servicios para que
+  los mantenimientos reales alimenten la ficha de venta.
 - Editar y eliminar vehículos.
 - Subir foto del vehículo a Storage.
 - Persistir el historial de repostajes en modo demo.
 - Editar/eliminar repostajes y adjuntar recibo.
+- Incluir el historial de viajes/rutas en la ficha de venta cuando el tracking suba datos.
 - Calcular consumo real entre tanques llenos y mostrar alertas de mantenimiento.
 - Sincronizar unidades y moneda con el perfil.
 - Probar toda la capa contra un proyecto Supabase real.

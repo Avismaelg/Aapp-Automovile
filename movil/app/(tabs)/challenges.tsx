@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -27,12 +28,12 @@ import {
   challengeRoutes,
   friends,
   recentChallenges,
-  vehicles,
   type Challenge,
   type ChallengeCategory,
   type Friend,
 } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { formatClock } from '@/src/lib/format';
 import { challengeUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
@@ -41,6 +42,31 @@ import {
   vehicleKindMeta,
   vehicleKinds,
 } from '@/src/lib/vehicles';
+
+function challengeId(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
+}
+
+function challengeCode(prefix: 'R' | 'S') {
+  return `${prefix}${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+type ChallengeMode = 'instant' | 'scheduled';
+
+const modeOptions: { key: ChallengeMode; label: string; icon: keyof typeof Ionicons.glyphMap; detail: string }[] = [
+  {
+    key: 'instant',
+    label: 'Al momento',
+    icon: 'flash',
+    detail: 'Salida inmediata con 2+ pilotos',
+  },
+  {
+    key: 'scheduled',
+    label: 'Programado',
+    icon: 'calendar-outline',
+    detail: 'Invita a un rival y espera',
+  },
+];
 
 const categoryOptions: {
   key: ChallengeCategory;
@@ -109,10 +135,13 @@ function RouteMini({
 
 export default function ChallengesScreen() {
   const me = useCurrentUser();
+  const { vehicles: garageVehicles } = useGarageVehicles();
   const [active, setActive] = useState<Challenge>(activeChallenge);
   const [selectedRouteId, setSelectedRouteId] = useState(challengeRoutes[1].id);
   const [category, setCategory] = useState<ChallengeCategory>('mixed');
+  const [challengeMode, setChallengeMode] = useState<ChallengeMode>('instant');
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
+  const [instantSelectedIds, setInstantSelectedIds] = useState<string[]>([]);
   const [matchedFriend, setMatchedFriend] = useState<Friend | null>(null);
   const [matching, setMatching] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -128,6 +157,15 @@ export default function ChallengesScreen() {
   const selectedFriend =
     filteredFriends.find((friend) => friend.id === selectedFriendId) ?? null;
   const rival = matchedFriend ?? selectedFriend;
+  const selectedInstantFriends = filteredFriends.filter((friend) =>
+    instantSelectedIds.includes(friend.id),
+  );
+  const myVehicle =
+    category === 'mixed'
+      ? garageVehicles[0] ?? me.car
+      : garageVehicles.find((vehicle) => vehicle.kind === category) ??
+        garageVehicles[0] ??
+        me.car;
 
   const standings = useMemo(
     () => [...active.participants].sort((a, b) => b.progress - a.progress),
@@ -149,7 +187,13 @@ export default function ChallengesScreen() {
   const chooseCategory = (next: ChallengeCategory) => {
     setCategory(next);
     setSelectedFriendId(null);
+    setInstantSelectedIds([]);
     setMatchedFriend(null);
+    setSentTo(null);
+  };
+
+  const chooseMode = (next: ChallengeMode) => {
+    setChallengeMode(next);
     setSentTo(null);
   };
 
@@ -176,19 +220,16 @@ export default function ChallengesScreen() {
       Alert.alert('Elige un rival', 'Toca un amigo o usa el emparejamiento rápido.');
       return;
     }
-    const myVehicle =
-      category === 'mixed'
-        ? me.car
-        : vehicles.find((vehicle) => vehicle.kind === category) ?? me.car;
     const newChallenge: Challenge = {
-      id: `c_${Date.now()}`,
-      code: `R${Math.floor(1000 + Math.random() * 9000)}`,
+      id: challengeId('c'),
+      code: challengeCode('R'),
       title: `Reto ${route.fromLabel.split(',')[0]} → ${route.toLabel}`,
       fromLabel: route.fromLabel,
       toLabel: route.toLabel,
       distanceKm: route.distanceKm,
       category,
       status: 'pending',
+      mode: 'scheduled',
       elapsedSeconds: 0,
       note:
         category === 'mixed'
@@ -226,6 +267,107 @@ export default function ChallengesScreen() {
     );
   };
 
+  const toggleInstantFriend = (friendId: string) => {
+    setSentTo(null);
+    setInstantSelectedIds((current) =>
+      current.includes(friendId)
+        ? current.filter((id) => id !== friendId)
+        : [...current, friendId],
+    );
+  };
+
+  const pickInstantRivals = () => {
+    if (filteredFriends.length === 0) {
+      Alert.alert('Sin pilotos disponibles', 'No hay amigos con ese tipo de vehículo. Prueba otra categoría.');
+      return;
+    }
+
+    const online = filteredFriends.filter((friend) => friend.online);
+    const pool = [...(online.length >= 2 ? online : filteredFriends)];
+    const picks: string[] = [];
+    while (picks.length < Math.min(2, pool.length)) {
+      const index = Math.floor(Math.random() * pool.length);
+      const [picked] = pool.splice(index, 1);
+      picks.push(picked.id);
+    }
+
+    setInstantSelectedIds(picks);
+    setSentTo(null);
+  };
+
+  const startInstantChallenge = () => {
+    if (selectedInstantFriends.length === 0) {
+      Alert.alert('Elige al menos un piloto', 'Un reto al momento necesita 2+ personas: tú y al menos otro piloto.');
+      return;
+    }
+    const code = challengeCode('S');
+    const participants = [
+      {
+        id: me.id,
+        name: me.name,
+        username: me.username,
+        color: me.color,
+        vehicleKind: myVehicle.kind,
+        vehicle: `${myVehicle.make} ${myVehicle.model}`,
+        progress: 0,
+        etaMin: route.etaMin,
+        isMe: true,
+      },
+      ...selectedInstantFriends.map((friend) => ({
+        id: friend.id,
+        name: friend.name,
+        username: friend.username,
+        color: friend.color,
+        vehicleKind: friend.vehicleKind,
+        vehicle: friend.car,
+        progress: 0,
+        etaMin: route.etaMin,
+      })),
+    ];
+
+    setActive({
+      id: challengeId('c_instant'),
+      code,
+      title: `Sala rápida · ${route.toLabel}`,
+      fromLabel: route.fromLabel,
+      toLabel: route.toLabel,
+      distanceKm: route.distanceKm,
+      category,
+      status: 'live',
+      mode: 'instant',
+      elapsedSeconds: 0,
+      note:
+        'Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.',
+      participants,
+    });
+    setSentTo(null);
+    Alert.alert(
+      'Reto en marcha',
+      `${participants.length} pilotos salen ahora hacia ${route.toLabel}. Comparte el código ${code} para que se unan.`,
+    );
+  };
+
+  const promptInstantStart = () => {
+    if (selectedInstantFriends.length === 0) {
+      Alert.alert('Elige al menos un piloto', 'El reto al momento necesita 2+ personas en total.');
+      return;
+    }
+    if (Platform.OS === 'web') {
+      startInstantChallenge();
+      return;
+    }
+    Alert.alert(
+      '¿Salir ahora?',
+      `Tú y ${selectedInstantFriends.length} ${
+        selectedInstantFriends.length === 1 ? 'piloto' : 'pilotos'
+      } saldrán inmediatamente hacia ${route.toLabel}. El reto mide llegada, no velocidad.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Salir ahora', onPress: startInstantChallenge },
+      ],
+    );
+  };
+
   const startChallenge = () => {
     setActive((previous) => ({
       ...previous,
@@ -251,8 +393,9 @@ export default function ChallengesScreen() {
   };
 
   const shareChallenge = async () => {
+    const label = active.mode === 'instant' ? 'Sala rápida de Caravana' : 'Reto de Caravana';
     await Share.share({
-      message: `Te reto en Caravana: ${active.fromLabel} → ${active.toLabel} (${active.distanceKm} km). Únete con ${challengeUrl(active.code)}`,
+      message: `${label}: ${active.fromLabel} → ${active.toLabel} (${active.distanceKm} km). Únete con ${challengeUrl(active.code)}`,
       url: challengeUrl(active.code),
     });
   };
@@ -279,8 +422,42 @@ export default function ChallengesScreen() {
       </View>
 
       <View style={styles.matchmakingPillRow}>
-        <Pill label="Modo emparejamiento" tone="lime" icon="git-compare-outline" />
+        <Pill
+          label={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
+          tone="lime"
+          icon={challengeMode === 'instant' ? 'flash' : 'calendar-outline'}
+        />
         <Pill label="Punto A → punto B" tone="neutral" icon="flag-outline" />
+      </View>
+
+      <View style={styles.modeSwitch}>
+        {modeOptions.map((option) => {
+          const selected = option.key === challengeMode;
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => chooseMode(option.key)}
+              style={[styles.modeOption, selected && styles.modeOptionActive]}
+            >
+              <View style={[styles.modeIcon, selected && styles.modeIconActive]}>
+                <Ionicons
+                  name={option.icon}
+                  size={17}
+                  color={selected ? '#120802' : colors.muted}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong" color={selected ? colors.text : colors.textSoft}>
+                  {option.label}
+                </AppText>
+                <AppText variant="caption" color={selected ? colors.muted : colors.dim} numberOfLines={1}>
+                  {option.detail}
+                </AppText>
+              </View>
+              {selected ? <Ionicons name="checkmark-circle" size={17} color={colors.lime} /> : null}
+            </Pressable>
+          );
+        })}
       </View>
 
       <LinearGradient
@@ -305,7 +482,7 @@ export default function ChallengesScreen() {
         <AppText variant="h2" style={{ marginTop: spacing.lg }}>{active.title}</AppText>
         <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
           {active.status === 'live'
-            ? `En curso · ${standings.length} participantes · código ${active.code}`
+            ? `${active.mode === 'instant' ? 'Sala rápida' : 'En curso'} · ${standings.length} participantes · código ${active.code}`
             : active.status === 'pending'
               ? 'Esperando que tu rival acepte el reto'
               : 'Resultado final del reto'}
@@ -447,24 +624,34 @@ export default function ChallengesScreen() {
       </Card>
 
       <SectionHeader
-        title="Modo emparejamiento"
+        title={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
         action="Cómo funciona"
         onAction={() =>
           Alert.alert(
-            'Cómo funciona',
-            'Elige una ruta A → B y una categoría. La app busca un amigo disponible de esa categoría o te deja elegir uno. Al aceptar, ambos comparten progreso y el primero en entrar en la meta gana. No se premia la velocidad máxima.',
+            challengeMode === 'instant' ? 'Reto al momento' : 'Cómo funciona',
+            challengeMode === 'instant'
+              ? 'Elige una ruta A → B, una categoría y uno o más pilotos disponibles. Al confirmar, la sala empieza de inmediato con 2+ participantes y gana quien llegue primero a la meta respetando las normas. No se premia la velocidad máxima.'
+              : 'Elige una ruta A → B y una categoría. La app busca un amigo disponible de esa categoría o te deja elegir uno. Al aceptar, ambos comparten progreso y el primero en entrar en la meta gana. No se premia la velocidad máxima.',
           )
         }
       />
       <Card style={styles.matchCard}>
         <View style={styles.matchHeading}>
           <View style={styles.matchIcon}>
-            <Ionicons name="git-compare-outline" size={22} color={colors.accent} />
+            <Ionicons
+              name={challengeMode === 'instant' ? 'flash' : 'git-compare-outline'}
+              size={22}
+              color={colors.accent}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <AppText variant="title">Encuentra tu próximo reto</AppText>
+            <AppText variant="title">
+              {challengeMode === 'instant' ? 'Arma la salida ahora' : 'Encuentra tu próximo reto'}
+            </AppText>
             <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
-              Elige ruta y categoría. Emparejamos un amigo disponible o eliges tú.
+              {challengeMode === 'instant'
+                ? 'Ruta, categoría y 2+ pilotos. La sala arranca en cuanto confirmes.'
+                : 'Elige ruta y categoría. Emparejamos un amigo disponible o eliges tú.'}
             </AppText>
           </View>
         </View>
@@ -531,15 +718,29 @@ export default function ChallengesScreen() {
         </View>
 
         <View style={styles.friendHeader}>
-          <AppText variant="label" color={colors.muted} style={styles.stepLabel}>3 · RIVAL</AppText>
-          <Pressable onPress={matchmake} style={styles.quickMatch} disabled={matching}>
-            {matching ? (
+          <AppText variant="label" color={colors.muted} style={styles.stepLabel}>
+            {challengeMode === 'instant' ? '3 · PILOTOS (2+)' : '3 · RIVAL'}
+          </AppText>
+          <Pressable
+            onPress={challengeMode === 'instant' ? pickInstantRivals : matchmake}
+            style={styles.quickMatch}
+            disabled={matching}
+          >
+            {matching && challengeMode === 'scheduled' ? (
               <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <Ionicons name="sparkles" size={14} color={colors.lime} />
+              <Ionicons
+                name={challengeMode === 'instant' ? 'shuffle' : 'sparkles'}
+                size={14}
+                color={colors.lime}
+              />
             )}
             <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
-              {matching ? 'BUSCANDO…' : 'EMPAREJAMIENTO RÁPIDO'}
+              {challengeMode === 'scheduled' && matching
+                ? 'BUSCANDO…'
+                : challengeMode === 'instant'
+                  ? 'ELEGIR 2 ALEATORIOS'
+                  : 'EMPAREJAMIENTO RÁPIDO'}
             </AppText>
           </Pressable>
         </View>
@@ -559,11 +760,18 @@ export default function ChallengesScreen() {
           >
             {filteredFriends.map((friend) => {
               const kind = vehicleKindMeta[friend.vehicleKind];
-              const selected = friend.id === selectedFriendId;
+              const selected =
+                challengeMode === 'instant'
+                  ? instantSelectedIds.includes(friend.id)
+                  : friend.id === selectedFriendId;
               return (
                 <Pressable
                   key={friend.id}
                   onPress={() => {
+                    if (challengeMode === 'instant') {
+                      toggleInstantFriend(friend.id);
+                      return;
+                    }
                     setSelectedFriendId(friend.id);
                     setMatchedFriend(null);
                     setSentTo(null);
@@ -591,34 +799,85 @@ export default function ChallengesScreen() {
           </ScrollView>
         )}
 
-        {rival ? (
-          <View style={styles.rivalCard}>
-            <Avatar name={rival.name} color={rival.color} size={42} online />
-            <View style={{ flex: 1 }}>
-              <AppText variant="bodyStrong">
-                {matchedFriend ? 'Rival encontrado' : 'Rival seleccionado'}: {rival.name}
-              </AppText>
-              <AppText variant="caption" color={colors.muted}>
-                {rival.car} · {vehicleCategoryLabel(rival.vehicleKind)}
-              </AppText>
-            </View>
-            <Pill
-              label={rival.online ? 'En línea' : 'Disponible'}
-              tone={rival.online ? 'lime' : 'neutral'}
-            />
-          </View>
-        ) : null}
+        {challengeMode === 'instant' ? (
+          <>
+            {selectedInstantFriends.length > 0 ? (
+              <View style={styles.lineupCard}>
+                <View style={styles.lineupAvatars}>
+                  <Avatar name={me.name} color={me.color} size={38} ring={colors.surface} />
+                  {selectedInstantFriends.map((friend, index) => (
+                    <View key={friend.id} style={[styles.lineupAvatar, index === 0 && { marginLeft: -8 }]}>
+                      <Avatar name={friend.name} color={friend.color} size={38} ring={colors.surface} />
+                    </View>
+                  ))}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyStrong">
+                    {selectedInstantFriends.length + 1} pilotos listos
+                  </AppText>
+                  <AppText variant="caption" color={colors.muted}>
+                    Tú y {selectedInstantFriends.map((friend) => friend.name.split(' ')[0]).join(', ')}
+                  </AppText>
+                </View>
+                <Pill label="2+" tone="lime" icon="people" />
+              </View>
+            ) : (
+              <View style={styles.instantHint}>
+                <Ionicons name="flash-outline" size={18} color={colors.accent} />
+                <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
+                  Elige al menos un piloto para formar una sala de 2+ personas. También puedes usar
+                  “Elegir 2 aleatorios”.
+                </AppText>
+              </View>
+            )}
 
-        <Button
-          label={rival ? `Enviar reto a ${rival.name.split(' ')[0]}` : 'Elige un rival'}
-          icon="flag"
-          onPress={sendChallenge}
-          disabled={!rival}
-          style={{ marginTop: spacing.md }}
-        />
-        <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 8 }}>
-          Sin apuestas. Sin rankings de velocidad. El reto mide llegada, no imprudencia.
-        </AppText>
+            <Button
+              label={
+                selectedInstantFriends.length > 0
+                  ? `Salir ahora con ${selectedInstantFriends.length + 1} pilotos`
+                  : 'Elige 2+ pilotos'
+              }
+              icon="flash"
+              onPress={promptInstantStart}
+              disabled={selectedInstantFriends.length === 0}
+              style={{ marginTop: spacing.md }}
+            />
+            <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 8 }}>
+              La sala empieza al confirmar. Gana quien llega primero a la meta respetando las normas.
+            </AppText>
+          </>
+        ) : (
+          <>
+            {rival ? (
+              <View style={styles.rivalCard}>
+                <Avatar name={rival.name} color={rival.color} size={42} online />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyStrong">
+                    {matchedFriend ? 'Rival encontrado' : 'Rival seleccionado'}: {rival.name}
+                  </AppText>
+                  <AppText variant="caption" color={colors.muted}>
+                    {rival.car} · {vehicleCategoryLabel(rival.vehicleKind)}
+                  </AppText>
+                </View>
+                <Pill
+                  label={rival.online ? 'En línea' : 'Disponible'}
+                  tone={rival.online ? 'lime' : 'neutral'}
+                />
+              </View>
+            ) : null}
+
+            <Button
+              label={rival ? `Enviar reto a ${rival.name.split(' ')[0]}` : 'Elige un rival'}
+              icon="flag"
+              onPress={sendChallenge}
+              disabled={!rival}
+              style={{ marginTop: spacing.md }}
+            />
+            <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 8 }}>
+              Sin apuestas. Sin rankings de velocidad. El reto mide llegada, no imprudencia.
+            </AppText>
+          </>
+        )}
       </Card>
 
       <SectionHeader title="Resultados recientes" action="Ver todos" />
@@ -678,6 +937,38 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   matchmakingPillRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
+  modeSwitch: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: spacing.md,
+  },
+  modeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  modeOptionActive: {
+    borderColor: 'rgba(201,255,77,0.35)',
+    backgroundColor: 'rgba(201,255,77,0.06)',
+  },
+  modeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: colors.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeIconActive: {
+    backgroundColor: colors.lime,
+  },
   liveCard: {
     marginTop: spacing.lg,
     borderRadius: radius['2xl'],
@@ -878,6 +1169,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgElevated,
     borderWidth: 1,
     borderColor: 'rgba(201,255,77,0.25)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  lineupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: 'rgba(255,90,31,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,31,0.3)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  lineupAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  lineupAvatar: {
+    borderWidth: 2,
+    borderColor: colors.surface,
+    borderRadius: 21,
+  },
+  instantHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     marginTop: spacing.md,

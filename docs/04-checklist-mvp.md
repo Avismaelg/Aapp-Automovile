@@ -10,7 +10,9 @@
 - Design system dark, iconos y splash generados.
 - Pantallas: Bienvenida, Registro, Login, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación, perfil público y perfil de vehículo.
 - Autenticación email/contraseña con Supabase: validación, sesión persistida, rutas protegidas y modo demo local.
-- Retos punto A → B con modo emparejamiento, categorías coche/moto/EV/camión y simulación local.
+- Retos punto A → B: modo programado 1v1 y **reto al momento con 2+ pilotos**, categorías coche/moto/EV/camión y simulación local.
+- Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
+- Ficha de vehículo con datos técnicos, mantenimiento de ejemplo e historial de venta en PDF.
 - Garaje multi-vehículo: coche, moto, EV y camión, cada uno con su QR.
 - Calculadora de combustible/energía + PDF + historial local (gasolina, diésel y EV).
 - QR real de perfil/coche/moto/EV/camión y escáner con cámara.
@@ -120,8 +122,12 @@
 - [ ] Perfil privado: el QR no filtra ubicación ni teléfono.
 - [ ] Repostaje parcial + lleno: el consumo se calcula bien.
 - [ ] Carga EV: kWh/100 km y costo por kWh correctos.
+- [ ] Reto al momento con 3+ pilotos: sala, timer, clasificación y finalización.
 - [ ] Reto entre coche, moto, EV y camión: cada categoría tiene su clasificación.
 - [ ] Reto mixto: aviso de seguridad y llegada verificada, sin ranking de velocidad.
+- [ ] Ficha de venta: PDF con datos, mantenimientos y repostajes; sin placa ni ubicación.
+- [ ] Modo conducción en horizontal y vertical, sin controles pequeños.
+- [ ] CarPlay Simulator y Android Auto DHU muestran la pantalla de Caravana.
 - [ ] Cuenta eliminada: se borran perfil, viajes, fotos y tokens.
 
 ---
@@ -162,6 +168,8 @@
 - El tracking está conectado a la UI en Home/Perfil, pero no sube datos a Supabase.
 - Los retos son una simulación local; no hay invitaciones ni Realtime reales.
 - El QR apunta a `caravana.app`, que aún no está desplegado.
+- El Modo conducción es una pantalla móvil; la proyección nativa CarPlay/Android Auto requiere entitlement, aprobación y build nativo.
+- Los mantenimientos de la ficha de venta son datos de ejemplo; falta su tabla y CRUD en Supabase.
 - El PDF funciona en nativo/web, pero el historial no persiste entre sesiones.
 - No hay push, moderación ni analítica.
 
@@ -174,4 +182,5 @@
 3. Aplicar la migración, configurar Email Auth y probar registro/login reales.
 4. Probar alta de vehículo y guardado de repostaje contra Supabase.
 5. Probar la app en un Android real con development build.
+6. Definir categoría y solicitar entitlement para CarPlay/Android Auto.
 5. Cerrar la primera party de prueba con 3 coches.

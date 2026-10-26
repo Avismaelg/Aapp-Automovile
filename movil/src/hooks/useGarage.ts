@@ -43,7 +43,12 @@ export function useGarageVehicles() {
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);
-      return ((data ?? []) as VehicleRow[]).map(mapVehicleRow);
+      const owner = {
+        id: account.id,
+        username: account.username,
+        name: account.displayName,
+      };
+      return ((data ?? []) as VehicleRow[]).map((row) => mapVehicleRow(row, owner));
     },
   });
 
@@ -93,6 +98,10 @@ export function useCreateVehicle() {
           qrSlug,
           qr: vehicleUrl(qrSlug),
           isPrimary: Boolean(input.isPrimary),
+          ownerId: account?.id,
+          ownerUsername: account?.username,
+          ownerName: account?.displayName,
+          acquiredAt: new Date().toISOString(),
         };
 
         await addDemoVehicle(vehicle);
@@ -120,7 +129,11 @@ export function useCreateVehicle() {
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));
-      return mapVehicleRow(data as VehicleRow);
+      return mapVehicleRow(data as VehicleRow, {
+        id: account.id,
+        username: account.username,
+        name: account.displayName,
+      });
     },
     onSuccess: () => {
       if (!demo) {
