@@ -96,6 +96,7 @@ export default function RootLayout() {
               name="profile/edit"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+            <Stack.Screen name="friends" />
             <Stack.Screen
               name="drive"
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}

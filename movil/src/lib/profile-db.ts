@@ -13,6 +13,9 @@ export type UserProfile = {
   createdAt: string;
 };
 
+export const PROFILE_COLUMNS =
+  'id, username, display_name, bio, city, country_code, avatar_url, privacy, qr_slug, created_at';
+
 export type ProfileRow = {
   id: string;
   username: string;

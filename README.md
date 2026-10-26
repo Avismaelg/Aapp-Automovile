@@ -22,6 +22,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Diseño dark + design system | ✅ |
 | Autenticación email/contraseña | ✅ UI, validación, sesión persistida, rutas protegidas y registro real probado; faltan Apple/Google y recuperación |
 | Perfil editable + público | ✅ nombre, bio, ciudad y privacidad reales en Supabase; perfil público por `@usuario` y vehículos públicos |
+| Amigos | ✅ búsqueda por nombre/@usuario, solicitudes, aceptar/rechazar y eliminar; demo con lista de ejemplo |
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Home / feed social | ✅ con datos mock |
 | Party / mapa en vivo | ✅ mapa real OSM + GPS; PTT simulado |
@@ -32,7 +33,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Combustible y energía | 🟡 gasolina/diésel + EV, PDF e historial; lectura/escritura base en Supabase; falta persistir el historial demo y editar registros |
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
-| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth, perfil editable, perfil público, garaje y combustible probados; 🟡 feed/amigos/retos siguen mock, advisors de seguridad/performance pendientes |
+| Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; migración `init_caravana` + fix de `search_path`, RLS y trigger de perfil aplicados; Auth, perfil editable, perfil público, amigos, garaje y combustible probados; 🟡 feed/retos siguen mock, advisors de seguridad/performance pendientes |
 | Voz real (LiveKit) | ⏳ UI PTT lista; falta SDK nativo + Edge Function de tokens |
 | Mapa real + GPS | ✅ OpenStreetMap/Leaflet en Party con tu ubicación en vivo; ✅ rutas por carretera con GraphHopper (cloud o self-hosted) y fallback; 🟡 miembros de party simulados y tiles pendientes de proveedor para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
@@ -221,7 +222,7 @@ app de auto/
 ## Lo que falta para producción
 
 - Conectar el proyecto Supabase y probar altas reales de vehículos y repostajes (la capa ya está escrita).
-- Pasar feed, amigos y retos de mocks a consultas reales.
+- Pasar feed y retos de mocks a consultas reales.
 - Apple/Google, recuperación de contraseña, cambio de `@usuario`, avatar y borrado de cuenta.
 - Publicar posiciones reales de la party por Supabase Realtime; hoy los otros miembros son demo.
 - Elegir proveedor de teselas para producción y perfiles GraphHopper de moto/camión/EV.

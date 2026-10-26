@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -22,7 +23,13 @@ import {
   Stat,
 } from '@/src/components/ui';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import {
+  useFriends,
+  useRespondFriendRequest,
+  useSendFriendRequest,
+} from '@/src/hooks/useFriends';
 import { usePublicProfile, usePublicProfileVehicles } from '@/src/hooks/useProfile';
+import { relationForTarget } from '@/src/lib/friends';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
@@ -35,6 +42,10 @@ export default function PublicProfileScreen() {
   const handle = (username || me.username).replace('@', '');
   const { profile, isLoading } = usePublicProfile(handle);
   const { vehicles: publicVehicles } = usePublicProfileVehicles(profile?.id);
+  const { entries: friendEntries, isDemo } = useFriends();
+  const sendFriendRequest = useSendFriendRequest();
+  const respondFriendRequest = useRespondFriendRequest();
+  const [friendError, setFriendError] = useState<string | null>(null);
   const primaryVehicle = publicVehicles[0];
   const isMe = profile?.id === me.id || profile?.username === me.username;
   const name = profile?.displayName ?? '';
@@ -42,12 +53,40 @@ export default function PublicProfileScreen() {
   const city = profile?.city || 'Santo Domingo, RD';
   const bio = profile?.bio || 'Rutas de fin de semana, café y buenas curvas.';
   const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : null;
+  const relation = profile ? relationForTarget(friendEntries, profile.id) : 'none';
+  const incomingRequest = friendEntries.find(
+    (entry) =>
+      entry.profile.id === profile?.id &&
+      entry.status === 'pending' &&
+      entry.direction === 'incoming',
+  );
 
   const share = async () => {
     await Share.share({
       message: `Perfil de ${name} en Caravana: ${profileUrl(handle)}`,
       url: profileUrl(handle),
     });
+  };
+
+  const addFriend = async () => {
+    if (!profile) return;
+    setFriendError(null);
+    if (isDemo) {
+      setFriendError('Las solicitudes de amistad se activan con una cuenta real.');
+      return;
+    }
+
+    try {
+      if (relation === 'incoming' && incomingRequest) {
+        await respondFriendRequest.mutateAsync({ id: incomingRequest.id, accept: true });
+      } else if (relation === 'none') {
+        await sendFriendRequest.mutateAsync(profile.id);
+      }
+    } catch (error) {
+      setFriendError(
+        error instanceof Error ? error.message : 'No pudimos enviar la solicitud.',
+      );
+    }
   };
 
   if (isLoading) {
@@ -142,8 +181,34 @@ export default function PublicProfileScreen() {
           <View style={styles.actions}>
             {isMe ? (
               <Button label="Compartir mi perfil" icon="share-outline" onPress={share} />
+            ) : relation === 'friends' ? (
+              <Button
+                label="Ya son amigos"
+                icon="checkmark-circle-outline"
+                variant="secondary"
+                disabled
+              />
+            ) : relation === 'outgoing' ? (
+              <Button
+                label="Solicitud enviada"
+                icon="time-outline"
+                variant="secondary"
+                disabled
+              />
+            ) : relation === 'incoming' ? (
+              <Button
+                label="Aceptar solicitud"
+                icon="person-add-outline"
+                loading={respondFriendRequest.isPending}
+                onPress={addFriend}
+              />
             ) : (
-              <Button label="Añadir amigo" icon="person-add-outline" onPress={() => {}} />
+              <Button
+                label="Añadir amigo"
+                icon="person-add-outline"
+                loading={sendFriendRequest.isPending}
+                onPress={addFriend}
+              />
             )}
             {isMe ? (
               <Button
@@ -168,6 +233,11 @@ export default function PublicProfileScreen() {
               />
             )}
           </View>
+          {friendError ? (
+            <AppText variant="caption" color={colors.accent} align="center" style={{ marginTop: 8 }}>
+              {friendError}
+            </AppText>
+          ) : null}
         </View>
       </View>
 

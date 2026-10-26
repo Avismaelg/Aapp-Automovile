@@ -9,6 +9,7 @@ import {
 } from '@/src/data/mock';
 import {
   mapProfileRow,
+  PROFILE_COLUMNS,
   type ProfilePrivacy,
   type ProfileRow,
   type UserProfile,
@@ -21,9 +22,6 @@ import { useDemoProfile } from '@/src/store/demoProfile';
 function demoMode(mode: string | undefined) {
   return mode === 'demo' || !isSupabaseConfigured || !supabase;
 }
-
-const PROFILE_COLUMNS =
-  'id, username, display_name, bio, city, country_code, avatar_url, privacy, qr_slug, created_at';
 
 export function useMyProfile() {
   const account = useAuth((state) => state.account);

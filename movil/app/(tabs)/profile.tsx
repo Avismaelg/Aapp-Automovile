@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Alert, Platform, Share, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Platform, Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
 import { QRCard } from '@/src/components/QRCard';
 import {
@@ -15,8 +15,9 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { achievements, friends } from '@/src/data/mock';
+import { achievements } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useFriends } from '@/src/hooks/useFriends';
 import { useMyProfile } from '@/src/hooks/useProfile';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const me = useCurrentUser();
   const { profile } = useMyProfile();
+  const { friends: friendEntries } = useFriends();
   const account = useAuth((state) => state.account);
   const signOut = useAuth((state) => state.signOut);
   const busy = useAuth((state) => state.busy);
@@ -187,7 +189,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={String(me.stats.friends)} label="amigos" accent={colors.lime} align="center" />
+            <Stat value={String(friendEntries.length)} label="amigos" accent={colors.lime} align="center" />
           </View>
         </Card>
 
@@ -232,20 +234,49 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          <SectionHeader title="Amigos" action="Ver todos" />
-          <View style={styles.friendRow}>
-            {friends.slice(0, 5).map((friend) => (
-              <View key={friend.id} style={styles.friend}>
-                <Avatar name={friend.name} color={friend.color} size={46} online={friend.online} />
-                <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-                  {friend.name.split(' ')[0]}
+          <SectionHeader
+            title="Amigos"
+            action="Ver todos"
+            onAction={() => router.push('/friends')}
+          />
+          {friendEntries.length === 0 ? (
+            <Card style={styles.friendsEmpty}>
+              <View style={styles.friendAdd}>
+                <Ionicons name="people-outline" size={20} color={colors.muted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">Tu caravana está empezando</AppText>
+                <AppText variant="caption" color={colors.muted}>
+                  Busca amigos por @usuario o comparte tu QR.
                 </AppText>
               </View>
-            ))}
-            <View style={styles.friendAdd}>
-              <Ionicons name="add" size={20} color={colors.muted} />
+              <Button
+                label="Buscar"
+                size="sm"
+                full={false}
+                onPress={() => router.push('/friends')}
+              />
+            </Card>
+          ) : (
+            <View style={styles.friendRow}>
+              {friendEntries.slice(0, 5).map((friend) => (
+                <View key={friend.id} style={styles.friend}>
+                  <Avatar
+                    name={friend.profile.displayName}
+                    color={profileColor(friend.profile.username)}
+                    size={46}
+                    uri={friend.profile.avatarUrl ?? undefined}
+                  />
+                  <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
+                    {friend.profile.displayName.split(' ')[0]}
+                  </AppText>
+                </View>
+              ))}
+              <Pressable onPress={() => router.push('/friends')} style={styles.friendAdd}>
+                <Ionicons name="add" size={20} color={colors.muted} />
+              </Pressable>
             </View>
-          </View>
+          )}
 
           <SectionHeader title="Cuenta" />
           <Card style={styles.settingsCard}>
@@ -429,6 +460,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   friendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  friendsEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
   friend: { alignItems: 'center', gap: 5, width: 48 },
   friendAdd: {
     width: 46,
