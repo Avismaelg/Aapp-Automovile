@@ -1,7 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -14,9 +21,11 @@ import {
   Pill,
   Stat,
 } from '@/src/components/ui';
-import { friends } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { usePublicProfile, usePublicProfileVehicles } from '@/src/hooks/useProfile';
+import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
+import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
 
 export default function PublicProfileScreen() {
@@ -24,19 +33,15 @@ export default function PublicProfileScreen() {
   const me = useCurrentUser();
   const { username } = useLocalSearchParams<{ username: string }>();
   const handle = (username || me.username).replace('@', '');
-  const isMe = handle === me.username;
-  const friend = friends.find((item) => item.username === handle);
-  const knownProfile = isMe || Boolean(friend);
-
-  const name = isMe ? me.name : friend?.name ?? '';
-  const color = isMe ? me.color : friend?.color ?? colors.accent;
-  const car = isMe
-    ? `${me.car.make} ${me.car.model} ${me.car.year}`
-    : friend?.car ?? '';
-  const city = isMe ? me.city : 'Santo Domingo, RD';
-  const bio = isMe
-    ? me.bio
-    : 'Rutas de fin de semana, café y buenas curvas. Siempre en caravana.';
+  const { profile, isLoading } = usePublicProfile(handle);
+  const { vehicles: publicVehicles } = usePublicProfileVehicles(profile?.id);
+  const primaryVehicle = publicVehicles[0];
+  const isMe = profile?.id === me.id || profile?.username === me.username;
+  const name = profile?.displayName ?? '';
+  const color = profileColor(handle);
+  const city = profile?.city || 'Santo Domingo, RD';
+  const bio = profile?.bio || 'Rutas de fin de semana, café y buenas curvas.';
+  const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : null;
 
   const share = async () => {
     await Share.share({
@@ -45,7 +50,18 @@ export default function PublicProfileScreen() {
     });
   };
 
-  if (!knownProfile) {
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
+        <ActivityIndicator color={colors.accent} />
+        <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
+          Cargando perfil…
+        </AppText>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
     return (
       <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
         <IconButton
@@ -99,7 +115,7 @@ export default function PublicProfileScreen() {
           <View style={styles.heroLine} />
         </LinearGradient>
         <View style={styles.heroContent}>
-          <Avatar name={name} color={color} size={88} uri={isMe ? me.avatarUrl : undefined} ring={colors.bg} />
+          <Avatar name={name} color={color} size={88} uri={profile.avatarUrl ?? undefined} ring={colors.bg} />
           <AppText variant="h1" align="center" style={{ marginTop: spacing.md }}>
             {name}
           </AppText>
@@ -109,9 +125,15 @@ export default function PublicProfileScreen() {
           <View style={styles.metaRow}>
             <Ionicons name="location-outline" size={13} color={colors.muted} />
             <AppText variant="caption" color={colors.muted}>{city}</AppText>
-            <View style={styles.dot} />
-            <Ionicons name="car-sport-outline" size={13} color={colors.muted} />
-            <AppText variant="caption" color={colors.muted}>{car}</AppText>
+            {primaryVehicle ? (
+              <>
+                <View style={styles.dot} />
+                <Ionicons name="car-sport-outline" size={13} color={colors.muted} />
+                <AppText variant="caption" color={colors.muted}>
+                  {primaryVehicle.make} {primaryVehicle.model} {primaryVehicle.year}
+                </AppText>
+              </>
+            ) : null}
           </View>
           <AppText variant="body" color={colors.textSoft} align="center" style={{ marginTop: 10 }}>
             {bio}
@@ -123,12 +145,28 @@ export default function PublicProfileScreen() {
             ) : (
               <Button label="Añadir amigo" icon="person-add-outline" onPress={() => {}} />
             )}
-            <Button
-              label="Ver garaje"
-              variant="secondary"
-              icon="car-sport-outline"
-              onPress={() => router.push('/(tabs)/garage')}
-            />
+            {isMe ? (
+              <Button
+                label="Editar perfil"
+                variant="secondary"
+                icon="create-outline"
+                onPress={() => router.push('/profile/edit')}
+              />
+            ) : primaryVehicle ? (
+              <Button
+                label="Ver vehículo"
+                variant="secondary"
+                icon="car-sport-outline"
+                onPress={() => router.push(`/v/${primaryVehicle.qrSlug}`)}
+              />
+            ) : (
+              <Button
+                label="Compartir perfil"
+                variant="secondary"
+                icon="share-outline"
+                onPress={share}
+              />
+            )}
           </View>
         </View>
       </View>
@@ -136,19 +174,20 @@ export default function PublicProfileScreen() {
       <View style={styles.body}>
         <Card style={styles.stats}>
           <View style={styles.statItem}>
-            <Stat value="128" label="rutas" align="center" />
+            <Stat value={String(publicVehicles.length)} label="vehículos" align="center" />
           </View>
           <View style={styles.divider} />
           <View style={styles.statItem}>
-            <Stat value="12.4k" label="km" align="center" />
+            <Stat value={joinedYear ? String(joinedYear) : '—'} label="en Caravana" align="center" />
           </View>
           <View style={styles.divider} />
           <View style={styles.statItem}>
-            <Stat value="42" label="amigos" accent={colors.lime} align="center" />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.statItem}>
-            <Stat value="3" label="retos" accent={colors.accent} align="center" />
+            <Stat
+              value={privacyLabel(profile.privacy)}
+              label="privacidad"
+              accent={colors.lime}
+              align="center"
+            />
           </View>
         </Card>
 
@@ -176,18 +215,43 @@ export default function PublicProfileScreen() {
           </View>
         </View>
 
-        <Card style={styles.carCard}>
-          <View style={styles.carIcon}>
-            <Ionicons name="car-sport" size={24} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppText variant="bodyStrong">{car}</AppText>
-            <AppText variant="caption" color={colors.muted}>
-              Coche principal · 128 rutas registradas
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.dim} />
-        </Card>
+        {primaryVehicle ? (
+          <Pressable
+            onPress={() => router.push(`/v/${primaryVehicle.qrSlug}`)}
+            style={({ pressed }) => [{ opacity: pressed ? 0.82 : 1 }]}
+          >
+            <Card style={styles.carCard}>
+              <View style={styles.carIcon}>
+                <Ionicons
+                  name={vehicleKindMeta[primaryVehicle.kind].icon}
+                  size={24}
+                  color={vehicleKindMeta[primaryVehicle.kind].color}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">
+                  {primaryVehicle.make} {primaryVehicle.model} {primaryVehicle.year}
+                </AppText>
+                <AppText variant="caption" color={colors.muted}>
+                  {primaryVehicle.nickname} · perfil público del vehículo
+                </AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+            </Card>
+          </Pressable>
+        ) : (
+          <Card style={styles.carCard}>
+            <View style={styles.carIcon}>
+              <Ionicons name="car-outline" size={24} color={colors.dim} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyStrong">Sin vehículos públicos</AppText>
+              <AppText variant="caption" color={colors.muted}>
+                El dueño no ha compartido ningún vehículo o su perfil es privado.
+              </AppText>
+            </View>
+          </Card>
+        )}
 
         <View style={styles.footerNote}>
           <Ionicons name="qr-code-outline" size={15} color={colors.dim} />

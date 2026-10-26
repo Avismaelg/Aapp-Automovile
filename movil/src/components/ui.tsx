@@ -376,12 +376,14 @@ export function Input({
   label,
   rightSlot,
   style,
+  inputStyle,
   error,
   ...props
 }: TextInputProps & {
   label?: string;
   rightSlot?: ReactNode;
   style?: StyleProp<ViewStyle>;
+  inputStyle?: StyleProp<TextStyle>;
   error?: string;
 }) {
   return (
@@ -396,7 +398,7 @@ export function Input({
           placeholderTextColor={colors.dim}
           selectionColor={colors.accent}
           {...props}
-          style={styles.input}
+          style={[styles.input, inputStyle]}
         />
         {rightSlot}
       </View>

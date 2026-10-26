@@ -12,6 +12,8 @@
 - Validación de formularios en español y mensajes de error legibles.
 - Sesión persistida con Supabase Auth y `AsyncStorage`.
 - Perfil automático creado por el trigger `handle_new_user`.
+- Edición real de nombre, bio, ciudad y privacidad en Supabase.
+- Perfil público por `@usuario` leyendo `profiles` y vehículos públicos.
 - Protección de las pestañas con `Stack.Protected` de Expo Router.
 - Enlaces públicos (`/u`, `/v`, `/challenge`) accesibles sin cuenta.
 - Modo demo completo para revisar la app sin claves.
@@ -159,7 +161,7 @@ proyecto; los errores más comunes se traducen en `src/store/auth.ts`.
 - Confirmación por correo con deep link nativo.
 - Inicio de sesión con Apple y Google.
 - Subida y recorte de avatar.
-- Edición real de perfil (nombre, bio, ciudad, privacidad).
+- Cambio de `@usuario` con validación de disponibilidad.
 - Borrado de cuenta in-app y borrado de datos asociados.
 - Rate limiting y captcha en Auth.
 - Verificación de edad y términos aceptados.

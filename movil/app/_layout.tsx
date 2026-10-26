@@ -93,6 +93,10 @@ export default function RootLayout() {
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen
+              name="profile/edit"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
               name="drive"
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}
             />

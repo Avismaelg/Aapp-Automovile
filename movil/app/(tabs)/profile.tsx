@@ -17,6 +17,8 @@ import {
 } from '@/src/components/ui';
 import { achievements, friends } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useMyProfile } from '@/src/hooks/useProfile';
+import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useAuth } from '@/src/store/auth';
@@ -34,17 +36,24 @@ const settings = [
 export default function ProfileScreen() {
   const router = useRouter();
   const me = useCurrentUser();
+  const { profile } = useMyProfile();
   const account = useAuth((state) => state.account);
   const signOut = useAuth((state) => state.signOut);
   const busy = useAuth((state) => state.busy);
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const isDemo = account?.mode === 'demo';
+  const displayName = profile?.displayName || me.name;
+  const username = profile?.username || me.username;
+  const city = profile?.city || me.city;
+  const bio = profile?.bio || me.bio;
+  const privacy = profile?.privacy ?? (isDemo ? 'friends' : 'public');
+  const avatarColor = profileColor(username);
 
   const shareProfile = async () => {
     await Share.share({
-      message: `Mi perfil de Caravana: ${profileUrl(me.username)}`,
-      url: profileUrl(me.username),
+      message: `Mi perfil de Caravana: ${profileUrl(username)}`,
+      url: profileUrl(username),
     });
   };
 
@@ -93,6 +102,10 @@ export default function ProfileScreen() {
     );
   };
 
+  const profileSettings = settings.map((setting, index) =>
+    index === 0 ? { ...setting, value: privacyLabel(privacy) } : setting,
+  );
+
   return (
     <Screen contentStyle={{ paddingHorizontal: 0 }}>
       <LinearGradient
@@ -123,7 +136,13 @@ export default function ProfileScreen() {
       <View style={styles.body}>
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
-            <Avatar name={me.name} color={me.color} size={86} uri={me.avatarUrl} ring={colors.bg} />
+            <Avatar
+              name={displayName}
+              color={avatarColor}
+              size={86}
+              uri={profile?.avatarUrl ?? me.avatarUrl}
+              ring={colors.bg}
+            />
             <View style={styles.carBadge}>
               <Ionicons name="car-sport" size={13} color="#120802" />
             </View>
@@ -135,22 +154,22 @@ export default function ProfileScreen() {
               size="sm"
               icon="create-outline"
               full={false}
-              onPress={() => {}}
+              onPress={() => router.push('/profile/edit')}
             />
             <IconButton icon="share-social-outline" size={38} onPress={shareProfile} />
           </View>
         </View>
 
         <View style={styles.identity}>
-          <AppText variant="h1">{me.name}</AppText>
+          <AppText variant="h1">{displayName}</AppText>
           <View style={styles.usernameRow}>
-            <AppText variant="caption" color={colors.accent}>@{me.username}</AppText>
+            <AppText variant="caption" color={colors.accent}>@{username}</AppText>
             <View style={styles.metaDot} />
             <Ionicons name="location-outline" size={12} color={colors.muted} />
-            <AppText variant="caption" color={colors.muted}>{me.city}</AppText>
+            <AppText variant="caption" color={colors.muted}>{city}</AppText>
           </View>
           <AppText variant="body" color={colors.textSoft} style={{ marginTop: 8 }}>
-            {me.bio}
+            {bio}
           </AppText>
         </View>
 
@@ -176,9 +195,9 @@ export default function ProfileScreen() {
           <SectionHeader title="Mi QR" action="Compartir" onAction={shareProfile} />
           <View style={styles.qrWrap}>
             <QRCard
-              value={profileUrl(me.username)}
+              value={profileUrl(username)}
               label="PERFIL"
-              caption={`@${me.username}`}
+              caption={`@${username}`}
               size={148}
             />
             <View style={styles.qrActions}>
@@ -291,7 +310,7 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.settingDivider} />
-            {settings.map((setting, index) => (
+            {profileSettings.map((setting, index) => (
               <View key={setting.label}>
                 <View style={styles.settingRow}>
                   <View style={styles.settingIcon}>

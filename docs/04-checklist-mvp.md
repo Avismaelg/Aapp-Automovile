@@ -10,6 +10,7 @@
 - Design system dark, iconos y splash generados.
 - Pantallas: Bienvenida, Registro, Login, Inicio, Party, Retos, Garaje, Consumo, Perfil, Escáner, invitación, perfil público y perfil de vehículo.
 - Autenticación email/contraseña con Supabase: validación, sesión persistida, rutas protegidas y modo demo local.
+- Perfil editable en Supabase (nombre, bio, ciudad, privacidad) y perfil público con vehículos públicos.
 - Retos punto A → B: modo programado 1v1 y **reto al momento con 2+ pilotos**, categorías coche/moto/EV/camión y simulación local.
 - Modo conducción con party, PTT grande, reto y diseño horizontal/vertical.
 - Ficha de vehículo con datos técnicos, mantenimiento de ejemplo e historial de venta en PDF.
@@ -30,8 +31,8 @@
 | # | Tarea | Responsable | Estimación |
 |---|---|---|---|
 | 1 | ✅ Crear proyecto Supabase y aplicar migración | Dev | Hecho |
-| 2 | ✅ Auth email probado; 🟡 añadir Apple/Google, recuperación, edición de perfil y borrado de cuenta | Dev | 3–4 días |
-| 3 | 🟡 Garaje y combustible reales; falta perfil editable, feed, amigos y retos en Supabase | Dev | 4–5 días |
+| 2 | ✅ Auth email y perfil editable probados; 🟡 añadir Apple/Google, recuperación, avatar y borrado de cuenta | Dev | 3–4 días |
+| 3 | 🟡 Perfil, garaje y combustible reales; falta feed, amigos y retos en Supabase | Dev | 4–5 días |
 | 4 | Desplegar GraphHopper, publicar miembros por Realtime y elegir proveedor de teselas para producción | Dev | 4–5 días |
 | 5 | LiveKit Cloud + Edge Function de tokens + PTT nativo | Dev | 4–6 días |
 | 6 | Detección de viajes con revisión (unir/dividir/descartar) | Dev | 4–5 días |

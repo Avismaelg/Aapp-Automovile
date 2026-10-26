@@ -42,6 +42,9 @@ type AuthState = {
   signUp: (input: SignUpInput) => Promise<AuthResult>;
   continueAsDemo: () => Promise<void>;
   signOut: () => Promise<void>;
+  syncAccount: (
+    partial: Partial<Pick<Account, 'displayName' | 'username' | 'avatarUrl'>>,
+  ) => void;
   clearError: () => void;
 };
 
@@ -331,6 +334,13 @@ export const useAuth = create<AuthState>((set) => ({
       error: null,
     });
   },
+
+  syncAccount: (partial) =>
+    set((state) =>
+      state.account
+        ? { account: { ...state.account, ...partial } }
+        : state,
+    ),
 
   clearError: () => set({ error: null }),
 }));
