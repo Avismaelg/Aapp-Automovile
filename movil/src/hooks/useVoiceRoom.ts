@@ -59,7 +59,17 @@ export function useVoiceRoom({
         );
 
         if (functionError) {
-          throw new Error(functionError.message);
+          let message = functionError.message;
+          const context = (functionError as { context?: Response }).context;
+          if (context) {
+            try {
+              const payload = (await context.clone().json()) as { error?: string };
+              if (payload.error) message = payload.error;
+            } catch {
+              // Usamos el mensaje original si el cuerpo no es JSON.
+            }
+          }
+          throw new Error(message);
         }
 
         const payload = (data ?? {}) as VoiceTokenResponse;

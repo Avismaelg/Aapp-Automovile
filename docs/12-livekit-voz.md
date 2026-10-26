@@ -100,10 +100,12 @@ También se puede usar EAS Build con un perfil de desarrollo. La app ya tiene:
 
 - El trigger crea **3 canales** al insertar una party.
 - La UI muestra Convoy, Ruta y Charla con contador por canal.
-- Cambiar de canal persiste `voice_channel_slug`.
+- Dos cuentas reales: A en Ruta y B en Convoy mostraron 1/1; al cambiar B a Ruta,
+  la UI mostró 0/2 y `voice_channel_slug` quedó en `route` para ambos.
 - La Edge Function está desplegada y activa.
-- Sin secretos, la app muestra el error controlado y no activa el micrófono.
-- TypeScript, ESLint y Expo Doctor pasan.
+- Sin secretos, la app muestra el error controlado y no activa el micrófono:
+  “LiveKit no está configurado…”.
+- TypeScript, ESLint, Expo Doctor y export web pasan.
 
 ## Pendiente
 

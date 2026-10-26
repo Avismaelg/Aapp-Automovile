@@ -72,7 +72,8 @@ canal, el cliente reconecta LiveKit a la sala `<voice_room>_<slug>`.
 - B envió un mensaje y quedó guardado en `party_messages`.
 - B salió: `left_at` se marcó y dejó de ver la party.
 - El trigger de party creó los 3 canales y la UI los muestra.
-- Cambiar de canal persiste `voice_channel_slug`.
+- Dos cuentas reales: A en Ruta y B en Convoy mostraron 1/1; al cambiar B
+  a Ruta, la UI mostró 0/2 y la base guardó `route` para ambos.
 - La Edge Function `livekit-token` está desplegada; sin secretos devuelve error
   controlado y no se activa el micrófono.
 - Cuentas, party, miembros y mensajes de prueba eliminados.
