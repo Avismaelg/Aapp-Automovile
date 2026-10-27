@@ -41,6 +41,8 @@ let subscribers = 0;
 let session = 0;
 let activeWatch: Location.LocationSubscription | null = null;
 let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let lastFixAt = 0;
+let sessionStartedAt = 0;
 
 function validHeading(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
@@ -57,6 +59,7 @@ function clearFallbackTimer() {
 
 function applyPosition(position: Location.LocationObject) {
   clearFallbackTimer();
+  lastFixAt = Date.now();
   useLiveLocationState.setState({
     status: 'live',
     message: 'Ubicación en vivo',
@@ -132,11 +135,12 @@ async function beginSession(id: number) {
   }
 }
 
-function startSession() {
+function startSession(message?: string) {
   session += 1;
   const id = session;
+  sessionStartedAt = Date.now();
   clearFallbackTimer();
-  useLiveLocationState.setState({ status: 'locating', message: LOCATING_MESSAGE });
+  useLiveLocationState.setState({ status: 'locating', message: message || LOCATING_MESSAGE });
 
   // No bloquear la pantalla si el permiso o el GPS tardan en responder.
   fallbackTimer = setTimeout(() => {
@@ -172,6 +176,18 @@ export function retryLiveLocation() {
   if (subscribers === 0) return;
   stopSession();
   startSession();
+}
+
+// Al volver a primer plano Android puede haber pausado el GPS: si la última
+// posición es vieja (o nunca llegó), se reinicia la sesión para obtener una
+// posición fresca en lugar de seguir mostrando la anterior.
+export function refreshStaleLocation(maxAgeMs = 20_000) {
+  if (subscribers === 0) return;
+  const noFixForAWhile = lastFixAt === 0 && Date.now() - sessionStartedAt > 15_000;
+  const staleFix = lastFixAt > 0 && Date.now() - lastFixAt > maxAgeMs;
+  if (!noFixForAWhile && !staleFix) return;
+  stopSession();
+  startSession('Actualizando tu ubicación…');
 }
 
 export function useLiveLocation() {

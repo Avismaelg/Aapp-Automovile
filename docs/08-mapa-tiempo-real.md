@@ -140,7 +140,13 @@ Mapa
 - **Siempre se vuelve a tu seguimiento**: al abrir la app, al volver a primer
   plano y al entrar en la pestaña Inicio, el mapa reengancha el seguimiento y
   hace zoom sobre tu posición (`useFocusEffect` + `AppState` + token de
-  recentrar), aunque lo hubieras soltado arrastrando antes.
+  recentrar), aunque lo hubieras soltado arrastrando antes. Además, la primera
+  posición de cada apertura fuerza el seguimiento y, si la cámara quedara a más
+  de 800 m de ti, salta directamente a tu ubicación en vez de animar.
+- **Tamaño del mapa en WebView**: `#map` va con `position: fixed; inset: 0` y se
+  fuerza `map.resize()` al arrancar (50 ms, 900 ms y 2,5 s) con `ResizeObserver`
+  para que el canvas ocupe siempre la pantalla completa aunque el WebView
+  termine de maquetar tarde.
 - Los eventos `dragstart`, `rotatestart` y `pitchstart` con `originalEvent`
   desactivan el seguimiento; los movimientos programáticos no.
 - Los marcadores se reproyectan cuando carga el terreno (`sourcedata`), porque

@@ -10,7 +10,7 @@ import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriendsOnMap } from '@/src/hooks/useFriendsOnMap';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
-import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useLiveLocation, refreshStaleLocation } from '@/src/hooks/useLiveLocation';
 import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
@@ -101,8 +101,10 @@ export default function NavigationScreen() {
   const handleMapError = useCallback((message: string) => setMapError(message), []);
 
   // Al abrir la app, volver a ella o entrar a Inicio, el mapa siempre sigue tu
-  // posición otra vez (aunque hayas arrastrado el mapa antes).
+  // posición otra vez (aunque hayas arrastrado el mapa antes) y pide una
+  // posición fresca si la anterior quedó vieja en segundo plano.
   const ensureFollowing = useCallback(() => {
+    refreshStaleLocation();
     setFollowing(true);
     setRecenterToken((value) => value + 1);
   }, []);

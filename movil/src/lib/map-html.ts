@@ -98,7 +98,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
 <link rel="stylesheet" href="${MAPLIBRE_BASE}.css" />
 <style>
   * { box-sizing: border-box; }
-  html, body, #map { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
+  html, body { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
+  #map { position: fixed; inset: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .vehicle, .dest { pointer-events: none; }
   .member { pointer-events: auto; cursor: pointer; }
@@ -317,6 +318,21 @@ export const WORLD_MAP_HTML = `<!doctype html>
     lastFollow = { center: center, bearing: bearing };
 
     var targetZoom = walking ? FOLLOW_ZOOM + 0.5 : FOLLOW_ZOOM;
+
+    // Failsafe: si la cámara está lejos (arranque, vuelta de segundo plano o
+    // una animación cancelada), saltamos directamente a tu posición.
+    var mapCenter = map.getCenter();
+    var offCenter = haversineLngLat([mapCenter.lng, mapCenter.lat], center);
+    if (offCenter > 800) {
+      map.jumpTo({
+        center: center,
+        zoom: targetZoom,
+        pitch: pitchFor(state.mode),
+        bearing: bearing
+      });
+      return;
+    }
+
     var options = {
       center: center,
       pitch: pitchFor(state.mode),
@@ -332,6 +348,12 @@ export const WORLD_MAP_HTML = `<!doctype html>
   function setLocation(location) {
     if (!location) return;
     var firstFix = !state.location;
+    if (firstFix) {
+      // Al abrir la app o recargar el mapa, la primera posición siempre
+      // reengancha el seguimiento: la cámara nunca se queda en el centro por
+      // defecto (Kennedy) aunque antes se hubiera soltado.
+      setFollowing(true);
+    }
     state.location = location;
     var moving = typeof location.speedKmh !== 'number' || location.speedKmh >= MOVING_KMH;
     if (typeof location.heading === 'number' && location.heading >= 0 && moving) {
@@ -738,17 +760,22 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
   function handleMessage(event) {
     var message = parse(event.data);
-    if (!message || typeof message.seq !== 'number' || message.seq === lastSeq) return;
-    lastSeq = message.seq;
-    if (message.type === 'location') setLocation(message.payload);
-    else if (message.type === 'members') setMembers(message.payload);
-    else if (message.type === 'destination') setDestination(message.payload);
-    else if (message.type === 'route') setRoute(message.payload);
-    else if (message.type === 'mode') setMode(message.payload);
-    else if (message.type === 'vehicle') setVehicleInput(message.payload);
-    else if (message.type === 'parking') setParking(message.payload);
-    else if (message.type === 'travel') setTravelMode(message.payload);
-    else if (message.type === 'recenter') recenter();
+    if (!message) return;
+    try {
+      if (typeof message.seq !== 'number' || message.seq === lastSeq) return;
+      lastSeq = message.seq;
+      if (message.type === 'location') setLocation(message.payload);
+      else if (message.type === 'members') setMembers(message.payload);
+      else if (message.type === 'destination') setDestination(message.payload);
+      else if (message.type === 'route') setRoute(message.payload);
+      else if (message.type === 'mode') setMode(message.payload);
+      else if (message.type === 'vehicle') setVehicleInput(message.payload);
+      else if (message.type === 'parking') setParking(message.payload);
+      else if (message.type === 'travel') setTravelMode(message.payload);
+      else if (message.type === 'recenter') recenter();
+    } catch (error) {
+      fail('Mapa: ' + (error && error.message ? error.message : String(error)));
+    }
   }
 
   // Al cargar el relieve la cámara cambia de altura sin evento de movimiento; reproyectamos los marcadores.
@@ -1137,7 +1164,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     renderer.setClearColor(0x000000, 0);
     map.getContainer().appendChild(canvas);
     var scene = new THREE.Scene();
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    scene.add(new THREE.AmbientLight(0xffffff, 1.15));
     var sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(0.6, 1, 0.4);
     scene.add(sun);
@@ -1369,30 +1396,72 @@ export const WORLD_MAP_HTML = `<!doctype html>
     });
   }
 
+  // En WebView el contenedor puede cambiar de tamaño después de crear el mapa
+  // (barra de pestañas, teclado, rotación). Forzamos canvas y padding a juego.
+  function watchResize() {
+    var container = map.getContainer();
+    var lastWidth = container.clientWidth;
+    var lastHeight = container.clientHeight;
+
+    function sync() {
+      if (!map) return;
+      var width = container.clientWidth;
+      var height = container.clientHeight;
+      if (width === lastWidth && height === lastHeight) return;
+      lastWidth = width;
+      lastHeight = height;
+      map.resize();
+      applyViewPadding();
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(sync).observe(container);
+    }
+    window.addEventListener('resize', sync);
+    map.on('resize', applyViewPadding);
+
+    // El WebView puede terminar de maquetar después de crear el mapa; forzamos
+    // el tamaño real unas cuantas veces al arrancar.
+    function forceSync() {
+      if (!map) return;
+      lastWidth = container.clientWidth;
+      lastHeight = container.clientHeight;
+      map.resize();
+      applyViewPadding();
+    }
+    setTimeout(forceSync, 50);
+    setTimeout(forceSync, 900);
+    setTimeout(forceSync, 2500);
+  }
+
   function onLoad() {
     mapReady = true;
     document.body.setAttribute('data-ready', 'true');
-    applyViewPadding();
-    map.on('resize', applyViewPadding);
-    map.setPitch(pitchFor(state.mode));
-    addTerrain();
-    addBuildings();
-    addRoute();
-    addGuideLayer();
-    addBrakeLayer();
-    addVehicle();
-    addDestination();
-    addParking();
-    addParkingLine();
-    setMembers(state.members);
-    setDestination(state.destination);
-    setRoute(state.route);
-    setParking(state.parking);
-    setTravelMode(state.travelMode);
-    if (state.location) {
-      vehicleMarker.setLngLat(lngLatOf(state.location));
-      if (state.heading !== null) vehicleMarker.setRotation(state.heading);
-      if (state.following) follow(false, true);
+    try {
+      applyViewPadding();
+      watchResize();
+      map.setPitch(pitchFor(state.mode));
+      addTerrain();
+      addBuildings();
+      addRoute();
+      addGuideLayer();
+      addBrakeLayer();
+      addVehicle();
+      addDestination();
+      addParking();
+      addParkingLine();
+      setMembers(state.members);
+      setDestination(state.destination);
+      setRoute(state.route);
+      setParking(state.parking);
+      setTravelMode(state.travelMode);
+      if (state.location) {
+        vehicleMarker.setLngLat(lngLatOf(state.location));
+        if (state.heading !== null) vehicleMarker.setRotation(state.heading);
+        if (state.following) follow(false, true);
+      }
+    } catch (error) {
+      fail('Mapa: ' + (error && error.message ? error.message : String(error)));
     }
     post({ type: 'ready' });
     void initCar3D();
