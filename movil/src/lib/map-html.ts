@@ -73,6 +73,8 @@ export type WorldMapCommand =
   | { type: 'parking'; payload: WorldMapParking | null }
   | { type: 'travel'; payload: WorldMapTravelMode }
   | { type: 'north'; payload: boolean }
+  | { type: 'fit'; payload: { coordinates: [number, number][] } }
+  | { type: 'autofollow'; payload: boolean }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -800,6 +802,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
       else if (message.type === 'parking') setParking(message.payload);
       else if (message.type === 'travel') setTravelMode(message.payload);
       else if (message.type === 'north') setNorthUp(message.payload);
+      else if (message.type === 'fit') fitRoute(message.payload && message.payload.coordinates);
+      else if (message.type === 'autofollow') setAutoFollow(message.payload);
       else if (message.type === 'recenter') recenter();
     } catch (error) {
       fail('Mapa: ' + (error && error.message ? error.message : String(error)));
@@ -1449,6 +1453,21 @@ export const WORLD_MAP_HTML = `<!doctype html>
     } else {
       map.easeTo({ bearing: 0, duration: 600, essential: true });
     }
+  }
+
+  // Encuadra la ruta completa (por ejemplo, la ruta de un evento).
+  function fitRoute(coordinates) {
+    if (!mapReady || !Array.isArray(coordinates) || coordinates.length < 2) return;
+    var bounds = new maplibregl.LngLatBounds();
+    coordinates.forEach(function (point) {
+      bounds.extend([point[1], point[0]]);
+    });
+    map.fitBounds(bounds, { padding: 48, maxZoom: 16, duration: 800 });
+    setFollowing(false);
+  }
+
+  function setAutoFollow(value) {
+    setFollowing(Boolean(value));
   }
 
   function addAccuracyLayer() {

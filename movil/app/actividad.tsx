@@ -34,6 +34,7 @@ import { colors, radius, spacing } from '@/src/theme';
 
 const quickActions = [
   { label: 'Party', icon: 'radio' as const, color: colors.accent, href: '/party' },
+  { label: 'Eventos', icon: 'calendar' as const, color: '#FF8AD4', href: '/events' },
   { label: 'Retos', icon: 'flag' as const, color: colors.lime, href: '/challenges' },
   { label: 'Rutas', icon: 'map' as const, color: '#2EE6A8', href: '/rutas' },
   { label: 'Récords', icon: 'trophy' as const, color: '#FFD24D', href: '/records' },

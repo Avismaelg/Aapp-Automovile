@@ -35,6 +35,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Modo conducción | ✅ pantalla grande y simplificada con party, PTT y reto; CarPlay/Android Auto nativos pendientes de build y aprobación |
 | Tracking en segundo plano | 🟡 grabación de rutas con `expo-location` + `TaskManager` y servicio en primer plano; falta probar un recorrido largo real |
 | Rutas y récords | ✅ viajes automáticos guardados en el dispositivo (distancia, duración, velocidad media y máxima), con indicador en el mapa; ✅ récords públicos de velocidad por tramo de autopista (top 3 + tu mejor marca); 🟡 faltan anti-trampas y editor de tramos |
+| Eventos con ruta | ✅ crear y publicar eventos públicos con ubicación o ruta de salida a meta (hasta 5 puntos, calles reales vía OSRM), detalle con mapa encuadrado, navegación a la salida y enlace compartible; 🟡 publicar para todos requiere aplicar la migración `16-eventos` en Supabase |
 | Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed con fotos, retos, party y borrado de cuenta probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | 🟡 SDK web/nativo, 3 canales por party, Edge Function de tokens y PTT push-to-talk integrados; faltan secretos LiveKit y prueba de audio en dispositivos |
 | Mapa 3D + GPS | ✅ pantalla **Inicio** personal estilo Waze (pestaña inicial del tab bar): MapLibre GL 3D, edificios y relieve, cámara que sigue posición y rumbo, vista 2D/3D y recentrar; rutas reales por calles (GraphHopper → OSRM → directa); búsqueda de destinos (Photon/OSM), ruta compartida por enlace `caravana://destino`; indicaciones giro a giro con distancia restante real, destinos recientes en Inicio, modo de videojuego a pantalla completa (ETA grande, banderas de checkpoint, flecha guía y frenado verde/amarillo/rojo); el coche 3D refleja tu vehículo; ✅ amigos con posición conocida aparecen en el mapa: al tocarlos se invitan al convoy o se retan; ✅ coche aparcado con línea guía, ruta de vuelta y modo caminando (muñeco peatón con el coche fijo en su sitio); 🟡 teselas vectoriales y motor de rutas propio pendientes para producción |
@@ -207,7 +208,8 @@ app de auto/
 │  ├─ 12-livekit-voz.md        # LiveKit, 3 canales y PTT real
 │  ├─ 13-feed.md               # feed de texto/foto, likes y comentarios
 │  ├─ 14-eliminar-cuenta.md    # borrado de cuenta, Storage y cascada
-│  └─ 15-rutas-y-recordes.md   # rutas grabadas, segundo plano y récords por tramo
+│  ├─ 15-rutas-y-recordes.md   # rutas grabadas, segundo plano y récords por tramo
+│  └─ 16-eventos.md            # eventos públicos con ubicación o ruta
 ├─ infra/
 │  └─ graphhopper/             # servidor Docker + extracto OSM
 ├─ movil/
