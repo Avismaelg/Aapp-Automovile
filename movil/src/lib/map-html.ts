@@ -90,6 +90,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
 <style>
   * { box-sizing: border-box; }
   html, body, #map { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
+  .marker-hidden { display: none; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .vehicle, .dest { pointer-events: none; }
   .member { pointer-events: auto; cursor: pointer; }
@@ -189,6 +190,25 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var guideMarker = null;
   var lastFollow = null;
   var smoothedHeading = null;
+  var lastDebugMsg = '-';
+  var renderCount = 0;
+  var lastAnchor = null;
+
+  function updateDebug() {
+    var el = document.getElementById('caravana-debug');
+    if (!el) return;
+    el.textContent =
+      'msg:' + lastDebugMsg +
+      ' | car:' + document.body.getAttribute('data-car') +
+      ' three:' + (THREE ? 'si' : 'no') +
+      ' | ruta:' + routePoints.length +
+      ' loc:' + (state.location ? 1 : 0) +
+      ' head:' + (state.heading !== null ? Math.round(state.heading) : 'nulo') +
+      ' | ' + (car3d ? 'w:' + car3d.width + 'x' + car3d.height : 'sin-3d') +
+      ' r:' + renderCount +
+      ' ' + (car3d && car3d.renderer ? car3d.renderer.info.render.calls + '/' + car3d.renderer.info.render.triangles : '') +
+      ' a:' + (lastAnchor ? Math.round(lastAnchor[0]) + ',' + Math.round(lastAnchor[1]) : 'nulo');
+  }
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -306,6 +326,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     updateBrakeAssist();
     updateGuideArrow();
     if (state.following) follow(true, firstFix);
+    updateDebug();
   }
 
   function buildMemberElement(member) {
@@ -387,6 +408,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     }
     map.getSource('caravana-route').setData(data);
     updateGuide();
+    updateDebug();
   }
 
   function haversineLngLat(a, b) {
@@ -698,6 +720,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     else if (message.type === 'mode') setMode(message.payload);
     else if (message.type === 'vehicle') setVehicleInput(message.payload);
     else if (message.type === 'recenter') recenter();
+    lastDebugMsg = message.type + ':' + message.seq;
+    updateDebug();
   }
 
   // Al cargar el relieve la cámara cambia de altura sin evento de movimiento; reproyectamos los marcadores.
@@ -1092,6 +1116,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
     scene.add(sun);
     var built = vehicleBuilder(state.vehicleKind)(state.vehicleColor);
     built.group.scale.setScalar(CAR_LENGTH_PX / built.lengthM);
+    built.group.traverse(function (object) {
+      object.frustumCulled = false;
+    });
     scene.add(built.group);
     car3d = {
       canvas: canvas,
@@ -1120,6 +1147,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
   // La posición sale de map.project() y el giro, de un punto 20 m por delante del coche.
   function renderCar() {
     if (!car3d || !mapReady) return;
+    renderCount += 1;
+    try {
     var container = map.getContainer();
     if (container.clientWidth !== car3d.width || container.clientHeight !== car3d.height) sizeCar();
 
@@ -1140,6 +1169,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var cosPitch = Math.cos(pitch);
     var heading = state.heading !== null ? state.heading : map.getBearing();
     var anchor = map.project(lngLatOf(state.location));
+    lastAnchor = [anchor.x, anchor.y];
     var ahead = map.project(aheadLngLat(state.location, heading, CAR_LOOKAHEAD_M));
     var onScreen = Math.atan2(ahead.x - anchor.x, anchor.y - ahead.y);
     var turn = Math.atan2(Math.sin(onScreen), Math.cos(onScreen) / cosPitch);
@@ -1152,6 +1182,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
     car3d.model.position.set(offsetX, offsetY * sinPitch, -offsetY * cosPitch);
     car3d.model.rotation.y = Math.PI / 2 - turn;
     car3d.renderer.render(car3d.scene, car3d.camera);
+    } catch (error) {
+      lastDebugMsg = 'rerr:' + String(error).slice(0, 55);
+      updateDebug();
+    }
   }
 
   async function initCar3D() {
@@ -1168,11 +1202,14 @@ export const WORLD_MAP_HTML = `<!doctype html>
       map.on('render', renderCar);
       document.body.setAttribute('data-car', '3d');
       renderCar();
+      updateDebug();
     } catch (error) {
       console.warn('Caravana: no se pudo crear el coche 3D; se usa la flecha 2D.', error);
       if (car3d) car3d.canvas.remove();
       car3d = null;
       document.body.setAttribute('data-car', '2d');
+      lastDebugMsg = 'error:' + String(error).slice(0, 60);
+      updateDebug();
     }
   }
 
@@ -1283,6 +1320,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   window.addEventListener('message', handleMessage);
   document.addEventListener('message', handleMessage);
   createMap();
+  updateDebug();
 })();
 </script>
 </body>

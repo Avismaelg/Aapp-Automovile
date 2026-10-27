@@ -35,6 +35,8 @@ import { colors, radius, spacing } from '@/src/theme';
 const quickActions = [
   { label: 'Party', icon: 'radio' as const, color: colors.accent, href: '/party' },
   { label: 'Retos', icon: 'flag' as const, color: colors.lime, href: '/challenges' },
+  { label: 'Rutas', icon: 'map' as const, color: '#2EE6A8', href: '/rutas' },
+  { label: 'Récords', icon: 'trophy' as const, color: '#FFD24D', href: '/records' },
   { label: 'Repostaje', icon: 'water' as const, color: colors.cyan, href: '/fuel' },
   { label: 'Mi QR', icon: 'qr-code' as const, color: '#B98CFF', href: '/scan' },
   { label: 'Garaje', icon: 'car-sport' as const, color: '#FFB84D', href: '/garage' },

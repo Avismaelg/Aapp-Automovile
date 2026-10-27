@@ -1,4 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type ChosenDestination = {
   latitude: number;
@@ -15,14 +17,22 @@ type DestinationState = {
   stopNavigation: () => void;
 };
 
-// Destino que el usuario busca en el mapa. Vive en memoria: al cerrar la app
-// se pierde; el destino de la party se guarda en Supabase. isNavigating activa
-// la interfaz de videojuego a pantalla completa.
-export const useChosenDestination = create<DestinationState>((set) => ({
-  destination: null,
-  isNavigating: false,
-  setDestination: (destination) => set({ destination }),
-  clearDestination: () => set({ destination: null, isNavigating: false }),
-  startNavigation: () => set({ isNavigating: true }),
-  stopNavigation: () => set({ isNavigating: false }),
-}));
+// Destino persistido en el dispositivo: al reabrir la app (incluso sin
+// conexión) sigue apareciendo el último destino elegido.
+export const useChosenDestination = create<DestinationState>()(
+  persist(
+    (set) => ({
+      destination: null,
+      isNavigating: false,
+      setDestination: (destination) => set({ destination }),
+      clearDestination: () => set({ destination: null, isNavigating: false }),
+      startNavigation: () => set({ isNavigating: true }),
+      stopNavigation: () => set({ isNavigating: false }),
+    }),
+    {
+      name: 'caravana.destination.v1',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ destination: state.destination }),
+    },
+  ),
+);

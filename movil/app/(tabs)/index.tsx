@@ -13,6 +13,7 @@ import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
@@ -39,6 +40,7 @@ export default function NavigationScreen() {
   const [mapKey, setMapKey] = useState(0);
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(null);
+  const [recordingNow, setRecordingNow] = useState(() => Date.now());
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
@@ -54,6 +56,10 @@ export default function NavigationScreen() {
   });
 
   const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
+  const { active: activeTrip } = useTripRecorder(
+    live.location,
+    primaryVehicle ? `${primaryVehicle.make} ${primaryVehicle.model}` : undefined,
+  );
   const vehicleLabel = primaryVehicle
     ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
     : 'Añade tu vehículo';
@@ -78,6 +84,12 @@ export default function NavigationScreen() {
       useChosenDestination.getState().stopNavigation();
     }
   }, [isNavigating, destination]);
+
+  useEffect(() => {
+    if (!activeTrip) return;
+    const timer = setInterval(() => setRecordingNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
+  }, [activeTrip]);
 
   const recenter = () => {
     setFollowing(true);
@@ -310,6 +322,17 @@ export default function NavigationScreen() {
               </AppText>
               <Ionicons name="search" size={14} color={colors.muted} />
             </Pressable>
+
+            {activeTrip ? (
+              <View style={styles.recordingPill}>
+                <View style={styles.recordingDot} />
+                <AppText variant="caption" color={colors.textSoft}>
+                  Grabando ruta ·{' '}
+                  {Math.max(1, Math.round((recordingNow - activeTrip.startedAt) / 60_000))} min ·{' '}
+                  {(activeTrip.distanceM / 1000).toFixed(1).replace('.', ',')} km
+                </AppText>
+              </View>
+            ) : null}
 
             {!live.isLive ? (
               <View style={styles.banner}>
@@ -545,6 +568,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   searchText: { flex: 1 },
+  recordingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  recordingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.lime,
+  },
   spacer: { flex: 1 },
   sideRow: {
     flexDirection: 'row',
