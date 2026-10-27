@@ -35,8 +35,9 @@
 - RLS: lectura pública de eventos `is_public`; solo el dueño inserta y borra.
 - **Local primero**: los eventos se guardan en `caravana.events.v1`
   (AsyncStorage) y funcionan sin conexión y en modo demo. Si la tabla remota no
-  existe (migración sin aplicar), el evento queda local y la app lo avisa; no se
-  pierde nada.
+  existe (migración sin aplicar), el evento queda local y la app lo avisa; al
+  abrir la app de nuevo se **reintenta publicar** automáticamente cuando la
+  tabla ya esté disponible, sin volver a crearlo.
 
 ## 3. Rutas de varios puntos
 

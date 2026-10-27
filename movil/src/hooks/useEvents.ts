@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { eventId, type AppEvent, type EventRoute } from '@/src/lib/events';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
@@ -44,10 +44,30 @@ function mapRow(row: EventRow): AppEvent {
   };
 }
 
+function insertPayload(event: AppEvent, hostId: string) {
+  return {
+    id: event.id,
+    host_id: hostId,
+    host_name: event.hostName,
+    title: event.title,
+    description: event.description,
+    starts_at: event.startsAt,
+    is_public: true,
+    location_label: event.locationLabel,
+    latitude: event.latitude,
+    longitude: event.longitude,
+    route: event.route?.coordinates ?? null,
+    route_distance_m: event.route?.distanceM ?? null,
+    route_time_ms: event.route?.timeMs ?? null,
+  };
+}
+
 export function useEvents() {
   const account = useAuth((state) => state.account);
   const demo = account?.mode === 'demo' || !isSupabaseConfigured || !supabase;
   const localEvents = useLocalEvents((state) => state.events);
+  const markSynced = useLocalEvents((state) => state.markSynced);
+  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['events'],
@@ -66,6 +86,30 @@ export function useEvents() {
       return ((data ?? []) as EventRow[]).map(mapRow);
     },
   });
+
+  // Reintenta publicar los eventos que quedaron pendientes (por ejemplo, antes
+  // de aplicar la migración o sin conexión). Si la tabla no existe, se detiene
+  // hasta el siguiente cambio local.
+  useEffect(() => {
+    if (demo || !supabase || !account) return;
+    const pending = localEvents.filter((event) => event.pendingSync);
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      for (const event of pending) {
+        const { error } = await supabase!.from('events').insert(insertPayload(event, account.id));
+        if (cancelled) return;
+        if (error) return;
+        markSynced(event.id);
+      }
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account, demo, localEvents, markSynced, queryClient]);
 
   const events = useMemo(() => {
     const byId = new Map<string, AppEvent>();
@@ -130,21 +174,7 @@ export function useCreateEvent() {
         return { ...event, pendingSync: false };
       }
 
-      const { error } = await supabase.from('events').insert({
-        id: event.id,
-        host_id: account.id,
-        host_name: event.hostName,
-        title: event.title,
-        description: event.description,
-        starts_at: event.startsAt,
-        is_public: true,
-        location_label: event.locationLabel,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        route: event.route?.coordinates ?? null,
-        route_distance_m: event.route?.distanceM ?? null,
-        route_time_ms: event.route?.timeMs ?? null,
-      });
+      const { error } = await supabase.from('events').insert(insertPayload(event, account.id));
 
       if (error) {
         // Sin tabla remota o sin conexión: el evento queda en el dispositivo.
