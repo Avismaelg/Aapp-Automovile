@@ -74,3 +74,21 @@ conducción responsable.
 - Los récords son por tramo y por viaje: no hay anti-trampas (GPS falso).
 - Falta un editor de tramos desde la app; hoy se cargan por migración.
 - Sin caché de teselas offline (MapLibre GL JS no la trae integrada).
+
+## 5. Optimización aplicada
+
+- **Party en vivo**: los cambios de `party_members` y `parties` ahora parchean
+  la caché de React Query en vez de invalidarla. Antes cada latido de cada
+  miembro (5 s) recargaba la party entera con perfiles; ahora solo se recarga
+  cuando cambia la estructura (altas, bajas o fin de party).
+- **Posición de party**: no se escribe en Supabase si el coche no se movió 5 m
+  en los últimos 30 s (menos escrituras y menos tráfico Realtime).
+- **Persistencia de rutas**: el viaje activo se guarda aparte cada 12 s (pocos
+  KB) y el archivo completo (hasta 30 rutas) solo al cerrar un viaje. Antes se
+  reescribía todo el historial cada 8 s en plena conducción.
+- **React Query**: `gcTime` de 10 minutos y sin refetch al recuperar foco de la
+  ventana; menos peticiones al cambiar de pestaña.
+- **Récords**: la mejor marca local solo revisa las 10 rutas más recientes.
+- **Mapa**: se retiró la instrumentación de debug; los errores de dibujo del
+  coche avisan una sola vez por sesión.
+

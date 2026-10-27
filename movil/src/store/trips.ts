@@ -34,14 +34,15 @@ type TripsState = {
   markRecordsSubmitted: (tripId: string) => void;
 };
 
-const STORAGE_KEY = 'caravana.trips.v1';
+const ARCHIVE_KEY = 'caravana.trips.v1';
+const ACTIVE_KEY = 'caravana.active-trip.v1';
 const MAX_TRIPS = 30;
 const MAX_POINTS = 700;
 const MOVE_START_KMH = 10;
 const STILL_KMH = 2.5;
 const STOP_AFTER_MS = 5 * 60_000;
 const MIN_POINT_DISTANCE_M = 15;
-const PERSIST_EVERY_MS = 8_000;
+const PERSIST_EVERY_MS = 12_000;
 
 let lastMovingAt = 0;
 let lastPersistAt = 0;
@@ -61,14 +62,32 @@ function haversineMeters(
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-async function persist() {
+// El viaje activo se guarda solo (pocos KB) cada 12 s; el archivo completo
+// (hasta 30 rutas) solo cuando un viaje termina. Así no reescribimos ~1 MB de
+// JSON en plena conducción.
+async function persistActive() {
   lastPersistAt = Date.now();
   try {
-    const { trips, active } = useTrips.getState();
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ trips, active }));
+    const { active } = useTrips.getState();
+    if (active) await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+    else await AsyncStorage.removeItem(ACTIVE_KEY);
   } catch {
     // Si el almacenamiento falla, la siguiente escritura reintenta.
   }
+}
+
+async function persistArchive() {
+  try {
+    const { trips } = useTrips.getState();
+    await AsyncStorage.setItem(ARCHIVE_KEY, JSON.stringify({ trips }));
+  } catch {
+    // Se reintenta al terminar el siguiente viaje.
+  }
+}
+
+async function persistAll() {
+  lastPersistAt = Date.now();
+  await Promise.all([persistActive(), persistArchive()]);
 }
 
 function schedulePersist() {
@@ -76,7 +95,7 @@ function schedulePersist() {
   const wait = Math.max(0, PERSIST_EVERY_MS - (Date.now() - lastPersistAt));
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    void persist();
+    void persistActive();
   }, wait);
 }
 
@@ -98,21 +117,30 @@ export const useTrips = create<TripsState>((set, get) => ({
   hydrate: async () => {
     if (get().hydrated) return;
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw) as { trips?: Trip[]; active?: Trip | null };
-        set({
-          trips: Array.isArray(stored.trips) ? stored.trips : [],
-          active: stored.active ?? null,
-          hydrated: true,
-        });
-        const active = stored.active ?? null;
-        if (active) {
-          const last = active.points[active.points.length - 1];
-          lastMovingAt = last?.at ?? active.startedAt;
-        }
-        return;
+      const [rawArchive, rawActive] = await Promise.all([
+        AsyncStorage.getItem(ARCHIVE_KEY),
+        AsyncStorage.getItem(ACTIVE_KEY),
+      ]);
+
+      let trips: Trip[] = [];
+      let active: Trip | null = null;
+
+      if (rawArchive) {
+        const parsed = JSON.parse(rawArchive) as { trips?: Trip[]; active?: Trip | null };
+        if (Array.isArray(parsed.trips)) trips = parsed.trips;
+        // Compatibilidad con la versión anterior que guardaba el viaje activo aquí.
+        if (!rawActive && parsed.active) active = parsed.active;
       }
+      if (rawActive) {
+        active = JSON.parse(rawActive) as Trip | null;
+      }
+
+      set({ trips, active, hydrated: true });
+      if (active) {
+        const last = active.points[active.points.length - 1];
+        lastMovingAt = last?.at ?? active.startedAt;
+      }
+      return;
     } catch {
       // Almacenamiento corrupto: empezamos vacío.
     }
@@ -169,7 +197,7 @@ export const useTrips = create<TripsState>((set, get) => ({
     if (speed < STILL_KMH && now - lastMovingAt > STOP_AFTER_MS && next.distanceM > 200) {
       const ended = finishTrip(next, now);
       set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
-      void persist();
+      void persistAll();
       return;
     }
 
@@ -182,7 +210,7 @@ export const useTrips = create<TripsState>((set, get) => ({
     if (!active) return;
     const ended = finishTrip(active, Date.now());
     set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
-    await persist();
+    await persistAll();
   },
 
   markRecordsSubmitted: (tripId) => {
@@ -192,6 +220,6 @@ export const useTrips = create<TripsState>((set, get) => ({
       trips: get().trips.map(patch),
       active: get().active ? patch(get().active as Trip) : null,
     });
-    void persist();
+    void persistArchive();
   },
 }));

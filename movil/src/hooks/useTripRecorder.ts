@@ -14,7 +14,8 @@ export function useTripRecorder(
   const recordPoint = useTrips((state) => state.recordPoint);
   const markRecordsSubmitted = useTrips((state) => state.markRecordsSubmitted);
   const active = useTrips((state) => state.active);
-  const trips = useTrips((state) => state.trips);
+  const activeId = active?.id ?? null;
+  const hydrated = useTrips((state) => state.hydrated);
 
   useEffect(() => {
     void hydrate();
@@ -40,26 +41,28 @@ export function useTripRecorder(
   const wasActiveRef = useRef(false);
   useEffect(() => {
     const wasActive = wasActiveRef.current;
-    wasActiveRef.current = Boolean(active);
-    if (!wasActive || active) return;
-    const ended = trips[0];
+    wasActiveRef.current = activeId !== null;
+    if (!wasActive || activeId) return;
+    const ended = useTrips.getState().trips[0];
     if (!ended || ended.recordsSubmitted) return;
     void submitTripSpeedRecords(ended, vehicleName).then((done) => {
       if (done) markRecordsSubmitted(ended.id);
     });
-  }, [active, trips, vehicleName, markRecordsSubmitted]);
+  }, [activeId, vehicleName, markRecordsSubmitted]);
 
   // Reintento de envíos pendientes (por ejemplo, sin conexión al terminar).
   const retriedRef = useRef(false);
   useEffect(() => {
-    if (retriedRef.current || trips.length === 0) return;
+    if (!hydrated || retriedRef.current) return;
     retriedRef.current = true;
-    const pendingTrip = trips.find((trip: Trip) => trip.endedAt && !trip.recordsSubmitted);
+    const pendingTrip = useTrips
+      .getState()
+      .trips.find((trip: Trip) => trip.endedAt && !trip.recordsSubmitted);
     if (!pendingTrip) return;
     void submitTripSpeedRecords(pendingTrip, vehicleName).then((done) => {
       if (done) markRecordsSubmitted(pendingTrip.id);
     });
-  }, [trips, vehicleName, markRecordsSubmitted]);
+  }, [hydrated, vehicleName, markRecordsSubmitted]);
 
   return { active };
 }

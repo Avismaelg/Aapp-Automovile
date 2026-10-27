@@ -187,20 +187,73 @@ export function useActiveParty() {
 
   useEffect(() => {
     if (demo || !supabase || !account) return;
-    const channel = supabase
+    const client = supabase;
+    const cacheKey = ['party', account.id, 'supabase'];
+
+    // Refrescar toda la party en cada latido (cada 5 s por miembro) era caro.
+    // Ahora los UPDATE parchean la caché y solo se recarga si cambia la
+    // estructura (altas, bajas o cambio de party).
+    const patchMembers = (row: Partial<PartyMemberRow>) => {
+      if (!row.user_id) return;
+      queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
+        if (!current) return current;
+        let found = false;
+        const members = current.members.map((member) => {
+          if (member.userId !== row.user_id) return member;
+          found = true;
+          return {
+            ...member,
+            lastLat: row.last_lat !== undefined ? row.last_lat : member.lastLat,
+            lastLng: row.last_lng !== undefined ? row.last_lng : member.lastLng,
+            lastSeenAt: row.last_seen_at !== undefined ? row.last_seen_at : member.lastSeenAt,
+            isMuted: row.is_muted !== undefined ? row.is_muted : member.isMuted,
+            voiceChannelSlug:
+              row.voice_channel_slug !== undefined ? row.voice_channel_slug : member.voiceChannelSlug,
+          };
+        });
+        return found ? { ...current, members } : current;
+      });
+    };
+
+    const patchParty = (row: Partial<PartyRow>) => {
+      queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          name: row.name ?? current.name,
+          status: row.status ?? current.status,
+          destinationLabel:
+            row.destination_label !== undefined ? row.destination_label : current.destinationLabel,
+          destinationLat:
+            row.destination_lat !== undefined ? row.destination_lat : current.destinationLat,
+          destinationLng:
+            row.destination_lng !== undefined ? row.destination_lng : current.destinationLng,
+        };
+      });
+    };
+
+    const channel = client
       .channel(`party-live-${account.id}-${channelId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'parties' },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ['party'] });
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            patchParty(payload.new as Partial<PartyRow>);
+          } else {
+            void queryClient.invalidateQueries({ queryKey: ['party'] });
+          }
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'party_members' },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ['party'] });
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            patchMembers(payload.new as Partial<PartyMemberRow>);
+          } else {
+            void queryClient.invalidateQueries({ queryKey: ['party'] });
+          }
         },
       )
       .subscribe();
@@ -428,8 +481,25 @@ export function usePartyLocation(
     const client = supabase;
     if (!partyId || !enabled || !accountId || !client) return;
 
-    const pushLocation = async () => {
+    // Evita escrituras redundantes: si el coche no se movió 5 m y la última
+    // actualización fue hace menos de 30 s, no hace falta tocar Supabase.
+    let lastPushAt = 0;
+    let lastLat: number | null = null;
+    let lastLng: number | null = null;
+
+    const pushLocation = async (force: boolean) => {
       const { latitude, longitude } = latestRef.current;
+      const now = Date.now();
+      if (!force && lastLat != null && lastLng != null) {
+        const meters = Math.hypot(
+          (latitude - lastLat) * 111320,
+          (longitude - lastLng) * 111320 * Math.cos((latitude * Math.PI) / 180),
+        );
+        if (meters < 5 && now - lastPushAt < 30_000) return;
+      }
+      lastPushAt = now;
+      lastLat = latitude;
+      lastLng = longitude;
       try {
         await client
           .from('party_members')
@@ -445,8 +515,8 @@ export function usePartyLocation(
       }
     };
 
-    void pushLocation();
-    const timer = setInterval(() => void pushLocation(), 5_000);
+    void pushLocation(true);
+    const timer = setInterval(() => void pushLocation(false), 5_000);
     return () => clearInterval(timer);
   }, [partyId, enabled, accountId]);
 }

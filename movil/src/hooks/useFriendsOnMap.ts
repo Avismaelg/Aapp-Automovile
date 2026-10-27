@@ -28,8 +28,10 @@ export function useFriendsOnMap() {
 
   const friendIds = useMemo(() => friends.map((friend) => friend.profile.id), [friends]);
 
+  const sortedFriendIds = useMemo(() => [...friendIds].sort(), [friendIds]);
+
   const positionsQuery = useQuery({
-    queryKey: ['friend-positions', friendIds.sort().join(','), account?.id ?? 'guest'],
+    queryKey: ['friend-positions', sortedFriendIds.join(','), account?.id ?? 'guest'],
     enabled: !isDemo && isSupabaseConfigured && friendIds.length > 0,
     queryFn: async () => {
       if (!supabase) return new Map<string, { latitude: number; longitude: number }>();

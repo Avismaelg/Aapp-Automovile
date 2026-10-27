@@ -50,9 +50,11 @@ export default function RecordsScreen() {
 
   const localBest = useMemo(() => {
     const map = new Map<string, number>();
+    // Solo las rutas recientes: suficientes para la mejor marca local.
+    const recent = trips.slice(0, 10);
     for (const segment of segments) {
       let best: number | null = null;
-      for (const trip of trips) {
+      for (const trip of recent) {
         const value = maxSpeedNearSegment(trip, segment.polyline);
         if (value != null) best = Math.max(best ?? 0, value);
       }
