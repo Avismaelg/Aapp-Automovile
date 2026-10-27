@@ -91,7 +91,8 @@ npx expo start
   `livekit-token`. LiveKit requiere un development build/EAS, no Expo Go.
   Ver [`docs/12-livekit-voz.md`](docs/12-livekit-voz.md).
 - **Mapa 3D:** es la pantalla inicial. Muestra edificios y relieve, y la cámara
-  sigue la posición y el rumbo del vehículo. Botones **3D/2D** y **recentrar**;
+  sigue la posición y el rumbo del vehículo, que se dibuja como coche 3D (con
+  flecha de respaldo si Three.js no carga). Botones **3D/2D** y **recentrar**;
   al arrastrar el mapa se suelta el seguimiento. La Party usa el mismo motor 3D.
   Si no das permiso de ubicación, usa Santo Domingo como ubicación de demo. En
   web puedes conceder el permiso desde el navegador.

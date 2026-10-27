@@ -38,6 +38,7 @@ export type WorldMapCommand =
   | { type: 'destination'; payload: WorldMapDestination | null }
   | { type: 'route'; payload: WorldMapRoute | null }
   | { type: 'mode'; payload: WorldMapMode }
+  | { type: 'vehicle'; payload: { color: string } }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -85,13 +86,14 @@ export const WORLD_MAP_HTML = `<!doctype html>
   html, body, #map { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .vehicle, .member, .dest { pointer-events: none; }
-  .vehicle { position: relative; width: 64px; height: 64px; }
+  .vehicle { --car-color: #ff5a1f; position: relative; width: 64px; height: 64px; transition: opacity 0.3s ease; }
   .vehicle-halo {
     position: absolute; left: 14px; top: 14px; width: 36px; height: 36px; border-radius: 50%;
-    background: rgba(255,90,31,0.45); animation: halo 2s ease-out infinite;
+    background: var(--car-color); animation: halo 2s ease-out infinite;
   }
   .vehicle-arrow { position: absolute; left: 0; top: 0; width: 64px; height: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
-  .vehicle-arrow path { fill: #ff5a1f; stroke: #ffffff; stroke-width: 4; stroke-linejoin: round; }
+  .vehicle-arrow path { fill: var(--car-color); stroke: #ffffff; stroke-width: 4; stroke-linejoin: round; }
+  .vehicle.is-3d .vehicle-arrow { display: none; }
   .member { position: relative; width: 44px; height: 44px; }
   .member-dot {
     position: absolute; left: 3px; top: 3px; width: 38px; height: 38px; border-radius: 50%;
@@ -119,7 +121,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     color: #101603; background: #c9ff4d; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 5px;
   }
   @keyframes halo {
-    0% { transform: scale(0.8); opacity: 0.9; }
+    0% { transform: scale(0.8); opacity: 0.45; }
     100% { transform: scale(2.4); opacity: 0; }
   }
   @keyframes talk {
@@ -142,6 +144,11 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var LOAD_TIMEOUT_MS = 25000;
   var VIEW_PADDING = { top: 90, bottom: 220, left: 0, right: 0 };
   var EMPTY_ROUTE = { type: 'FeatureCollection', features: [] };
+  var THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+  var CAR_LENGTH_PX = 60;
+  var CAR_LENGTH_M = 4.2;
+  var CAR_LOOKAHEAD_M = 20;
+  var CAMERA_DISTANCE = 1000;
 
   var state = {
     location: null,
@@ -150,7 +157,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     route: null,
     mode: '3d',
     following: true,
-    heading: null
+    heading: null,
+    vehicleColor: '#ff5a1f'
   };
   var map = null;
   var mapReady = false;
@@ -160,6 +168,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var destinationMarker = null;
   var destinationLabel = null;
   var memberMarkers = new Map();
+  var THREE = null;
+  var car3d = null;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -237,6 +247,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
   function setLocation(location) {
     if (!location) return;
+    var firstFix = !state.location;
     state.location = location;
     var moving = typeof location.speedKmh !== 'number' || location.speedKmh >= MOVING_KMH;
     if (typeof location.heading === 'number' && location.heading >= 0 && moving) {
@@ -245,7 +256,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (!mapReady) return;
     vehicleMarker.setLngLat(lngLatOf(location));
     if (state.heading !== null) vehicleMarker.setRotation(state.heading);
-    if (state.following) follow(true, false);
+    renderCar();
+    if (state.following) follow(true, firstFix);
   }
 
   function buildMemberElement(member) {
@@ -345,6 +357,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     else if (message.type === 'destination') setDestination(message.payload);
     else if (message.type === 'route') setRoute(message.payload);
     else if (message.type === 'mode') setMode(message.payload);
+    else if (message.type === 'vehicle') setVehicleColor(message.payload && message.payload.color);
     else if (message.type === 'recenter') recenter();
   }
 
@@ -391,8 +404,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
       minzoom: 14.5,
       paint: {
         'fill-extrusion-color': '#313c53',
-        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
-        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'height_min'], 0],
         'fill-extrusion-opacity': 0.9
       }
     }, firstSymbolLayerId());
@@ -423,6 +436,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   function addVehicle() {
     var element = document.createElement('div');
     element.className = 'vehicle';
+    element.style.setProperty('--car-color', state.vehicleColor);
     element.innerHTML =
       '<div class="vehicle-halo"></div>' +
       '<svg class="vehicle-arrow" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 L50 56 L32 46 L14 56 Z"></path></svg>';
@@ -433,6 +447,247 @@ export const WORLD_MAP_HTML = `<!doctype html>
     })
       .setLngLat(state.location ? lngLatOf(state.location) : DEFAULT_CENTER)
       .addTo(map);
+  }
+
+  function normalizeColor(value) {
+    var color = typeof value === 'string' ? value.trim() : '';
+    if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+    if (/^#[0-9a-f]{3}$/i.test(color)) {
+      return '#' + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2) + color.charAt(3) + color.charAt(3);
+    }
+    if (/^[0-9a-f]{6}$/i.test(color)) return '#' + color;
+    return '#ff5a1f';
+  }
+
+  function setVehicleColor(value) {
+    state.vehicleColor = normalizeColor(value);
+    if (vehicleMarker) vehicleMarker.getElement().style.setProperty('--car-color', state.vehicleColor);
+    if (car3d) {
+      car3d.paint.color.set(state.vehicleColor);
+      renderCar();
+    }
+  }
+
+  function buildCar(color) {
+    var car = new THREE.Group();
+    var paint = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.25, roughness: 0.35 });
+    var trim = new THREE.MeshStandardMaterial({ color: 0x11161d, metalness: 0.35, roughness: 0.55 });
+    var glass = new THREE.MeshStandardMaterial({ color: 0x0a141d, metalness: 0.75, roughness: 0.18, side: THREE.DoubleSide });
+    var rubber = new THREE.MeshStandardMaterial({ color: 0x080a0d, roughness: 0.95 });
+    var rim = new THREE.MeshStandardMaterial({ color: 0x95a1b4, metalness: 0.85, roughness: 0.3 });
+    var headlight = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe9b0, emissiveIntensity: 1.8, roughness: 0.25 });
+    var taillight = new THREE.MeshStandardMaterial({ color: 0xff3040, emissive: 0xff2233, emissiveIntensity: 1.2, roughness: 0.3 });
+
+    var shape = new THREE.Shape();
+    shape.moveTo(-2.05, 0.28);
+    shape.lineTo(-2.1, 0.62);
+    shape.lineTo(-2.02, 0.94);
+    shape.lineTo(-1.55, 1.02);
+    shape.lineTo(-1.15, 1.38);
+    shape.lineTo(0.35, 1.42);
+    shape.lineTo(0.95, 1.08);
+    shape.lineTo(1.7, 0.98);
+    shape.lineTo(2.08, 0.78);
+    shape.lineTo(2.1, 0.45);
+    shape.lineTo(2.02, 0.28);
+    shape.lineTo(-2.05, 0.28);
+
+    var bodyGeometry = new THREE.ExtrudeGeometry(shape, {
+      depth: 1.72,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.06,
+      bevelSegments: 2,
+      curveSegments: 1
+    });
+    bodyGeometry.translate(0, 0, -0.86);
+    car.add(new THREE.Mesh(bodyGeometry, paint));
+
+    var windowShape = new THREE.Shape();
+    windowShape.moveTo(-1.02, 1.0);
+    windowShape.lineTo(-0.86, 1.31);
+    windowShape.lineTo(0.18, 1.34);
+    windowShape.lineTo(0.72, 1.03);
+    windowShape.lineTo(-1.02, 1.0);
+    var windowGeometry = new THREE.ShapeGeometry(windowShape);
+    var leftWindow = new THREE.Mesh(windowGeometry, glass);
+    leftWindow.position.z = 0.94;
+    car.add(leftWindow);
+    var rightWindow = new THREE.Mesh(windowGeometry, glass);
+    rightWindow.position.z = -0.94;
+    car.add(rightWindow);
+
+    var windshield = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.52, 1.46), glass);
+    windshield.position.set(0.68, 1.2, 0);
+    windshield.rotation.z = -0.62;
+    car.add(windshield);
+    var rearWindow = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.46, 1.4), glass);
+    rearWindow.position.set(-1.24, 1.18, 0);
+    rearWindow.rotation.z = 0.62;
+    car.add(rearWindow);
+
+    var mirrorGeometry = new THREE.BoxGeometry(0.18, 0.1, 0.14);
+    [0.98, -0.98].forEach(function (z) {
+      var mirror = new THREE.Mesh(mirrorGeometry, trim);
+      mirror.position.set(0.62, 1.05, z);
+      car.add(mirror);
+    });
+
+    var wheelGeometry = new THREE.CylinderGeometry(0.34, 0.34, 0.24, 18);
+    wheelGeometry.rotateX(Math.PI / 2);
+    var hubGeometry = new THREE.CylinderGeometry(0.17, 0.17, 0.25, 12);
+    hubGeometry.rotateX(Math.PI / 2);
+    [[-1.35, 0.92], [-1.35, -0.92], [1.35, 0.92], [1.35, -0.92]].forEach(function (position) {
+      var wheel = new THREE.Mesh(wheelGeometry, rubber);
+      wheel.position.set(position[0], 0.34, position[1]);
+      car.add(wheel);
+      var hub = new THREE.Mesh(hubGeometry, rim);
+      hub.position.set(position[0], 0.34, position[1]);
+      car.add(hub);
+    });
+
+    var headlightGeometry = new THREE.BoxGeometry(0.08, 0.16, 0.38);
+    [0.5, -0.5].forEach(function (z) {
+      var light = new THREE.Mesh(headlightGeometry, headlight);
+      light.position.set(2.04, 0.82, z);
+      car.add(light);
+      var tail = new THREE.Mesh(headlightGeometry, taillight);
+      tail.position.set(-2.04, 0.84, z);
+      car.add(tail);
+    });
+
+    var grille = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.74), trim);
+    grille.position.set(2.08, 0.58, 0);
+    car.add(grille);
+    var plate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.12, 0.36),
+      new THREE.MeshStandardMaterial({ color: 0xe8edf4, roughness: 0.5 })
+    );
+    plate.position.set(2.1, 0.44, 0);
+    car.add(plate);
+
+    var shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 32),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.36, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(2.3, 1.1, 1);
+    shadow.position.y = 0.02;
+    car.add(shadow);
+
+    car.traverse(function (object) {
+      if (!object.material) return;
+      var materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach(function (material) {
+        material.side = THREE.DoubleSide;
+      });
+    });
+
+    return { group: car, paint: paint };
+  }
+
+  function sizeCar() {
+    if (!car3d) return;
+    var container = map.getContainer();
+    car3d.width = container.clientWidth;
+    car3d.height = container.clientHeight;
+    car3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    car3d.renderer.setSize(car3d.width, car3d.height, false);
+    car3d.camera.left = -car3d.width / 2;
+    car3d.camera.right = car3d.width / 2;
+    car3d.camera.top = car3d.height / 2;
+    car3d.camera.bottom = -car3d.height / 2;
+    car3d.camera.updateProjectionMatrix();
+  }
+
+  function createCar3D() {
+    var canvas = document.createElement('canvas');
+    canvas.id = 'caravana-car';
+    canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;display:none';
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
+    map.getContainer().appendChild(canvas);
+    var scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    var sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(0.6, 1, 0.4);
+    scene.add(sun);
+    var built = buildCar(state.vehicleColor);
+    built.group.scale.setScalar(CAR_LENGTH_PX / CAR_LENGTH_M);
+    scene.add(built.group);
+    car3d = {
+      canvas: canvas,
+      renderer: renderer,
+      scene: scene,
+      camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000),
+      model: built.group,
+      paint: built.paint,
+      width: 0,
+      height: 0
+    };
+    sizeCar();
+  }
+
+  function aheadLngLat(location, heading, meters) {
+    var radians = heading * Math.PI / 180;
+    var latitude = location.latitude;
+    return [
+      location.longitude + meters * Math.sin(radians) / (111320 * Math.cos(latitude * Math.PI / 180)),
+      latitude + meters * Math.cos(radians) / 111320
+    ];
+  }
+
+  // Dibujamos el coche en su propio canvas con la misma cámara inclinada que el mapa.
+  // La posición sale de map.project() y el giro, de un punto 20 m por delante del coche.
+  function renderCar() {
+    if (!car3d || !mapReady) return;
+    var container = map.getContainer();
+    if (container.clientWidth !== car3d.width || container.clientHeight !== car3d.height) sizeCar();
+
+    var located = Boolean(state.location);
+    car3d.canvas.style.display = located ? 'block' : 'none';
+    if (vehicleMarker) vehicleMarker.getElement().classList.toggle('is-3d', located);
+    if (!located) return;
+
+    var pitch = map.getPitch() * Math.PI / 180;
+    var sinPitch = Math.sin(pitch);
+    var cosPitch = Math.cos(pitch);
+    var heading = state.heading !== null ? state.heading : map.getBearing();
+    var anchor = map.project(lngLatOf(state.location));
+    var ahead = map.project(aheadLngLat(state.location, heading, CAR_LOOKAHEAD_M));
+    var onScreen = Math.atan2(ahead.x - anchor.x, anchor.y - ahead.y);
+    var turn = Math.atan2(Math.sin(onScreen), Math.cos(onScreen) / cosPitch);
+    var offsetX = anchor.x - car3d.width / 2;
+    var offsetY = car3d.height / 2 - anchor.y;
+
+    car3d.camera.up.set(0, sinPitch, -cosPitch);
+    car3d.camera.position.set(0, CAMERA_DISTANCE * cosPitch, CAMERA_DISTANCE * sinPitch);
+    car3d.camera.lookAt(0, 0, 0);
+    car3d.model.position.set(offsetX, offsetY * sinPitch, -offsetY * cosPitch);
+    car3d.model.rotation.y = Math.PI / 2 - turn;
+    car3d.renderer.render(car3d.scene, car3d.camera);
+  }
+
+  async function initCar3D() {
+    if (THREE || car3d) return;
+    try {
+      THREE = await import(THREE_MODULE_URL);
+    } catch (error) {
+      console.warn('Caravana: no se pudo cargar Three.js; se usa la flecha 2D.', error);
+      return;
+    }
+    if (!mapReady || car3d) return;
+    try {
+      createCar3D();
+      map.on('render', renderCar);
+      document.body.setAttribute('data-car', '3d');
+      renderCar();
+    } catch (error) {
+      console.warn('Caravana: no se pudo crear el coche 3D; se usa la flecha 2D.', error);
+      if (car3d) car3d.canvas.remove();
+      car3d = null;
+      document.body.setAttribute('data-car', '2d');
+    }
   }
 
   function addDestination() {
@@ -464,6 +719,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       if (state.following) follow(false, true);
     }
     post({ type: 'ready' });
+    void initCar3D();
   }
 
   function webglAvailable() {
@@ -521,6 +777,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
   document.body.setAttribute('data-follow', 'on');
   document.body.setAttribute('data-mode', state.mode);
+  document.body.setAttribute('data-car', '2d');
   window.addEventListener('message', handleMessage);
   document.addEventListener('message', handleMessage);
   createMap();

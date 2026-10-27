@@ -20,6 +20,7 @@ type WorldMapProps = {
   location: WorldMapLocation;
   route?: WorldMapRoute | null;
   mode?: WorldMapMode;
+  vehicleColor?: string;
   recenterToken?: number;
   onFollowChange?: (following: boolean) => void;
   onError?: (message: string) => void;
@@ -32,6 +33,7 @@ export function WorldMap({
   location,
   route = null,
   mode = '3d',
+  vehicleColor = '#ff5a1f',
   recenterToken = 0,
   onFollowChange,
   onError,
@@ -41,13 +43,13 @@ export function WorldMap({
   const frameId = `caravana-map-${reactId.replace(/:/g, '')}`;
   const readyRef = useRef(false);
   const seqRef = useRef(0);
-  const latestRef = useRef({ members, destination, location, route, mode });
+  const latestRef = useRef({ members, destination, location, route, mode, vehicleColor });
   const callbacksRef = useRef({ onFollowChange, onError });
 
   useEffect(() => {
-    latestRef.current = { members, destination, location, route, mode };
+    latestRef.current = { members, destination, location, route, mode, vehicleColor };
     callbacksRef.current = { onFollowChange, onError };
-  }, [members, destination, location, route, mode, onFollowChange, onError]);
+  }, [members, destination, location, route, mode, vehicleColor, onFollowChange, onError]);
 
   const getContentWindow = useCallback(() => {
     const doc = (globalThis as { document?: Document }).document;
@@ -71,6 +73,7 @@ export function WorldMap({
     send({ type: 'destination', payload: latest.destination });
     send({ type: 'route', payload: latest.route });
     send({ type: 'mode', payload: latest.mode });
+    send({ type: 'vehicle', payload: { color: latest.vehicleColor } });
   }, [send]);
 
   useEffect(() => {
@@ -92,6 +95,10 @@ export function WorldMap({
   useEffect(() => {
     send({ type: 'mode', payload: mode });
   }, [mode, send]);
+
+  useEffect(() => {
+    send({ type: 'vehicle', payload: { color: vehicleColor } });
+  }, [send, vehicleColor]);
 
   useEffect(() => {
     if (recenterToken > 0) send({ type: 'recenter' });

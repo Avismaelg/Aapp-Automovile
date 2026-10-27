@@ -2,7 +2,7 @@
 
 > Estado: la pestaña **Mapa** es la pantalla inicial de la app. Usa MapLibre GL
 > en 3D sobre datos de OpenStreetMap/OpenFreeMap, muestra edificios y relieve y
-> sigue la posición y el rumbo del vehículo. La Party reutiliza el mismo motor
+> sigue la posición y el rumbo de un coche 3D sobre el mapa. La Party reutiliza el mismo motor
 > para enseñar la caravana. Probado en web con GPS real del navegador y
 > ubicaciones simuladas; falta la prueba en dispositivos físicos.
 
@@ -21,11 +21,17 @@
     OpenStreetMap y relieve Mapzen.
 - **Pantalla inicial**: `app/(tabs)/index.tsx`. El antiguo dashboard pasó a
   `app/actividad.tsx`, accesible desde el botón de actividad del mapa.
-- Vehículo con flecha de navegación:
-  - halo naranja y flecha orientada al rumbo;
+- Vehículo 3D:
+  - modelo procedural con Three.js 0.186.1 (sin GLB), dibujado sobre el mapa con
+    la misma inclinación de la cámara; mide unos 60 px de largo en cualquier zoom;
+  - la posición sale de `map.project()` en cada frame y el giro del rumbo GPS se
+    calcula relativo a la vista, así apunta bien con el mapa girado o inclinado;
+  - el color lo elige el vehículo principal (`vehicle`) y pinta carrocería, halo y
+    flecha de respaldo;
+  - si Three.js o WebGL fallan, se muestra la flecha 2D (`data-car="2d"`);
   - la cámara se centra en el vehículo con inclinación de 60° y zoom 16,5;
   - el rumbo del GPS gira la cámara (heading-up) cuando el vehículo se mueve;
-  - el marcador conserva su orientación cuando el vehículo está parado.
+  - parado, el coche conserva el último rumbo válido.
 - Controles:
   - **3D/2D**: 2D mantiene el seguimiento y el rumbo, pero con inclinación 0;
   - **recentrar**: solo aparece si el usuario movió el mapa;
@@ -96,6 +102,11 @@ Mapa
 - Los marcadores se reproyectan cuando carga el terreno (`sourcedata`), porque
   el DEM cambia la altura de la cámara sin emitir `move`. Sin esto el vehículo
   quedaba unos 140 px desplazado al arrancar.
+- El coche no es una capa de MapLibre: es un `canvas` de Three.js superpuesto
+  (`pointer-events: none`) que se redibuja en cada `render` del mapa. Las capas
+  personalizadas de MapLibre dejaron de dibujarse con terreno e inclinación en las
+  pruebas, así que el coche se dibuja fuera del motor. Como efecto, ningún edificio
+  lo tapa.
 
 ---
 
@@ -158,9 +169,10 @@ Mapa
   memoria. Existe vista 2D y un aviso si WebGL no está disponible.
 - La pestaña Party monta un segundo mapa 3D mientras está abierta. Al volver al
   mapa principal se conserva el primero.
-- MapLibre se carga desde unpkg y el estilo/teselas desde OpenFreeMap. Son
-  servicios públicos gratuitos: para producción hay que fijar versión, tener un
-  plan de teselas y cachear.
+- MapLibre y Three.js se cargan desde unpkg y jsDelivr, y el estilo/teselas desde
+  OpenFreeMap. Son servicios públicos gratuitos: para producción hay que fijar
+  versión, tener un plan de teselas y cachear. Sin Three.js el coche se ve como
+  flecha 2D.
 - No hay mapas offline ni caché de teselas.
 - No hay navegación giro a giro ni CarPlay/Android Auto nativos.
 - El relieve puede mostrar un aviso interno de `maxzoom` de elevación; no rompe
@@ -216,6 +228,11 @@ Prueba manual/web realizada:
 10. Recargar: el vehículo queda alineado con el centro con relleno (410 px =
     410 px).
 11. Abrir `/actividad` y volver: regresa al mapa, que sigue listo.
+12. Coche 3D: `data-car=3d`, canvas `#caravana-car` visible y marcador con clase
+    `is-3d`. Con rumbo 90° y bearing 0° el coche apunta al este; con bearing 90°
+    apunta arriba. El comando `vehicle` cambia el color de la pintura.
+13. Bloquear `three@0.186.1` (Playwright `route`): `data-car=2d`, sin canvas y la
+    flecha visible en el centro.
 
-Resultado: `tsc`, `eslint`, `expo-doctor` (20/20) y export web correctos.
-Consola sin errores; solo avisos internos de MapLibre.
+Resultado: `tsc` y `expo lint` correctos. Coche 3D comprobado en web (pasos 12 y
+13). Consola sin errores; solo avisos internos de MapLibre.
