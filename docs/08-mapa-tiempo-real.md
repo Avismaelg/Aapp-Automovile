@@ -45,6 +45,16 @@
   real sobre la polilínea (punto más cercano).
 - **Destinos recientes**: Inicio guarda los últimos 4 destinos y los muestra
   como chips para repetir la ruta con un toque.
+- **Información de la vía (estilo Google Maps)**:
+  - calle actual en el HUD (tramo de la ruta o, sin ruta, la vía que reporta OSM);
+  - **límite de velocidad** leído de OpenStreetMap (Nominatim + API de OSM,
+    máximo una consulta cada 20 s y 100 m); el cartel solo aparece donde OSM
+    tiene la etiqueta `maxspeed` (en Santo Domingo la cobertura es escasa);
+  - **hora de llegada** estimada junto al tiempo y los kilómetros restantes;
+  - **círculo de precisión GPS** alrededor del coche;
+  - botón **N** (brújula) para fijar el mapa al norte sin dejar de seguirte.
+- Sin datos de **tráfico en tiempo real** ni **radares**: requieren un proveedor
+  de tráfico de pago y Overpass (OSM) no respondió desde la red de pruebas.
 - **Modo de videojuego (estilo Forza Horizon)**: al elegir una ruta o pulsar
   **Navegar**, el mapa pasa a pantalla completa: bandera **CONVOY** con el
   nombre de la party, ETA y distancia grandes y velocímetro; las únicas

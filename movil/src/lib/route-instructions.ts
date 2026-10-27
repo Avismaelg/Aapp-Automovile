@@ -18,6 +18,13 @@ function haversineMeters(a: LatLng, b: LatLng) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+export function metersBetween(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+) {
+  return haversineMeters([a.latitude, a.longitude], [b.latitude, b.longitude]);
+}
+
 // Distancia acumulada desde el inicio de la ruta hasta cada punto.
 export function cumulativeDistances(points: LatLng[]) {
   const cumulative: number[] = new Array(points.length).fill(0);

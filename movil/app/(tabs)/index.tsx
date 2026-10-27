@@ -12,6 +12,7 @@ import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation, refreshStaleLocation } from '@/src/hooks/useLiveLocation';
 import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
+import { useRoadInfo } from '@/src/hooks/useRoadInfo';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
@@ -70,6 +71,8 @@ export default function NavigationScreen() {
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(null);
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const [northUp, setNorthUp] = useState(false);
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
@@ -84,6 +87,7 @@ export default function NavigationScreen() {
     destination: destination ?? live.location,
     enabled: Boolean(destination),
   });
+  const roadInfo = useRoadInfo(live.location);
 
   const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
   const parkingSpot = useParking((state) => state.spot);
@@ -142,6 +146,18 @@ export default function NavigationScreen() {
       ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
       : null;
 
+  // Calle actual: la del tramo de la ruta o, sin ruta, la que reporta OSM.
+  const currentStreet = useMemo(() => {
+    const list = route.route?.instructions;
+    if (!list || progressM == null) return roadInfo.roadName;
+    let current = list[0];
+    for (const item of list) {
+      if (item.atDistanceM <= progressM + 5) current = item;
+      else break;
+    }
+    return current?.road ?? roadInfo.roadName;
+  }, [route.route, progressM, roadInfo.roadName]);
+
   const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
   const handleMapError = useCallback((message: string) => setMapError(message), []);
 
@@ -178,6 +194,25 @@ export default function NavigationScreen() {
     const timer = setInterval(() => setRecordingNow(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, [activeTrip]);
+
+  // Hora de llegada estimada (se refresca cada 30 s, como Google Maps).
+  useEffect(() => {
+    if (!route.route) return;
+    const immediate = setTimeout(() => setClockNow(Date.now()), 0);
+    const timer = setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => {
+      clearTimeout(immediate);
+      clearInterval(timer);
+    };
+  }, [route.route]);
+
+  const arrivalLabel =
+    route.route && remainingTimeMs != null
+      ? new Date(clockNow + remainingTimeMs).toLocaleTimeString('es-DO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
 
   const recenter = () => {
     setFollowing(true);
@@ -301,6 +336,7 @@ export default function NavigationScreen() {
             : null
         }
         travelMode={walking ? 'walking' : 'car'}
+        northUp={northUp}
         route={route.route}
         mode={mode}
         vehicleColor={primaryVehicle?.color}
@@ -349,7 +385,9 @@ export default function NavigationScreen() {
               <View style={styles.navMetaRow}>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
                   {routeLine
-                    ? `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)} restantes`
+                    ? `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)}${
+                        arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''
+                      }`
                     : 'Calculando ruta por calles…'}
                 </AppText>
                 <View style={styles.navMetaDot} />
@@ -364,13 +402,32 @@ export default function NavigationScreen() {
               </View>
             </View>
             <View style={styles.navSpeed}>
-              <AppText variant="display" style={styles.navSpeedValue}>
-                {speedLabel}
-              </AppText>
+              <View style={styles.speedRow}>
+                <AppText variant="display" style={styles.navSpeedValue}>
+                  {speedLabel}
+                </AppText>
+                {roadInfo.limitKmh != null ? (
+                  <View style={styles.speedLimit}>
+                    <AppText variant="label" style={styles.speedLimitText}>
+                      {roadInfo.limitKmh}
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
               <AppText variant="label" color={colors.muted}>
                 km/h
               </AppText>
             </View>
+            <Pressable
+              style={[styles.navCompass, northUp && styles.navCompassActive]}
+              onPress={() => setNorthUp((value) => !value)}
+              accessibilityRole="button"
+              accessibilityLabel="Orientar el mapa al norte"
+            >
+              <AppText variant="label" color={northUp ? '#120802' : colors.text} style={styles.modeText}>
+                N
+              </AppText>
+            </Pressable>
             <View style={styles.navActions}>
               <Pressable
                 style={styles.navButtonDark}
@@ -543,18 +600,51 @@ export default function NavigationScreen() {
 
             <View style={styles.sideRow}>
               <View style={styles.speedHud}>
-                <AppText variant="display" style={styles.speedValue}>
-                  {speedLabel}
-                </AppText>
+                <View style={styles.speedRow}>
+                  <AppText variant="display" style={styles.speedValue}>
+                    {speedLabel}
+                  </AppText>
+                  {roadInfo.limitKmh != null ? (
+                    <View style={styles.speedLimit}>
+                      <AppText variant="label" style={styles.speedLimitText}>
+                        {roadInfo.limitKmh}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
                 <View style={styles.speedMeta}>
                   <View style={[styles.liveDot, !live.isLive && styles.liveDotOff]} />
                   <AppText variant="label" color={colors.muted} style={styles.speedUnit}>
                     km/h · {live.isLive ? 'GPS' : 'DEMO'}
                   </AppText>
                 </View>
+                {currentStreet ? (
+                  <AppText
+                    variant="caption"
+                    color={colors.textSoft}
+                    numberOfLines={1}
+                    style={styles.streetName}
+                  >
+                    {currentStreet}
+                  </AppText>
+                ) : null}
               </View>
 
               <View style={styles.controls}>
+                <Pressable
+                  style={[styles.roundControl, northUp && styles.roundControlLime]}
+                  onPress={() => setNorthUp((value) => !value)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Orientar el mapa al norte"
+                >
+                  <AppText
+                    variant="label"
+                    color={northUp ? '#120802' : colors.text}
+                    style={styles.modeText}
+                  >
+                    N
+                  </AppText>
+                </Pressable>
                 <Pressable
                   style={styles.roundControl}
                   onPress={toggleMode}
@@ -592,7 +682,7 @@ export default function NavigationScreen() {
                       {route.isLoading
                         ? 'Buscando ruta por calles…'
                         : routeLine
-                          ? `${routeLine} · ${routeSourceLabel}`
+                          ? `${routeLine} · ${routeSourceLabel}${arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''}`
                           : 'Sin ruta todavía'}
                     </AppText>
                   </View>
@@ -812,6 +902,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   speedValue: { fontSize: 40, lineHeight: 44 },
+  speedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  speedLimit: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: '#ff4d5e',
+    backgroundColor: '#f4f6f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  speedLimitText: { fontSize: 11, color: '#0b0f14' },
+  streetName: { marginTop: 2, fontSize: 9, maxWidth: 160 },
   speedMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -841,6 +944,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
   },
   roundControlAccent: {
+    backgroundColor: colors.lime,
+    borderColor: colors.lime,
+  },
+  roundControlLime: {
+    backgroundColor: colors.lime,
+    borderColor: colors.lime,
+  },
+  navCompass: {
+    position: 'absolute',
+    right: 0,
+    bottom: 96,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(6,8,11,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  navCompassActive: {
     backgroundColor: colors.lime,
     borderColor: colors.lime,
   },

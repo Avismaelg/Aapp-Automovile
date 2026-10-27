@@ -72,6 +72,7 @@ export type WorldMapCommand =
   | { type: 'vehicle'; payload: { color: string; kind?: WorldMapVehicleKind } }
   | { type: 'parking'; payload: WorldMapParking | null }
   | { type: 'travel'; payload: WorldMapTravelMode }
+  | { type: 'north'; payload: boolean }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -229,7 +230,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     vehicleColor: '#ff5a1f',
     vehicleKind: 'car',
     parking: null,
-    travelMode: 'car'
+    travelMode: 'car',
+    northUp: false
   };
   var map = null;
   var mapReady = false;
@@ -315,11 +317,13 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (!mapReady || !state.location) return;
     var point = state.location;
     var walking = state.travelMode === 'walking';
-    var bearing = walking
-      ? map.getBearing()
-      : state.heading !== null
-        ? state.heading
-        : map.getBearing();
+    var bearing = state.northUp
+      ? 0
+      : walking
+        ? map.getBearing()
+        : state.heading !== null
+          ? state.heading
+          : map.getBearing();
     var center = lngLatOf(point);
     var moving = !walking && typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
 
@@ -391,6 +395,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (!mapReady) return;
     vehicleMarker.setLngLat(lngLatOf(location));
     if (state.heading !== null) vehicleMarker.setRotation(state.heading);
+    updateAccuracy(location);
     if (personMarker && state.travelMode === 'walking') {
       personMarker.setLngLat(lngLatOf(location));
     }
@@ -794,6 +799,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       else if (message.type === 'vehicle') setVehicleInput(message.payload);
       else if (message.type === 'parking') setParking(message.payload);
       else if (message.type === 'travel') setTravelMode(message.payload);
+      else if (message.type === 'north') setNorthUp(message.payload);
       else if (message.type === 'recenter') recenter();
     } catch (error) {
       fail('Mapa: ' + (error && error.message ? error.message : String(error)));
@@ -1434,6 +1440,66 @@ export const WORLD_MAP_HTML = `<!doctype html>
     map.easeTo({ pitch: pitchFor(state.mode), duration: 600, essential: true });
   }
 
+  function setNorthUp(value) {
+    state.northUp = Boolean(value);
+    if (!mapReady) return;
+    lastFollow = null;
+    if (state.following) {
+      follow(true, false);
+    } else {
+      map.easeTo({ bearing: 0, duration: 600, essential: true });
+    }
+  }
+
+  function addAccuracyLayer() {
+    map.addSource('caravana-accuracy', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-accuracy',
+      type: 'fill',
+      source: 'caravana-accuracy',
+      paint: {
+        'fill-color': '#4de1ff',
+        'fill-opacity': 0.1,
+        'fill-outline-color': 'rgba(77,225,255,0.28)'
+      }
+    }, firstSymbolLayerId());
+  }
+
+  // Círculo de precisión GPS alrededor del coche, como el de Google Maps.
+  function updateAccuracy(location) {
+    if (!mapReady || !map.getSource('caravana-accuracy')) return;
+    var accuracy = typeof location.accuracy === 'number' ? location.accuracy : null;
+    if (accuracy == null || accuracy < 5 || accuracy > 150) {
+      map.getSource('caravana-accuracy').setData(EMPTY_ROUTE);
+      return;
+    }
+    var earthRadius = 6378137;
+    var latitude = location.latitude * Math.PI / 180;
+    var longitude = location.longitude * Math.PI / 180;
+    var distance = accuracy / earthRadius;
+    var coordinates = [];
+    for (var step = 0; step <= 48; step += 1) {
+      var bearing = step * Math.PI * 2 / 48;
+      var lat2 = Math.asin(
+        Math.sin(latitude) * Math.cos(distance) +
+        Math.cos(latitude) * Math.sin(distance) * Math.cos(bearing)
+      );
+      var lng2 = longitude + Math.atan2(
+        Math.sin(bearing) * Math.sin(distance) * Math.cos(latitude),
+        Math.cos(distance) - Math.sin(latitude) * Math.sin(lat2)
+      );
+      coordinates.push([lng2 * 180 / Math.PI, lat2 * 180 / Math.PI]);
+    }
+    map.getSource('caravana-accuracy').setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [coordinates] }
+      }]
+    });
+  }
+
   function addParking() {
     var element = document.createElement('div');
     element.className = 'parking';
@@ -1579,6 +1645,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       map.setPitch(pitchFor(state.mode));
       addTerrain();
       addBuildings();
+      addAccuracyLayer();
       addRoadStyle();
       addRoute();
       addGuideLayer();
