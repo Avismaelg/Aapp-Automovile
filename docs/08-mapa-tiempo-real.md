@@ -126,10 +126,14 @@ Mapa
 
 ### Cámara
 
+- **Cámara de persecución**: inclinación 65° y zoom 17; el padding deja el coche
+  abajo en pantalla (55 % arriba, 10 % abajo) para ver hacia adelante, como una
+  cámara 360 montada detrás del vehículo. El padding se recalcula al cambiar el
+  tamaño del contenedor.
+- Para no "enloquecer" con cada señal GPS, el seguimiento solo re-anima si el
+  coche se movió más de 12 m o giró más de 10° desde la última animación.
 - `easeTo` mueve centro, rumbo e inclinación; el zoom solo cambia al iniciar o
-  recentrar.
-- `map.setPadding({ top: 90, bottom: 220 })` deja el coche por encima de la
-  tarjeta inferior y del HUD, no debajo de ellos.
+  recentrar (o si el zoom quedó por debajo del de seguimiento).
 - Los eventos `dragstart`, `rotatestart` y `pitchstart` con `originalEvent`
   desactivan el seguimiento; los movimientos programáticos no.
 - Los marcadores se reproyectan cuando carga el terreno (`sourcedata`), porque

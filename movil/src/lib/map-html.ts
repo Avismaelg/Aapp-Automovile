@@ -147,11 +147,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
   var TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
   var DEFAULT_CENTER = [-69.9312, 18.4861];
-  var CRUISE_PITCH = 60;
-  var FOLLOW_ZOOM = 16.5;
+  var CRUISE_PITCH = 65;
+  var FOLLOW_ZOOM = 17;
   var MOVING_KMH = 5;
   var LOAD_TIMEOUT_MS = 25000;
-  var VIEW_PADDING = { top: 90, bottom: 220, left: 0, right: 0 };
   var EMPTY_ROUTE = { type: 'FeatureCollection', features: [] };
   var THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
   var CAR_LENGTH_PX = 60;
@@ -188,6 +187,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var car3d = null;
   var routePoints = [];
   var guideMarker = null;
+  var lastFollow = null;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -252,14 +252,26 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
   function follow(animate, zoomIn) {
     if (!mapReady || !state.location) return;
+    var center = lngLatOf(state.location);
+    var bearing = state.heading !== null ? state.heading : map.getBearing();
+
+    // Si el coche apenas se movió o giró, no re-animamos: evita el salto
+    // constante de la cámara con cada señal GPS.
+    if (lastFollow && !zoomIn) {
+      var moved = haversineLngLat(lastFollow.center, center);
+      var turned = Math.abs(((bearing - lastFollow.bearing + 540) % 360) - 180);
+      if (moved < 12 && turned < 10) return;
+    }
+    lastFollow = { center: center, bearing: bearing };
+
     var options = {
-      center: lngLatOf(state.location),
+      center: center,
       pitch: pitchFor(state.mode),
-      bearing: state.heading !== null ? state.heading : map.getBearing(),
-      duration: animate ? 900 : 0,
+      bearing: bearing,
+      duration: animate ? 800 : 0,
       essential: true
     };
-    if (zoomIn) options.zoom = FOLLOW_ZOOM;
+    if (zoomIn || map.getZoom() < FOLLOW_ZOOM - 0.5) options.zoom = FOLLOW_ZOOM;
     map.easeTo(options);
   }
 
@@ -1151,10 +1163,24 @@ export const WORLD_MAP_HTML = `<!doctype html>
     destinationMarker = new maplibregl.Marker({ element: element });
   }
 
+  // Cámara de persecución: el coche queda abajo en pantalla y se ve hacia
+  // adelante, como una cámara 360 montada detrás del vehículo.
+  function applyViewPadding() {
+    var container = map.getContainer();
+    var height = container.clientHeight || 800;
+    map.setPadding({
+      top: Math.round(height * 0.55),
+      bottom: Math.round(height * 0.1),
+      left: 0,
+      right: 0
+    });
+  }
+
   function onLoad() {
     mapReady = true;
     document.body.setAttribute('data-ready', 'true');
-    map.setPadding(VIEW_PADDING);
+    applyViewPadding();
+    map.on('resize', applyViewPadding);
     map.setPitch(pitchFor(state.mode));
     addTerrain();
     addBuildings();
