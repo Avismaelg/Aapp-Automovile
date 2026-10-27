@@ -80,6 +80,7 @@ export type NewVehicleInput = {
 export const DEFAULT_VEHICLE_COLORS = [
   '#FF5A1F',
   '#C81D25',
+  '#101418',
   '#C9FF4D',
   '#4DE1FF',
   '#B98CFF',

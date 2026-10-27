@@ -140,6 +140,7 @@ export default function MapScreen() {
         route={route.route}
         mode={mode}
         vehicleColor={primaryVehicle?.color}
+        vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
         onFollowChange={handleFollowChange}
         onError={handleMapError}

@@ -27,10 +27,12 @@ export type WorldMapRoute = {
   coordinates: [number, number][];
   distanceM: number;
   timeMs: number;
-  source: 'graphhopper' | 'fallback';
+  source: 'graphhopper' | 'osrm' | 'fallback';
 };
 
 export type WorldMapMode = '2d' | '3d';
+
+export type WorldMapVehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';
 
 export type WorldMapCommand =
   | { type: 'location'; payload: WorldMapLocation }
@@ -38,7 +40,7 @@ export type WorldMapCommand =
   | { type: 'destination'; payload: WorldMapDestination | null }
   | { type: 'route'; payload: WorldMapRoute | null }
   | { type: 'mode'; payload: WorldMapMode }
-  | { type: 'vehicle'; payload: { color: string } }
+  | { type: 'vehicle'; payload: { color: string; kind?: WorldMapVehicleKind } }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -146,7 +148,6 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var EMPTY_ROUTE = { type: 'FeatureCollection', features: [] };
   var THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
   var CAR_LENGTH_PX = 60;
-  var CAR_LENGTH_M = 4.2;
   var CAR_LOOKAHEAD_M = 20;
   var CAMERA_DISTANCE = 1000;
 
@@ -158,7 +159,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     mode: '3d',
     following: true,
     heading: null,
-    vehicleColor: '#ff5a1f'
+    vehicleColor: '#ff5a1f',
+    vehicleKind: 'car'
   };
   var map = null;
   var mapReady = false;
@@ -357,7 +359,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     else if (message.type === 'destination') setDestination(message.payload);
     else if (message.type === 'route') setRoute(message.payload);
     else if (message.type === 'mode') setMode(message.payload);
-    else if (message.type === 'vehicle') setVehicleColor(message.payload && message.payload.color);
+    else if (message.type === 'vehicle') setVehicleInput(message.payload);
     else if (message.type === 'recenter') recenter();
   }
 
@@ -459,13 +461,33 @@ export const WORLD_MAP_HTML = `<!doctype html>
     return '#ff5a1f';
   }
 
-  function setVehicleColor(value) {
-    state.vehicleColor = normalizeColor(value);
+  function normalizeKind(value) {
+    var kinds = ['car', 'motorcycle', 'ev', 'truck'];
+    return kinds.indexOf(value) >= 0 ? value : 'car';
+  }
+
+  function vehicleBuilder(kind) {
+    if (kind === 'motorcycle') return buildMotorcycle;
+    if (kind === 'truck') return buildTruck;
+    return buildCar;
+  }
+
+  function setVehicleInput(input) {
+    state.vehicleColor = normalizeColor(input && input.color);
+    state.vehicleKind = normalizeKind(input && input.kind);
     if (vehicleMarker) vehicleMarker.getElement().style.setProperty('--car-color', state.vehicleColor);
-    if (car3d) {
-      car3d.paint.color.set(state.vehicleColor);
-      renderCar();
+    if (!car3d) return;
+    car3d.paint.color.set(state.vehicleColor);
+    if (car3d.kind !== state.vehicleKind) {
+      car3d.scene.remove(car3d.model);
+      var built = vehicleBuilder(state.vehicleKind)(state.vehicleColor);
+      built.group.scale.setScalar(CAR_LENGTH_PX / built.lengthM);
+      car3d.model = built.group;
+      car3d.paint = built.paint;
+      car3d.kind = state.vehicleKind;
+      car3d.scene.add(car3d.model);
     }
+    renderCar();
   }
 
   function buildCar(color) {
@@ -583,7 +605,126 @@ export const WORLD_MAP_HTML = `<!doctype html>
       });
     });
 
-    return { group: car, paint: paint };
+    return { group: car, paint: paint, lengthM: 4.2 };
+  }
+
+  function buildMotorcycle(color) {
+    var group = new THREE.Group();
+    var paint = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.25, roughness: 0.35 });
+    var dark = new THREE.MeshStandardMaterial({ color: 0x11161d, roughness: 0.6 });
+    var chrome = new THREE.MeshStandardMaterial({ color: 0x9aa6b8, metalness: 0.7, roughness: 0.3 });
+    var lightMat = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe9b0, emissiveIntensity: 1.6, roughness: 0.3 });
+    var tailMat = new THREE.MeshStandardMaterial({ color: 0xff3040, emissive: 0xff2233, emissiveIntensity: 1.1, roughness: 0.3 });
+
+    var wheelGeometry = new THREE.CylinderGeometry(0.33, 0.33, 0.14, 16);
+    wheelGeometry.rotateX(Math.PI / 2);
+    var frontWheel = new THREE.Mesh(wheelGeometry, dark);
+    frontWheel.position.set(0.75, 0.33, 0);
+    group.add(frontWheel);
+    var rearWheel = new THREE.Mesh(wheelGeometry, dark);
+    rearWheel.position.set(-0.75, 0.33, 0);
+    group.add(rearWheel);
+
+    var body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.4, 0.34), paint);
+    body.position.set(0, 0.75, 0);
+    group.add(body);
+    var tank = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.24, 0.36), paint);
+    tank.position.set(0.2, 1.02, 0);
+    group.add(tank);
+    var seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.3), dark);
+    seat.position.set(-0.4, 1.0, 0);
+    group.add(seat);
+    var fork = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.6, 0.09), chrome);
+    fork.position.set(0.72, 0.62, 0);
+    group.add(fork);
+    var handlebar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.72), chrome);
+    handlebar.position.set(0.58, 1.08, 0);
+    group.add(handlebar);
+    var headlight = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.15, 0.18), lightMat);
+    headlight.position.set(0.86, 0.9, 0);
+    group.add(headlight);
+    var taillight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.2), tailMat);
+    taillight.position.set(-1.02, 0.82, 0);
+    group.add(taillight);
+
+    var shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 32),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(1.05, 0.5, 1);
+    shadow.position.y = 0.02;
+    group.add(shadow);
+
+    group.traverse(function (object) {
+      if (!object.material) return;
+      var materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach(function (material) {
+        material.side = THREE.DoubleSide;
+      });
+    });
+
+    return { group: group, paint: paint, lengthM: 2.1 };
+  }
+
+  function buildTruck(color) {
+    var group = new THREE.Group();
+    var paint = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.25, roughness: 0.35 });
+    var dark = new THREE.MeshStandardMaterial({ color: 0x11161d, roughness: 0.6 });
+    var glass = new THREE.MeshStandardMaterial({ color: 0x0a141d, metalness: 0.75, roughness: 0.18, side: THREE.DoubleSide });
+    var cargo = new THREE.MeshStandardMaterial({ color: 0xd8dee6, roughness: 0.55 });
+    var lightMat = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe9b0, emissiveIntensity: 1.6, roughness: 0.3 });
+    var tailMat = new THREE.MeshStandardMaterial({ color: 0xff3040, emissive: 0xff2233, emissiveIntensity: 1.1, roughness: 0.3 });
+
+    var chassis = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.3, 2.0), dark);
+    chassis.position.set(0, 0.55, 0);
+    group.add(chassis);
+    var cab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.9, 2.1), paint);
+    cab.position.set(2.4, 1.6, 0);
+    group.add(cab);
+    var windshield = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 1.8), glass);
+    windshield.position.set(3.26, 1.95, 0);
+    group.add(windshield);
+    var cargoBox = new THREE.Mesh(new THREE.BoxGeometry(4.3, 2.2, 2.2), cargo);
+    cargoBox.position.set(-0.9, 1.8, 0);
+    group.add(cargoBox);
+
+    var wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 18);
+    wheelGeometry.rotateX(Math.PI / 2);
+    [[2.4, 0.95], [2.4, -0.95], [-1.6, 0.95], [-1.6, -0.95], [-2.8, 0.95], [-2.8, -0.95]].forEach(function (position) {
+      var wheel = new THREE.Mesh(wheelGeometry, dark);
+      wheel.position.set(position[0], 0.5, position[1]);
+      group.add(wheel);
+    });
+
+    var lightGeometry = new THREE.BoxGeometry(0.08, 0.16, 0.38);
+    [0.8, -0.8].forEach(function (z) {
+      var head = new THREE.Mesh(lightGeometry, lightMat);
+      head.position.set(3.3, 0.75, z);
+      group.add(head);
+      var tail = new THREE.Mesh(lightGeometry, tailMat);
+      tail.position.set(-3.06, 0.75, z);
+      group.add(tail);
+    });
+
+    var shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 32),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.36, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(3.4, 1.15, 1);
+    shadow.position.y = 0.02;
+    group.add(shadow);
+
+    group.traverse(function (object) {
+      if (!object.material) return;
+      var materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach(function (material) {
+        material.side = THREE.DoubleSide;
+      });
+    });
+
+    return { group: group, paint: paint, lengthM: 6.8 };
   }
 
   function sizeCar() {
@@ -612,8 +753,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(0.6, 1, 0.4);
     scene.add(sun);
-    var built = buildCar(state.vehicleColor);
-    built.group.scale.setScalar(CAR_LENGTH_PX / CAR_LENGTH_M);
+    var built = vehicleBuilder(state.vehicleKind)(state.vehicleColor);
+    built.group.scale.setScalar(CAR_LENGTH_PX / built.lengthM);
     scene.add(built.group);
     car3d = {
       canvas: canvas,
@@ -622,6 +763,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000),
       model: built.group,
       paint: built.paint,
+      kind: state.vehicleKind,
       width: 0,
       height: 0
     };

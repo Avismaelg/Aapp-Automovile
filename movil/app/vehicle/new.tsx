@@ -341,7 +341,7 @@ export default function NewVehicleScreen() {
                     <Ionicons
                       name="checkmark"
                       size={15}
-                      color={item === '#F3F6FA' ? colors.bg : '#0B0F14'}
+                      color={item === '#F3F6FA' ? colors.bg : '#F3F6FA'}
                     />
                   ) : null}
                 </Pressable>

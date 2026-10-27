@@ -12,6 +12,7 @@ import {
   type WorldMapMember,
   type WorldMapMode,
   type WorldMapRoute,
+  type WorldMapVehicleKind,
 } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
 
@@ -22,6 +23,7 @@ type WorldMapProps = {
   route?: WorldMapRoute | null;
   mode?: WorldMapMode;
   vehicleColor?: string;
+  vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
   onFollowChange?: (following: boolean) => void;
   onError?: (message: string) => void;
@@ -39,6 +41,7 @@ export function WorldMap({
   route = null,
   mode = '3d',
   vehicleColor = '#ff5a1f',
+  vehicleKind = 'car',
   recenterToken = 0,
   onFollowChange,
   onError,
@@ -50,13 +53,13 @@ export function WorldMap({
   }, []);
   const readyRef = useRef(false);
   const seqRef = useRef(0);
-  const latestRef = useRef({ members, destination, location, route, mode, vehicleColor });
+  const latestRef = useRef({ members, destination, location, route, mode, vehicleColor, vehicleKind });
   const callbacksRef = useRef({ onFollowChange, onError });
 
   useEffect(() => {
-    latestRef.current = { members, destination, location, route, mode, vehicleColor };
+    latestRef.current = { members, destination, location, route, mode, vehicleColor, vehicleKind };
     callbacksRef.current = { onFollowChange, onError };
-  }, [members, destination, location, route, mode, vehicleColor, onFollowChange, onError]);
+  }, [members, destination, location, route, mode, vehicleColor, vehicleKind, onFollowChange, onError]);
 
   const send = useCallback((command: WorldMapCommand) => {
     if (!readyRef.current) return;
@@ -71,7 +74,7 @@ export function WorldMap({
     send({ type: 'destination', payload: latest.destination });
     send({ type: 'route', payload: latest.route });
     send({ type: 'mode', payload: latest.mode });
-    send({ type: 'vehicle', payload: { color: latest.vehicleColor } });
+    send({ type: 'vehicle', payload: { color: latest.vehicleColor, kind: latest.vehicleKind } });
   }, [send]);
 
   useEffect(() => {
@@ -95,8 +98,8 @@ export function WorldMap({
   }, [mode, send]);
 
   useEffect(() => {
-    send({ type: 'vehicle', payload: { color: vehicleColor } });
-  }, [send, vehicleColor]);
+    send({ type: 'vehicle', payload: { color: vehicleColor, kind: vehicleKind } });
+  }, [send, vehicleColor, vehicleKind]);
 
   useEffect(() => {
     if (recenterToken > 0) send({ type: 'recenter' });
