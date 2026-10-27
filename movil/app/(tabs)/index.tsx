@@ -74,6 +74,13 @@ export default function NavigationScreen() {
   const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
   const showParking =
     Boolean(parkingSpot) && parkingDistance != null && parkingDistance > 40;
+  // Con el coche aparcado y caminando, el mapa muestra un peatón en tu
+  // posición y deja el coche 3D fijo en el aparcamiento.
+  const walking =
+    Boolean(parkingSpot) &&
+    parkingDistance != null &&
+    parkingDistance > 25 &&
+    (live.location.speedKmh ?? 0) < 8;
   const vehicleLabel = primaryVehicle
     ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
     : 'Añade tu vehículo';
@@ -226,6 +233,7 @@ export default function NavigationScreen() {
             ? { latitude: parkingSpot.latitude, longitude: parkingSpot.longitude }
             : null
         }
+        travelMode={walking ? 'walking' : 'car'}
         route={route.route}
         mode={mode}
         vehicleColor={primaryVehicle?.color}

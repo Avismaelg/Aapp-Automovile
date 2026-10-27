@@ -34,6 +34,8 @@ export type WorldMapMode = '2d' | '3d';
 
 export type WorldMapVehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';
 
+export type WorldMapTravelMode = 'car' | 'walking';
+
 export type WorldMapParking = {
   latitude: number;
   longitude: number;
@@ -47,6 +49,7 @@ export type WorldMapCommand =
   | { type: 'mode'; payload: WorldMapMode }
   | { type: 'vehicle'; payload: { color: string; kind?: WorldMapVehicleKind } }
   | { type: 'parking'; payload: WorldMapParking | null }
+  | { type: 'travel'; payload: WorldMapTravelMode }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -120,6 +123,17 @@ export const WORLD_MAP_HTML = `<!doctype html>
     white-space: nowrap; background: #06131a; color: #4de1ff; font-size: 9px; font-weight: 800;
     padding: 2px 6px; border-radius: 5px; border: 1px solid rgba(77,225,255,0.5);
   }
+  .person { pointer-events: none; position: relative; width: 54px; height: 54px; }
+  .person-halo {
+    position: absolute; left: 9px; top: 9px; width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(77,225,255,0.4); animation: halo 2s ease-out infinite;
+  }
+  .person-badge {
+    position: absolute; left: 12px; top: 12px; width: 30px; height: 30px; border-radius: 50%;
+    background: #4de1ff; border: 2px solid #06080b; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .person-badge svg { width: 18px; height: 18px; fill: none; stroke: #06131a; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .member { position: relative; width: 44px; height: 44px; }
   .member-dot {
     position: absolute; left: 3px; top: 3px; width: 38px; height: 38px; border-radius: 50%;
@@ -191,7 +205,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     heading: null,
     vehicleColor: '#ff5a1f',
     vehicleKind: 'car',
-    parking: null
+    parking: null,
+    travelMode: 'car'
   };
   var map = null;
   var mapReady = false;
@@ -206,6 +221,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var routePoints = [];
   var guideMarker = null;
   var parkingMarker = null;
+  var personMarker = null;
   var lastFollow = null;
   var smoothedHeading = null;
   var carRenderWarned = false;
@@ -235,6 +251,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   }
 
   function pitchFor(mode) {
+    if (state.travelMode === 'walking') return 45;
     return mode === '2d' ? 0 : CRUISE_PITCH;
   }
 
@@ -274,9 +291,14 @@ export const WORLD_MAP_HTML = `<!doctype html>
   function follow(animate, zoomIn) {
     if (!mapReady || !state.location) return;
     var point = state.location;
-    var bearing = state.heading !== null ? state.heading : map.getBearing();
+    var walking = state.travelMode === 'walking';
+    var bearing = walking
+      ? map.getBearing()
+      : state.heading !== null
+        ? state.heading
+        : map.getBearing();
     var center = lngLatOf(point);
-    var moving = typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
+    var moving = !walking && typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
 
     // Movimiento continuo: en vez de saltar a cada señal GPS, proyectamos a
     // donde estará el coche y la cámara desliza hasta ese punto.
@@ -288,10 +310,13 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (lastFollow && !zoomIn) {
       var moved = haversineLngLat(lastFollow.center, center);
       var turned = Math.abs(((bearing - lastFollow.bearing + 540) % 360) - 180);
-      if (moved < 8 && turned < 6) return;
+      var minMove = walking ? 3 : 8;
+      var minTurn = walking ? 4 : 6;
+      if (moved < minMove && turned < minTurn) return;
     }
     lastFollow = { center: center, bearing: bearing };
 
+    var targetZoom = walking ? FOLLOW_ZOOM + 0.5 : FOLLOW_ZOOM;
     var options = {
       center: center,
       pitch: pitchFor(state.mode),
@@ -300,7 +325,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       essential: true
     };
     if (moving) options.easing = function (t) { return t; };
-    if (zoomIn || map.getZoom() < FOLLOW_ZOOM - 0.5) options.zoom = FOLLOW_ZOOM;
+    if (zoomIn || map.getZoom() < targetZoom - 0.5) options.zoom = targetZoom;
     map.easeTo(options);
   }
 
@@ -322,6 +347,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (!mapReady) return;
     vehicleMarker.setLngLat(lngLatOf(location));
     if (state.heading !== null) vehicleMarker.setRotation(state.heading);
+    if (personMarker && state.travelMode === 'walking') {
+      personMarker.setLngLat(lngLatOf(location));
+    }
     renderCar();
     updateBrakeAssist();
     updateGuideArrow();
@@ -719,6 +747,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     else if (message.type === 'mode') setMode(message.payload);
     else if (message.type === 'vehicle') setVehicleInput(message.payload);
     else if (message.type === 'parking') setParking(message.payload);
+    else if (message.type === 'travel') setTravelMode(message.payload);
     else if (message.type === 'recenter') recenter();
   }
 
@@ -1165,8 +1194,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var sinPitch = Math.sin(pitch);
     var cosPitch = Math.cos(pitch);
     var heading = state.heading !== null ? state.heading : map.getBearing();
-    var anchor = map.project(lngLatOf(state.location));
-    var ahead = map.project(aheadLngLat(state.location, heading, CAR_LOOKAHEAD_M));
+    var walking = state.travelMode === 'walking' && Boolean(state.parking);
+    var referenced = walking ? state.parking : state.location;
+    var anchor = map.project(lngLatOf(referenced));
+    var ahead = map.project(aheadLngLat(referenced, heading, CAR_LOOKAHEAD_M));
     var onScreen = Math.atan2(ahead.x - anchor.x, anchor.y - ahead.y);
     var turn = Math.atan2(Math.sin(onScreen), Math.cos(onScreen) / cosPitch);
     var offsetX = anchor.x - car3d.width / 2;
@@ -1206,6 +1237,38 @@ export const WORLD_MAP_HTML = `<!doctype html>
       car3d = null;
       document.body.setAttribute('data-car', '2d');
     }
+  }
+
+  function addPerson() {
+    var element = document.createElement('div');
+    element.className = 'person';
+    element.style.display = 'none';
+    element.innerHTML =
+      '<div class="person-halo"></div>' +
+      '<div class="person-badge"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<circle cx="13" cy="4" r="2"></circle>' +
+      '<path d="M13 6l-2.5 4.5L13 13l1 6"></path>' +
+      '<path d="M10.5 10.5L8 14l-1.5 5"></path>' +
+      '<path d="M13 10l3 2 2 5"></path>' +
+      '</svg></div>';
+    personMarker = new maplibregl.Marker({ element: element, anchor: 'center' });
+  }
+
+  function setTravelMode(mode) {
+    state.travelMode = mode === 'walking' ? 'walking' : 'car';
+    if (!mapReady) return;
+    var walking = state.travelMode === 'walking';
+
+    if (walking) {
+      if (!personMarker) addPerson();
+      if (state.location) personMarker.setLngLat(lngLatOf(state.location)).addTo(map);
+      personMarker.getElement().style.display = '';
+    } else if (personMarker) {
+      personMarker.getElement().style.display = 'none';
+    }
+
+    renderCar();
+    map.easeTo({ pitch: pitchFor(state.mode), duration: 600, essential: true });
   }
 
   function addParking() {
@@ -1325,6 +1388,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     setDestination(state.destination);
     setRoute(state.route);
     setParking(state.parking);
+    setTravelMode(state.travelMode);
     if (state.location) {
       vehicleMarker.setLngLat(lngLatOf(state.location));
       if (state.heading !== null) vehicleMarker.setRotation(state.heading);

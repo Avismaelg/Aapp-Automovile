@@ -13,6 +13,7 @@ import {
   type WorldMapMode,
   type WorldMapParking,
   type WorldMapRoute,
+  type WorldMapTravelMode,
   type WorldMapVehicleKind,
 } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
@@ -22,6 +23,7 @@ type WorldMapProps = {
   destination?: WorldMapDestination | null;
   location: WorldMapLocation;
   parking?: WorldMapParking | null;
+  travelMode?: WorldMapTravelMode;
   route?: WorldMapRoute | null;
   mode?: WorldMapMode;
   vehicleColor?: string;
@@ -42,6 +44,7 @@ export function WorldMap({
   destination = null,
   location,
   parking = null,
+  travelMode = 'car',
   route = null,
   mode = '3d',
   vehicleColor = '#ff5a1f',
@@ -58,13 +61,13 @@ export function WorldMap({
   }, []);
   const readyRef = useRef(false);
   const seqRef = useRef(0);
-  const latestRef = useRef({ members, destination, location, parking, route, mode, vehicleColor, vehicleKind });
+  const latestRef = useRef({ members, destination, location, parking, travelMode, route, mode, vehicleColor, vehicleKind });
   const callbacksRef = useRef({ onFollowChange, onMemberPress, onError });
 
   useEffect(() => {
-    latestRef.current = { members, destination, location, parking, route, mode, vehicleColor, vehicleKind };
+    latestRef.current = { members, destination, location, parking, travelMode, route, mode, vehicleColor, vehicleKind };
     callbacksRef.current = { onFollowChange, onMemberPress, onError };
-  }, [members, destination, location, parking, route, mode, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onError]);
+  }, [members, destination, location, parking, travelMode, route, mode, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onError]);
 
   const send = useCallback((command: WorldMapCommand) => {
     if (!readyRef.current) return;
@@ -78,6 +81,7 @@ export function WorldMap({
     send({ type: 'members', payload: latest.members });
     send({ type: 'destination', payload: latest.destination });
     send({ type: 'parking', payload: latest.parking });
+    send({ type: 'travel', payload: latest.travelMode });
     send({ type: 'route', payload: latest.route });
     send({ type: 'mode', payload: latest.mode });
     send({ type: 'vehicle', payload: { color: latest.vehicleColor, kind: latest.vehicleKind } });
@@ -98,6 +102,10 @@ export function WorldMap({
   useEffect(() => {
     send({ type: 'parking', payload: parking });
   }, [parking, send]);
+
+  useEffect(() => {
+    send({ type: 'travel', payload: travelMode });
+  }, [travelMode, send]);
 
   useEffect(() => {
     send({ type: 'route', payload: route });

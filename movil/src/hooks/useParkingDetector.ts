@@ -62,6 +62,13 @@ export function useParkingDetector(location: {
     if (speed >= MOVE_KMH) {
       lastMovingRef.current = { latitude, longitude };
       lastMovingAtRef.current = now;
+
+      // Si ya estás conduciendo lejos del punto aparcado, el coche se movió:
+      // se olvida el aparcamiento viejo.
+      const spot = useParking.getState().spot;
+      if (spot && haversineMeters(spot, { latitude, longitude }) > 200) {
+        useParking.getState().clearSpot();
+      }
       return;
     }
 

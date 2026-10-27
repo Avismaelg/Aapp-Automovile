@@ -88,6 +88,12 @@ conducción responsable.
 - En Inicio aparece la píldora **"Tu coche aparcado · N m"**: al tocarla se
   traza la ruta por calles hasta el coche (destino "Mi coche"); una pulsación
   larga permite olvidar la ubicación guardada.
+- **Modo caminando**: cuando te alejas más de 25 m del coche a menos de 8 km/h,
+  el mapa cambia solo: el **coche 3D se queda aparcado** en su punto (con la
+  etiqueta de distancia) y tu posición pasa a mostrarse con un **muñeco peatón**
+  que sigue el GPS, con la cámara más baja (45°) y sin rotar. Al volver al coche
+  o superar 8 km/h vuelve el modo coche; si te alejas más de 200 m conduciendo,
+  el aparcamiento viejo se olvida.
 
 ## 6. Optimización aplicada
 
