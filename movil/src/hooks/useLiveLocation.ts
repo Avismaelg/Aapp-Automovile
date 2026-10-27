@@ -40,9 +40,11 @@ const useLiveLocationState = create<LiveLocationState>(() => ({
 let subscribers = 0;
 let session = 0;
 let activeWatch: Location.LocationSubscription | null = null;
+let activeHeading: Location.LocationSubscription | null = null;
 let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 let lastFixAt = 0;
 let sessionStartedAt = 0;
+let lastHeadingAt = 0;
 
 function validHeading(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
@@ -60,17 +62,45 @@ function clearFallbackTimer() {
 function applyPosition(position: Location.LocationObject) {
   clearFallbackTimer();
   lastFixAt = Date.now();
+  const speedKmh = validSpeedKmh(position.coords.speed);
+  const previousHeading = useLiveLocationState.getState().location.heading;
+  const gpsHeading = validHeading(position.coords.heading);
+  // Parado o a poca velocidad se conserva el rumbo de la brújula.
+  const heading =
+    gpsHeading ?? (speedKmh == null || speedKmh < 10 ? previousHeading : null);
   useLiveLocationState.setState({
     status: 'live',
     message: 'Ubicación en vivo',
     location: {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
-      heading: validHeading(position.coords.heading),
+      heading,
       accuracy: position.coords.accuracy ?? null,
-      speedKmh: validSpeedKmh(position.coords.speed),
+      speedKmh,
       source: 'gps',
     },
+  });
+}
+
+// La brújula da el rumbo real del teléfono cuando vamos despacio o parados;
+// en marcha manda el rumbo del GPS.
+function applyCompassHeading(value: number) {
+  if (!Number.isFinite(value) || value < 0) return;
+  const current = useLiveLocationState.getState();
+  const speed = current.location.speedKmh ?? 0;
+  if (speed >= 10) return;
+
+  const previous = current.location.heading;
+  if (previous != null) {
+    const delta = Math.abs(((value - previous + 540) % 360) - 180);
+    if (delta < 3) return;
+  }
+
+  const now = Date.now();
+  if (now - lastHeadingAt < 250) return;
+  lastHeadingAt = now;
+  useLiveLocationState.setState({
+    location: { ...current.location, heading: value },
   });
 }
 
@@ -129,6 +159,27 @@ async function beginSession(id: number) {
       return;
     }
     activeWatch = subscription;
+
+    // Brújula: permite girar el mapa aunque estemos parados o caminando.
+    try {
+      const heading = await Location.watchHeadingAsync(
+        (update) => {
+          if (id !== session) return;
+          const value = update.trueHeading >= 0 ? update.trueHeading : update.magHeading;
+          applyCompassHeading(value);
+        },
+        () => {
+          // Sin brújula en este dispositivo: seguimos con el rumbo del GPS.
+        },
+      );
+      if (id !== session) {
+        heading.remove();
+        return;
+      }
+      activeHeading = heading;
+    } catch {
+      // La brújula es opcional.
+    }
   } catch {
     if (id !== session) return;
     fallBackToDemo('error', 'GPS no disponible · usando ubicación de demo');
@@ -160,6 +211,8 @@ function stopSession() {
   clearFallbackTimer();
   activeWatch?.remove();
   activeWatch = null;
+  activeHeading?.remove();
+  activeHeading = null;
 }
 
 function acquireLocation() {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 export type RoadInfo = {
   limitKmh: number | null;
@@ -8,6 +9,15 @@ export type RoadInfo = {
 const EMPTY: RoadInfo = { limitKmh: null, roadName: null };
 const QUERY_MIN_INTERVAL_MS = 20_000;
 const QUERY_MIN_DISTANCE_M = 100;
+
+function requestHeaders() {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (Platform.OS !== 'web') {
+    // Nominatim exige identificar la app; en navegador no se puede cambiar.
+    headers['User-Agent'] = 'CaravanaApp/0.1 (https://github.com/Avismaelg/Aapp-Automovile)';
+  }
+  return headers;
+}
 
 function parseSpeedLimit(value: unknown): number | null {
   if (typeof value !== 'string' && typeof value !== 'number') return null;
@@ -75,7 +85,7 @@ export function useRoadInfo(
           `&lat=${latitude.toFixed(5)}&lon=${longitude.toFixed(5)}`;
         const reverse = await fetch(reverseUrl, {
           signal: controller.signal,
-          headers: { Accept: 'application/json' },
+          headers: requestHeaders(),
         });
         if (!reverse.ok) return;
         const place = (await reverse.json()) as NominatimReverse;
@@ -88,7 +98,7 @@ export function useRoadInfo(
         if (limitKmh == null && place.osm_type === 'way' && place.osm_id) {
           const wayResponse = await fetch(
             `https://api.openstreetmap.org/api/0.6/way/${place.osm_id}.json`,
-            { signal: controller.signal, headers: { Accept: 'application/json' } },
+            { signal: controller.signal, headers: requestHeaders() },
           );
           if (wayResponse.ok) {
             const way = (await wayResponse.json()) as OsmWayResponse;

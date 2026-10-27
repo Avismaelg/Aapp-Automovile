@@ -183,6 +183,17 @@ export default function NavigationScreen() {
     return () => subscription.remove();
   }, [ensureFollowing]);
 
+  // Al elegir una ruta (o cambiar de destino) la cámara se centra en el coche.
+  const destinationKey = destination
+    ? `${destination.latitude.toFixed(5)},${destination.longitude.toFixed(5)}`
+    : null;
+
+  useEffect(() => {
+    if (!destinationKey) return;
+    const timer = setTimeout(() => ensureFollowing(), 0);
+    return () => clearTimeout(timer);
+  }, [destinationKey, ensureFollowing]);
+
   useEffect(() => {
     if (isNavigating && !destination) {
       useChosenDestination.getState().stopNavigation();

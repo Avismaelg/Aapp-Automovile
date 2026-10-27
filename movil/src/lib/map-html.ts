@@ -321,11 +321,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var walking = state.travelMode === 'walking';
     var bearing = state.northUp
       ? 0
-      : walking
-        ? map.getBearing()
-        : state.heading !== null
-          ? state.heading
-          : map.getBearing();
+      : state.heading !== null
+        ? state.heading
+        : map.getBearing();
     var center = lngLatOf(point);
     var moving = !walking && typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
 
@@ -384,8 +382,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     }
     state.location = location;
     var moving = typeof location.speedKmh !== 'number' || location.speedKmh >= MOVING_KMH;
-    if (typeof location.heading === 'number' && location.heading >= 0 && moving) {
-      // Filtro simple: el GPS tiembla ±20°, la cámara no debe bailar.
+    if (typeof location.heading === 'number' && location.heading >= 0) {
+      // Filtro simple: el GPS y la brújula tiemblan; la cámara no debe bailar.
       if (smoothedHeading === null) {
         smoothedHeading = location.heading;
       } else {
