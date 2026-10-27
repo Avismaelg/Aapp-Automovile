@@ -25,6 +25,7 @@ type WorldMapProps = {
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
   onFollowChange?: (following: boolean) => void;
+  onMemberPress?: (memberId: string) => void;
   onError?: (message: string) => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -39,6 +40,7 @@ export function WorldMap({
   vehicleKind = 'car',
   recenterToken = 0,
   onFollowChange,
+  onMemberPress,
   onError,
   style,
 }: WorldMapProps) {
@@ -47,12 +49,12 @@ export function WorldMap({
   const readyRef = useRef(false);
   const seqRef = useRef(0);
   const latestRef = useRef({ members, destination, location, route, mode, vehicleColor, vehicleKind });
-  const callbacksRef = useRef({ onFollowChange, onError });
+  const callbacksRef = useRef({ onFollowChange, onMemberPress, onError });
 
   useEffect(() => {
     latestRef.current = { members, destination, location, route, mode, vehicleColor, vehicleKind };
-    callbacksRef.current = { onFollowChange, onError };
-  }, [members, destination, location, route, mode, vehicleColor, vehicleKind, onFollowChange, onError]);
+    callbacksRef.current = { onFollowChange, onMemberPress, onError };
+  }, [members, destination, location, route, mode, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onError]);
 
   const getContentWindow = useCallback(() => {
     const doc = (globalThis as { document?: Document }).document;
@@ -122,6 +124,10 @@ export function WorldMap({
       }
       if (message.type === 'follow') {
         callbacksRef.current.onFollowChange?.(message.value);
+        return;
+      }
+      if (message.type === 'memberTap') {
+        callbacksRef.current.onMemberPress?.(message.id);
         return;
       }
       callbacksRef.current.onError?.(message.message);

@@ -46,6 +46,7 @@ export type WorldMapCommand =
 export type WorldMapEvent =
   | { type: 'ready' }
   | { type: 'follow'; value: boolean }
+  | { type: 'memberTap'; id: string }
   | { type: 'error'; message: string };
 
 export function encodeWorldMapCommand(seq: number, command: WorldMapCommand) {
@@ -63,10 +64,13 @@ export function parseWorldMapEvent(raw: unknown): WorldMapEvent | null {
   }
   if (!data || typeof data !== 'object') return null;
 
-  const event = data as { type?: unknown; value?: unknown; message?: unknown };
+  const event = data as { type?: unknown; value?: unknown; id?: unknown; message?: unknown };
   if (event.type === 'ready') return { type: 'ready' };
   if (event.type === 'follow' && typeof event.value === 'boolean') {
     return { type: 'follow', value: event.value };
+  }
+  if (event.type === 'memberTap' && typeof event.id === 'string') {
+    return { type: 'memberTap', id: event.id };
   }
   if (event.type === 'error' && typeof event.message === 'string') {
     return { type: 'error', message: event.message };
@@ -87,7 +91,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
   * { box-sizing: border-box; }
   html, body, #map { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-  .vehicle, .member, .dest { pointer-events: none; }
+  .vehicle, .dest { pointer-events: none; }
+  .member { pointer-events: auto; cursor: pointer; }
   .vehicle { --car-color: #ff5a1f; position: relative; width: 64px; height: 64px; transition: opacity 0.3s ease; }
   .vehicle-halo {
     position: absolute; left: 14px; top: 14px; width: 36px; height: 36px; border-radius: 50%;
@@ -278,6 +283,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
   function buildMemberElement(member) {
     var element = document.createElement('div');
     element.className = 'member';
+    element.addEventListener('click', function () {
+      post({ type: 'memberTap', id: member.id });
+    });
     var dot = document.createElement('div');
     dot.className = 'member-dot';
     dot.style.background = member.color;

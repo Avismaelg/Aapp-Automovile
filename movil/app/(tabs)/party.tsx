@@ -215,13 +215,21 @@ export default function PartyScreen() {
     });
 
   const startNavigation = useChosenDestination((state) => state.startNavigation);
+  const setChosenDestination = useChosenDestination((state) => state.setDestination);
   const createChallenge = useCreateChallenge();
   const { vehicles: garageVehicles } = useGarageVehicles();
   const primaryVehicle = garageVehicles.find((item) => item.isPrimary) ?? garageVehicles[0];
 
   const openConvoyMap = () => {
-    if (destination) startNavigation();
-    router.replace('/(tabs)');
+    if (destination) {
+      setChosenDestination({
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+        label: destination.label,
+      });
+      startNavigation();
+    }
+    router.replace('/');
   };
 
   // Reto instantáneo de llegada: nunca por velocidad máxima.
@@ -274,14 +282,14 @@ export default function PartyScreen() {
 
   const leave = async () => {
     if (isDemo) {
-      router.replace('/(tabs)');
+      router.replace('/');
       return;
     }
     if (!party) return;
     const perform = async () => {
       try {
         await leaveParty.mutateAsync({ partyId: party.id, isHost: party.isHost });
-        router.replace('/(tabs)');
+        router.replace('/');
       } catch (error) {
         Alert.alert(
           'No pudimos salir',
@@ -381,7 +389,7 @@ export default function PartyScreen() {
 
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
-          <IconButton icon="chevron-down" size={40} onPress={() => router.replace('/(tabs)')} />
+          <IconButton icon="chevron-down" size={40} onPress={() => router.replace('/')} />
           <Pill label="Party en vivo" tone="danger" icon="radio" />
           <View style={styles.topActions}>
             <IconButton

@@ -137,7 +137,7 @@ export default function DestinationScreen() {
       label: (Array.isArray(params.label) ? params.label[0] : params.label)?.trim() || 'Destino compartido',
     });
     startNavigation();
-    router.replace('/(tabs)');
+    router.replace('/');
   };
 
   useEffect(() => {
@@ -180,7 +180,7 @@ export default function DestinationScreen() {
       label: place.name,
     });
     startNavigation();
-    router.replace('/(tabs)');
+    router.replace('/');
   };
 
   if (isSharedRoute) {

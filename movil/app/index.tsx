@@ -1,0 +1,712 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, type Href } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { WorldMap } from '@/src/components/WorldMap';
+import { AppText, Avatar, Button, IconButton } from '@/src/components/ui';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useFriendsOnMap } from '@/src/hooks/useFriendsOnMap';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
+import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
+import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useActiveParty } from '@/src/hooks/useParty';
+import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
+import { partyUrl } from '@/src/lib/qr';
+import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
+import { useChosenDestination } from '@/src/store/destination';
+import { colors, radius, spacing } from '@/src/theme';
+
+const GLASS = 'rgba(6,8,11,0.74)';
+
+// Pantalla inicial personal, estilo Waze: tu coche, tu destino y tus amigos
+// en el mapa para invitarlos al convoy o retarlos. Sin elementos de party.
+export default function NavigationScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const me = useCurrentUser();
+  const live = useLiveLocation();
+  const { party, isDemo } = useActiveParty();
+  const { vehicles } = useGarageVehicles();
+  const { members: mapFriends } = useFriendsOnMap();
+  const createChallenge = useCreateChallenge();
+
+  const [mode, setMode] = useState<WorldMapMode>('3d');
+  const [following, setFollowing] = useState(true);
+  const [recenterToken, setRecenterToken] = useState(0);
+  const [mapKey, setMapKey] = useState(0);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(null);
+
+  const chosenDestination = useChosenDestination((state) => state.destination);
+  const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
+  const isNavigating = useChosenDestination((state) => state.isNavigating);
+  const startNavigation = useChosenDestination((state) => state.startNavigation);
+
+  const destination = chosenDestination;
+
+  const route = useGraphHopperRoute({
+    origin: live.location,
+    destination: destination ?? live.location,
+    enabled: Boolean(destination),
+  });
+
+  const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
+  const vehicleLabel = primaryVehicle
+    ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
+    : 'Añade tu vehículo';
+  const speedLabel =
+    live.location.speedKmh == null ? '--' : String(Math.round(live.location.speedKmh));
+  const routeLine = route.route
+    ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
+    : null;
+  const routeSourceLabel = route.route
+    ? route.route.source === 'graphhopper'
+      ? 'GraphHopper'
+      : route.route.source === 'osrm'
+        ? 'Calles OSM'
+        : 'Ruta directa'
+    : null;
+
+  const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
+  const handleMapError = useCallback((message: string) => setMapError(message), []);
+
+  useEffect(() => {
+    if (isNavigating && !destination) {
+      useChosenDestination.getState().stopNavigation();
+    }
+  }, [isNavigating, destination]);
+
+  const recenter = () => {
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
+  };
+
+  const toggleMode = () => setMode((value) => (value === '3d' ? '2d' : '3d'));
+
+  const retryMap = () => {
+    setMapError(null);
+    setFollowing(true);
+    setMapKey((value) => value + 1);
+  };
+
+  const shareRouteLink = async () => {
+    if (!destination) return;
+    const { latitude, longitude, label } = destination;
+    const deepLink = `caravana://destino?lat=${latitude}&lng=${longitude}&label=${encodeURIComponent(label)}`;
+    const mapLink = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
+    try {
+      await Share.share({
+        message: `Ruta de Caravana → ${label}\n${mapLink}\nÁbrela en la app: ${deepLink}`,
+        url: deepLink,
+      });
+    } catch {
+      // El usuario canceló o la plataforma no soporta compartir.
+    }
+  };
+
+  const clearDestination = () => {
+    clearChosenDestination();
+  };
+
+  // Acciones sobre un amigo visto en el mapa.
+  const inviteToConvoy = async () => {
+    if (isDemo || !party?.code) {
+      Alert.alert(
+        'Convoy',
+        isDemo
+          ? 'Los convoys reales requieren una cuenta conectada. Crea una party en la pestaña Party.'
+          : 'Primero crea o únete a una party en la pestaña Party.',
+      );
+      return;
+    }
+    await Share.share({
+      message: `Únete a mi convoy en Caravana: ${partyUrl(party.code)}`,
+      url: partyUrl(party.code),
+    });
+  };
+
+  const challengeFriend = (friend: WorldMapMember) => {
+    if (isDemo) {
+      Alert.alert('Retos', 'Los retos reales requieren una cuenta conectada.');
+      return;
+    }
+    Alert.alert(
+      `Reto a ${friend.name.split(' ')[0]}`,
+      'Reto por llegada: gana quien llegue primero al destino, respetando las leyes.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reto',
+          style: 'destructive',
+          onPress: () => {
+            void createChallenge
+              .mutateAsync({
+                title: `Reto: ${friend.name.split(' ')[0]}`,
+                category: 'mixed',
+                mode: 'instant',
+                fromLabel: 'Mi ubicación',
+                toLabel: destination?.label ?? 'Meta libre',
+                distanceKm: (route.route?.distanceM ?? 0) / 1000,
+                rules: 'Por llegada: gana quien llegue primero respetando las leyes.',
+                hostVehicleId: primaryVehicle?.id,
+                hostVehicleKind: primaryVehicle?.kind ?? 'car',
+                invitees: [{ userId: friend.id, vehicleKind: 'car' }],
+              })
+              .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
+              .catch((error: unknown) =>
+                Alert.alert(
+                  'Reto',
+                  error instanceof Error ? error.message : 'No pudimos crear el reto.',
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleFriendPress = useCallback(
+    (id: string) => {
+      const friend = mapFriends.find((member) => member.id === id) ?? null;
+      setSelectedFriend(friend);
+    },
+    [mapFriends],
+  );
+
+  const navigating = isNavigating && Boolean(destination);
+
+  return (
+    <View style={styles.root}>
+      <WorldMap
+        key={mapKey}
+        members={mapFriends}
+        destination={destination}
+        location={live.location}
+        route={route.route}
+        mode={mode}
+        vehicleColor={primaryVehicle?.color}
+        vehicleKind={primaryVehicle?.kind}
+        recenterToken={recenterToken}
+        onFollowChange={handleFollowChange}
+        onMemberPress={handleFriendPress}
+        onError={handleMapError}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.overlay,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
+        ]}
+      >
+        {navigating && destination ? (
+          <View pointerEvents="box-none" style={styles.navLayer}>
+            <View style={styles.navTop}>
+              <View style={styles.navChip}>
+                <Ionicons name="navigate" size={12} color="#120802" />
+                <AppText variant="label" color="#120802" style={styles.navChipText}>
+                  NAVEGACIÓN
+                </AppText>
+              </View>
+              <AppText
+                variant="caption"
+                color={colors.textSoft}
+                numberOfLines={1}
+                style={styles.navDestination}
+              >
+                {destination.label}
+              </AppText>
+              <AppText variant="display" style={styles.navEta}>
+                {routeLine ? (routeLine.split(' · ')[1] ?? '--') : '--'}
+              </AppText>
+              <AppText variant="label" color={colors.muted}>
+                {routeLine
+                  ? `${routeLine.split(' · ')[0]} · ${routeSourceLabel}`
+                  : 'Calculando ruta por calles…'}
+              </AppText>
+            </View>
+            <View style={styles.navSpeed}>
+              <AppText variant="display" style={styles.navSpeedValue}>
+                {speedLabel}
+              </AppText>
+              <AppText variant="label" color={colors.muted}>
+                km/h
+              </AppText>
+            </View>
+            <View style={styles.navActions}>
+              <Pressable
+                style={styles.navButtonDark}
+                onPress={() => router.push('/destino' as Href)}
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar ruta"
+              >
+                <Ionicons name="swap-horizontal" size={18} color={colors.text} />
+                <AppText variant="bodyStrong" color={colors.text}>
+                  Cambiar ruta
+                </AppText>
+              </Pressable>
+              <Pressable
+                style={styles.navButtonLime}
+                onPress={clearDestination}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar ruta"
+              >
+                <Ionicons name="close" size={18} color="#120802" />
+                <AppText variant="bodyStrong" color="#120802">
+                  Cerrar ruta
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.topRow}>
+              <Pressable onPress={() => router.push('/(tabs)/profile')} hitSlop={6}>
+                <Avatar
+                  name={me.name}
+                  color={me.color}
+                  size={42}
+                  uri={me.avatarUrl}
+                  ring={colors.border}
+                  online={live.isLive}
+                />
+              </Pressable>
+              <Pressable style={styles.vehiclePill} onPress={() => router.push('/(tabs)/garage')}>
+                <Ionicons name="car-sport" size={16} color={colors.accent} />
+                <AppText variant="bodyStrong" numberOfLines={1} style={styles.vehicleText}>
+                  {vehicleLabel}
+                </AppText>
+                <Ionicons name="chevron-down" size={14} color={colors.muted} />
+              </Pressable>
+              <IconButton
+                icon="newspaper-outline"
+                size={42}
+                onPress={() => router.push('/actividad' as Href)}
+              />
+            </View>
+
+            <Pressable
+              style={styles.searchPill}
+              onPress={() => router.push('/destino' as Href)}
+              accessibilityRole="button"
+              accessibilityLabel="Buscar destino"
+            >
+              <Ionicons
+                name={destination ? 'flag' : 'search'}
+                size={16}
+                color={destination ? colors.lime : colors.textSoft}
+              />
+              <AppText
+                variant="bodyStrong"
+                numberOfLines={1}
+                color={destination ? colors.text : colors.textSoft}
+                style={styles.searchText}
+              >
+                {destination ? destination.label : '¿A dónde vamos?'}
+              </AppText>
+              <Ionicons name="search" size={14} color={colors.muted} />
+            </Pressable>
+
+            {!live.isLive ? (
+              <View style={styles.banner}>
+                <View style={styles.bannerDot} />
+                <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+                  {live.message}
+                </AppText>
+                {live.status !== 'locating' ? (
+                  <Pressable onPress={live.retry} hitSlop={8}>
+                    <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                      REINTENTAR
+                    </AppText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {mapError ? (
+              <View style={[styles.banner, styles.bannerError]}>
+                <Ionicons name="warning-outline" size={16} color={colors.accent} />
+                <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+                  {mapError}
+                </AppText>
+                <Pressable onPress={retryMap} hitSlop={8}>
+                  <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                    REINTENTAR
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={styles.spacer} pointerEvents="none" />
+
+            <View style={styles.sideRow}>
+              <View style={styles.speedHud}>
+                <AppText variant="display" style={styles.speedValue}>
+                  {speedLabel}
+                </AppText>
+                <View style={styles.speedMeta}>
+                  <View style={[styles.liveDot, !live.isLive && styles.liveDotOff]} />
+                  <AppText variant="label" color={colors.muted} style={styles.speedUnit}>
+                    km/h · {live.isLive ? 'GPS' : 'DEMO'}
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={styles.controls}>
+                <Pressable
+                  style={styles.roundControl}
+                  onPress={toggleMode}
+                  accessibilityRole="button"
+                  accessibilityLabel={mode === '3d' ? 'Cambiar a vista 2D' : 'Cambiar a vista 3D'}
+                >
+                  <AppText variant="label" color={colors.text} style={styles.modeText}>
+                    {mode === '3d' ? '3D' : '2D'}
+                  </AppText>
+                </Pressable>
+                {!following ? (
+                  <Pressable
+                    style={[styles.roundControl, styles.roundControlAccent]}
+                    onPress={recenter}
+                    accessibilityRole="button"
+                    accessibilityLabel="Recentrar mapa"
+                  >
+                    <Ionicons name="navigate" size={20} color="#120802" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            {destination ? (
+              <View style={styles.destinationCard}>
+                <View style={styles.destinationRow}>
+                  <View style={styles.destinationIcon}>
+                    <Ionicons name="flag" size={15} color="#120802" />
+                  </View>
+                  <View style={styles.destinationText}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {destination.label}
+                    </AppText>
+                    <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                      {route.isLoading
+                        ? 'Buscando ruta por calles…'
+                        : routeLine
+                          ? `${routeLine} · ${routeSourceLabel}`
+                          : 'Sin ruta todavía'}
+                    </AppText>
+                  </View>
+                  <IconButton icon="close" size={30} tone="ghost" onPress={clearDestination} />
+                </View>
+                <View style={styles.destinationActions}>
+                  <Button
+                    label="Navegar"
+                    variant="lime"
+                    size="sm"
+                    icon="navigate"
+                    onPress={startNavigation}
+                    style={styles.destinationAction}
+                  />
+                  <Button
+                    label="Compartir ruta"
+                    variant="secondary"
+                    size="sm"
+                    icon="share-social-outline"
+                    onPress={shareRouteLink}
+                    style={styles.destinationAction}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {selectedFriend ? (
+              <View style={styles.friendSheet}>
+                <View style={styles.friendRow}>
+                  <Avatar
+                    name={selectedFriend.name}
+                    color={selectedFriend.color}
+                    size={38}
+                    online
+                    ring={colors.border}
+                  />
+                  <View style={styles.friendText}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {selectedFriend.name}
+                    </AppText>
+                    <AppText variant="caption" color={colors.muted}>
+                      En el mapa ahora
+                    </AppText>
+                  </View>
+                  <IconButton
+                    icon="close"
+                    size={30}
+                    tone="ghost"
+                    onPress={() => setSelectedFriend(null)}
+                  />
+                </View>
+                <View style={styles.destinationActions}>
+                  <Button
+                    label="Invitar al convoy"
+                    variant="lime"
+                    size="sm"
+                    icon="person-add"
+                    onPress={() => void inviteToConvoy()}
+                    style={styles.destinationAction}
+                  />
+                  <Button
+                    label="Retar"
+                    variant="secondary"
+                    size="sm"
+                    icon="flag"
+                    onPress={() => challengeFriend(selectedFriend)}
+                    style={styles.destinationAction}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            <Pressable
+              style={styles.attribution}
+              hitSlop={6}
+              onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
+            >
+              <AppText variant="caption" color={colors.dim} style={styles.attributionText}>
+                © OpenFreeMap · © OpenMapTiles · © OpenStreetMap · Relieve Mapzen
+              </AppText>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: spacing.lg,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  vehiclePill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 42,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+  },
+  vehicleText: { flex: 1 },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  bannerError: { borderColor: 'rgba(255,90,31,0.4)' },
+  bannerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  bannerText: { flex: 1 },
+  retryText: { fontSize: 9 },
+  searchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    minHeight: 44,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+  },
+  searchText: { flex: 1 },
+  spacer: { flex: 1 },
+  sideRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  speedHud: {
+    minWidth: 128,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  speedValue: { fontSize: 40, lineHeight: 44 },
+  speedMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.green,
+  },
+  liveDotOff: { backgroundColor: colors.dim },
+  speedUnit: { fontSize: 9 },
+  controls: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  roundControl: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  roundControlAccent: {
+    backgroundColor: colors.lime,
+    borderColor: colors.lime,
+  },
+  modeText: { fontSize: 11 },
+  destinationCard: {
+    backgroundColor: 'rgba(11,15,20,0.94)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius['2xl'],
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  destinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  destinationIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  destinationText: { flex: 1 },
+  destinationActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  destinationAction: { flexShrink: 1 },
+  friendSheet: {
+    marginTop: spacing.sm,
+    backgroundColor: 'rgba(11,15,20,0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,255,77,0.3)',
+    borderRadius: radius['2xl'],
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  friendText: { flex: 1 },
+  navLayer: { flex: 1 },
+  navTop: {
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: 'rgba(6,8,11,0.68)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(201,255,77,0.25)',
+  },
+  navChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.lime,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  navChipText: { fontSize: 9 },
+  navDestination: { maxWidth: '100%' },
+  navEta: { fontSize: 46, lineHeight: 50, color: colors.lime },
+  navSpeed: {
+    position: 'absolute',
+    left: 0,
+    bottom: 96,
+    alignItems: 'center',
+    backgroundColor: 'rgba(6,8,11,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  navSpeedValue: { fontSize: 40, lineHeight: 44 },
+  navActions: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  navButtonDark: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 52,
+    backgroundColor: 'rgba(6,8,11,0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: radius.xl,
+  },
+  navButtonLime: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 52,
+    backgroundColor: colors.lime,
+    borderRadius: radius.xl,
+  },
+  attribution: {
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+  },
+  attributionText: { fontSize: 9 },
+});
