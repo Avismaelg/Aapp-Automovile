@@ -18,11 +18,12 @@
     ruta completa por calles y se muestran distancia y duración antes de
     publicar.
 - Pantalla **Detalle** (`app/event/[id].tsx`):
-  - mapa con la ruta encuadrada completa (sin seguir al usuario), marcador de
-    meta y el coche en su posición;
-  - estadísticas, host, fecha y descripción;
+  - **trazado esquemático de la ruta** (SVG) con salida y meta, distancia,
+    duración y número de puntos; se usa un esquema propio en vez de un segundo
+    mapa para que la ruta se vea siempre con fiabilidad;
+  - host, fecha y descripción;
   - **Navegar a la salida** (o al evento si es solo ubicación): fija el destino
-    y abre el mapa en modo navegación;
+    y abre el mapa principal en modo navegación, con giros y hora de llegada;
   - compartir con enlace `caravana://event/<id>`.
 
 ## 2. Datos

@@ -1458,12 +1458,28 @@ export const WORLD_MAP_HTML = `<!doctype html>
   // Encuadra la ruta completa (por ejemplo, la ruta de un evento).
   function fitRoute(coordinates) {
     if (!mapReady || !Array.isArray(coordinates) || coordinates.length < 2) return;
-    var bounds = new maplibregl.LngLatBounds();
-    coordinates.forEach(function (point) {
-      bounds.extend([point[1], point[0]]);
-    });
-    map.fitBounds(bounds, { padding: 48, maxZoom: 16, duration: 800 });
     setFollowing(false);
+
+    var minLat = Infinity;
+    var maxLat = -Infinity;
+    var minLng = Infinity;
+    var maxLng = -Infinity;
+    coordinates.forEach(function (point) {
+      minLat = Math.min(minLat, point[0]);
+      maxLat = Math.max(maxLat, point[0]);
+      minLng = Math.min(minLng, point[1]);
+      maxLng = Math.max(maxLng, point[1]);
+    });
+
+    var center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+    var spanM = Math.max(
+      (maxLat - minLat) * 111320,
+      (maxLng - minLng) * 111320 * Math.cos(center[1] * Math.PI / 180)
+    );
+    var zoom = spanM > 0
+      ? Math.min(16, Math.max(10.5, Math.log(160000000 / Math.max(spanM, 400)) / Math.LN2))
+      : 14;
+    map.jumpTo({ center: center, zoom: zoom, pitch: 45, bearing: 0 });
   }
 
   function setAutoFollow(value) {
