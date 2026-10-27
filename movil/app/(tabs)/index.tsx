@@ -1,23 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WorldMap } from '@/src/components/WorldMap';
-import { AppText, Avatar, IconButton } from '@/src/components/ui';
+import { AppText, Avatar, Button, IconButton } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
-import { useActiveParty, usePartyLocation } from '@/src/hooks/useParty';
+import { useActiveParty, usePartyLocation, useSetPartyDestination } from '@/src/hooks/useParty';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import type {
   WorldMapDestination,
   WorldMapMember,
   WorldMapMode,
 } from '@/src/lib/map-html';
+import { useChosenDestination } from '@/src/store/destination';
 import { colors, radius, shadows, spacing } from '@/src/theme';
 
 const GLASS = 'rgba(6,8,11,0.74)';
@@ -41,6 +42,11 @@ export default function MapScreen() {
   const [recenterToken, setRecenterToken] = useState(0);
   const [mapKey, setMapKey] = useState(0);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [sharedNotice, setSharedNotice] = useState<string | null>(null);
+
+  const chosenDestination = useChosenDestination((state) => state.destination);
+  const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
+  const setPartyDestination = useSetPartyDestination();
 
   usePartyLocation(party?.id, live.location, Boolean(party) && !isDemo && live.isLive);
 
@@ -88,10 +94,14 @@ export default function MapScreen() {
     return null;
   }, [isDemo, party]);
 
+  const activeDestination = chosenDestination ?? destination;
+  const canShareWithParty = Boolean(party && !isDemo && party.isHost);
+  const canClearDestination = Boolean(chosenDestination) || canShareWithParty;
+
   const route = useGraphHopperRoute({
     origin: live.location,
-    destination: destination ?? live.location,
-    enabled: Boolean(destination),
+    destination: activeDestination ?? live.location,
+    enabled: Boolean(activeDestination),
   });
 
   const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
@@ -106,8 +116,15 @@ export default function MapScreen() {
   const routeLine = route.route
     ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
     : null;
+  const routeSourceLabel = route.route
+    ? route.route.source === 'graphhopper'
+      ? 'GraphHopper'
+      : route.route.source === 'osrm'
+        ? 'Calles OSM'
+        : 'Ruta directa'
+    : null;
   const partySubtitle = [
-    destination?.label ?? 'Sin destino',
+    activeDestination?.label ?? 'Sin destino',
     routeLine,
     `${crewCount} ${crewCount === 1 ? 'piloto' : 'pilotos'}`,
   ]
@@ -116,6 +133,50 @@ export default function MapScreen() {
 
   const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
   const handleMapError = useCallback((message: string) => setMapError(message), []);
+
+  const shareRouteLink = async () => {
+    if (!activeDestination) return;
+    const { latitude, longitude, label } = activeDestination;
+    const deepLink = `caravana://destino?lat=${latitude}&lng=${longitude}&label=${encodeURIComponent(label)}`;
+    const mapLink = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
+    try {
+      await Share.share({
+        message: `Ruta de Caravana → ${label}\n${mapLink}\nÁbrela en la app: ${deepLink}`,
+        url: deepLink,
+      });
+    } catch {
+      // El usuario canceló o la plataforma no soporta compartir.
+    }
+  };
+
+  const shareWithParty = async () => {
+    if (!party || !activeDestination) return;
+    try {
+      await setPartyDestination.mutateAsync({
+        partyId: party.id,
+        label: activeDestination.label,
+        lat: activeDestination.latitude,
+        lng: activeDestination.longitude,
+      });
+      setSharedNotice('Ruta compartida con la caravana.');
+    } catch (error) {
+      setSharedNotice(
+        error instanceof Error ? error.message : 'No pudimos compartir la ruta.',
+      );
+    }
+  };
+
+  const clearDestination = () => {
+    clearChosenDestination();
+    setSharedNotice(null);
+    if (party && !isDemo && party.isHost) {
+      void setPartyDestination
+        .mutateAsync({ partyId: party.id, label: null, lat: null, lng: null })
+        .catch(() => {
+          setSharedNotice('No pudimos quitar el destino de la caravana.');
+        });
+    }
+  };
 
   const recenter = () => {
     setFollowing(true);
@@ -135,7 +196,7 @@ export default function MapScreen() {
       <WorldMap
         key={mapKey}
         members={mapMembers}
-        destination={destination}
+        destination={activeDestination}
         location={live.location}
         route={route.route}
         mode={mode}
@@ -178,6 +239,28 @@ export default function MapScreen() {
             onPress={() => router.push('/actividad' as Href)}
           />
         </View>
+
+        <Pressable
+          style={styles.searchPill}
+          onPress={() => router.push('/destino' as Href)}
+          accessibilityRole="button"
+          accessibilityLabel="Buscar destino"
+        >
+          <Ionicons
+            name={activeDestination ? 'flag' : 'search'}
+            size={16}
+            color={activeDestination ? colors.lime : colors.textSoft}
+          />
+          <AppText
+            variant="bodyStrong"
+            numberOfLines={1}
+            color={activeDestination ? colors.text : colors.textSoft}
+            style={styles.searchText}
+          >
+            {activeDestination ? activeDestination.label : '¿A dónde vamos?'}
+          </AppText>
+          <Ionicons name="search" size={14} color={colors.muted} />
+        </Pressable>
 
         {!live.isLive ? (
           <View style={styles.banner}>
@@ -249,6 +332,61 @@ export default function MapScreen() {
         </View>
 
         <View style={styles.bottomCard}>
+          {activeDestination ? (
+            <View style={styles.destinationCard}>
+              <View style={styles.destinationRow}>
+                <View style={styles.destinationIcon}>
+                  <Ionicons name="flag" size={15} color="#120802" />
+                </View>
+                <View style={styles.destinationText}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>
+                    {activeDestination.label}
+                  </AppText>
+                  <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                    {route.isLoading
+                      ? 'Buscando ruta por calles…'
+                      : routeLine
+                        ? `${routeLine} · ${routeSourceLabel}`
+                        : 'Sin ruta todavía'}
+                  </AppText>
+                </View>
+                {canClearDestination ? (
+                  <IconButton
+                    icon="close"
+                    size={30}
+                    tone="ghost"
+                    onPress={clearDestination}
+                  />
+                ) : null}
+              </View>
+              <View style={styles.destinationActions}>
+                {canShareWithParty ? (
+                  <Button
+                    label="Compartir con la party"
+                    variant="lime"
+                    size="sm"
+                    icon="radio"
+                    loading={setPartyDestination.isPending}
+                    onPress={shareWithParty}
+                    style={styles.destinationAction}
+                  />
+                ) : null}
+                <Button
+                  label="Compartir ruta"
+                  variant="secondary"
+                  size="sm"
+                  icon="share-social-outline"
+                  onPress={shareRouteLink}
+                  style={styles.destinationAction}
+                />
+              </View>
+              {sharedNotice ? (
+                <AppText variant="caption" color={colors.lime} numberOfLines={2}>
+                  {sharedNotice}
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
           <Pressable style={styles.partyRow} onPress={() => router.push('/(tabs)/party')}>
             <View style={[styles.partyIcon, !inParty && styles.partyIconEmpty]}>
               <Ionicons
@@ -357,6 +495,44 @@ const styles = StyleSheet.create({
   },
   bannerText: { flex: 1 },
   retryText: { fontSize: 9 },
+  searchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    minHeight: 44,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+  },
+  searchText: { flex: 1 },
+  destinationCard: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  destinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  destinationIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  destinationText: { flex: 1 },
+  destinationActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  destinationAction: { flexShrink: 1 },
   spacer: { flex: 1 },
   sideRow: {
     flexDirection: 'row',

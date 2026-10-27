@@ -3,7 +3,7 @@ import { create } from 'zustand';
 
 import {
   fallbackRoute,
-  fetchGraphHopperRoute,
+  fetchStreetRoute,
   isGraphHopperConfigured,
 } from '@/src/lib/graphhopper';
 import type { WorldMapRoute } from '@/src/lib/map-html';
@@ -73,19 +73,25 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
     useRouteState.setState({ isLoading: true, error: null });
 
     try {
-      const route = await fetchGraphHopperRoute({
+      const route = await fetchStreetRoute({
         origin,
         destination,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
-      useRouteState.setState({ route, isLoading: false });
+      useRouteState.setState({
+        route,
+        isLoading: false,
+        error: route.source === 'fallback'
+          ? 'No hubo ruta por calles; mostramos la línea directa.'
+          : null,
+      });
     } catch {
       if (controller.signal.aborted) return;
       useRouteState.setState({
         route: fallbackRoute(origin, destination),
         isLoading: false,
-        error: 'GraphHopper no respondió; mostrando ruta directa.',
+        error: 'No pudimos calcular la ruta; mostramos la línea directa.',
       });
     }
   }, 700);

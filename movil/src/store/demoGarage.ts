@@ -27,6 +27,7 @@ type DemoGarageState = {
   hydrate: () => Promise<void>;
   addVehicle: (vehicle: Vehicle) => Promise<void>;
   setOdometer: (vehicleId: string, odometerKm: number) => Promise<void>;
+  setPhoto: (vehicleId: string, photoUrl: string | null) => Promise<void>;
 };
 
 export const useDemoGarage = create<DemoGarageState>((set, get) => ({
@@ -74,6 +75,15 @@ export const useDemoGarage = create<DemoGarageState>((set, get) => ({
   setOdometer: async (vehicleId, odometerKm) => {
     const next = get().vehicles.map((vehicle) =>
       vehicle.id === vehicleId ? { ...vehicle, odometerKm } : vehicle,
+    );
+
+    set({ vehicles: next, hydrated: true });
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  },
+
+  setPhoto: async (vehicleId, photoUrl) => {
+    const next = get().vehicles.map((vehicle) =>
+      vehicle.id === vehicleId ? { ...vehicle, photoUrl } : vehicle,
     );
 
     set({ vehicles: next, hydrated: true });

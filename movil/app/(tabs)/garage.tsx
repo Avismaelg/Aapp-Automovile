@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -19,7 +19,7 @@ import {
 } from '@/src/components/ui';
 import { type Vehicle } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useGarageVehicles } from '@/src/hooks/useGarage';
+import { useGarageVehicles, pickVehiclePhoto, useSetVehiclePhoto } from '@/src/hooks/useGarage';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import {
   isElectric,
@@ -51,10 +51,25 @@ export default function GarageScreen() {
   const router = useRouter();
   const me = useCurrentUser();
   const { vehicles: garageVehicles, isLoading, isError, refetch } = useGarageVehicles();
+  const setPhoto = useSetVehiclePhoto();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const vehicle = garageVehicles.find((item) => item.id === selectedId) ?? garageVehicles[0];
   const meta = vehicle ? vehicleKindMeta[vehicle.kind] : null;
   const electric = vehicle ? isElectric(vehicle) : false;
+
+  const changePhoto = async () => {
+    if (!vehicle) return;
+    try {
+      const uri = await pickVehiclePhoto();
+      if (!uri) return;
+      await setPhoto.mutateAsync({ vehicleId: vehicle.id, uri });
+    } catch (error) {
+      Alert.alert(
+        'Foto del vehículo',
+        error instanceof Error ? error.message : 'No pudimos actualizar la foto.',
+      );
+    }
+  };
 
   const shareQr = async () => {
     await Share.share({
@@ -135,16 +150,50 @@ export default function GarageScreen() {
           />
           <Pill label={String(vehicle.year)} tone="neutral" />
         </View>
-        <View style={styles.carArt}>
-          {vehicle.kind === 'car' ? (
-            <CarSilhouette />
+        <Pressable
+          onPress={changePhoto}
+          disabled={setPhoto.isPending}
+          style={({ pressed }) => [styles.carArt, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            vehicle.photoUrl ? 'Cambiar foto del vehículo' : 'Añadir foto del vehículo'
+          }
+        >
+          {vehicle.photoUrl ? (
+            <>
+              <Image
+                source={{ uri: vehicle.photoUrl }}
+                style={styles.vehiclePhoto}
+                resizeMode="cover"
+              />
+              <View style={styles.photoBadge}>
+                <Ionicons name="camera" size={14} color="#120802" />
+                <AppText variant="label" style={styles.photoBadgeText}>
+                  {setPhoto.isPending ? 'Subiendo…' : 'Cambiar foto'}
+                </AppText>
+              </View>
+            </>
+          ) : setPhoto.isPending ? (
+            <ActivityIndicator color={meta.color} />
           ) : (
-            <View style={[styles.vehicleArt, { backgroundColor: `${meta.color}12` }]}>
-              <Ionicons name={meta.icon} size={74} color={`${meta.color}CC`} />
-              <View style={[styles.vehicleArtLine, { backgroundColor: `${meta.color}55` }]} />
-            </View>
+            <>
+              {vehicle.kind === 'car' ? (
+                <CarSilhouette />
+              ) : (
+                <View style={[styles.vehicleArt, { backgroundColor: `${meta.color}12` }]}>
+                  <Ionicons name={meta.icon} size={74} color={`${meta.color}CC`} />
+                  <View style={[styles.vehicleArtLine, { backgroundColor: `${meta.color}55` }]} />
+                </View>
+              )}
+              <View style={[styles.photoBadge, styles.photoBadgeEmpty]}>
+                <Ionicons name="camera-outline" size={14} color={colors.accent} />
+                <AppText variant="label" color={colors.accent} style={styles.photoBadgeText}>
+                  Añadir foto
+                </AppText>
+              </View>
+            </>
           )}
-        </View>
+        </Pressable>
         <View style={styles.carInfo}>
           <AppText variant="label" color={colors.textSoft}>
             {vehicle.make.toUpperCase()} · {vehicleFuelLabel(vehicle).toUpperCase()}
@@ -245,7 +294,15 @@ export default function GarageScreen() {
             ]}
           >
             <View style={[styles.vehicleThumb, { backgroundColor: `${itemMeta.color}1A` }]}>
-              <Ionicons name={itemMeta.icon} size={24} color={itemMeta.color} />
+              {item.photoUrl ? (
+                <Image
+                  source={{ uri: item.photoUrl }}
+                  style={styles.vehicleThumbImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name={itemMeta.icon} size={24} color={itemMeta.color} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <View style={styles.vehicleNameRow}>
@@ -356,7 +413,40 @@ const styles = StyleSheet.create({
   },
   carCardElectric: { borderColor: 'rgba(77,225,255,0.22)' },
   carTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  carArt: { alignItems: 'center', marginTop: spacing.sm, minHeight: 92, justifyContent: 'center' },
+  carArt: {
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    minHeight: 92,
+    justifyContent: 'center',
+  },
+  vehiclePhoto: {
+    width: '100%',
+    height: 150,
+    borderRadius: radius.lg,
+  },
+  photoBadge: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.lime,
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  photoBadgeEmpty: {
+    position: 'relative',
+    right: undefined,
+    bottom: undefined,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,31,0.3)',
+  },
+  photoBadgeText: { fontSize: 9 },
   carSilhouette: { opacity: 0.9 },
   vehicleArt: {
     width: 190,
@@ -427,7 +517,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  vehicleThumbImage: { width: 52, height: 52 },
   vehicleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addVehicle: {
     flexDirection: 'row',

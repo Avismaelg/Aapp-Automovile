@@ -16,6 +16,7 @@ export type VehicleRow = {
   odometer_km: number | string;
   is_primary: boolean;
   qr_slug: string;
+  photo_url: string | null;
   created_at?: string;
 };
 
@@ -110,6 +111,7 @@ export function mapVehicleRow(row: VehicleRow, owner?: VehicleOwner): Vehicle {
     efficiencyUnit: row.efficiency_unit ?? (kind === 'ev' ? 'kwh_100km' : 'km_l'),
     qrSlug: row.qr_slug,
     qr: vehicleUrl(row.qr_slug),
+    photoUrl: row.photo_url ?? null,
     isPrimary: row.is_primary,
     ownerId: owner?.id,
     ownerUsername: owner?.username,

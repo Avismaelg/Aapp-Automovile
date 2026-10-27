@@ -63,7 +63,7 @@ export async function fetchGraphHopperRoute({
   signal?: AbortSignal;
 }): Promise<WorldMapRoute> {
   if (!isGraphHopperConfigured) {
-    return fallbackRoute(origin, destination);
+    throw new Error('GraphHopper no está configurado.');
   }
 
   const base = GRAPHHOPPER_URL
@@ -117,6 +117,87 @@ export async function fetchGraphHopperRoute({
     timeMs: path.time,
     source: 'graphhopper',
   };
+}
+
+type OsrmResponse = {
+  code?: string;
+  routes?: {
+    distance: number;
+    duration: number;
+    geometry?: {
+      coordinates: [number, number][];
+    };
+  }[];
+};
+
+// Servidor público de demostración de OSRM: rutas reales por calle sin API key.
+// Para producción conviene GraphHopper propio o un OSRM hospedado.
+const OSRM_URL = 'https://router.project-osrm.org';
+
+export async function fetchOsrmRoute({
+  origin,
+  destination,
+  signal,
+}: {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  signal?: AbortSignal;
+}): Promise<WorldMapRoute> {
+  const path = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
+  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+
+  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+  const data = (await response.json()) as OsrmResponse;
+  const route = data.routes?.[0];
+  if (!response.ok || !route) {
+    throw new Error(data.code ? `OSRM respondió ${data.code}.` : 'OSRM no devolvió una ruta válida.');
+  }
+
+  const coordinates = (route.geometry?.coordinates ?? [])
+    .filter(
+      (coordinate): coordinate is [number, number] =>
+        Array.isArray(coordinate) &&
+        coordinate.length === 2 &&
+        Number.isFinite(coordinate[0]) &&
+        Number.isFinite(coordinate[1]),
+    )
+    .map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
+
+  if (coordinates.length < 2) {
+    throw new Error('OSRM devolvió una ruta vacía.');
+  }
+
+  return {
+    coordinates,
+    distanceM: route.distance,
+    timeMs: route.duration * 1000,
+    source: 'osrm',
+  };
+}
+
+// GraphHopper primero, luego OSRM público y, al final, línea directa.
+export async function fetchStreetRoute({
+  origin,
+  destination,
+  signal,
+}: {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  signal?: AbortSignal;
+}): Promise<WorldMapRoute> {
+  if (isGraphHopperConfigured) {
+    try {
+      return await fetchGraphHopperRoute({ origin, destination, signal });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+  }
+  try {
+    return await fetchOsrmRoute({ origin, destination, signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+  }
+  return fallbackRoute(origin, destination);
 }
 
 export function formatRouteDistance(distanceM: number) {

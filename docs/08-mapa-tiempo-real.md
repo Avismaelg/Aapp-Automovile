@@ -21,9 +21,22 @@
     OpenStreetMap y relieve Mapzen.
 - **Pantalla inicial**: `app/(tabs)/index.tsx`. El antiguo dashboard pasó a
   `app/actividad.tsx`, accesible desde el botón de actividad del mapa.
+- **Buscar destino (tipo Waze)**: botón **¿A dónde vamos?** en el mapa abre
+  `app/destino.tsx`: busca calles, ciudades y sitios con **Photon** (datos de
+  OpenStreetMap, sin API key) sesgado hacia tu posición. Al elegir uno, la ruta
+  se traza **por calles y carreteras reales**: GraphHopper primero y, si no
+  responde, el servidor público de OSRM; la línea recta queda solo como último
+  recurso.
+- **Compartir la ruta**: el anfitrión pulsa **Compartir con la party** y el
+  destino se guarda en la party (`RPC set_party_destination`, cualquier miembro
+  activo puede fijarlo); todos la ven por Realtime. También hay **Compartir
+  ruta** con un enlace `caravana://destino?lat=…&lng=…&label=…` que abre la app
+  y ofrece aceptar la ruta.
 - Vehículo 3D:
   - modelo procedural con Three.js 0.186.1 (sin GLB), dibujado sobre el mapa con
     la misma inclinación de la cámara; mide unos 60 px de largo en cualquier zoom;
+    hay modelos de coche, moto y camión según el vehículo principal del garaje
+    (el EV usa el modelo del coche);
   - la posición sale de `map.project()` en cada frame y el giro del rumbo GPS se
     calcula relativo a la vista, así apunta bien con el mapa girado o inclinado;
   - el color lo elige el vehículo principal (`vehicle`) y pinta carrocería, halo y
@@ -74,6 +87,7 @@ React Native / web
   ├─ destination  destino de la party
   ├─ route        coordenadas, distancia, tiempo y motor
   ├─ mode         "2d" | "3d"
+  ├─ vehicle      color y tipo del vehículo (coche, moto, EV, camión)
   └─ recenter     volver a seguir el vehículo
 
 Mapa
@@ -170,9 +184,10 @@ Mapa
 - La pestaña Party monta un segundo mapa 3D mientras está abierta. Al volver al
   mapa principal se conserva el primero.
 - MapLibre y Three.js se cargan desde unpkg y jsDelivr, y el estilo/teselas desde
-  OpenFreeMap. Son servicios públicos gratuitos: para producción hay que fijar
-  versión, tener un plan de teselas y cachear. Sin Three.js el coche se ve como
-  flecha 2D.
+  OpenFreeMap. La búsqueda usa Photon (photon.komoot.io) y las rutas de respaldo
+  el OSRM público (router.project-osrm.org). Son servicios públicos gratuitos:
+  para producción hay que fijar versión, tener un plan de teselas y hospedar el
+  motor de rutas. Sin Three.js el coche se ve como flecha 2D.
 - No hay mapas offline ni caché de teselas.
 - No hay navegación giro a giro ni CarPlay/Android Auto nativos.
 - El relieve puede mostrar un aviso interno de `maxzoom` de elevación; no rompe

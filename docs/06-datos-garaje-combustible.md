@@ -59,8 +59,16 @@ eficiencia y unidad. El QR usa el `qr_slug` generado por la base de datos.
 - marca, modelo, año, apodo y odómetro;
 - combustible: gasolina, diésel o eléctrico;
 - consumo en `km/L` o `kWh/100 km`;
-- color;
+- color (entre ellos negro);
 - vehículo principal automático si es el primero.
+
+### Foto del vehículo
+
+En la tarjeta del garaje se toca la imagen (o el botón **Añadir foto**) para
+elegir una foto de la galería: se recorta a 4:3, se sube al bucket de Storage
+`vehicles` en `owner_id/vehicle_id/…` (solo el dueño puede escribir) y se guarda
+la URL pública en `vehicles.photo_url`. En demo la foto se muestra local, sin
+subir nada. Las miniaturas de la lista usan la foto si existe.
 
 En Supabase se inserta en `public.vehicles` con `owner_id = auth.uid()`. Si se
 marca como principal, primero se desmarca el anterior para respetar el índice

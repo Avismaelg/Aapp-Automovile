@@ -39,6 +39,7 @@ export type Vehicle = {
   efficiencyUnit: 'km_l' | 'kwh_100km';
   qrSlug: string;
   qr: string;
+  photoUrl?: string | null;
   isPrimary?: boolean;
   ownerId?: string;
   ownerUsername?: string;

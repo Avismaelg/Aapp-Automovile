@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 
 import type { Vehicle } from '@/src/data/mock';
 import {
@@ -71,6 +72,73 @@ function friendlyGarageError(message: string) {
     return 'Tu sesión no tiene permiso para guardar este vehículo. Vuelve a iniciar sesión.';
   }
   return 'No pudimos guardar el vehículo. Revisa tu conexión e inténtalo de nuevo.';
+}
+
+// Abre la galería y, si elige una, la recorta a 4:3.
+export async function pickVehiclePhoto(): Promise<string | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Necesitamos permiso para ver tus fotos.');
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 0.7,
+  });
+
+  if (result.canceled || result.assets.length === 0) return null;
+  return result.assets[0].uri;
+}
+
+export function useSetVehiclePhoto() {
+  const queryClient = useQueryClient();
+  const account = useAuth((state) => state.account);
+  const demo = isDemoAccount(account?.mode);
+  const setDemoPhoto = useDemoGarage((state) => state.setPhoto);
+
+  return useMutation({
+    mutationFn: async ({ vehicleId, uri }: { vehicleId: string; uri: string }) => {
+      if (demo) {
+        // En demo no hay Storage: mostramos la foto local (valida hasta borrar la app).
+        await setDemoPhoto(vehicleId, uri);
+        return uri;
+      }
+      if (!supabase || !account) {
+        throw new Error('Inicia sesión para subir la foto.');
+      }
+
+      const file = await fetch(uri);
+      if (!file.ok) throw new Error('No pudimos leer la foto elegida.');
+      const bytes = await file.arrayBuffer();
+
+      const path = `${account.id}/${vehicleId}/${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('vehicles')
+        .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) {
+        throw new Error('No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+      }
+
+      const { data: publicUrl } = supabase.storage.from('vehicles').getPublicUrl(path);
+      const { error: updateError } = await supabase
+        .from('vehicles')
+        .update({ photo_url: publicUrl.publicUrl })
+        .eq('id', vehicleId)
+        .eq('owner_id', account.id);
+
+      if (updateError) {
+        throw new Error('La foto se subió pero no pudimos guardarla en el vehículo.');
+      }
+
+      return publicUrl.publicUrl;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['garage'] });
+    },
+  });
 }
 
 export function useCreateVehicle() {

@@ -369,6 +369,49 @@ export function useSetVoiceChannel() {
   });
 }
 
+export function useSetPartyDestination() {
+  const queryClient = useQueryClient();
+  const account = useAuth((state) => state.account);
+  const demo = demoMode(account?.mode);
+
+  return useMutation({
+    mutationFn: async ({
+      partyId,
+      label,
+      lat,
+      lng,
+    }: {
+      partyId: string;
+      label: string | null;
+      lat: number | null;
+      lng: number | null;
+    }) => {
+      if (demo) return;
+      if (!supabase || !account) throw new Error('Inicia sesión para compartir la ruta.');
+
+      const { error } = await supabase.rpc('set_party_destination', {
+        p_party_id: partyId,
+        p_label: label,
+        p_lat: lat,
+        p_lng: lng,
+      });
+
+      if (error) {
+        if (error.message.includes('not_a_member')) {
+          throw new Error('No perteneces a esta party.');
+        }
+        if (error.message.includes('party_not_found')) {
+          throw new Error('La party ya no existe.');
+        }
+        throw new Error('No pudimos actualizar el destino de la caravana.');
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['party'] });
+    },
+  });
+}
+
 export function usePartyLocation(
   partyId: string | undefined,
   location: LiveLocation,
