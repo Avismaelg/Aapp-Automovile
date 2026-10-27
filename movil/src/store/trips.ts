@@ -43,7 +43,9 @@ const MAX_POINTS = 700;
 const MOVE_START_KMH = 15;
 const START_CONFIRM_SAMPLES = 3;
 const MIN_RECORD_KMH = 8;
-const STOP_AFTER_MS = 2 * 60_000;
+const STOP_AFTER_MS = 90_000;
+const MIN_TRIP_DISTANCE_M = 200;
+const STALE_TRIP_MS = 10 * 60_000;
 const MIN_POINT_DISTANCE_M = 15;
 const PERSIST_EVERY_MS = 12_000;
 
@@ -140,7 +142,24 @@ export const useTrips = create<TripsState>((set, get) => ({
         active = JSON.parse(rawActive) as Trip | null;
       }
 
+      let cleaned = false;
+      // Si quedó un viaje activo de una sesión anterior (app cerrada, crash o
+      // un viaje corto que nunca se cerró), se archiva o se descarta.
+      if (active) {
+        const lastPoint = active.points[active.points.length - 1];
+        const stale = !lastPoint || Date.now() - lastPoint.at > STALE_TRIP_MS;
+        if (stale) {
+          if (active.distanceM >= MIN_TRIP_DISTANCE_M && lastPoint) {
+            const ended = finishTrip(active, lastPoint.at);
+            trips = [ended, ...trips].slice(0, MAX_TRIPS);
+          }
+          active = null;
+          cleaned = true;
+        }
+      }
+
       set({ trips, active, hydrated: true });
+      if (cleaned) void persistAll();
       if (active) {
         const last = active.points[active.points.length - 1];
         lastMovingAt = last?.at ?? active.startedAt;
@@ -220,9 +239,14 @@ export const useTrips = create<TripsState>((set, get) => ({
         hours > 0 ? Math.min(200, Math.round((distanceM / 1000 / hours) * 10) / 10) : active.avgSpeedKmh,
     };
 
-    if (!driving && now - lastMovingAt > STOP_AFTER_MS && next.distanceM > 200) {
-      const ended = finishTrip(next, now);
-      set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
+    if (!driving && now - lastMovingAt > STOP_AFTER_MS) {
+      if (next.distanceM >= MIN_TRIP_DISTANCE_M) {
+        const ended = finishTrip(next, now);
+        set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
+      } else {
+        // Movimiento de aparcamiento o manobre: no es una ruta.
+        set({ active: null });
+      }
       void persistAll();
       return;
     }
@@ -234,8 +258,12 @@ export const useTrips = create<TripsState>((set, get) => ({
   stopTrip: async () => {
     const active = get().active;
     if (!active) return;
-    const ended = finishTrip(active, Date.now());
-    set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
+    if (active.distanceM >= MIN_TRIP_DISTANCE_M) {
+      const ended = finishTrip(active, Date.now());
+      set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
+    } else {
+      set({ active: null });
+    }
     await persistAll();
   },
 

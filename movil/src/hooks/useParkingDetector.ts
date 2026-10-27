@@ -4,7 +4,7 @@ import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { useTrips } from '@/src/store/trips';
 
 const MOVE_KMH = 10;
-const PARK_AFTER_MS = 3 * 60_000;
+const PARK_AFTER_MS = 90_000;
 
 function haversineMeters(
   a: { latitude: number; longitude: number },

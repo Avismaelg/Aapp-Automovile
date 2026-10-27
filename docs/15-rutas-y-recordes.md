@@ -24,9 +24,9 @@ Archivos:
   **15 km/h sostenidos en 3 muestras seguidas** (una caminata o un pico de ruido
   del GPS no abre ruta). Solo se acumulan puntos por encima de **8 km/h**, así
   que caminar después de aparcar no ensucia la ruta.
-- El viaje se cierra tras **2 minutos sin movimiento de coche** (o al entrar en
-  modo peatón), y al menos 200 m recorridos; también se puede detener a mano en
-  **Mis rutas**.
+- El viaje se cierra tras **90 segundos sin movimiento de coche** (o al entrar
+  en modo peatón); si el recorrido no llega a **200 m** se descarta. También se
+  puede detener a mano en **Mis rutas**.
 - **Puntos**: uno cada 15 m como mínimo, con velocidad y hora. Se guardan como
   máximo 700 puntos (se simplifican) y se conservan las últimas 30 rutas.
 - **Estadísticas**: distancia, duración, velocidad media y máxima.
@@ -82,7 +82,7 @@ conducción responsable.
 ## 5. Coche aparcado
 
 - El gancho `useParkingDetector` guarda el **último punto en movimiento** cuando
-  el coche lleva 3 minutos por debajo de 2,5 km/h (si antes se movió a más de
+  el coche lleva 90 segundos por debajo de 2,5 km/h (si antes se movió a más de
   10 km/h). Se persiste en `caravana.parking.v1`, así que sobrevive al cierre de
   la app y a estar sin conexión.
 - Al abrir la app con el coche ya aparcado se toma como referencia el último
