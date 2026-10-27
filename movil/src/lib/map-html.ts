@@ -858,7 +858,11 @@ export const WORLD_MAP_HTML = `<!doctype html>
       type: 'line',
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#05070a', 'line-width': 10, 'line-opacity': 0.7 }
+      paint: {
+        'line-color': '#06080b',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 14, 11, 16, 15, 18, 22],
+        'line-opacity': 0.92
+      }
     }, before);
     map.addLayer({
       id: 'caravana-route-line',
@@ -866,8 +870,118 @@ export const WORLD_MAP_HTML = `<!doctype html>
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'kind'], 'fallback'], '#c9ff4d', '#ff5a1f'],
-        'line-width': 5
+        'line-color': ['case', ['==', ['get', 'kind'], 'fallback'], '#c9ff4d', '#ff6a2b'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 7, 16, 10, 18, 15]
+      }
+    }, before);
+    // Brillo interior: da volumen a la cinta, como la ruta de Waze.
+    map.addLayer({
+      id: 'caravana-route-core',
+      type: 'line',
+      source: 'caravana-route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': ['case', ['==', ['get', 'kind'], 'fallback'], '#eaffb0', '#ffb489'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 14, 2, 16, 3, 18, 4],
+        'line-opacity': 0.9
+      }
+    }, before);
+    addRouteArrows(before);
+  }
+
+  function createRouteArrowIcon() {
+    var size = 36;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext('2d');
+    context.strokeStyle = 'rgba(240,248,255,0.92)';
+    context.lineWidth = size * 0.16;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
+    context.moveTo(size * 0.28, size * 0.58);
+    context.lineTo(size * 0.5, size * 0.34);
+    context.lineTo(size * 0.72, size * 0.58);
+    context.stroke();
+    var image = context.getImageData(0, 0, size, size);
+    map.addImage('caravana-route-arrow', {
+      width: size,
+      height: size,
+      data: new Uint8Array(image.data.buffer)
+    });
+  }
+
+  function addRouteArrows(before) {
+    createRouteArrowIcon();
+    map.addLayer({
+      id: 'caravana-route-arrows',
+      type: 'symbol',
+      source: 'caravana-route',
+      filter: ['!=', ['get', 'kind'], 'fallback'],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 90,
+        'icon-image': 'caravana-route-arrow',
+        'icon-size': 0.75,
+        'icon-rotation-alignment': 'map',
+        'icon-pitch-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true
+      }
+    }, before);
+  }
+
+  // Estilo tipo Waze: menos ruido de etiquetas de negocios y calles más
+  // legibles, con las arterias resaltadas sobre la base.
+  function hideClutter() {
+    var layers = map.getStyle().layers || [];
+    for (var index = 0; index < layers.length; index += 1) {
+      var layer = layers[index];
+      if (layer.type !== 'symbol') continue;
+      var sourceLayer = layer['source-layer'] || '';
+      if (sourceLayer === 'poi' || sourceLayer === 'housenumber') {
+        try {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        } catch (error) {
+          // Si el estilo no permite ocultarla, se deja como está.
+        }
+      }
+    }
+  }
+
+  function addRoadStyle() {
+    var style = map.getStyle();
+    var sources = style.sources || {};
+    var sourceId = Object.keys(sources).filter(function (id) {
+      return sources[id].type === 'vector';
+    })[0];
+    if (!sourceId) return;
+    var before = firstSymbolLayerId();
+    map.addLayer({
+      id: 'caravana-arteries',
+      type: 'line',
+      source: sourceId,
+      'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['primary', 'secondary', 'tertiary']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#4b5670',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 14, 3, 16, 6, 18, 11],
+        'line-opacity': 0.95
+      }
+    }, before);
+    map.addLayer({
+      id: 'caravana-highways',
+      type: 'line',
+      source: sourceId,
+      'source-layer': 'transportation',
+      filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#5d6a86',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 14, 4, 16, 7.5, 18, 13],
+        'line-opacity': 0.95
       }
     }, before);
   }
@@ -1465,9 +1579,11 @@ export const WORLD_MAP_HTML = `<!doctype html>
       map.setPitch(pitchFor(state.mode));
       addTerrain();
       addBuildings();
+      addRoadStyle();
       addRoute();
       addGuideLayer();
       addBrakeLayer();
+      hideClutter();
       addVehicle();
       addDestination();
       addParking();

@@ -78,9 +78,13 @@
   - el botón de recentrar vuelve a seguirlo con zoom 16,5.
 - Marcadores de la party con inicial, color, nombre y pulso al hablar.
 - Destino con bandera y etiqueta.
-- Ruta con casing oscuro:
-  - naranja para GraphHopper;
-  - lima para la ruta directa de fallback.
+- Ruta estilo Waze:
+  - cinta gruesa con **casing oscuro**, cuerpo naranja y **brillo interior**;
+    ancho dependiente del zoom;
+  - **flechas de dirección** repetidas a lo largo de la ruta;
+  - la ruta directa de fallback se pinta en lima;
+  - arterias y autopistas resaltadas sobre la base y etiquetas de negocios
+    ocultas para reducir ruido visual.
 - HUD con velocidad (`coords.speed`), estado GPS/demo y botones rápidos a Party,
   Retos, Repostar y Conducir.
 - Aviso de permiso/error con **REINTENTAR** y aviso de error del mapa con
