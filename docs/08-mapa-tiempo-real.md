@@ -1,11 +1,11 @@
 # Caravana — Mapa 3D y ubicación en tiempo real
 
-> Estado: el mapa es la **pantalla inicial personal** de la app (estilo Waze,
-> a pantalla completa, sin pestaña propia): tu coche, tu destino y tus amigos
-> en el mapa. Usa MapLibre GL en 3D sobre datos de OpenStreetMap/OpenFreeMap,
-> muestra edificios y relieve, sigue la posición y el rumbo del vehículo con
-> asistencia de conducción y frenado. La Party tiene su propio mapa en la
-> pestaña Party. Probado en web y en Android (development build).
+> Estado: la pestaña **Inicio** es la pantalla inicial personal de la app
+> (estilo Waze): tu coche, tu destino y tus amigos en el mapa. Usa MapLibre GL
+> en 3D sobre datos de OpenStreetMap/OpenFreeMap, muestra edificios y relieve,
+> sigue la posición y el rumbo del vehículo con asistencia de conducción y
+> frenado. La Party tiene su propio mapa en la pestaña Party. Probado en web y
+> en Android (development build).
 
 ---
 
@@ -20,8 +20,8 @@
     exageración 1.
   - Atribución obligatoria en la interfaz: OpenFreeMap, OpenMapTiles,
     OpenStreetMap y relieve Mapzen.
-- **Pantalla inicial**: `app/index.tsx`, personal y a pantalla completa (estilo
-  Waze, sin pestaña Mapa ni elementos de party). El antiguo dashboard pasó a
+- **Pantalla inicial**: `app/(tabs)/index.tsx`, personal y estilo Waze (pestaña
+  **Inicio** en el tab bar, sin elementos de party). El antiguo dashboard pasó a
   `app/actividad.tsx`, accesible desde el botón de actividad del mapa.
 - **Amigos en el mapa**: los amigos con posición conocida (su última party con
   ubicación compartida) aparecen como marcadores; al tocarlos se abre una hoja
@@ -89,7 +89,7 @@ Archivos principales:
 | `movil/src/hooks/useLiveLocation.ts` | suscripción GPS compartida |
 | `movil/src/hooks/useGraphHopperRoute.ts` | ruta compartida y deduplicada |
 | `movil/src/hooks/useParty.ts` | publicación de posición en la party |
-| `movil/app/index.tsx` | pantalla inicial del mapa (personal) |
+| `movil/app/(tabs)/index.tsx` | pantalla Inicio: mapa personal |
 | `movil/app/(tabs)/party.tsx` | mapa de la party con el mismo motor |
 
 ---

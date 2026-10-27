@@ -18,6 +18,15 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Inicio',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={22} color={color as string} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="party"
         options={{
           title: 'Party',
