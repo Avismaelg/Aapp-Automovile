@@ -137,6 +137,10 @@ Mapa
   movió más de 8 m o giró más de 6°.
 - `easeTo` mueve centro, rumbo e inclinación; el zoom solo cambia al iniciar o
   recentrar (o si el zoom quedó por debajo del de seguimiento).
+- **Siempre se vuelve a tu seguimiento**: al abrir la app, al volver a primer
+  plano y al entrar en la pestaña Inicio, el mapa reengancha el seguimiento y
+  hace zoom sobre tu posición (`useFocusEffect` + `AppState` + token de
+  recentrar), aunque lo hubieras soltado arrastrando antes.
 - Los eventos `dragstart`, `rotatestart` y `pitchstart` con `originalEvent`
   desactivan el seguimiento; los movimientos programáticos no.
 - Los marcadores se reproyectan cuando carga el terreno (`sourcedata`), porque

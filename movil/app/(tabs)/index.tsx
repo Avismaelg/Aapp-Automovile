@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WorldMap } from '@/src/components/WorldMap';
@@ -99,6 +99,26 @@ export default function NavigationScreen() {
 
   const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
   const handleMapError = useCallback((message: string) => setMapError(message), []);
+
+  // Al abrir la app, volver a ella o entrar a Inicio, el mapa siempre sigue tu
+  // posición otra vez (aunque hayas arrastrado el mapa antes).
+  const ensureFollowing = useCallback(() => {
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      ensureFollowing();
+    }, [ensureFollowing]),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') ensureFollowing();
+    });
+    return () => subscription.remove();
+  }, [ensureFollowing]);
 
   useEffect(() => {
     if (isNavigating && !destination) {
