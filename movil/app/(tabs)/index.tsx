@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,12 +17,33 @@ import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
-import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
+import type { RouteInstructionIcon, WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
+import {
+  cumulativeDistances,
+  formatInstructionDistance,
+  nextInstruction,
+  routeProgress,
+} from '@/src/lib/route-instructions';
 import { useChosenDestination } from '@/src/store/destination';
 import { useParking } from '@/src/store/parking';
 import { colors, radius, spacing } from '@/src/theme';
 
 const GLASS = 'rgba(6,8,11,0.74)';
+
+const instructionIcons: Record<RouteInstructionIcon, keyof typeof Ionicons.glyphMap> = {
+  straight: 'arrow-up',
+  left: 'arrow-back',
+  right: 'arrow-forward',
+  'slight-left': 'return-up-back',
+  'slight-right': 'return-up-forward',
+  'sharp-left': 'arrow-back',
+  'sharp-right': 'arrow-forward',
+  uturn: 'refresh',
+  roundabout: 'sync',
+  merge: 'git-merge',
+  arrive: 'flag',
+  depart: 'navigate',
+};
 
 function formatParkingDistance(meters: number | null) {
   if (meters == null) return 'aquí cerca';
@@ -52,6 +73,7 @@ export default function NavigationScreen() {
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
+  const recentDestinations = useChosenDestination((state) => state.recents);
   const isNavigating = useChosenDestination((state) => state.isNavigating);
   const startNavigation = useChosenDestination((state) => state.startNavigation);
 
@@ -96,6 +118,29 @@ export default function NavigationScreen() {
         ? 'Calles OSM'
         : 'Ruta directa'
     : null;
+
+  // Progreso sobre la ruta y próxima maniobra, como Waze.
+  const routeCumulative = useMemo(
+    () => (route.route ? cumulativeDistances(route.route.coordinates) : []),
+    [route.route],
+  );
+  const progressM = useMemo(
+    () =>
+      route.route
+        ? (routeProgress(route.route.coordinates, routeCumulative, live.location)?.progressM ?? null)
+        : null,
+    [route.route, routeCumulative, live.location],
+  );
+  const upcoming = useMemo(
+    () => nextInstruction(route.route?.instructions, progressM),
+    [route.route, progressM],
+  );
+  const remainingRouteM =
+    route.route && progressM != null ? Math.max(0, route.route.distanceM - progressM) : null;
+  const remainingTimeMs =
+    route.route && remainingRouteM != null && route.route.distanceM > 0
+      ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
+      : null;
 
   const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
   const handleMapError = useCallback((message: string) => setMapError(message), []);
@@ -277,28 +322,46 @@ export default function NavigationScreen() {
         {navigating && destination ? (
           <View pointerEvents="box-none" style={styles.navLayer}>
             <View style={styles.navTop}>
-              <View style={styles.navChip}>
-                <Ionicons name="navigate" size={12} color="#120802" />
-                <AppText variant="label" color="#120802" style={styles.navChipText}>
-                  NAVEGACIÓN
+              <View style={styles.navInstructionRow}>
+                <View style={styles.navInstructionIcon}>
+                  <Ionicons
+                    name={upcoming ? instructionIcons[upcoming.icon] : 'navigate'}
+                    size={24}
+                    color="#120802"
+                  />
+                </View>
+                <View style={styles.navInstructionText}>
+                  <AppText variant="h2" numberOfLines={2}>
+                    {upcoming ? upcoming.text : 'Sigue la ruta'}
+                  </AppText>
+                  {upcoming?.road && upcoming.icon !== 'arrive' ? (
+                    <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                      {upcoming.road}
+                    </AppText>
+                  ) : null}
+                </View>
+                {upcoming ? (
+                  <AppText variant="h2" color={colors.lime} style={styles.navInstructionDistance}>
+                    {formatInstructionDistance(upcoming.remainingM)}
+                  </AppText>
+                ) : null}
+              </View>
+              <View style={styles.navMetaRow}>
+                <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
+                  {routeLine
+                    ? `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)} restantes`
+                    : 'Calculando ruta por calles…'}
+                </AppText>
+                <View style={styles.navMetaDot} />
+                <AppText
+                  variant="caption"
+                  color={colors.muted}
+                  numberOfLines={1}
+                  style={{ flexShrink: 1 }}
+                >
+                  {destination.label}
                 </AppText>
               </View>
-              <AppText
-                variant="caption"
-                color={colors.textSoft}
-                numberOfLines={1}
-                style={styles.navDestination}
-              >
-                {destination.label}
-              </AppText>
-              <AppText variant="display" style={styles.navEta}>
-                {routeLine ? (routeLine.split(' · ')[1] ?? '--') : '--'}
-              </AppText>
-              <AppText variant="label" color={colors.muted}>
-                {routeLine
-                  ? `${routeLine.split(' · ')[0]} · ${routeSourceLabel}`
-                  : 'Calculando ruta por calles…'}
-              </AppText>
             </View>
             <View style={styles.navSpeed}>
               <AppText variant="display" style={styles.navSpeedValue}>
@@ -381,6 +444,33 @@ export default function NavigationScreen() {
               </AppText>
               <Ionicons name="search" size={14} color={colors.muted} />
             </Pressable>
+
+            {destination == null && recentDestinations.length > 0 ? (
+              <View style={styles.recentsRow}>
+                {recentDestinations.slice(0, 3).map((recent) => (
+                  <Pressable
+                    key={`${recent.label}-${recent.latitude.toFixed(5)}`}
+                    style={styles.recentChip}
+                    onPress={() => {
+                      useChosenDestination.getState().setDestination(recent);
+                      startNavigation();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ir a ${recent.label}`}
+                  >
+                    <Ionicons name="time-outline" size={11} color={colors.muted} />
+                    <AppText
+                      variant="caption"
+                      color={colors.textSoft}
+                      numberOfLines={1}
+                      style={styles.recentChipText}
+                    >
+                      {recent.label}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             {activeTrip ? (
               <View style={styles.recordingPill}>
@@ -666,6 +756,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
+  recentChipText: { flexShrink: 1 },
+  recentsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  recentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '48%',
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   recordingDot: {
     width: 7,
     height: 7,
@@ -780,28 +889,41 @@ const styles = StyleSheet.create({
   friendText: { flex: 1 },
   navLayer: { flex: 1 },
   navTop: {
-    alignItems: 'center',
-    gap: 6,
     marginHorizontal: -spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
-    backgroundColor: 'rgba(6,8,11,0.68)',
+    backgroundColor: 'rgba(6,8,11,0.72)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(201,255,77,0.25)',
   },
-  navChip: {
+  navInstructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  navInstructionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navInstructionText: { flex: 1 },
+  navInstructionDistance: { fontSize: 22 },
+  navMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.lime,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    marginTop: spacing.sm,
   },
-  navChipText: { fontSize: 9 },
-  navDestination: { maxWidth: '100%' },
-  navEta: { fontSize: 46, lineHeight: 50, color: colors.lime },
+  navMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.dim,
+  },
   navSpeed: {
     position: 'absolute',
     left: 0,

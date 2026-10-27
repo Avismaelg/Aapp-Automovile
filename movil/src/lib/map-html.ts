@@ -23,11 +23,33 @@ export type WorldMapLocation = {
 };
 
 // Coordenadas en formato [latitud, longitud], igual que GraphHopper.
+export type RouteInstructionIcon =
+  | 'straight'
+  | 'left'
+  | 'right'
+  | 'slight-left'
+  | 'slight-right'
+  | 'sharp-left'
+  | 'sharp-right'
+  | 'uturn'
+  | 'roundabout'
+  | 'merge'
+  | 'arrive'
+  | 'depart';
+
+export type RouteInstruction = {
+  icon: RouteInstructionIcon;
+  text: string;
+  road?: string;
+  atDistanceM: number;
+};
+
 export type WorldMapRoute = {
   coordinates: [number, number][];
   distanceM: number;
   timeMs: number;
   source: 'graphhopper' | 'osrm' | 'fallback';
+  instructions?: RouteInstruction[];
 };
 
 export type WorldMapMode = '2d' | '3d';

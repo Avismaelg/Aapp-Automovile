@@ -38,6 +38,13 @@
   activo puede fijarlo); todos la ven por Realtime. También hay **Compartir
   ruta** con un enlace `caravana://destino?lat=…&lng=…&label=…` que abre la app
   y ofrece aceptar la ruta.
+- **Indicaciones giro a giro**: la ruta pide los pasos al motor (OSRM
+  `steps=true`, GraphHopper `instructions=true`) y muestra la próxima maniobra
+  con icono, texto y distancia («Gira a la derecha por Avenida Tiradentes ·
+  180 m»), más el tiempo y la distancia **restantes** calculados con tu progreso
+  real sobre la polilínea (punto más cercano).
+- **Destinos recientes**: Inicio guarda los últimos 4 destinos y los muestra
+  como chips para repetir la ruta con un toque.
 - **Modo de videojuego (estilo Forza Horizon)**: al elegir una ruta o pulsar
   **Navegar**, el mapa pasa a pantalla completa: bandera **CONVOY** con el
   nombre de la party, ETA y distancia grandes y velocímetro; las únicas

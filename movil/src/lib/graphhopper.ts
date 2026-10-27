@@ -1,4 +1,5 @@
 import type { WorldMapRoute } from '@/src/lib/map-html';
+import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -49,6 +50,13 @@ type GraphHopperResponse = {
     points: {
       coordinates: [number, number][];
     };
+    instructions?: {
+      text?: string;
+      distance?: number;
+      sign?: number;
+      interval?: [number, number];
+      street_name?: string;
+    }[];
   }[];
   message?: string;
 };
@@ -77,7 +85,7 @@ export async function fetchGraphHopperRoute({
     `point=${destination.latitude},${destination.longitude}`,
     `profile=${encodeURIComponent(GRAPHHOPPER_PROFILE)}`,
     'points_encoded=false',
-    'instructions=false',
+    'instructions=true',
     'calc_points=true',
     'locale=es',
   ];
@@ -116,6 +124,7 @@ export async function fetchGraphHopperRoute({
     distanceM: path.distance,
     timeMs: path.time,
     source: 'graphhopper',
+    instructions: instructionsFromGraphHopper(path.instructions ?? [], coordinates),
   };
 }
 
@@ -127,6 +136,17 @@ type OsrmResponse = {
     geometry?: {
       coordinates: [number, number][];
     };
+    legs?: {
+      steps?: {
+        distance: number;
+        name?: string;
+        maneuver?: {
+          type?: string;
+          modifier?: string;
+          exit?: number;
+        };
+      }[];
+    }[];
   }[];
 };
 
@@ -144,7 +164,7 @@ export async function fetchOsrmRoute({
   signal?: AbortSignal;
 }): Promise<WorldMapRoute> {
   const path = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
-  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=true&alternatives=false`;
 
   const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
   const data = (await response.json()) as OsrmResponse;
@@ -172,6 +192,9 @@ export async function fetchOsrmRoute({
     distanceM: route.distance,
     timeMs: route.duration * 1000,
     source: 'osrm',
+    instructions: instructionsFromOsrm(
+      route.legs?.flatMap((leg) => leg.steps ?? []) ?? [],
+    ),
   };
 }
 
