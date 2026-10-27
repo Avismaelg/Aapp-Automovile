@@ -130,8 +130,11 @@ Mapa
   abajo en pantalla (55 % arriba, 10 % abajo) para ver hacia adelante, como una
   cámara 360 montada detrás del vehículo. El padding se recalcula al cambiar el
   tamaño del contenedor.
-- Para no "enloquecer" con cada señal GPS, el seguimiento solo re-anima si el
-  coche se movió más de 12 m o giró más de 10° desde la última animación.
+- Para que el seguimiento sea fluido, la cámara no salta a cada señal GPS:
+  proyecta a donde estará el coche con su velocidad (2,2 s de anticipación) y
+  desliza con easing lineal durante ~1,9 s hasta ese punto. El rumbo se
+  suaviza con un filtro (el GPS tiembla ±20°) y solo re-anima si el coche se
+  movió más de 8 m o giró más de 6°.
 - `easeTo` mueve centro, rumbo e inclinación; el zoom solo cambia al iniciar o
   recentrar (o si el zoom quedó por debajo del de seguimiento).
 - Los eventos `dragstart`, `rotatestart` y `pitchstart` con `originalEvent`

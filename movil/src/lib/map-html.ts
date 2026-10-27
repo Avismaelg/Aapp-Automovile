@@ -188,6 +188,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var routePoints = [];
   var guideMarker = null;
   var lastFollow = null;
+  var smoothedHeading = null;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -252,15 +253,22 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
   function follow(animate, zoomIn) {
     if (!mapReady || !state.location) return;
-    var center = lngLatOf(state.location);
+    var point = state.location;
     var bearing = state.heading !== null ? state.heading : map.getBearing();
+    var center = lngLatOf(point);
+    var moving = typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
 
-    // Si el coche apenas se movió o giró, no re-animamos: evita el salto
-    // constante de la cámara con cada señal GPS.
+    // Movimiento continuo: en vez de saltar a cada señal GPS, proyectamos a
+    // donde estará el coche y la cámara desliza hasta ese punto.
+    if (moving) {
+      var meters = (point.speedKmh / 3.6) * 2.2;
+      center = aheadLngLat(point, bearing, meters);
+    }
+
     if (lastFollow && !zoomIn) {
       var moved = haversineLngLat(lastFollow.center, center);
       var turned = Math.abs(((bearing - lastFollow.bearing + 540) % 360) - 180);
-      if (moved < 12 && turned < 10) return;
+      if (moved < 8 && turned < 6) return;
     }
     lastFollow = { center: center, bearing: bearing };
 
@@ -268,9 +276,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
       center: center,
       pitch: pitchFor(state.mode),
       bearing: bearing,
-      duration: animate ? 800 : 0,
+      duration: animate ? (moving ? 1900 : 500) : 0,
       essential: true
     };
+    if (moving) options.easing = function (t) { return t; };
     if (zoomIn || map.getZoom() < FOLLOW_ZOOM - 0.5) options.zoom = FOLLOW_ZOOM;
     map.easeTo(options);
   }
@@ -281,7 +290,14 @@ export const WORLD_MAP_HTML = `<!doctype html>
     state.location = location;
     var moving = typeof location.speedKmh !== 'number' || location.speedKmh >= MOVING_KMH;
     if (typeof location.heading === 'number' && location.heading >= 0 && moving) {
-      state.heading = location.heading;
+      // Filtro simple: el GPS tiembla ±20°, la cámara no debe bailar.
+      if (smoothedHeading === null) {
+        smoothedHeading = location.heading;
+      } else {
+        var delta = ((location.heading - smoothedHeading + 540) % 360) - 180;
+        smoothedHeading = (smoothedHeading + delta * 0.5 + 360) % 360;
+      }
+      state.heading = smoothedHeading;
     }
     if (!mapReady) return;
     vehicleMarker.setLngLat(lngLatOf(location));
@@ -1109,7 +1125,14 @@ export const WORLD_MAP_HTML = `<!doctype html>
 
     var located = Boolean(state.location);
     car3d.canvas.style.display = located ? 'block' : 'none';
-    if (vehicleMarker) vehicleMarker.getElement().classList.toggle('is-3d', located);
+    if (vehicleMarker) {
+      var element = vehicleMarker.getElement();
+      element.classList.toggle('is-3d', located);
+      // Con relieve e inclinación MapLibre puede colocar el marcador DOM en
+      // posiciones raras; escondido no molesta.
+      element.style.opacity = located ? '0' : '';
+      element.style.display = located ? 'none' : '';
+    }
     if (!located) return;
 
     var pitch = map.getPitch() * Math.PI / 180;
