@@ -27,7 +27,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Modo demo local | ✅ entra sin claves y conserva la sesión en el dispositivo |
 | Feed social | ✅ publicaciones de texto y foto, likes, comentarios y visibilidad reales con Realtime; faltan guardados y moderación; demo con feed de ejemplo |
 | Party / mapa en vivo | ✅ crear o unirse por código, miembros y posiciones reales por Supabase Realtime, chat en vivo, 3 canales de voz (Convoy/Ruta/Charla) y mapa 3D compartido; PTT real integrado con LiveKit, pendiente de secretos y prueba en dispositivos |
-| Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; 🟡 progreso por GPS y anti-trampas pendientes |
+| Retos / emparejamiento | ✅ retos programados e instantáneos con invitación, aceptación, inicio, cronómetro, finalización e historial reales en Supabase + Realtime; ✅ demo local; ✅ retar a un compañero o a todo el convoy desde la party; 🟡 progreso por GPS y anti-trampas pendientes |
 | Garaje multi-vehículo | ✅ coche, moto, EV y camión con QR; lectura y alta reales en Supabase + garaje demo persistente; ✅ foto del vehículo (bucket `vehicles`, recorte 4:3) en la tarjeta del garaje; falta edición de datos |
 | Escáner QR | ✅ cámara nativa + fallback web |
 | Perfil público por usuario y vehículo | ✅ datos técnicos, mantenimiento real en Supabase e historial de venta PDF; falta editar/eliminar mantenimientos |
@@ -36,7 +36,7 @@ Esto es un **MVP visual y funcional**, todavía no una app publicada. Las pantal
 | Tracking en segundo plano | 🟡 servicio base (`expo-location` + `TaskManager`), falta UI de revisión |
 | Supabase | ✅ proyecto `ecmqmgpruxclmpnnpgzv` conectado; Auth, perfil, amigos, garaje, combustible, mantenimiento, feed con fotos, retos, party y borrado de cuenta probados; 🟡 quedan `auth_rls_initplan` y políticas permisivas duplicadas para producción |
 | Voz real (LiveKit) | 🟡 SDK web/nativo, 3 canales por party, Edge Function de tokens y PTT push-to-talk integrados; faltan secretos LiveKit y prueba de audio en dispositivos |
-| Mapa 3D + GPS | ✅ pantalla inicial con MapLibre GL 3D, edificios y relieve, cámara que sigue posición y rumbo, vista 2D/3D y recentrar; posiciones de la party y rutas reales por calles (GraphHopper → OSRM → directa); ✅ búsqueda de destinos (Photon/OSM) y ruta compartida con la party o por enlace `caravana://destino`; ✅ el coche 3D del mapa refleja tu vehículo y su color; 🟡 teselas vectoriales y motor de rutas propio pendientes para producción |
+| Mapa 3D + GPS | ✅ pantalla inicial con MapLibre GL 3D, edificios y relieve, cámara que sigue posición y rumbo, vista 2D/3D y recentrar; posiciones de la party y rutas reales por calles (GraphHopper → OSRM → directa); ✅ búsqueda de destinos (Photon/OSM) y ruta compartida con la party o por enlace `caravana://destino`; ✅ modo de videojuego a pantalla completa (ETA grande, banderas de checkpoint y flecha guía estilo Forza) con solo cambiar/cerrar ruta; ✅ el coche 3D del mapa refleja tu vehículo y su color; 🟡 teselas vectoriales y motor de rutas propio pendientes para producción |
 | 3D garage / clubs / meets | ⏳ fase 2 |
 
 **Pantallas:** Bienvenida, Registro, Inicio de sesión, Mapa 3D, Actividad, Publicar, Amigos, Party, Retos, Garaje, Consumo, Perfil, Escáner, Modo conducción, invitación a party, invitación a reto, perfil público, ficha de venta del vehículo y perfil público de vehículo.

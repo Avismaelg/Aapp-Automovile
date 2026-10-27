@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,6 +46,8 @@ export default function MapScreen() {
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
+  const isNavigating = useChosenDestination((state) => state.isNavigating);
+  const startNavigation = useChosenDestination((state) => state.startNavigation);
   const setPartyDestination = useSetPartyDestination();
 
   usePartyLocation(party?.id, live.location, Boolean(party) && !isDemo && live.isLive);
@@ -134,6 +136,12 @@ export default function MapScreen() {
   const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
   const handleMapError = useCallback((message: string) => setMapError(message), []);
 
+  useEffect(() => {
+    if (isNavigating && !activeDestination) {
+      useChosenDestination.getState().stopNavigation();
+    }
+  }, [isNavigating, activeDestination]);
+
   const shareRouteLink = async () => {
     if (!activeDestination) return;
     const { latitude, longitude, label } = activeDestination;
@@ -215,6 +223,67 @@ export default function MapScreen() {
           { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
         ]}
       >
+        {isNavigating && activeDestination ? (
+          <View pointerEvents="box-none" style={styles.navLayer}>
+            <View style={styles.navTop}>
+              <View style={styles.navChip}>
+                <Ionicons name={inParty ? 'radio' : 'navigate'} size={12} color="#120802" />
+                <AppText variant="label" color="#120802" style={styles.navChipText}>
+                  {inParty ? `CONVOY · ${partyName}` : 'NAVEGACIÓN'}
+                </AppText>
+              </View>
+              <AppText
+                variant="caption"
+                color={colors.textSoft}
+                numberOfLines={1}
+                style={styles.navDestination}
+              >
+                {activeDestination.label}
+              </AppText>
+              <AppText variant="display" style={styles.navEta}>
+                {routeLine ? (routeLine.split(' · ')[1] ?? '--') : '--'}
+              </AppText>
+              <AppText variant="label" color={colors.muted}>
+                {routeLine
+                  ? `${routeLine.split(' · ')[0]} · ${routeSourceLabel}`
+                  : 'Calculando ruta por calles…'}
+              </AppText>
+            </View>
+            <View style={styles.navSpeed}>
+              <AppText variant="display" style={styles.navSpeedValue}>
+                {speedLabel}
+              </AppText>
+              <AppText variant="label" color={colors.muted}>
+                km/h
+              </AppText>
+            </View>
+            <View style={styles.navActions}>
+              <Pressable
+                style={styles.navButtonDark}
+                onPress={() => router.push('/destino' as Href)}
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar ruta"
+              >
+                <Ionicons name="swap-horizontal" size={18} color={colors.text} />
+                <AppText variant="bodyStrong" color={colors.text}>
+                  Cambiar ruta
+                </AppText>
+              </Pressable>
+              <Pressable
+                style={styles.navButtonLime}
+                onPress={clearDestination}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar ruta"
+              >
+                <Ionicons name="close" size={18} color="#120802" />
+                <AppText variant="bodyStrong" color="#120802">
+                  Cerrar ruta
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <>
         <View style={styles.topRow}>
           <Pressable onPress={() => router.push('/(tabs)/profile')} hitSlop={6}>
             <Avatar
@@ -360,6 +429,14 @@ export default function MapScreen() {
                 ) : null}
               </View>
               <View style={styles.destinationActions}>
+                <Button
+                  label="Navegar"
+                  variant="lime"
+                  size="sm"
+                  icon="navigate"
+                  onPress={startNavigation}
+                  style={styles.destinationAction}
+                />
                 {canShareWithParty ? (
                   <Button
                     label="Compartir con la party"
@@ -441,6 +518,8 @@ export default function MapScreen() {
             © OpenFreeMap · © OpenMapTiles · © OpenStreetMap · Relieve Mapzen
           </AppText>
         </Pressable>
+          </>
+        )}
       </View>
     </View>
   );
@@ -534,6 +613,73 @@ const styles = StyleSheet.create({
   },
   destinationAction: { flexShrink: 1 },
   spacer: { flex: 1 },
+  navLayer: { flex: 1 },
+  navTop: {
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: 'rgba(6,8,11,0.68)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(201,255,77,0.25)',
+  },
+  navChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.lime,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  navChipText: { fontSize: 9 },
+  navDestination: { maxWidth: '100%' },
+  navEta: { fontSize: 46, lineHeight: 50, color: colors.lime },
+  navSpeed: {
+    position: 'absolute',
+    left: 0,
+    bottom: 96,
+    alignItems: 'center',
+    backgroundColor: 'rgba(6,8,11,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  navSpeedValue: { fontSize: 40, lineHeight: 44 },
+  navActions: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  navButtonDark: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 52,
+    backgroundColor: 'rgba(6,8,11,0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: radius.xl,
+  },
+  navButtonLime: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 52,
+    backgroundColor: colors.lime,
+    borderRadius: radius.xl,
+  },
   sideRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

@@ -96,6 +96,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
   .vehicle-arrow { position: absolute; left: 0; top: 0; width: 64px; height: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
   .vehicle-arrow path { fill: var(--car-color); stroke: #ffffff; stroke-width: 4; stroke-linejoin: round; }
   .vehicle.is-3d .vehicle-arrow { display: none; }
+  .guide-arrow { pointer-events: none; width: 44px; height: 44px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
+  .guide-arrow path { fill: #c9ff4d; stroke: #06080b; stroke-width: 3; stroke-linejoin: round; }
   .member { position: relative; width: 44px; height: 44px; }
   .member-dot {
     position: absolute; left: 3px; top: 3px; width: 38px; height: 38px; border-radius: 50%;
@@ -150,6 +152,13 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var CAR_LENGTH_PX = 60;
   var CAR_LOOKAHEAD_M = 20;
   var CAMERA_DISTANCE = 1000;
+  var GUIDE_CHECKPOINT_MIN_M = 500;
+  var GUIDE_MAX_CHECKPOINTS = 40;
+  var GUIDE_ARROW_AHEAD_M = 45;
+  var BRAKE_LOOKAHEAD_M = 400;
+  var BRAKE_RED_M = 150;
+  var BRAKE_RED_DEG = 55;
+  var BRAKE_YELLOW_DEG = 25;
 
   var state = {
     location: null,
@@ -172,6 +181,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var memberMarkers = new Map();
   var THREE = null;
   var car3d = null;
+  var routePoints = [];
+  var guideMarker = null;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -259,6 +270,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     vehicleMarker.setLngLat(lngLatOf(location));
     if (state.heading !== null) vehicleMarker.setRotation(state.heading);
     renderCar();
+    updateBrakeAssist();
+    updateGuideArrow();
     if (state.following) follow(true, firstFix);
   }
 
@@ -321,6 +334,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     state.route = route || null;
     if (!mapReady) return;
     var points = state.route && state.route.coordinates ? state.route.coordinates : [];
+    routePoints = points.map(function (point) { return [point[1], point[0]]; });
     var data = EMPTY_ROUTE;
     if (points.length > 1) {
       data = {
@@ -336,6 +350,293 @@ export const WORLD_MAP_HTML = `<!doctype html>
       };
     }
     map.getSource('caravana-route').setData(data);
+    updateGuide();
+  }
+
+  function haversineLngLat(a, b) {
+    var R = 6371000;
+    var toRad = function (deg) { return deg * Math.PI / 180; };
+    var dLat = toRad(b[1] - a[1]);
+    var dLng = toRad(b[0] - a[0]);
+    var h =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  function bearingLngLat(a, b) {
+    var dLng = (b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180);
+    var dLat = b[1] - a[1];
+    var deg = Math.atan2(dLng, dLat) * 180 / Math.PI;
+    return (deg + 360) % 360;
+  }
+
+  // Banderas de checkpoint repartidas a lo largo de la ruta, estilo Forza.
+  function computeCheckpoints(points) {
+    var cumulative = [];
+    var total = 0;
+    for (var i = 1; i < points.length; i += 1) {
+      total += haversineLngLat(points[i - 1], points[i]);
+      cumulative.push(total);
+    }
+    if (total < GUIDE_CHECKPOINT_MIN_M * 2) return [];
+
+    var spacing = Math.max(GUIDE_CHECKPOINT_MIN_M, total / GUIDE_MAX_CHECKPOINTS);
+    var result = [];
+    var next = spacing;
+    var index = 1;
+    while (next < total - spacing * 0.6) {
+      while (index < cumulative.length && cumulative[index - 1] < next) index += 1;
+      if (index >= points.length) break;
+      var before = index === 1 ? 0 : cumulative[index - 2];
+      var span = cumulative[index - 1] - before;
+      var t = span > 0 ? (next - before) / span : 0;
+      var a = points[index - 1];
+      var b = points[index];
+      result.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      next += spacing;
+    }
+    return result;
+  }
+
+  // Punto de la ruta a X metros delante del coche, con el rumbo de ese tramo.
+  function pointAheadOnRoute(origin, meters) {
+    var nearest = 0;
+    var nearestDistance = Infinity;
+    for (var i = 0; i < routePoints.length; i += 1) {
+      var d = haversineLngLat(origin, routePoints[i]);
+      if (d < nearestDistance) {
+        nearestDistance = d;
+        nearest = i;
+      }
+    }
+
+    var walked = 0;
+    for (var j = nearest; j < routePoints.length - 1; j += 1) {
+      var a = routePoints[j];
+      var b = routePoints[j + 1];
+      var span = haversineLngLat(a, b);
+      if (walked + span >= meters) {
+        var t = span > 0 ? (meters - walked) / span : 0;
+        return {
+          point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+          bearing: bearingLngLat(a, b)
+        };
+      }
+      walked += span;
+    }
+
+    var last = routePoints[routePoints.length - 1];
+    var before = routePoints[routePoints.length - 2];
+    return { point: last, bearing: bearingLngLat(before, last) };
+  }
+
+  function updateGuide() {
+    if (!mapReady || !map.getSource('caravana-guide')) return;
+    var checkpoints = routePoints.length > 2 ? computeCheckpoints(routePoints) : [];
+    map.getSource('caravana-guide').setData(
+      checkpoints.length
+        ? {
+            type: 'FeatureCollection',
+            features: checkpoints.map(function (point) {
+              return {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Point', coordinates: point }
+              };
+            })
+          }
+        : EMPTY_ROUTE
+    );
+    updateBrakeAssist();
+    updateGuideArrow();
+  }
+
+  function nearestRouteIndex(origin) {
+    var nearest = 0;
+    var nearestDistance = Infinity;
+    for (var i = 0; i < routePoints.length; i += 1) {
+      var d = haversineLngLat(origin, routePoints[i]);
+      if (d < nearestDistance) {
+        nearestDistance = d;
+        nearest = i;
+      }
+    }
+    return nearest;
+  }
+
+  // Curva siguiente: cambio de rumbo y distancia desde el coche.
+  function brakeLevel(deltaDeg, distanceM) {
+    if (deltaDeg >= BRAKE_RED_DEG && distanceM <= BRAKE_RED_M) return 'red';
+    if (deltaDeg >= BRAKE_YELLOW_DEG) return 'yellow';
+    return 'green';
+  }
+
+  // Asistencia de frenado: pinta los próximos metros de ruta en
+  // verde (sin problema), amarillo (suelta el acelerador) o rojo (frena ya).
+  function updateBrakeAssist() {
+    if (!mapReady || !map.getSource('caravana-brake')) return;
+    if (routePoints.length < 3 || !state.location) {
+      map.getSource('caravana-brake').setData(EMPTY_ROUTE);
+      return;
+    }
+
+    var origin = lngLatOf(state.location);
+    var start = nearestRouteIndex(origin);
+    var segments = [];
+    var walked = 0;
+    var i = start;
+
+    while (i < routePoints.length - 1 && walked < BRAKE_LOOKAHEAD_M) {
+      var a = routePoints[i];
+      var b = routePoints[i + 1];
+      var span = haversineLngLat(a, b);
+      if (span === 0) {
+        i += 1;
+        continue;
+      }
+
+      // Rumbo de entrada y de salida en la curva que sigue a este tramo.
+      var before = routePoints[Math.max(0, i - 1)];
+      var delta = Math.abs(bearingLngLat(before, a) - bearingLngLat(a, b));
+      if (delta > 180) delta = 360 - delta;
+      var level = brakeLevel(delta, walked + span);
+
+      segments.push({
+        type: 'Feature',
+        properties: { level: level },
+        geometry: { type: 'LineString', coordinates: [a, b] }
+      });
+      walked += span;
+      i += 1;
+    }
+
+    map.getSource('caravana-brake').setData({
+      type: 'FeatureCollection',
+      features: segments
+    });
+  }
+
+  function addBrakeLayer() {
+    map.addSource('caravana-brake', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-brake-line',
+      type: 'line',
+      source: 'caravana-brake',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': [
+          'match',
+          ['get', 'level'],
+          'red',
+          '#ff4d5e',
+          'yellow',
+          '#ffc94d',
+          '#3ddc84'
+        ],
+        'line-width': 5,
+        'line-opacity': 0.92
+      }
+    }, firstSymbolLayerId());
+  }
+
+  // Nivel de la primera curva que exige frenar más adelante.
+  function nextBrakeLevel() {
+    var origin = lngLatOf(state.location);
+    var start = nearestRouteIndex(origin);
+    var walked = 0;
+    var i = start;
+    while (i < routePoints.length - 1 && walked < BRAKE_LOOKAHEAD_M) {
+      var a = routePoints[i];
+      var b = routePoints[i + 1];
+      var before = routePoints[Math.max(0, i - 1)];
+      var delta = Math.abs(bearingLngLat(before, a) - bearingLngLat(a, b));
+      if (delta > 180) delta = 360 - delta;
+      var span = haversineLngLat(a, b);
+      var level = brakeLevel(delta, walked + span);
+      if (level !== 'green') return level;
+      walked += span;
+      i += 1;
+    }
+    return 'green';
+  }
+
+  function updateGuideArrow() {
+    if (!mapReady) return;
+    var show = routePoints.length >= 2 && Boolean(state.location);
+    if (!show) {
+      if (guideMarker) guideMarker.getElement().style.display = 'none';
+      return;
+    }
+    var target = pointAheadOnRoute(lngLatOf(state.location), GUIDE_ARROW_AHEAD_M);
+    if (!guideMarker) {
+      var element = document.createElement('div');
+      element.className = 'guide-arrow';
+      element.innerHTML =
+        '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 L34 34 L20 27 L6 34 Z"></path></svg>';
+      guideMarker = new maplibregl.Marker({
+        element: element,
+        rotationAlignment: 'map',
+        pitchAlignment: 'viewport'
+      }).setLngLat(target.point).addTo(map);
+    }
+    guideMarker.getElement().style.display = '';
+    guideMarker.setLngLat(target.point);
+    guideMarker.setRotation(target.bearing);
+    var level = nextBrakeLevel();
+    var arrowPath = guideMarker.getElement().querySelector('path');
+    if (arrowPath) {
+      arrowPath.setAttribute(
+        'fill',
+        level === 'red' ? '#ff4d5e' : level === 'yellow' ? '#ffc94d' : '#c9ff4d'
+      );
+    }
+  }
+
+  function createFlagIcon() {
+    var size = 60;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext('2d');
+    context.fillStyle = 'rgba(6,8,11,0.9)';
+    context.fillRect(size * 0.42, size * 0.14, size * 0.07, size * 0.72);
+    context.beginPath();
+    context.moveTo(size * 0.49, size * 0.16);
+    context.lineTo(size * 0.86, size * 0.3);
+    context.lineTo(size * 0.49, size * 0.46);
+    context.closePath();
+    context.fillStyle = '#c9ff4d';
+    context.fill();
+    context.strokeStyle = 'rgba(6,8,11,0.85)';
+    context.lineWidth = size * 0.05;
+    context.stroke();
+    context.beginPath();
+    context.arc(size * 0.455, size * 0.87, size * 0.09, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(201,255,77,0.9)';
+    context.fill();
+    var image = context.getImageData(0, 0, size, size);
+    map.addImage('caravana-guide-flag', {
+      width: size,
+      height: size,
+      data: new Uint8Array(image.data.buffer)
+    });
+  }
+
+  function addGuideLayer() {
+    createFlagIcon();
+    map.addSource('caravana-guide', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-guide-flags',
+      type: 'symbol',
+      source: 'caravana-guide',
+      layout: {
+        'icon-image': 'caravana-guide-flag',
+        'icon-size': 0.85,
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true
+      }
+    }, firstSymbolLayerId());
   }
 
   function setMode(mode) {
@@ -850,6 +1151,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     addTerrain();
     addBuildings();
     addRoute();
+    addGuideLayer();
+    addBrakeLayer();
     addVehicle();
     addDestination();
     setMembers(state.members);

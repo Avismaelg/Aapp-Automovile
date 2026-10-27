@@ -32,6 +32,19 @@
   activo puede fijarlo); todos la ven por Realtime. También hay **Compartir
   ruta** con un enlace `caravana://destino?lat=…&lng=…&label=…` que abre la app
   y ofrece aceptar la ruta.
+- **Modo de videojuego (estilo Forza Horizon)**: al elegir una ruta o pulsar
+  **Navegar**, el mapa pasa a pantalla completa: bandera **CONVOY** con el
+  nombre de la party, ETA y distancia grandes y velocímetro; las únicas
+  opciones son **Cambiar ruta** y **Cerrar ruta**.
+- **Asistencia de conducción**: banderas de checkpoint repartidas a lo largo de
+  la ruta (cada 500 m, máx. 40), flecha guía 45 m delante del coche con el rumbo
+  del tramo y **asistencia de frenado**: los próximos 400 m de ruta se pintan
+  **verde** (sin problema), **amarillo** (curva moderada) o **rojo** (curva
+  cerrada cerca: frena ya). La flecha guía toma el color de la próxima curva.
+- **Retar desde la party**: cada piloto del convoy es un botón para retarlo a
+  llegar primero (reto instantáneo de llegada, nunca por velocidad) y hay
+  **Retar al convoy** para todo el grupo; además **Mapa del convoy** salta al
+  mapa en modo de videojuego.
 - Vehículo 3D:
   - modelo procedural con Three.js 0.186.1 (sin GLB), dibujado sobre el mapa con
     la misma inclinación de la cámara; mide unos 60 px de largo en cualquier zoom;

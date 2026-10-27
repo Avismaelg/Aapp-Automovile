@@ -109,6 +109,7 @@ async function searchPlaces(
 export default function DestinationScreen() {
   const live = useLiveLocation();
   const setDestination = useChosenDestination((state) => state.setDestination);
+  const startNavigation = useChosenDestination((state) => state.startNavigation);
   const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string }>();
 
   const [query, setQuery] = useState('');
@@ -135,6 +136,7 @@ export default function DestinationScreen() {
       longitude: sharedLongitude,
       label: (Array.isArray(params.label) ? params.label[0] : params.label)?.trim() || 'Destino compartido',
     });
+    startNavigation();
     router.replace('/(tabs)');
   };
 
@@ -177,7 +179,8 @@ export default function DestinationScreen() {
       longitude: place.longitude,
       label: place.name,
     });
-    router.back();
+    startNavigation();
+    router.replace('/(tabs)');
   };
 
   if (isSharedRoute) {

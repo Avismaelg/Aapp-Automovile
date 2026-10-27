@@ -23,6 +23,9 @@ import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/compone
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
+import { useChosenDestination } from '@/src/store/destination';
+import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
@@ -211,6 +214,64 @@ export default function PartyScreen() {
       url: partyUrl(partyCode),
     });
 
+  const startNavigation = useChosenDestination((state) => state.startNavigation);
+  const createChallenge = useCreateChallenge();
+  const { vehicles: garageVehicles } = useGarageVehicles();
+  const primaryVehicle = garageVehicles.find((item) => item.isPrimary) ?? garageVehicles[0];
+
+  const openConvoyMap = () => {
+    if (destination) startNavigation();
+    router.replace('/(tabs)');
+  };
+
+  // Reto instantáneo de llegada: nunca por velocidad máxima.
+  const challengePilots = (title: string, pilots: DisplayMember[]) => {
+    if (isDemo) {
+      Alert.alert('Retos', 'Los retos reales requieren una cuenta conectada.');
+      return;
+    }
+    const invitees = pilots
+      .filter((member) => !member.isMe)
+      .map((member) => ({ userId: member.id, vehicleKind: 'car' as const }));
+    if (invitees.length === 0) {
+      Alert.alert('Retos', 'Todavía no hay pilotos a quienes retar.');
+      return;
+    }
+    Alert.alert(
+      title,
+      'Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reto',
+          style: 'destructive',
+          onPress: () => {
+            void createChallenge
+              .mutateAsync({
+                title: title.replace('Reto a ', 'Reto: '),
+                category: 'mixed',
+                mode: 'instant',
+                fromLabel: 'Salida del convoy',
+                toLabel: partyDestination,
+                distanceKm: (graphHopper.route?.distanceM ?? 0) / 1000,
+                rules: 'Por llegada: gana quien llegue primero respetando las leyes.',
+                hostVehicleId: primaryVehicle?.id,
+                hostVehicleKind: primaryVehicle?.kind ?? 'car',
+                invitees,
+              })
+              .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
+              .catch((error: unknown) =>
+                Alert.alert(
+                  'Reto',
+                  error instanceof Error ? error.message : 'No pudimos crear el reto.',
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
   const leave = async () => {
     if (isDemo) {
       router.replace('/(tabs)');
@@ -383,12 +444,14 @@ export default function PartyScreen() {
               {!destination
                 ? 'Sin destino · comparte solo la caravana en vivo'
                 : graphHopper.isLoading
-                  ? 'Calculando ruta con GraphHopper…'
+                  ? 'Calculando ruta por calles…'
                   : graphHopper.error
-                    ? 'GraphHopper no disponible · ruta directa'
+                    ? 'Sin ruta por calles · línea directa'
                     : graphHopper.source === 'graphhopper'
                       ? `GraphHopper · ${routeDistance} · ${routeDuration}`
-                      : 'Ruta directa · configura GraphHopper'}
+                      : graphHopper.source === 'osrm'
+                        ? `Calles OSM · ${routeDistance} · ${routeDuration}`
+                        : 'Ruta directa · configura GraphHopper'}
             </AppText>
           </View>
         </View>
@@ -431,7 +494,14 @@ export default function PartyScreen() {
           contentContainerStyle={styles.memberRow}
         >
           {displayMembers.map((member) => (
-            <View key={member.id} style={styles.member}>
+            <Pressable
+              key={member.id}
+              onPress={() => challengePilots(`Reto a ${member.name.split(' ')[0]}`, [member])}
+              disabled={member.isMe}
+              style={({ pressed }) => [styles.member, pressed && { opacity: 0.75 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Retar a ${member.name}`}
+            >
               <Avatar
                 name={member.name}
                 color={member.color}
@@ -451,12 +521,31 @@ export default function PartyScreen() {
                       : 'EN VIVO'}
                 </AppText>
               </View>
-            </View>
+            </Pressable>
           ))}
           <Pressable style={styles.addMember} onPress={() => void shareParty()}>
             <Ionicons name="add" size={20} color={colors.muted} />
           </Pressable>
         </ScrollView>
+
+        <View style={styles.convoyActions}>
+          <Button
+            label="Mapa del convoy"
+            variant="lime"
+            size="sm"
+            icon="navigate"
+            onPress={openConvoyMap}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label="Retar al convoy"
+            variant="secondary"
+            size="sm"
+            icon="flag"
+            onPress={() => challengePilots(`Reto al convoy: ${partyName}`, displayMembers)}
+            style={{ flex: 1 }}
+          />
+        </View>
 
         <View style={styles.routeCard}>
           <View style={styles.routePoint}>
@@ -699,6 +788,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   memberRow: { gap: 8, paddingVertical: spacing.md, paddingRight: spacing.lg },
+  convoyActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   member: {
     flexDirection: 'row',
     alignItems: 'center',
