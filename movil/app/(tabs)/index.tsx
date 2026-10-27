@@ -11,6 +11,7 @@ import { useFriendsOnMap } from '@/src/hooks/useFriendsOnMap';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
@@ -18,9 +19,16 @@ import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
 import { useChosenDestination } from '@/src/store/destination';
+import { useParking } from '@/src/store/parking';
 import { colors, radius, spacing } from '@/src/theme';
 
 const GLASS = 'rgba(6,8,11,0.74)';
+
+function formatParkingDistance(meters: number | null) {
+  if (meters == null) return 'aquí cerca';
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+}
 
 // Pantalla inicial personal, estilo Waze: tu coche, tu destino y tus amigos
 // en el mapa para invitarlos al convoy o retarlos. Sin elementos de party.
@@ -60,6 +68,12 @@ export default function NavigationScreen() {
     live.location,
     primaryVehicle ? `${primaryVehicle.make} ${primaryVehicle.model}` : undefined,
   );
+  const parkingSpot = useParking((state) => state.spot);
+  const clearParking = useParking((state) => state.clearSpot);
+  useParkingDetector(live.location);
+  const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
+  const showParking =
+    Boolean(parkingSpot) && parkingDistance != null && parkingDistance > 40;
   const vehicleLabel = primaryVehicle
     ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
     : 'Añade tu vehículo';
@@ -121,6 +135,16 @@ export default function NavigationScreen() {
 
   const clearDestination = () => {
     clearChosenDestination();
+  };
+
+  const goToParkedCar = () => {
+    if (!parkingSpot) return;
+    useChosenDestination.getState().setDestination({
+      latitude: parkingSpot.latitude,
+      longitude: parkingSpot.longitude,
+      label: 'Mi coche',
+    });
+    startNavigation();
   };
 
   // Acciones sobre un amigo visto en el mapa.
@@ -197,6 +221,11 @@ export default function NavigationScreen() {
         members={mapFriends}
         destination={destination}
         location={live.location}
+        parking={
+          parkingSpot
+            ? { latitude: parkingSpot.latitude, longitude: parkingSpot.longitude }
+            : null
+        }
         route={route.route}
         mode={mode}
         vehicleColor={primaryVehicle?.color}
@@ -332,6 +361,32 @@ export default function NavigationScreen() {
                   {(activeTrip.distanceM / 1000).toFixed(1).replace('.', ',')} km
                 </AppText>
               </View>
+            ) : null}
+
+            {showParking && parkingSpot ? (
+              <Pressable
+                style={styles.parkingPill}
+                onPress={goToParkedCar}
+                onLongPress={() =>
+                  Alert.alert('Coche aparcado', '¿Olvidar la ubicación guardada?', [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Olvidar', style: 'destructive', onPress: clearParking },
+                  ])
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ir a mi coche aparcado"
+              >
+                <Ionicons name="car" size={15} color={colors.cyan} />
+                <AppText
+                  variant="caption"
+                  color={colors.textSoft}
+                  style={styles.parkingText}
+                  numberOfLines={1}
+                >
+                  Tu coche aparcado · {formatParkingDistance(parkingDistance)}
+                </AppText>
+                <Ionicons name="navigate" size={14} color={colors.cyan} />
+              </Pressable>
             ) : null}
 
             {!live.isLive ? (
@@ -587,6 +642,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.lime,
   },
+  parkingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    backgroundColor: GLASS,
+    borderWidth: 1,
+    borderColor: 'rgba(77,225,255,0.4)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  parkingText: { flexShrink: 1 },
   spacer: { flex: 1 },
   sideRow: {
     flexDirection: 'row',

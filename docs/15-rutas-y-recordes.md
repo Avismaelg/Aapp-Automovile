@@ -75,7 +75,21 @@ conducción responsable.
 - Falta un editor de tramos desde la app; hoy se cargan por migración.
 - Sin caché de teselas offline (MapLibre GL JS no la trae integrada).
 
-## 5. Optimización aplicada
+## 5. Coche aparcado
+
+- El gancho `useParkingDetector` guarda el **último punto en movimiento** cuando
+  el coche lleva 3 minutos por debajo de 2,5 km/h (si antes se movió a más de
+  10 km/h). Se persiste en `caravana.parking.v1`, así que sobrevive al cierre de
+  la app y a estar sin conexión.
+- Al abrir la app con el coche ya aparcado se toma como referencia el último
+  punto de la ruta más reciente (menos de 24 h).
+- El mapa dibuja el coche aparcado con un marcador cian y una **línea guía
+  discontinua** desde tu posición (solo si estás a más de 40 m).
+- En Inicio aparece la píldora **"Tu coche aparcado · N m"**: al tocarla se
+  traza la ruta por calles hasta el coche (destino "Mi coche"); una pulsación
+  larga permite olvidar la ubicación guardada.
+
+## 6. Optimización aplicada
 
 - **Party en vivo**: los cambios de `party_members` y `parties` ahora parchean
   la caché de React Query en vez de invalidarla. Antes cada latido de cada

@@ -34,6 +34,11 @@ export type WorldMapMode = '2d' | '3d';
 
 export type WorldMapVehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';
 
+export type WorldMapParking = {
+  latitude: number;
+  longitude: number;
+};
+
 export type WorldMapCommand =
   | { type: 'location'; payload: WorldMapLocation }
   | { type: 'members'; payload: WorldMapMember[] }
@@ -41,6 +46,7 @@ export type WorldMapCommand =
   | { type: 'route'; payload: WorldMapRoute | null }
   | { type: 'mode'; payload: WorldMapMode }
   | { type: 'vehicle'; payload: { color: string; kind?: WorldMapVehicleKind } }
+  | { type: 'parking'; payload: WorldMapParking | null }
   | { type: 'recenter' };
 
 export type WorldMapEvent =
@@ -103,6 +109,17 @@ export const WORLD_MAP_HTML = `<!doctype html>
   .vehicle.is-3d .vehicle-arrow { display: none; }
   .guide-arrow { pointer-events: none; width: 44px; height: 44px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
   .guide-arrow path { fill: #c9ff4d; stroke: #06080b; stroke-width: 3; stroke-linejoin: round; }
+  .parking { pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .parking-badge {
+    width: 38px; height: 38px; border-radius: 50%; background: #4de1ff;
+    border: 2px solid #06080b; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  }
+  .parking-badge svg { width: 21px; height: 21px; fill: none; stroke: #06131a; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .parking-label {
+    white-space: nowrap; background: #06131a; color: #4de1ff; font-size: 9px; font-weight: 800;
+    padding: 2px 6px; border-radius: 5px; border: 1px solid rgba(77,225,255,0.5);
+  }
   .member { position: relative; width: 44px; height: 44px; }
   .member-dot {
     position: absolute; left: 3px; top: 3px; width: 38px; height: 38px; border-radius: 50%;
@@ -173,7 +190,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
     following: true,
     heading: null,
     vehicleColor: '#ff5a1f',
-    vehicleKind: 'car'
+    vehicleKind: 'car',
+    parking: null
   };
   var map = null;
   var mapReady = false;
@@ -187,6 +205,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var car3d = null;
   var routePoints = [];
   var guideMarker = null;
+  var parkingMarker = null;
   var lastFollow = null;
   var smoothedHeading = null;
   var carRenderWarned = false;
@@ -306,6 +325,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     renderCar();
     updateBrakeAssist();
     updateGuideArrow();
+    updateParkingLine();
     if (state.following) follow(true, firstFix);
   }
 
@@ -698,6 +718,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     else if (message.type === 'route') setRoute(message.payload);
     else if (message.type === 'mode') setMode(message.payload);
     else if (message.type === 'vehicle') setVehicleInput(message.payload);
+    else if (message.type === 'parking') setParking(message.payload);
     else if (message.type === 'recenter') recenter();
   }
 
@@ -1187,6 +1208,81 @@ export const WORLD_MAP_HTML = `<!doctype html>
     }
   }
 
+  function addParking() {
+    var element = document.createElement('div');
+    element.className = 'parking';
+    element.style.display = 'none';
+    element.innerHTML =
+      '<div class="parking-badge"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M4 16h16M6 16V9l2-4h8l2 4v7M6 16v3M18 16v3"></path>' +
+      '<circle cx="8.5" cy="16" r="1.3"></circle><circle cx="15.5" cy="16" r="1.3"></circle>' +
+      '</svg></div><div class="parking-label">Tu coche</div>';
+    parkingMarker = new maplibregl.Marker({ element: element, anchor: 'bottom' });
+  }
+
+  function addParkingLine() {
+    map.addSource('caravana-parking-line', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-parking-line',
+      type: 'line',
+      source: 'caravana-parking-line',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#4de1ff',
+        'line-width': 4,
+        'line-dasharray': [2, 2],
+        'line-opacity': 0.9
+      }
+    }, firstSymbolLayerId());
+  }
+
+  function parkingLabel(distance) {
+    if (distance == null) return 'Tu coche';
+    return distance < 1000
+      ? 'Tu coche · ' + Math.round(distance) + ' m'
+      : 'Tu coche · ' + (distance / 1000).toFixed(1) + ' km';
+  }
+
+  function updateParkingLine() {
+    if (!mapReady || !parkingMarker || !map.getSource('caravana-parking-line')) return;
+    if (!state.parking) {
+      parkingMarker.getElement().style.display = 'none';
+      map.getSource('caravana-parking-line').setData(EMPTY_ROUTE);
+      return;
+    }
+    parkingMarker.getElement().style.display = '';
+    var distance = state.location
+      ? haversineLngLat(lngLatOf(state.location), lngLatOf(state.parking))
+      : null;
+    var label = parkingMarker.getElement().querySelector('.parking-label');
+    if (label) label.textContent = parkingLabel(distance);
+    var data = EMPTY_ROUTE;
+    if (state.location && distance != null && distance > 40) {
+      data = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [lngLatOf(state.location), lngLatOf(state.parking)]
+          }
+        }]
+      };
+    }
+    map.getSource('caravana-parking-line').setData(data);
+  }
+
+  function setParking(parking) {
+    state.parking = parking
+      ? { latitude: parking.latitude, longitude: parking.longitude }
+      : null;
+    if (!mapReady) return;
+    if (!parkingMarker) addParking();
+    if (state.parking) parkingMarker.setLngLat(lngLatOf(state.parking)).addTo(map);
+    updateParkingLine();
+  }
+
   function addDestination() {
     var element = document.createElement('div');
     element.className = 'dest';
@@ -1223,9 +1319,12 @@ export const WORLD_MAP_HTML = `<!doctype html>
     addBrakeLayer();
     addVehicle();
     addDestination();
+    addParking();
+    addParkingLine();
     setMembers(state.members);
     setDestination(state.destination);
     setRoute(state.route);
+    setParking(state.parking);
     if (state.location) {
       vehicleMarker.setLngLat(lngLatOf(state.location));
       if (state.heading !== null) vehicleMarker.setRotation(state.heading);
