@@ -9,6 +9,7 @@ import { useTrips, type Trip } from '@/src/store/trips';
 export function useTripRecorder(
   location: { latitude: number; longitude: number; speedKmh?: number | null },
   vehicleName?: string,
+  options?: { walking?: boolean },
 ) {
   const hydrate = useTrips((state) => state.hydrate);
   const recordPoint = useTrips((state) => state.recordPoint);
@@ -16,6 +17,7 @@ export function useTripRecorder(
   const active = useTrips((state) => state.active);
   const activeId = active?.id ?? null;
   const hydrated = useTrips((state) => state.hydrated);
+  const walking = options?.walking ?? false;
 
   useEffect(() => {
     void hydrate();
@@ -34,8 +36,17 @@ export function useTripRecorder(
 
   const { latitude, longitude, speedKmh = null } = location;
   useEffect(() => {
+    // Caminando no se graba ruta de coche.
+    if (walking) return;
     recordPoint({ latitude, longitude, speedKmh });
-  }, [latitude, longitude, speedKmh, recordPoint]);
+  }, [latitude, longitude, speedKmh, recordPoint, walking]);
+
+  // Al empezar a caminar (coche aparcado) se cierra el viaje de coche.
+  const stopTrip = useTrips((state) => state.stopTrip);
+  useEffect(() => {
+    if (!walking) return;
+    if (useTrips.getState().active) void stopTrip();
+  }, [walking, stopTrip]);
 
   // Al terminar un viaje se publican sus récords si hay conexión.
   const wasActiveRef = useRef(false);

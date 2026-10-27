@@ -64,10 +64,6 @@ export default function NavigationScreen() {
   });
 
   const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
-  const { active: activeTrip } = useTripRecorder(
-    live.location,
-    primaryVehicle ? `${primaryVehicle.make} ${primaryVehicle.model}` : undefined,
-  );
   const parkingSpot = useParking((state) => state.spot);
   const clearParking = useParking((state) => state.clearSpot);
   useParkingDetector(live.location);
@@ -81,6 +77,10 @@ export default function NavigationScreen() {
     parkingDistance != null &&
     parkingDistance > 25 &&
     (live.location.speedKmh ?? 0) < 8;
+  const vehicleName = primaryVehicle
+    ? `${primaryVehicle.make} ${primaryVehicle.model}`
+    : undefined;
+  const { active: activeTrip } = useTripRecorder(live.location, vehicleName, { walking });
   const vehicleLabel = primaryVehicle
     ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
     : 'Añade tu vehículo';

@@ -20,9 +20,13 @@ Archivos:
 
 - **Local primero**: los viajes viven en `AsyncStorage` (`caravana.trips.v1`).
   Funcionan sin conexión y sobreviven a cerrar la app.
-- **Inicio automático**: cuando el GPS detecta movimiento a partir de 10 km/h se
-  abre un viaje. Se cierra solo tras 5 minutos por debajo de 2,5 km/h (y al
-  menos 200 m recorridos), o al pulsar detener en **Mis rutas**.
+- **Inicio automático solo al conducir**: el viaje se abre cuando el GPS marca
+  **15 km/h sostenidos en 3 muestras seguidas** (una caminata o un pico de ruido
+  del GPS no abre ruta). Solo se acumulan puntos por encima de **8 km/h**, así
+  que caminar después de aparcar no ensucia la ruta.
+- El viaje se cierra tras **2 minutos sin movimiento de coche** (o al entrar en
+  modo peatón), y al menos 200 m recorridos; también se puede detener a mano en
+  **Mis rutas**.
 - **Puntos**: uno cada 15 m como mínimo, con velocidad y hora. Se guardan como
   máximo 700 puntos (se simplifican) y se conservan las últimas 30 rutas.
 - **Estadísticas**: distancia, duración, velocidad media y máxima.

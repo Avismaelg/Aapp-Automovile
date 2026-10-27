@@ -38,15 +38,20 @@ const ARCHIVE_KEY = 'caravana.trips.v1';
 const ACTIVE_KEY = 'caravana.active-trip.v1';
 const MAX_TRIPS = 30;
 const MAX_POINTS = 700;
-const MOVE_START_KMH = 10;
-const STILL_KMH = 2.5;
-const STOP_AFTER_MS = 5 * 60_000;
+// Solo se graba al conducir: 15 km/h sostenidos en varias muestras. Así una
+// caminata (o un pico de ruido del GPS) nunca abre una ruta.
+const MOVE_START_KMH = 15;
+const START_CONFIRM_SAMPLES = 3;
+const MIN_RECORD_KMH = 8;
+const STOP_AFTER_MS = 2 * 60_000;
 const MIN_POINT_DISTANCE_M = 15;
 const PERSIST_EVERY_MS = 12_000;
 
 let lastMovingAt = 0;
 let lastPersistAt = 0;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let fastSamples = 0;
+let pendingStart: TripPoint | null = null;
 
 function haversineMeters(
   a: { latitude: number; longitude: number },
@@ -154,15 +159,33 @@ export const useTrips = create<TripsState>((set, get) => ({
     const { active } = get();
 
     if (!active) {
-      if (speed < MOVE_START_KMH) return;
+      if (speed < MOVE_START_KMH) {
+        fastSamples = 0;
+        pendingStart = null;
+        return;
+      }
+
+      // Confirmamos movimiento de coche con varias muestras seguidas antes de
+      // empezar a grabar; el viaje arranca en la primera muestra rápida.
+      if (!pendingStart) {
+        pendingStart = { latitude, longitude, speedKmh: speed, at: now };
+        fastSamples = 0;
+      }
+      fastSamples += 1;
+      if (fastSamples < START_CONFIRM_SAMPLES) return;
+
+      const startPoint = pendingStart;
+      fastSamples = 0;
+      pendingStart = null;
+
       const trip: Trip = {
-        id: `t_${now.toString(36)}`,
-        startedAt: now,
+        id: `t_${startPoint.at.toString(36)}`,
+        startedAt: startPoint.at,
         endedAt: null,
         distanceM: 0,
-        maxSpeedKmh: speed,
+        maxSpeedKmh: Math.max(startPoint.speedKmh ?? speed, speed),
         avgSpeedKmh: speed,
-        points: [{ latitude, longitude, speedKmh: speed, at: now }],
+        points: [startPoint],
       };
       lastMovingAt = now;
       set({ active: trip });
@@ -172,10 +195,13 @@ export const useTrips = create<TripsState>((set, get) => ({
 
     const previous = active.points[active.points.length - 1];
     const segmentM = previous ? haversineMeters(previous, { latitude, longitude }) : 0;
-    if (speed >= STILL_KMH) lastMovingAt = now;
+    // Solo se acumulan puntos en movimiento de coche (>= 8 km/h): caminar
+    // después de aparcar no ensucia la ruta.
+    const driving = speed >= MIN_RECORD_KMH;
+    if (driving) lastMovingAt = now;
 
     const nextPoints =
-      segmentM >= MIN_POINT_DISTANCE_M
+      driving && segmentM >= MIN_POINT_DISTANCE_M
         ? [...active.points, { latitude, longitude, speedKmh: speed, at: now }]
         : active.points;
     const points =
@@ -184,7 +210,7 @@ export const useTrips = create<TripsState>((set, get) => ({
         : nextPoints;
 
     const hours = (now - active.startedAt) / 3_600_000;
-    const distanceM = active.distanceM + segmentM;
+    const distanceM = active.distanceM + (driving ? segmentM : 0);
     const next: Trip = {
       ...active,
       points,
@@ -194,7 +220,7 @@ export const useTrips = create<TripsState>((set, get) => ({
         hours > 0 ? Math.min(200, Math.round((distanceM / 1000 / hours) * 10) / 10) : active.avgSpeedKmh,
     };
 
-    if (speed < STILL_KMH && now - lastMovingAt > STOP_AFTER_MS && next.distanceM > 200) {
+    if (!driving && now - lastMovingAt > STOP_AFTER_MS && next.distanceM > 200) {
       const ended = finishTrip(next, now);
       set({ active: null, trips: [ended, ...get().trips].slice(0, MAX_TRIPS) });
       void persistAll();
