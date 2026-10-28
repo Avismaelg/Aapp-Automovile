@@ -100,7 +100,6 @@ conducción responsable.
   el aparcamiento viejo se olvida.
 
 ## 6. Optimización aplicada
-
 - **Party en vivo**: los cambios de `party_members` y `parties` ahora parchean
   la caché de React Query en vez de invalidarla. Antes cada latido de cada
   miembro (5 s) recargaba la party entera con perfiles; ahora solo se recarga
@@ -115,4 +114,17 @@ conducción responsable.
 - **Récords**: la mejor marca local solo revisa las 10 rutas más recientes.
 - **Mapa**: se retiró la instrumentación de debug; los errores de dibujo del
   coche avisan una sola vez por sesión.
+- **Brújula ligera**: el rumbo del teléfono se publica como mucho cada 900 ms y
+  solo si cambió más de 6°, así el mapa gira fluido sin re-renderizar la
+  pantalla decenas de veces por segundo.
+- **Menos mensajes al WebView**: el wrapper del mapa ignora posiciones repetidas
+  (compara coordenadas, rumbo, velocidad y precisión redondeados).
+- **Círculo de precisión**: se regenera como mucho cada 10 s o si la precisión
+  cambia >20 % (antes, en cada señal GPS).
+- **Línea del coche aparcado**: máximo una actualización cada 1,5 s.
+- **Coche 3D**: no se redibuja si el encuadre no cambió y el canvas usa como
+  máximo 1,5× de densidad de píxeles (antes 2×).
+- **Progreso de ruta**: solo se recalcula cuando cambian las coordenadas, no con
+  cada actualización de rumbo.
+
 

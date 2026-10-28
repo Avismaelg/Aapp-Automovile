@@ -123,7 +123,10 @@ export default function NavigationScreen() {
         : 'Ruta directa'
     : null;
 
-  // Progreso sobre la ruta y próxima maniobra, como Waze.
+  // Progreso sobre la ruta y próxima maniobra, como Waze. Se recalcula solo
+  // cuando cambia la posición, no en cada actualización de rumbo.
+  const latitude = live.location.latitude;
+  const longitude = live.location.longitude;
   const routeCumulative = useMemo(
     () => (route.route ? cumulativeDistances(route.route.coordinates) : []),
     [route.route],
@@ -131,9 +134,10 @@ export default function NavigationScreen() {
   const progressM = useMemo(
     () =>
       route.route
-        ? (routeProgress(route.route.coordinates, routeCumulative, live.location)?.progressM ?? null)
+        ? (routeProgress(route.route.coordinates, routeCumulative, { latitude, longitude })
+            ?.progressM ?? null)
         : null,
-    [route.route, routeCumulative, live.location],
+    [route.route, routeCumulative, latitude, longitude],
   );
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),

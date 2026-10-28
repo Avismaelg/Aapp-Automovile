@@ -252,6 +252,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var lastFollow = null;
   var smoothedHeading = null;
   var carRenderWarned = false;
+  var accuracyValue = null;
+  var accuracyUpdatedAt = 0;
+  var parkingLineAt = 0;
+  var lastCarKey = '';
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -1291,7 +1295,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var container = map.getContainer();
     car3d.width = container.clientWidth;
     car3d.height = container.clientHeight;
-    car3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    car3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     car3d.renderer.setSize(car3d.width, car3d.height, false);
     car3d.camera.left = -car3d.width / 2;
     car3d.camera.right = car3d.width / 2;
@@ -1329,6 +1333,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       width: 0,
       height: 0
     };
+    lastCarKey = '';
     sizeCar();
   }
 
@@ -1373,6 +1378,21 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var turn = Math.atan2(Math.sin(onScreen), Math.cos(onScreen) / cosPitch);
     var offsetX = anchor.x - car3d.width / 2;
     var offsetY = car3d.height / 2 - anchor.y;
+
+    // Si el encuadre y el vehículo no cambiaron, el canvas ya tiene el frame
+    // correcto: no gastamos GPU redibujando.
+    var frameKey = [
+      offsetX.toFixed(1),
+      offsetY.toFixed(1),
+      turn.toFixed(3),
+      map.getBearing().toFixed(1),
+      map.getPitch().toFixed(1),
+      car3d.width + 'x' + car3d.height,
+      state.vehicleColor,
+      car3d.kind
+    ].join('|');
+    if (frameKey === lastCarKey) return;
+    lastCarKey = frameKey;
 
     car3d.camera.up.set(0, sinPitch, -cosPitch);
     car3d.camera.position.set(0, CAMERA_DISTANCE * cosPitch, CAMERA_DISTANCE * sinPitch);
@@ -1499,20 +1519,33 @@ export const WORLD_MAP_HTML = `<!doctype html>
   }
 
   // Círculo de precisión GPS alrededor del coche, como el de Google Maps.
+  // Se regenera como mucho cada 10 s o si la precisión cambia >20 %.
   function updateAccuracy(location) {
     if (!mapReady || !map.getSource('caravana-accuracy')) return;
     var accuracy = typeof location.accuracy === 'number' ? location.accuracy : null;
     if (accuracy == null || accuracy < 5 || accuracy > 150) {
-      map.getSource('caravana-accuracy').setData(EMPTY_ROUTE);
+      if (accuracyValue !== null) {
+        accuracyValue = null;
+        map.getSource('caravana-accuracy').setData(EMPTY_ROUTE);
+      }
       return;
     }
+
+    var now = Date.now();
+    var changed =
+      accuracyValue == null ||
+      Math.abs(accuracy - accuracyValue) > Math.max(8, accuracy * 0.2);
+    if (!changed && now - accuracyUpdatedAt < 10000) return;
+    accuracyUpdatedAt = now;
+    accuracyValue = accuracy;
+
     var earthRadius = 6378137;
     var latitude = location.latitude * Math.PI / 180;
     var longitude = location.longitude * Math.PI / 180;
     var distance = accuracy / earthRadius;
     var coordinates = [];
-    for (var step = 0; step <= 48; step += 1) {
-      var bearing = step * Math.PI * 2 / 48;
+    for (var step = 0; step <= 28; step += 1) {
+      var bearing = step * Math.PI * 2 / 28;
       var lat2 = Math.asin(
         Math.sin(latitude) * Math.cos(distance) +
         Math.cos(latitude) * Math.sin(distance) * Math.cos(bearing)
@@ -1568,8 +1601,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
       : 'Tu coche · ' + (distance / 1000).toFixed(1) + ' km';
   }
 
-  function updateParkingLine() {
+  function updateParkingLine(force) {
     if (!mapReady || !parkingMarker || !map.getSource('caravana-parking-line')) return;
+    if (!force && Date.now() - parkingLineAt < 1500) return;
+    parkingLineAt = Date.now();
     if (!state.parking) {
       parkingMarker.getElement().style.display = 'none';
       map.getSource('caravana-parking-line').setData(EMPTY_ROUTE);
@@ -1605,7 +1640,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (!mapReady) return;
     if (!parkingMarker) addParking();
     if (state.parking) parkingMarker.setLngLat(lngLatOf(state.parking)).addTo(map);
-    updateParkingLine();
+    updateParkingLine(true);
   }
 
   function addDestination() {

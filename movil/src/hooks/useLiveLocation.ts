@@ -93,11 +93,11 @@ function applyCompassHeading(value: number) {
   const previous = current.location.heading;
   if (previous != null) {
     const delta = Math.abs(((value - previous + 540) % 360) - 180);
-    if (delta < 3) return;
+    if (delta < 6) return;
   }
 
   const now = Date.now();
-  if (now - lastHeadingAt < 250) return;
+  if (now - lastHeadingAt < 900) return;
   lastHeadingAt = now;
   useLiveLocationState.setState({
     location: { ...current.location, heading: value },

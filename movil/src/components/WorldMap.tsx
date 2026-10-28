@@ -67,6 +67,7 @@ export function WorldMap({
   }, []);
   const readyRef = useRef(false);
   const seqRef = useRef(0);
+  const lastLocationKeyRef = useRef('');
   const latestRef = useRef({ members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, mode, vehicleColor, vehicleKind });
   const callbacksRef = useRef({ onFollowChange, onMemberPress, onError });
 
@@ -97,6 +98,15 @@ export function WorldMap({
   }, [send]);
 
   useEffect(() => {
+    const key = [
+      location.latitude.toFixed(5),
+      location.longitude.toFixed(5),
+      Math.round((location.heading ?? -1) / 5),
+      Math.round((location.speedKmh ?? -1) / 2),
+      Math.round((location.accuracy ?? 0) / 10),
+    ].join('|');
+    if (key === lastLocationKeyRef.current) return;
+    lastLocationKeyRef.current = key;
     send({ type: 'location', payload: location });
   }, [location, send]);
 
