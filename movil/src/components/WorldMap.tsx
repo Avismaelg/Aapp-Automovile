@@ -78,16 +78,32 @@ const TRAFFIC_COLOR: unknown = [
   'rgba(0,0,0,0)',
 ];
 
-// Coche 3D como indicador de posición (Android): tamaño fijo en pantalla y
-// giro para que el morro (+X del modelo) apunte hacia la marcha.
-const PUCK_SCALE = 22;
-const PUCK_ROTATION = 90;
-// El coche aparcado se dibuja en el mapa a escala de calle: ~45 pt de largo a
-// cualquier zoom (el factor se duplica por cada nivel que te alejas).
+// Coche 3D como indicador de posición (Android): tamaño fijo en pantalla
+// (~45 pt de largo) y giro para que el morro apunte hacia la marcha.
+const PUCK_SCALE = 11;
+const PUCK_ROTATION = 180;
+// El coche aparcado está en el mapa (metros): para que mida ~45 pt a
+// cualquier zoom, la escala se duplica por cada nivel que te alejas. Va por
+// escalones de medio nivel porque Mapbox no interpola listas.
 const PARKED_SCALE: unknown = [
-  'interpolate', ['exponential', 2], ['zoom'],
-  12, ['literal', [368, 368, 368]],
-  20, ['literal', [1.44, 1.44, 1.44]],
+  'step', ['zoom'],
+  ['literal', [184.0, 184.0, 184.0]],
+  12.5, ['literal', [130.11, 130.11, 130.11]],
+  13, ['literal', [92.0, 92.0, 92.0]],
+  13.5, ['literal', [65.05, 65.05, 65.05]],
+  14, ['literal', [46.0, 46.0, 46.0]],
+  14.5, ['literal', [32.53, 32.53, 32.53]],
+  15, ['literal', [23.0, 23.0, 23.0]],
+  15.5, ['literal', [16.26, 16.26, 16.26]],
+  16, ['literal', [11.5, 11.5, 11.5]],
+  16.5, ['literal', [8.13, 8.13, 8.13]],
+  17, ['literal', [5.75, 5.75, 5.75]],
+  17.5, ['literal', [4.07, 4.07, 4.07]],
+  18, ['literal', [2.88, 2.88, 2.88]],
+  18.5, ['literal', [2.03, 2.03, 2.03]],
+  19, ['literal', [1.44, 1.44, 1.44]],
+  19.5, ['literal', [1.02, 1.02, 1.02]],
+  20, ['literal', [0.72, 0.72, 0.72]],
 ];
 
 type WorldMapProps = {
@@ -523,7 +539,7 @@ export const WorldMap = memo(function WorldMap({
             ))
           : null}
 
-        {parking && carModel ? (
+        {parking && carModel && (parkingDistance == null || parkingDistance > 30) ? (
           <ShapeSource
             id="caravana-parked-car"
             shape={{
@@ -537,7 +553,7 @@ export const WorldMap = memo(function WorldMap({
               style={{
                 modelId: 'caravana-car',
                 modelScale: PARKED_SCALE as number[],
-                modelRotation: [0, 0, 0],
+                modelRotation: [0, 0, 180],
                 modelCastShadows: true,
                 modelEmissiveStrength: 0.6,
               }}
