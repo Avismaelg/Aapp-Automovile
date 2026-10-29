@@ -12,6 +12,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
+// Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
+// la tarea de ubicación en segundo plano tiene que estar definida siempre.
+import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
@@ -41,11 +45,14 @@ export default function RootLayout() {
   });
   const authStatus = useAuth((state) => state.status);
   const initializeAuth = useAuth((state) => state.initialize);
-  const ready = loaded && authStatus !== 'loading';
+  // Si una fuente falla, React Native usa su fallback del sistema. No debemos
+  // dejar la app en una pantalla negra solo por un recurso visual opcional.
+  const ready = authStatus !== 'loading' && (loaded || Boolean(error));
   const isAuthenticated = authStatus === 'authenticated';
+  useBackgroundTracking(isAuthenticated);
 
   useEffect(() => {
-    if (error) throw error;
+    if (error) void SplashScreen.hideAsync();
   }, [error]);
 
   useEffect(() => {
@@ -64,13 +71,14 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-            animation: 'fade',
-          }}
-        >
+          <AppErrorBoundary>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.bg },
+                animation: 'fade',
+              }}
+            >
           {/* Enlaces públicos: perfil, vehículo e invitación abren sin cuenta. */}
           <Stack.Screen name="u/[username]" />
           <Stack.Screen name="v/[slug]" />
@@ -123,7 +131,8 @@ export default function RootLayout() {
           <Stack.Protected guard={!isAuthenticated} redirectTo="/">
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
-        </Stack>
+            </Stack>
+          </AppErrorBoundary>
       </SafeAreaProvider>
     </QueryClientProvider>
   );

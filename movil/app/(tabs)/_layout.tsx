@@ -1,19 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useChosenDestination } from '@/src/store/destination';
 import { colors, fonts, radius } from '@/src/theme';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const isNavigating = useChosenDestination((state) => state.isNavigating);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.dim,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: isNavigating
+          ? { display: 'none' }
+          : [styles.tabBar, { height: 64 + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }],
         tabBarLabelStyle: styles.tabLabel,
         tabBarItemStyle: styles.tabItem,
+        tabBarHideOnKeyboard: true,
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
@@ -83,17 +91,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgElevated,
     borderTopColor: colors.border,
     borderTopWidth: 1,
-    height: 82,
     paddingTop: 9,
-    paddingBottom: 16,
   },
   tabItem: {
-    paddingVertical: 2,
+    paddingVertical: 4,
     minWidth: 0,
+    flex: 1,
   },
   tabLabel: {
     fontFamily: fonts.bodySemi,
-    fontSize: 9,
+    fontSize: 10,
     letterSpacing: 0,
   },
   partyIcon: {

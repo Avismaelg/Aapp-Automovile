@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Share,
@@ -87,6 +88,14 @@ export default function PublicProfileScreen() {
         error instanceof Error ? error.message : 'No pudimos enviar la solicitud.',
       );
     }
+  };
+
+  const reportProfile = () => {
+    Alert.alert(
+      'Reportar perfil',
+      'Si este perfil incumple las normas, guarda el usuario y envía el reporte desde Ayuda y soporte.',
+      [{ text: 'Entendido', style: 'cancel' }],
+    );
   };
 
   if (isLoading) {
@@ -281,7 +290,7 @@ export default function PublicProfileScreen() {
                 en vivo nunca aparece aquí.
               </AppText>
             </Card>
-            <PressableRow icon="flag-outline" label="Reportar perfil" onPress={() => {}} />
+            <PressableRow icon="flag-outline" label="Reportar perfil" onPress={reportProfile} />
           </View>
         </View>
 
@@ -346,11 +355,16 @@ function PressableRow({
   onPress: () => void;
 }) {
   return (
-    <View style={styles.reportRow}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.reportRow, pressed && { opacity: 0.7 }]}
+    >
       <Ionicons name={icon} size={16} color={colors.muted} />
       <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>{label}</AppText>
       <Ionicons name="chevron-forward" size={13} color={colors.dim} />
-    </View>
+    </Pressable>
   );
 }
 

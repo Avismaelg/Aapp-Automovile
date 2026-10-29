@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -21,7 +21,7 @@ import {
   Pill,
 } from '@/src/components/ui';
 import type { FuelKind, VehicleKind } from '@/src/data/mock';
-import { useCreateVehicle, useGarageVehicles } from '@/src/hooks/useGarage';
+import { useCreateVehicle, useGarageVehicles, useUpdateVehicle } from '@/src/hooks/useGarage';
 import { DEFAULT_VEHICLE_COLORS } from '@/src/lib/vehicle-db';
 import { vehicleKinds, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
@@ -42,8 +42,12 @@ type FieldErrors = {
 
 export default function NewVehicleScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ vehicleId?: string | string[] }>();
+  const vehicleId = Array.isArray(params.vehicleId) ? params.vehicleId[0] : params.vehicleId;
   const { vehicles, isDemo } = useGarageVehicles();
   const createVehicle = useCreateVehicle();
+  const updateVehicle = useUpdateVehicle();
+  const editingVehicle = vehicleId ? vehicles.find((item) => item.id === vehicleId) : undefined;
 
   const [kind, setKind] = useState<VehicleKind>('car');
   const [fuel, setFuel] = useState<FuelKind>('gasoline');
@@ -56,10 +60,28 @@ export default function NewVehicleScreen() {
   const [color, setColor] = useState(DEFAULT_VEHICLE_COLORS[0]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [loadedVehicleId, setLoadedVehicleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editingVehicle || loadedVehicleId === editingVehicle.id) return;
+    const timer = setTimeout(() => {
+      setKind(editingVehicle.kind);
+      setFuel(editingVehicle.fuel);
+      setMake(editingVehicle.make);
+      setModel(editingVehicle.model);
+      setYear(String(editingVehicle.year));
+      setNickname(editingVehicle.nickname);
+      setOdometer(String(editingVehicle.odometerKm));
+      setEfficiency(String(editingVehicle.efficiency));
+      setColor(editingVehicle.color);
+      setLoadedVehicleId(editingVehicle.id);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [editingVehicle, loadedVehicleId]);
 
   const meta = vehicleKindMeta[kind];
   const electric = kind === 'ev';
-  const firstVehicle = vehicles.length === 0;
+  const firstVehicle = !editingVehicle && vehicles.length === 0;
 
   const availableFuels =
     kind === 'ev'
@@ -104,7 +126,7 @@ export default function NewVehicleScreen() {
     if (Object.keys(nextErrors).length > 0) return;
 
     try {
-      await createVehicle.mutateAsync({
+      const input = {
         make,
         model,
         year: yearNumber,
@@ -114,8 +136,13 @@ export default function NewVehicleScreen() {
         fuel: electric ? 'electric' : fuel,
         efficiency: efficiencyNumber,
         odometerKm: odometerNumber,
-        isPrimary: firstVehicle,
-      });
+        isPrimary: editingVehicle?.isPrimary ?? firstVehicle,
+      };
+      if (editingVehicle) {
+        await updateVehicle.mutateAsync({ vehicleId: editingVehicle.id, input });
+      } else {
+        await createVehicle.mutateAsync(input);
+      }
       goBack();
     } catch (error) {
       setFormError(
@@ -139,14 +166,20 @@ export default function NewVehicleScreen() {
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
-            <AppText variant="label" color={colors.accent}>NUEVO VEHÍCULO</AppText>
+            <AppText variant="label" color={colors.accent}>
+              {editingVehicle ? 'EDITAR VEHÍCULO' : 'NUEVO VEHÍCULO'}
+            </AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">Añade tu máquina.</AppText>
+            <AppText variant="h1">
+              {editingVehicle ? 'Actualiza tu máquina.' : 'Añade tu máquina.'}
+            </AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
-              Cada coche, moto, EV o camión tiene su historial, consumo y QR propio.
+              {editingVehicle
+                ? 'Mantén al día sus datos para que el mapa, consumo y QR sean correctos.'
+                : 'Cada coche, moto, EV o camión tiene su historial, consumo y QR propio.'}
             </AppText>
           </View>
 
@@ -167,6 +200,9 @@ export default function NewVehicleScreen() {
                   <Pressable
                     key={item}
                     onPress={() => changeKind(item)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Tipo ${itemMeta.shortLabel}`}
+                    accessibilityState={{ selected: active }}
                     style={({ pressed }) => [
                       styles.kindOption,
                       active && {
@@ -276,6 +312,9 @@ export default function NewVehicleScreen() {
                     <Pressable
                       key={option.key}
                       onPress={() => setFuel(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityLabel={option.label}
+                      accessibilityState={{ selected: active }}
                       style={[
                         styles.fuelOption,
                         active && styles.fuelOptionActive,
@@ -330,6 +369,8 @@ export default function NewVehicleScreen() {
                 <Pressable
                   key={item}
                   onPress={() => setColor(item)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: color === item }}
                   style={[
                     styles.colorDot,
                     { backgroundColor: item },
@@ -368,10 +409,14 @@ export default function NewVehicleScreen() {
           {formError ? <AuthNotice message={formError} /> : null}
 
           <Button
-            label={createVehicle.isPending ? 'Guardando…' : 'Guardar vehículo'}
+            label={createVehicle.isPending || updateVehicle.isPending
+              ? 'Guardando…'
+              : editingVehicle
+                ? 'Guardar cambios'
+                : 'Guardar vehículo'}
             icon="checkmark-circle-outline"
             size="lg"
-            loading={createVehicle.isPending}
+            loading={createVehicle.isPending || updateVehicle.isPending}
             onPress={submit}
             style={{ marginTop: spacing.sm }}
           />

@@ -5,6 +5,7 @@ type LatLng = [number, number];
 export type RouteProgress = {
   progressM: number;
   nearestIndex: number;
+  distanceM: number;
 };
 
 function haversineMeters(a: LatLng, b: LatLng) {
@@ -51,7 +52,7 @@ export function routeProgress(
       nearestIndex = index;
     }
   }
-  return { progressM: cumulative[nearestIndex] ?? 0, nearestIndex };
+  return { progressM: cumulative[nearestIndex] ?? 0, nearestIndex, distanceM: best };
 }
 
 function iconFromModifier(type: string, modifier: string | undefined): RouteInstructionIcon {

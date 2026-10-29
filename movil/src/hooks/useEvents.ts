@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 
+import { isDemoMode } from '@/src/lib/demo';
 import { eventId, type AppEvent, type EventRoute } from '@/src/lib/events';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useLocalEvents } from '@/src/store/events';
 
@@ -64,7 +65,7 @@ function insertPayload(event: AppEvent, hostId: string) {
 
 export function useEvents() {
   const account = useAuth((state) => state.account);
-  const demo = account?.mode === 'demo' || !isSupabaseConfigured || !supabase;
+  const demo = isDemoMode(account?.mode);
   const localEvents = useLocalEvents((state) => state.events);
   const markSynced = useLocalEvents((state) => state.markSynced);
   const queryClient = useQueryClient();
@@ -141,7 +142,7 @@ export function useEvent(id: string | undefined) {
 export function useCreateEvent() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = account?.mode === 'demo' || !isSupabaseConfigured || !supabase;
+  const demo = isDemoMode(account?.mode);
   const addLocal = useLocalEvents((state) => state.addEvent);
   const markSynced = useLocalEvents((state) => state.markSynced);
 

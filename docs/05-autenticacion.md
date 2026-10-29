@@ -142,6 +142,13 @@ proyecto; los errores más comunes se traducen en `src/store/auth.ts`.
 
 ## 7. Seguridad y privacidad
 
+### Enlaces nativos de confirmación
+
+En Android/iOS el cliente usa el esquema `caravana://auth/callback` para
+confirmación de correo y recuperación de sesión. Debe añadirse exactamente esa
+URL a la lista de Redirect URLs de Supabase Auth. El cliente consume tanto el
+flujo PKCE (`code`) como los tokens del fragmento y usa `setSession`/`exchangeCodeForSession`.
+
 - RLS está activo en `profiles`, `vehicles`, `fuel_logs`, `challenges` y el resto
   del esquema.
 - El cliente solo usa la `anon key`.

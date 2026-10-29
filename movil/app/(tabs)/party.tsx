@@ -454,12 +454,12 @@ export default function PartyScreen() {
                 : graphHopper.isLoading
                   ? 'Calculando ruta por calles…'
                   : graphHopper.error
-                    ? 'Sin ruta por calles · línea directa'
+                    ? 'No encontramos una calle transitable'
                     : graphHopper.source === 'graphhopper'
                       ? `GraphHopper · ${routeDistance} · ${routeDuration}`
                       : graphHopper.source === 'osrm'
                         ? `Calles OSM · ${routeDistance} · ${routeDuration}`
-                        : 'Ruta directa · configura GraphHopper'}
+                        : 'Sin ruta por calles'}
             </AppText>
           </View>
         </View>

@@ -1,3 +1,6 @@
+import { haversineMeters } from '@/src/lib/geo';
+import { fetchWithTimeout } from '@/src/lib/network';
+
 export type SearchPlace = {
   id: string;
   latitude: number;
@@ -22,20 +25,6 @@ type PhotonFeature = {
   };
 };
 
-function haversineMeters(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-) {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
 // Búsqueda de lugares con Photon (OpenStreetMap, sin API key).
 export async function searchPlaces(
   query: string,
@@ -48,7 +37,10 @@ export async function searchPlaces(
     params.set('lon', near.longitude.toFixed(5));
   }
 
-  const response = await fetch(`https://photon.komoot.io/api/?${params.toString()}`, { signal });
+  const response = await fetchWithTimeout(
+    `https://photon.komoot.io/api/?${params.toString()}`,
+    { signal },
+  );
   const data = (await response.json()) as { features?: PhotonFeature[] };
   const features = data.features ?? [];
 

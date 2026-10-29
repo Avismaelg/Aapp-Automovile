@@ -25,10 +25,22 @@ export default function DestinationScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchToken = useRef(0);
+  const liveLocationRef = useRef(live.location);
 
   const hasQuery = query.trim().length >= 3;
   const visibleResults = hasQuery ? results : [];
   const searchingNow = hasQuery && isSearching;
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    setResults([]);
+    setSearchError(null);
+    setIsSearching(false);
+  };
+
+  useEffect(() => {
+    liveLocationRef.current = live.location;
+  }, [live.location]);
 
   const sharedLatitude = Number.parseFloat(params.lat ?? '');
   const sharedLongitude = Number.parseFloat(params.lng ?? '');
@@ -61,7 +73,7 @@ export default function DestinationScreen() {
         setIsSearching(true);
         setSearchError(null);
         try {
-          const found = await searchPlaces(trimmed, live.location, controller.signal);
+          const found = await searchPlaces(trimmed, liveLocationRef.current, controller.signal);
           if (searchToken.current !== token) return;
           setResults(found);
           setSearchError(found.length === 0 ? 'Sin resultados. Prueba con otra palabra.' : null);
@@ -79,7 +91,7 @@ export default function DestinationScreen() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, live.location]);
+  }, [query]);
 
   const selectPlace = (place: SearchPlace) => {
     setDestination({
@@ -87,7 +99,6 @@ export default function DestinationScreen() {
       longitude: place.longitude,
       label: place.name,
     });
-    startNavigation();
     router.replace('/');
   };
 
@@ -143,7 +154,7 @@ export default function DestinationScreen() {
       <View style={styles.searchWrap}>
         <Input
           value={query}
-          onChangeText={setQuery}
+          onChangeText={handleQueryChange}
           placeholder="Calle, ciudad o sitio… ej. Pico Duarte"
           autoCorrect={false}
           autoFocus
@@ -209,11 +220,11 @@ export default function DestinationScreen() {
         )}
       />
 
-      <Pressable onPress={() => router.back()} hitSlop={8} style={styles.footer}>
+      <View style={styles.footer}>
         <AppText variant="caption" color={colors.dim}>
           Búsqueda: Photon/Komoot · Datos © OpenStreetMap
         </AppText>
-      </Pressable>
+      </View>
     </SafeAreaView>
   );
 }

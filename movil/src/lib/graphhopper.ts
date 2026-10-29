@@ -1,5 +1,8 @@
 import type { WorldMapRoute } from '@/src/lib/map-html';
+import { haversineMeters } from '@/src/lib/geo';
+import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
+import { compactRouteCoordinates } from '@/src/lib/route-geometry';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -12,19 +15,6 @@ type GeoPoint = {
   latitude: number;
   longitude: number;
 };
-
-function haversineMeters(a: GeoPoint, b: GeoPoint) {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLon = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 export function fallbackRoute(origin: GeoPoint, destination: GeoPoint): WorldMapRoute {
   const direct = haversineMeters(origin, destination);
@@ -94,7 +84,7 @@ export async function fetchGraphHopperRoute({
     params.push(`key=${encodeURIComponent(GRAPHHOPPER_API_KEY)}`);
   }
 
-  const response = await fetch(`${base}?${params.join('&')}`, {
+  const response = await fetchWithTimeout(`${base}?${params.join('&')}`, {
     signal,
     headers: { Accept: 'application/json' },
   });
@@ -119,12 +109,13 @@ export async function fetchGraphHopperRoute({
     throw new Error('GraphHopper devolvió una ruta vacía.');
   }
 
+  const instructions = instructionsFromGraphHopper(path.instructions ?? [], coordinates);
   return {
-    coordinates,
+    coordinates: compactRouteCoordinates(coordinates),
     distanceM: path.distance,
     timeMs: path.time,
     source: 'graphhopper',
-    instructions: instructionsFromGraphHopper(path.instructions ?? [], coordinates),
+    instructions,
   };
 }
 
@@ -164,9 +155,12 @@ export async function fetchOsrmRoute({
   signal?: AbortSignal;
 }): Promise<WorldMapRoute> {
   const path = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
-  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=true&alternatives=false&continue_straight=false`;
 
-  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+  const response = await fetchWithTimeout(url, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
   const data = (await response.json()) as OsrmResponse;
   const route = data.routes?.[0];
   if (!response.ok || !route) {
@@ -188,7 +182,7 @@ export async function fetchOsrmRoute({
   }
 
   return {
-    coordinates,
+    coordinates: compactRouteCoordinates(coordinates),
     distanceM: route.distance,
     timeMs: route.duration * 1000,
     source: 'osrm',
@@ -198,7 +192,8 @@ export async function fetchOsrmRoute({
   };
 }
 
-// GraphHopper primero, luego OSRM público y, al final, línea directa.
+// GraphHopper primero y OSRM público como respaldo. Nunca se devuelve una
+// línea directa como si fuera una ruta segura para conducir.
 export async function fetchStreetRoute({
   origin,
   destination,
@@ -208,19 +203,24 @@ export async function fetchStreetRoute({
   destination: GeoPoint;
   signal?: AbortSignal;
 }): Promise<WorldMapRoute> {
+  let lastError: unknown = null;
   if (isGraphHopperConfigured) {
     try {
       return await fetchGraphHopperRoute({ origin, destination, signal });
     } catch (error) {
       if (signal?.aborted) throw error;
+      lastError = error;
     }
   }
   try {
     return await fetchOsrmRoute({ origin, destination, signal });
   } catch (error) {
     if (signal?.aborted) throw error;
+    lastError = error;
   }
-  return fallbackRoute(origin, destination);
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('No encontramos una calle transitable entre esos puntos.');
 }
 
 export function formatRouteDistance(distanceM: number) {

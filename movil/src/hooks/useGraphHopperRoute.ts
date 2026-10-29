@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import {
-  fallbackRoute,
   fetchStreetRoute,
   isGraphHopperConfigured,
 } from '@/src/lib/graphhopper';
@@ -82,16 +81,14 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
       useRouteState.setState({
         route,
         isLoading: false,
-        error: route.source === 'fallback'
-          ? 'No hubo ruta por calles; mostramos la línea directa.'
-          : null,
+        error: null,
       });
     } catch {
       if (controller.signal.aborted) return;
       useRouteState.setState({
-        route: fallbackRoute(origin, destination),
+        route: null,
         isLoading: false,
-        error: 'No pudimos calcular la ruta; mostramos la línea directa.',
+        error: 'No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.',
       });
     }
   }, 700);
@@ -101,6 +98,14 @@ function clearRoute() {
   cancelPending();
   requested = null;
   useRouteState.setState({ route: null, isLoading: false, error: null });
+}
+
+function retryRoute() {
+  if (!requested) return;
+  const { origin, destination } = requested;
+  cancelPending();
+  requested = null;
+  requestRoute(origin, destination);
 }
 
 export function useGraphHopperRoute({
@@ -136,5 +141,6 @@ export function useGraphHopperRoute({
     error,
     configured: isGraphHopperConfigured,
     source: route?.source ?? 'fallback',
+    retry: retryRoute,
   };
 }

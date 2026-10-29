@@ -62,7 +62,7 @@ export default function GarageScreen() {
     try {
       const uri = await pickVehiclePhoto();
       if (!uri) return;
-      await setPhoto.mutateAsync({ vehicleId: vehicle.id, uri });
+      await setPhoto.mutateAsync({ vehicleId: vehicle.id, photo: uri });
     } catch (error) {
       Alert.alert(
         'Foto del vehículo',
@@ -214,7 +214,15 @@ export default function GarageScreen() {
           <Stat value="Activo" label="QR público" accent={meta.color} />
         </View>
         <View style={styles.carActions}>
-          <Button label="Editar" variant="secondary" icon="create-outline" size="sm" onPress={() => {}} />
+          <Button
+            label="Editar"
+            variant="secondary"
+            icon="create-outline"
+            size="sm"
+            onPress={() =>
+              router.push({ pathname: '/vehicle/new', params: { vehicleId: vehicle.id } })
+            }
+          />
           <Button
             label={electric ? 'Ver cargas' : 'Ver consumo'}
             variant="ghost"
@@ -366,7 +374,12 @@ function PressableRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.scanRow}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.scanRow, pressed && { opacity: 0.72 }]}
+    >
       <Ionicons name={icon} size={18} color={colors.accent} />
       <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
         {label}

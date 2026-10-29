@@ -31,6 +31,31 @@ type TextVariant =
   | 'label'
   | 'mono';
 
+const iconLabels: Partial<Record<keyof typeof Ionicons.glyphMap, string>> = {
+  add: 'Añadir',
+  'arrow-back': 'Volver',
+  'arrow-forward': 'Avanzar',
+  'chevron-back': 'Volver',
+  'chevron-down': 'Abrir opciones',
+  'chevron-forward': 'Abrir',
+  close: 'Cerrar',
+  create: 'Editar',
+  'create-outline': 'Editar',
+  download: 'Descargar',
+  'download-outline': 'Descargar',
+  'log-out-outline': 'Cerrar sesión',
+  refresh: 'Actualizar',
+  'scan-outline': 'Escanear QR',
+  'share-outline': 'Compartir',
+  'share-social-outline': 'Compartir',
+  'settings-outline': 'Ajustes',
+  'trash-outline': 'Eliminar',
+};
+
+function labelForIcon(icon: keyof typeof Ionicons.glyphMap) {
+  return iconLabels[icon] ?? icon.replace(/-outline$/, '').replace(/-/g, ' ');
+}
+
 export function AppText({
   children,
   variant = 'body',
@@ -76,6 +101,8 @@ export function Screen({
       {scroll ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={styles.scrollContent}
         >
           {content}
@@ -124,6 +151,8 @@ export function Button({
   disabled,
   loading,
   style,
+  accessibilityLabel,
+  accessibilityHint,
 }: {
   label: string;
   onPress?: () => void;
@@ -134,6 +163,8 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }) {
   const palette = {
     primary: { bg: colors.accent, fg: '#120802', border: colors.accent },
@@ -149,8 +180,16 @@ export function Button({
 
   return (
     <Pressable
-      disabled={disabled || loading}
+      disabled={disabled || loading || !onPress}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{
+        disabled: Boolean(disabled || loading || !onPress),
+        busy: Boolean(loading),
+      }}
+      hitSlop={4}
       style={({ pressed }) => [
         styles.button,
         size === 'sm' && styles.buttonSm,
@@ -159,7 +198,7 @@ export function Button({
         {
           backgroundColor: palette.bg,
           borderColor: palette.border,
-          opacity: disabled ? 0.45 : pressed ? 0.82 : 1,
+          opacity: disabled || !onPress ? 0.45 : pressed ? 0.82 : 1,
         },
         variant === 'primary' && shadows.accent,
         style,
@@ -196,6 +235,9 @@ export function IconButton({
   tone = 'surface',
   color = colors.text,
   badge,
+  disabled,
+  accessibilityLabel,
+  accessibilityHint,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
@@ -203,6 +245,9 @@ export function IconButton({
   tone?: 'surface' | 'accent' | 'ghost';
   color?: string;
   badge?: boolean;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }) {
   const toneStyle = {
     surface: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
@@ -210,17 +255,28 @@ export function IconButton({
     ghost: { backgroundColor: 'transparent', borderColor: colors.border },
   }[tone];
 
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.iconButton,
-        toneStyle,
-        { width: size, height: size, opacity: pressed ? 0.75 : 1 },
-      ]}
-    >
+  const content = (
+    <>
       <Ionicons name={icon} size={size * 0.46} color={color} />
       {badge ? <View style={styles.badge} /> : null}
+    </>
+  );
+
+  const sharedStyle = [styles.iconButton, toneStyle, { width: size, height: size }];
+  if (!onPress) return <View style={sharedStyle}>{content}</View>;
+
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? labelForIcon(icon)}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      hitSlop={Math.max(4, Math.ceil((48 - size) / 2))}
+      style={({ pressed }) => [sharedStyle, { opacity: disabled ? 0.45 : pressed ? 0.75 : 1 }]}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -358,7 +414,12 @@ export function SectionHeader({
     <View style={styles.sectionHeader}>
       <AppText variant="title">{title}</AppText>
       {action ? (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <Pressable
+          onPress={onAction}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={action}
+        >
           <AppText variant="label" color={colors.accent}>
             {action}
           </AppText>
@@ -395,9 +456,10 @@ export function Input({
       ) : null}
       <View style={[styles.inputWrap, error ? styles.inputWrapError : null]}>
         <TextInput
+          {...props}
           placeholderTextColor={colors.dim}
           selectionColor={colors.accent}
-          {...props}
+          accessibilityLabel={props.accessibilityLabel ?? label}
           style={[styles.input, inputStyle]}
         />
         {rightSlot}

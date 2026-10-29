@@ -14,18 +14,15 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
+import { isDemoMode } from '@/src/lib/demo';
 import { mapVehicleRow, type VehicleRow } from '@/src/lib/vehicle-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoProfile } from '@/src/store/demoProfile';
 
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
-
 export function useMyProfile() {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const demoProfile = useDemoProfile((state) => state.profile);
   const hydrateDemo = useDemoProfile((state) => state.hydrate);
 
@@ -82,7 +79,7 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
   const syncAccount = useAuth((state) => state.syncAccount);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const updateDemo = useDemoProfile((state) => state.update);
 
   return useMutation({
@@ -170,7 +167,7 @@ function friendProfile(username: string): UserProfile | null {
 
 export function usePublicProfile(username?: string) {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const demoProfile = useDemoProfile((state) => state.profile);
   const hydrateDemo = useDemoProfile((state) => state.hydrate);
   const handle = (username ?? '').replace('@', '');
@@ -225,7 +222,7 @@ export function usePublicProfile(username?: string) {
 
 export function usePublicProfileVehicles(profileId?: string) {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['public-profile-vehicles', profileId ?? 'none', demo ? 'demo' : 'supabase'],

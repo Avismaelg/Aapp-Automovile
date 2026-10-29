@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 
 import type { Vehicle } from '@/src/data/mock';
+import { isDemoMode } from '@/src/lib/demo';
 import {
   demoQrSlug,
   demoVehicleId,
@@ -12,17 +13,45 @@ import {
   type VehicleRow,
 } from '@/src/lib/vehicle-db';
 import { vehicleUrl } from '@/src/lib/qr';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
-import { useAuth } from '@/src/store/auth';
+import { supabase } from '@/src/lib/supabase';
+import { useAuth, type Account } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 
-function isDemoAccount(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+const PHOTO_TOO_LARGE = 'La foto es demasiado grande. Usa una imagen de 8 MB o menos.';
+
+function ownerOf(account: Account) {
+  return { id: account.id, username: account.username, name: account.displayName };
+}
+
+// Campos editables comunes a crear y editar en modo demo.
+function demoVehicleFields(input: NewVehicleInput) {
+  const make = input.make.trim();
+  const model = input.model.trim();
+  return {
+    make,
+    model,
+    year: input.year,
+    nickname: input.nickname?.trim() || `${make} ${model}`,
+    color: input.color,
+    odometerKm: input.odometerKm,
+    kind: input.kind,
+    fuel: input.fuel,
+    efficiency: input.efficiency,
+    efficiencyUnit: input.kind === 'ev' ? 'kwh_100km' : 'km_l',
+    isPrimary: Boolean(input.isPrimary),
+  } satisfies Partial<Vehicle>;
+}
+
+function photoExtension(mimeType: string) {
+  const subtype = mimeType.split('/')[1]?.toLowerCase() ?? 'jpeg';
+  if (subtype === 'jpeg' || subtype === 'pjpeg') return 'jpg';
+  return /^[a-z0-9]+$/.test(subtype) ? subtype : 'jpg';
 }
 
 export function useGarageVehicles() {
   const account = useAuth((state) => state.account);
-  const demo = isDemoAccount(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const demoVehicles = useDemoGarage((state) => state.vehicles);
   const hydrateDemo = useDemoGarage((state) => state.hydrate);
 
@@ -44,11 +73,7 @@ export function useGarageVehicles() {
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);
-      const owner = {
-        id: account.id,
-        username: account.username,
-        name: account.displayName,
-      };
+      const owner = ownerOf(account);
       return ((data ?? []) as VehicleRow[]).map((row) => mapVehicleRow(row, owner));
     },
   });
@@ -74,8 +99,13 @@ function friendlyGarageError(message: string) {
   return 'No pudimos guardar el vehículo. Revisa tu conexión e inténtalo de nuevo.';
 }
 
+export type VehiclePhotoSelection = {
+  uri: string;
+  mimeType: string;
+};
+
 // Abre la galería y, si elige una, la recorta a 4:3.
-export async function pickVehiclePhoto(): Promise<string | null> {
+export async function pickVehiclePhoto(): Promise<VehiclePhotoSelection | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     throw new Error('Necesitamos permiso para ver tus fotos.');
@@ -89,34 +119,45 @@ export async function pickVehiclePhoto(): Promise<string | null> {
   });
 
   if (result.canceled || result.assets.length === 0) return null;
-  return result.assets[0].uri;
+  const asset = result.assets[0];
+  if (asset.type !== 'image') throw new Error('El archivo elegido no es una imagen.');
+  if (asset.fileSize != null && asset.fileSize > MAX_PHOTO_BYTES) {
+    throw new Error(PHOTO_TOO_LARGE);
+  }
+  return {
+    uri: asset.uri,
+    mimeType: asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg',
+  };
 }
 
 export function useSetVehiclePhoto() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = isDemoAccount(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const setDemoPhoto = useDemoGarage((state) => state.setPhoto);
 
   return useMutation({
-    mutationFn: async ({ vehicleId, uri }: { vehicleId: string; uri: string }) => {
+    mutationFn: async ({ vehicleId, photo }: { vehicleId: string; photo: VehiclePhotoSelection }) => {
       if (demo) {
         // En demo no hay Storage: mostramos la foto local (valida hasta borrar la app).
-        await setDemoPhoto(vehicleId, uri);
-        return uri;
+        await setDemoPhoto(vehicleId, photo.uri);
+        return photo.uri;
       }
       if (!supabase || !account) {
         throw new Error('Inicia sesión para subir la foto.');
       }
 
-      const file = await fetch(uri);
+      const file = await fetch(photo.uri);
       if (!file.ok) throw new Error('No pudimos leer la foto elegida.');
       const bytes = await file.arrayBuffer();
+      if (bytes.byteLength > MAX_PHOTO_BYTES) {
+        throw new Error(PHOTO_TOO_LARGE);
+      }
 
-      const path = `${account.id}/${vehicleId}/${Date.now()}.jpg`;
+      const path = `${account.id}/${vehicleId}/${Date.now()}.${photoExtension(photo.mimeType)}`;
       const { error: uploadError } = await supabase.storage
         .from('vehicles')
-        .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+        .upload(path, bytes, { contentType: photo.mimeType, upsert: true });
 
       if (uploadError) {
         throw new Error('No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.');
@@ -144,7 +185,7 @@ export function useSetVehiclePhoto() {
 export function useCreateVehicle() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = isDemoAccount(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const addDemoVehicle = useDemoGarage((state) => state.addVehicle);
 
   return useMutation({
@@ -153,19 +194,9 @@ export function useCreateVehicle() {
         const qrSlug = demoQrSlug(input.make, input.model);
         const vehicle: Vehicle = {
           id: demoVehicleId(),
-          make: input.make.trim(),
-          model: input.model.trim(),
-          year: input.year,
-          nickname: input.nickname?.trim() || `${input.make.trim()} ${input.model.trim()}`,
-          color: input.color,
-          odometerKm: input.odometerKm,
-          kind: input.kind,
-          fuel: input.fuel,
-          efficiency: input.efficiency,
-          efficiencyUnit: input.kind === 'ev' ? 'kwh_100km' : 'km_l',
+          ...demoVehicleFields(input),
           qrSlug,
           qr: vehicleUrl(qrSlug),
-          isPrimary: Boolean(input.isPrimary),
           ownerId: account?.id,
           ownerUsername: account?.username,
           ownerName: account?.displayName,
@@ -180,16 +211,7 @@ export function useCreateVehicle() {
         throw new Error('Inicia sesión para guardar tu vehículo.');
       }
 
-      if (input.isPrimary) {
-        const { error: clearError } = await supabase
-          .from('vehicles')
-          .update({ is_primary: false })
-          .eq('owner_id', account.id)
-          .eq('is_primary', true);
-
-        if (clearError) throw new Error(friendlyGarageError(clearError.message));
-      }
-
+      // El trigger vehicles_single_primary desmarca el principal anterior.
       const { data, error } = await supabase
         .from('vehicles')
         .insert(vehicleInsertPayload(account.id, input))
@@ -197,16 +219,54 @@ export function useCreateVehicle() {
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));
-      return mapVehicleRow(data as VehicleRow, {
-        id: account.id,
-        username: account.username,
-        name: account.displayName,
-      });
+      return mapVehicleRow(data as VehicleRow, ownerOf(account));
     },
     onSuccess: () => {
       if (!demo) {
         void queryClient.invalidateQueries({ queryKey: ['garage'] });
       }
+    },
+  });
+}
+
+export function useUpdateVehicle() {
+  const queryClient = useQueryClient();
+  const account = useAuth((state) => state.account);
+  const demo = isDemoMode(account?.mode);
+  const updateDemoVehicle = useDemoGarage((state) => state.updateVehicle);
+
+  return useMutation({
+    mutationFn: async ({ vehicleId, input }: { vehicleId: string; input: NewVehicleInput }) => {
+      if (demo) {
+        const current = useDemoGarage.getState().vehicles.find((item) => item.id === vehicleId);
+        if (!current) throw new Error('No encontramos ese vehículo.');
+
+        const updated: Vehicle = { ...current, ...demoVehicleFields(input) };
+
+        await updateDemoVehicle(vehicleId, updated);
+        return updated;
+      }
+
+      if (!supabase || !account) {
+        throw new Error('Inicia sesión para editar tu vehículo.');
+      }
+
+      // El trigger vehicles_single_primary desmarca el principal anterior.
+      const payload = vehicleInsertPayload(account.id, input);
+      const { owner_id: _ownerId, ...updates } = payload;
+      const { data, error } = await supabase
+        .from('vehicles')
+        .update(updates)
+        .eq('id', vehicleId)
+        .eq('owner_id', account.id)
+        .select('*')
+        .single();
+
+      if (error) throw new Error(friendlyGarageError(error.message));
+      return mapVehicleRow(data as VehicleRow, ownerOf(account));
+    },
+    onSuccess: () => {
+      if (!demo) void queryClient.invalidateQueries({ queryKey: ['garage'] });
     },
   });
 }

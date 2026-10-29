@@ -113,6 +113,12 @@ export function parseWorldMapEvent(raw: unknown): WorldMapEvent | null {
 }
 
 const MAPLIBRE_BASE = 'https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl';
+const MAPTILER_KEY = (process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '').trim();
+const MAP_STYLE_URL = MAPTILER_KEY
+  ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`
+  : 'https://tiles.openfreemap.org/styles/dark';
+
+export const WORLD_MAP_PROVIDER = MAPTILER_KEY ? 'maptiler' : 'openfreemap';
 
 // El HTML es estático: los datos cambian por postMessage y el WebView no se recarga.
 export const WORLD_MAP_HTML = `<!doctype html>
@@ -201,9 +207,16 @@ export const WORLD_MAP_HTML = `<!doctype html>
 <script src="${MAPLIBRE_BASE}.js"></script>
 <script>
 (function () {
-  var STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
-  var TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  // Rendimiento: el WebView renderiza a la resolución física del panel
+  // (≈2.8x en la mayoría de teléfonos). El modo 2D es el arranque ligero y
+  // el modo 3D se activa bajo demanda.
+  window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.0);
+
+  var STYLE_URL = '${MAP_STYLE_URL}';
+  var FALLBACK_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+  var styleFallbackAttempted = false;
   var DEFAULT_CENTER = [-69.9312, 18.4861];
+  var MAP_PIXEL_RATIO = 1.0;
   var CRUISE_PITCH = 65;
   var FOLLOW_ZOOM = 17;
   var MOVING_KMH = 5;
@@ -226,7 +239,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     members: [],
     destination: null,
     route: null,
-    mode: '3d',
+    mode: '2d',
     following: true,
     heading: null,
     vehicleColor: '#ff5a1f',
@@ -256,6 +269,10 @@ export const WORLD_MAP_HTML = `<!doctype html>
   var accuracyUpdatedAt = 0;
   var parkingLineAt = 0;
   var lastCarKey = '';
+  var lastRouteProgressIndex = -1;
+  // El canvas del vehículo usa una resolución moderada para no competir con
+  // el mapa por la GPU del teléfono.
+  var caravanaPerfScale = 1;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -367,7 +384,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
       center: center,
       pitch: pitchFor(state.mode),
       bearing: bearing,
-      duration: animate ? (moving ? 1900 : 500) : 0,
+       // La señal GPS llega cada pocos segundos; una animación de 1.9 s se
+       // solapaba con la siguiente y producía sensación de mapa pesado.
+       duration: animate ? (moving ? 850 : 450) : 0,
       essential: true
     };
     if (moving) options.easing = function (t) { return t; };
@@ -404,6 +423,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       personMarker.setLngLat(lngLatOf(location));
     }
     renderCar();
+    updateRouteProgress(false);
     updateBrakeAssist();
     updateGuideArrow();
     updateParkingLine();
@@ -469,26 +489,76 @@ export const WORLD_MAP_HTML = `<!doctype html>
   }
 
   function setRoute(route) {
+    var hadRoute = routePoints.length > 1;
     state.route = route || null;
     if (!mapReady) return;
     var points = state.route && state.route.coordinates ? state.route.coordinates : [];
     routePoints = points.map(function (point) { return [point[1], point[0]]; });
-    var data = EMPTY_ROUTE;
-    if (points.length > 1) {
-      data = {
-        type: 'FeatureCollection',
-        features: [{
-          type: 'Feature',
-          properties: { kind: state.route.source },
-          geometry: {
-            type: 'LineString',
-            coordinates: points.map(function (point) { return [point[1], point[0]]; })
-          }
-        }]
-      };
-    }
-    map.getSource('caravana-route').setData(data);
+    lastRouteProgressIndex = -1;
+    updateRouteProgress(true);
     updateGuide();
+    if (!hadRoute && routePoints.length > 1) focusRoute();
+  }
+
+  function routeDataForProgress(splitIndex) {
+    if (!state.route || routePoints.length < 2) return EMPTY_ROUTE;
+
+    var split = Math.max(0, Math.min(routePoints.length - 1, splitIndex));
+    var features = [];
+    var past = routePoints.slice(0, split + 1);
+    var future = routePoints.slice(split);
+    var kind = state.route.source;
+
+    if (past.length > 1) {
+      features.push({
+        type: 'Feature',
+        properties: { kind: kind, segment: 'past' },
+        geometry: { type: 'LineString', coordinates: past }
+      });
+    }
+    if (future.length > 1) {
+      features.push({
+        type: 'Feature',
+        properties: { kind: kind, segment: 'future' },
+        geometry: { type: 'LineString', coordinates: future }
+      });
+    }
+    return { type: 'FeatureCollection', features: features };
+  }
+
+  function updateRouteProgress(force) {
+    if (!mapReady || !map.getSource('caravana-route')) return;
+    if (!state.route || routePoints.length < 2) {
+      lastRouteProgressIndex = -1;
+      map.getSource('caravana-route').setData(EMPTY_ROUTE);
+      return;
+    }
+
+    var split = state.location ? nearestRouteIndex(lngLatOf(state.location)) : 0;
+    if (!force && split === lastRouteProgressIndex) return;
+    lastRouteProgressIndex = split;
+    map.getSource('caravana-route').setData(routeDataForProgress(split));
+  }
+
+  // Reencuadre corto: el coche queda en el centro y el tramo inmediato de la
+  // ruta ocupa la vista, en lugar de mostrar la ruta completa diminuta.
+  function focusRoute() {
+    if (!mapReady || !state.location) return;
+    var center = lngLatOf(state.location);
+    var bearing = state.northUp
+      ? 0
+      : state.heading !== null
+        ? state.heading
+        : map.getBearing();
+    lastFollow = { center: center, bearing: bearing };
+    map.easeTo({
+      center: center,
+      zoom: Math.max(17.5, map.getZoom()),
+      pitch: pitchFor(state.mode),
+      bearing: bearing,
+      duration: 650,
+      essential: true
+    });
   }
 
   function haversineLngLat(a, b) {
@@ -781,6 +851,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     state.mode = mode === '2d' ? '2d' : '3d';
     document.body.setAttribute('data-mode', state.mode);
     if (!mapReady) return;
+    renderCar();
     map.easeTo({ pitch: pitchFor(state.mode), duration: 700, essential: true });
   }
 
@@ -812,56 +883,6 @@ export const WORLD_MAP_HTML = `<!doctype html>
     }
   }
 
-  // Al cargar el relieve la cámara cambia de altura sin evento de movimiento; reproyectamos los marcadores.
-  function refreshMarkers() {
-    if (vehicleMarker) vehicleMarker.setLngLat(vehicleMarker.getLngLat());
-    if (destinationMarker) destinationMarker.setLngLat(destinationMarker.getLngLat());
-    memberMarkers.forEach(function (entry) {
-      entry.marker.setLngLat(entry.marker.getLngLat());
-    });
-  }
-
-  function addTerrain() {
-    try {
-      map.addSource('caravana-terrain', {
-        type: 'raster-dem',
-        tiles: [TERRAIN_URL],
-        encoding: 'terrarium',
-        tileSize: 256,
-        maxzoom: 15
-      });
-      map.setTerrain({ source: 'caravana-terrain', exaggeration: 1 });
-    } catch (error) {
-      // Sin relieve el mapa sigue en 3D con inclinación y edificios.
-    }
-  }
-
-  function addBuildings() {
-    var style = map.getStyle();
-    var layers = style.layers || [];
-    var sources = style.sources || {};
-    var sourceId = Object.keys(sources).filter(function (id) {
-      return sources[id].type === 'vector';
-    })[0];
-    var hasExtrusions = layers.some(function (layer) {
-      return layer.type === 'fill-extrusion';
-    });
-    if (!sourceId || hasExtrusions) return;
-    map.addLayer({
-      id: 'caravana-buildings-3d',
-      type: 'fill-extrusion',
-      source: sourceId,
-      'source-layer': 'building',
-      minzoom: 14.5,
-      paint: {
-        'fill-extrusion-color': '#313c53',
-        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
-        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'height_min'], 0],
-        'fill-extrusion-opacity': 0.9
-      }
-    }, firstSymbolLayerId());
-  }
-
   function addRoute() {
     map.addSource('caravana-route', { type: 'geojson', data: EMPTY_ROUTE });
     var before = firstSymbolLayerId();
@@ -871,9 +892,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#06080b',
+        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#101820', '#061008'],
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 14, 11, 16, 15, 18, 22],
-        'line-opacity': 0.92
+        'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.55, 0.96]
       }
     }, before);
     map.addLayer({
@@ -882,8 +903,8 @@ export const WORLD_MAP_HTML = `<!doctype html>
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'kind'], 'fallback'], '#c9ff4d', '#ff6a2b'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 7, 16, 10, 18, 15]
+        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#596778', '#baff3f'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 8, 16, 12, 18, 17]
       }
     }, before);
     // Brillo interior: da volumen a la cinta, como la ruta de Waze.
@@ -893,9 +914,9 @@ export const WORLD_MAP_HTML = `<!doctype html>
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'kind'], 'fallback'], '#eaffb0', '#ffb489'],
+        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#9aa7b8', '#f2ffc1'],
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 14, 2, 16, 3, 18, 4],
-        'line-opacity': 0.9
+        'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.35, 0.95]
       }
     }, before);
     addRouteArrows(before);
@@ -930,7 +951,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
       id: 'caravana-route-arrows',
       type: 'symbol',
       source: 'caravana-route',
-      filter: ['!=', ['get', 'kind'], 'fallback'],
+      filter: ['==', ['get', 'segment'], 'future'],
       layout: {
         'symbol-placement': 'line',
         'symbol-spacing': 90,
@@ -952,7 +973,18 @@ export const WORLD_MAP_HTML = `<!doctype html>
       var layer = layers[index];
       if (layer.type !== 'symbol') continue;
       var sourceLayer = layer['source-layer'] || '';
-      if (sourceLayer === 'poi' || sourceLayer === 'housenumber') {
+       var keepPlaceLabel =
+         layer.id === 'place_city' ||
+         layer.id === 'place_city_large' ||
+         layer.id === 'place_country_major' ||
+         layer.id === 'highway_name_motorway';
+       if (
+         sourceLayer === 'poi' ||
+         sourceLayer === 'housenumber' ||
+         sourceLayer === 'transportation' ||
+         (sourceLayer === 'transportation_name' && !keepPlaceLabel) ||
+         (sourceLayer === 'place' && !keepPlaceLabel)
+       ) {
         try {
           map.setLayoutProperty(layer.id, 'visibility', 'none');
         } catch (error) {
@@ -1295,7 +1327,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var container = map.getContainer();
     car3d.width = container.clientWidth;
     car3d.height = container.clientHeight;
-    car3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    car3d.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, caravanaPerfScale));
     car3d.renderer.setSize(car3d.width, car3d.height, false);
     car3d.camera.left = -car3d.width / 2;
     car3d.camera.right = car3d.width / 2;
@@ -1308,7 +1340,7 @@ export const WORLD_MAP_HTML = `<!doctype html>
     var canvas = document.createElement('canvas');
     canvas.id = 'caravana-car';
     canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;display:none';
-    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, alpha: true });
     renderer.setClearColor(0x000000, 0);
     map.getContainer().appendChild(canvas);
     var scene = new THREE.Scene();
@@ -1355,16 +1387,18 @@ export const WORLD_MAP_HTML = `<!doctype html>
     if (container.clientWidth !== car3d.width || container.clientHeight !== car3d.height) sizeCar();
 
     var located = Boolean(state.location);
-    car3d.canvas.style.display = located ? 'block' : 'none';
+    var moving = state.location && typeof state.location.speedKmh === 'number' && state.location.speedKmh >= MOVING_KMH;
+    var use3d = located && state.mode === '3d' && (Boolean(state.route || state.destination) || moving);
+    car3d.canvas.style.display = use3d ? 'block' : 'none';
     if (vehicleMarker) {
       var element = vehicleMarker.getElement();
-      element.classList.toggle('is-3d', located);
+      element.classList.toggle('is-3d', use3d);
       // Con relieve e inclinación MapLibre puede colocar el marcador DOM en
       // posiciones raras; escondido no molesta.
-      element.style.opacity = located ? '0' : '';
-      element.style.display = located ? 'none' : '';
+      element.style.opacity = use3d ? '0' : '';
+      element.style.display = use3d ? 'none' : '';
     }
-    if (!located) return;
+    if (!use3d) return;
 
     var pitch = map.getPitch() * Math.PI / 180;
     var sinPitch = Math.sin(pitch);
@@ -1705,14 +1739,16 @@ export const WORLD_MAP_HTML = `<!doctype html>
   }
 
   function onLoad() {
+    if (mapReady) return;
     mapReady = true;
     document.body.setAttribute('data-ready', 'true');
     try {
+      // MapLibre tiene su propio pixel ratio; cambiar solo window.devicePixelRatio
+      // no siempre afecta al canvas del mapa en Android WebView.
+      if (map.setPixelRatio) map.setPixelRatio(MAP_PIXEL_RATIO);
       applyViewPadding();
       watchResize();
       map.setPitch(pitchFor(state.mode));
-      addTerrain();
-      addBuildings();
       addAccuracyLayer();
       addRoadStyle();
       addRoute();
@@ -1773,10 +1809,15 @@ export const WORLD_MAP_HTML = `<!doctype html>
       if (!map.hasImage(event.id)) map.addImage(event.id, { width: 1, height: 1, data: new Uint8Array(4) });
     });
     map.on('load', onLoad);
-    map.on('sourcedata', function (event) {
-      if (mapReady && event.sourceId === 'caravana-terrain') refreshMarkers();
+    map.on('style.load', function () {
+      if (!mapReady) onLoad();
     });
     map.on('error', function (event) {
+      if (!mapReady && !styleFallbackAttempted && STYLE_URL !== FALLBACK_STYLE_URL) {
+        styleFallbackAttempted = true;
+        map.setStyle(FALLBACK_STYLE_URL);
+        return;
+      }
       if (!mapReady && !event.sourceId) fail('No pudimos cargar el mapa. Revisa tu conexión.');
     });
     map.on('dragstart', function (event) {

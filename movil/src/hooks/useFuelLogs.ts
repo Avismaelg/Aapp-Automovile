@@ -1,18 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fuelLogs as mockFuelLogs, type FuelLog, type Vehicle } from '@/src/data/mock';
+import { isDemoMode } from '@/src/lib/demo';
 import { mapFuelLogRow, type FuelLogRow } from '@/src/lib/vehicle-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 
-function demoFuel(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
-
 export function useFuelLogs(availableVehicles: Vehicle[]) {
   const account = useAuth((state) => state.account);
-  const demo = demoFuel(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const vehicleKey = availableVehicles
     .map((vehicle) => vehicle.id)
@@ -64,7 +61,7 @@ export type NewFuelLogInput = {
 export function useAddFuelLog() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoFuel(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const setDemoOdometer = useDemoGarage((state) => state.setOdometer);
 
   return useMutation({

@@ -20,7 +20,8 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { isDemoMode } from '@/src/lib/demo';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
 
@@ -61,10 +62,6 @@ type VehicleRow = {
   is_primary: boolean;
   created_at: string;
 };
-
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
 
 function fallbackProfile(id: string): UserProfile {
   return {
@@ -148,7 +145,7 @@ export function useChallengeFriends() {
 export function useChallenges() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['challenges', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
@@ -338,7 +335,7 @@ export type CreateChallengeInput = {
 export function useCreateChallenge() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (input: CreateChallengeInput) => {
@@ -411,7 +408,7 @@ export function useCreateChallenge() {
 export function useRespondChallenge() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({
@@ -441,7 +438,7 @@ export function useRespondChallenge() {
 export function useStartChallenge() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (challengeId: string) => {
@@ -465,7 +462,7 @@ export function useStartChallenge() {
 export function useFinishChallenge() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (challengeId: string) => {

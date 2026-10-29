@@ -125,7 +125,12 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.coverActions}>
             <IconButton icon="qr-code-outline" size={38} onPress={() => router.push('/scan')} />
-            <IconButton icon="settings-outline" size={38} />
+            <IconButton
+              icon="settings-outline"
+              size={38}
+              onPress={() => router.push('/profile/edit')}
+              accessibilityHint="Editar los datos de tu perfil"
+            />
           </View>
         </View>
         <View style={styles.coverPattern}>
@@ -342,7 +347,19 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.settingDivider} />
             {profileSettings.map((setting, index) => (
-              <View key={setting.label}>
+              <Pressable
+                key={setting.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${setting.label}${setting.value ? `, ${setting.value}` : ''}`}
+                onPress={() => {
+                  if (index === 0) {
+                    router.push('/profile/edit');
+                  } else {
+                    Alert.alert(setting.label, 'Esta preferencia estará disponible en una próxima versión.');
+                  }
+                }}
+                style={({ pressed }) => pressed && { opacity: 0.72 }}
+              >
                 <View style={styles.settingRow}>
                   <View style={styles.settingIcon}>
                     <Ionicons name={setting.icon} size={17} color={colors.textSoft} />
@@ -354,7 +371,7 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={14} color={colors.dim} />
                 </View>
                 {index < settings.length - 1 ? <View style={styles.settingDivider} /> : null}
-              </View>
+              </Pressable>
             ))}
           </Card>
 

@@ -1,92 +1,68 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
+import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
+
 const TASK_NAME = 'caravana-background-location';
-const STORAGE_KEY = 'caravana.tracking.session';
+// Un fix con más error que esto ensucia la ruta más de lo que aporta.
+const MAX_ACCURACY_M = 100;
 
-export type TrackingPoint = {
-  latitude: number;
-  longitude: number;
-  speed: number | null;
-  heading: number | null;
-  timestamp: number;
+const UPDATE_OPTIONS: Location.LocationTaskOptions = {
+  accuracy: Location.Accuracy.High,
+  timeInterval: 15_000,
+  distanceInterval: 25,
+  deferredUpdatesInterval: 30_000,
+  activityType: Location.ActivityType.AutomotiveNavigation,
+  pausesUpdatesAutomatically: false,
+  showsBackgroundLocationIndicator: true,
+  foregroundService: {
+    notificationTitle: 'Caravana está registrando tu ruta',
+    notificationBody: 'Tu viaje se guarda automáticamente. Toca para abrir.',
+    notificationColor: '#FF5A1F',
+    // El servicio sigue aunque el usuario cierre la app desde recientes.
+    killServiceOnDestroy: false,
+  },
 };
 
-export type TrackingSession = {
-  active: boolean;
-  startedAt: number | null;
-  endedAt: number | null;
-  points: TrackingPoint[];
-  distanceM: number;
-};
-
-const EMPTY_SESSION: TrackingSession = {
-  active: false,
-  startedAt: null,
-  endedAt: null,
-  points: [],
-  distanceM: 0,
-};
-
-function haversineMeters(a: TrackingPoint, b: TrackingPoint) {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLon = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
+function toBackgroundPoint(location: Location.LocationObject): BackgroundPoint | null {
+  const { latitude, longitude, speed, accuracy } = location.coords;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (accuracy != null && accuracy > MAX_ACCURACY_M) return null;
+  return {
+    latitude,
+    longitude,
+    speedKmh: speed != null && Number.isFinite(speed) && speed >= 0 ? speed * 3.6 : null,
+    at: location.timestamp,
+  };
 }
 
-async function readSession(): Promise<TrackingSession> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!raw) return { ...EMPTY_SESSION };
-  try {
-    return { ...EMPTY_SESSION, ...(JSON.parse(raw) as TrackingSession) };
-  } catch {
-    return { ...EMPTY_SESSION };
-  }
-}
-
-async function writeSession(session: TrackingSession) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-}
-
+// Debe definirse al cargar el módulo (no dentro de un componente): cuando el
+// sistema despierta la app en segundo plano solo ejecuta el código global.
+// Por eso app/_layout.tsx importa este archivo.
 if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(TASK_NAME)) {
-  TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
-    if (error) return;
-    const locations = (data as { locations?: Location.LocationObject[] })?.locations;
-    if (!locations?.length) return;
+  TaskManager.defineTask<{ locations?: Location.LocationObject[] }>(
+    TASK_NAME,
+    async ({ data, error }) => {
+      if (error || !data?.locations?.length) return;
+      const points = data.locations
+        .map(toBackgroundPoint)
+        .filter((point): point is BackgroundPoint => point !== null);
+      try {
+        await saveBackgroundBatch(points);
+      } catch {
+        // Almacenamiento lleno u ocupado: se pierde este lote, no el servicio.
+      }
+    },
+  );
+}
 
-    const session = await readSession();
-    if (!session.active) return;
-
-    const newPoints: TrackingPoint[] = locations.map((loc) => ({
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-      speed: loc.coords.speed,
-      heading: loc.coords.heading,
-      timestamp: loc.timestamp,
-    }));
-
-    let distance = session.distanceM;
-    const all = [...session.points, ...newPoints];
-    for (let i = Math.max(1, session.points.length); i < all.length; i += 1) {
-      const delta = haversineMeters(all[i - 1], all[i]);
-      if (delta < 250) distance += delta; // descarta saltos de GPS
-    }
-
-    await writeSession({
-      ...session,
-      points: all.slice(-5000),
-      distanceM: distance,
-    });
-  });
+async function hasTrackingPermissions() {
+  const [foreground, background] = await Promise.all([
+    Location.getForegroundPermissionsAsync(),
+    Location.getBackgroundPermissionsAsync(),
+  ]);
+  return foreground.granted && background.granted;
 }
 
 export async function requestTrackingPermissions() {
@@ -95,6 +71,11 @@ export async function requestTrackingPermissions() {
   if (foreground.status !== 'granted') return false;
   const background = await Location.requestBackgroundPermissionsAsync();
   return background.status === 'granted';
+}
+
+async function ensureUpdatesRunning() {
+  if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) return;
+  await Location.startLocationUpdatesAsync(TASK_NAME, UPDATE_OPTIONS);
 }
 
 export async function startTracking() {
@@ -106,47 +87,29 @@ export async function startTracking() {
   if (!hasPermission) {
     throw new Error('Necesitamos permiso de ubicación “Siempre” para registrar tus rutas.');
   }
-
-  const session = await readSession();
-  await writeSession({
-    ...session,
-    active: true,
-    startedAt: session.startedAt ?? Date.now(),
-    endedAt: null,
-  });
-
-  const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
-  if (!alreadyRunning) {
-    await Location.startLocationUpdatesAsync(TASK_NAME, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 15000,
-      distanceInterval: 25,
-      deferredUpdatesInterval: 30000,
-      pausesUpdatesAutomatically: false,
-      showsBackgroundLocationIndicator: true,
-      foregroundService: {
-        notificationTitle: 'Caravana está registrando tu ruta',
-        notificationBody: 'Tu viaje se guarda automáticamente. Toca para abrir.',
-        notificationColor: '#FF5A1F',
-      },
-    });
-  }
+  await ensureUpdatesRunning();
 }
 
 export async function stopTracking() {
   if (Platform.OS === 'web') return;
-  const session = await readSession();
-  await writeSession({ ...session, active: false, endedAt: Date.now() });
-  const running = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
-  if (running) {
+  if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
     await Location.stopLocationUpdatesAsync(TASK_NAME);
   }
 }
 
-export async function getTrackingSession() {
-  return readSession();
-}
+export type ResumeResult = 'running' | 'no-permission' | 'error';
 
-export async function clearTrackingSession() {
-  await AsyncStorage.removeItem(STORAGE_KEY);
+// El sistema puede haber parado el servicio (reinicio del teléfono,
+// actualización de la app, ahorro de batería). Lo relanza sin pedir permisos:
+// debe llamarse con la app en primer plano, Android no deja arrancar un
+// servicio de ubicación desde segundo plano.
+export async function resumeTracking(): Promise<ResumeResult> {
+  if (Platform.OS === 'web') return 'error';
+  try {
+    if (!(await hasTrackingPermissions())) return 'no-permission';
+    await ensureUpdatesRunning();
+    return 'running';
+  } catch {
+    return 'error';
+  }
 }

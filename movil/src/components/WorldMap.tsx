@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { type StyleProp, type ViewStyle } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -42,7 +42,7 @@ type WebViewHandle = { postMessage: (message: string) => void };
 
 const MAP_SOURCE = { html: WORLD_MAP_HTML };
 
-export function WorldMap({
+export const WorldMap = memo(function WorldMap({
   members,
   destination = null,
   location,
@@ -198,8 +198,17 @@ export function WorldMap({
       androidLayerType="hardware"
       onLoadStart={handleLoadStart}
       onMessage={handleMessage}
+      onError={(event) => {
+        const description = event.nativeEvent.description?.trim();
+        callbacksRef.current.onError?.(
+          description ? `No pudimos cargar el mapa: ${description}` : 'No pudimos cargar el mapa.',
+        );
+      }}
+      onHttpError={() => {
+        callbacksRef.current.onError?.('El servidor del mapa no respondió. Revisa tu conexión.');
+      }}
       style={[{ flex: 1, backgroundColor: colors.bg }, style]}
       containerStyle={{ backgroundColor: colors.bg }}
     />
   );
-}
+});

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { isDemoMode } from '@/src/lib/demo';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import type { Trip } from '@/src/store/trips';
 import { useAuth } from '@/src/store/auth';
@@ -123,7 +124,7 @@ export function useHighwaySegments() {
 
 export function useSpeedRecords() {
   const account = useAuth((state) => state.account);
-  const demo = account?.mode === 'demo' || !isSupabaseConfigured || !supabase;
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['speed-records'],

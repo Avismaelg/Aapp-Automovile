@@ -93,11 +93,11 @@ function applyCompassHeading(value: number) {
   const previous = current.location.heading;
   if (previous != null) {
     const delta = Math.abs(((value - previous + 540) % 360) - 180);
-    if (delta < 6) return;
+    if (delta < 8) return;
   }
 
   const now = Date.now();
-  if (now - lastHeadingAt < 900) return;
+    if (now - lastHeadingAt < 1_400) return;
   lastHeadingAt = now;
   useLiveLocationState.setState({
     location: { ...current.location, heading: value },
@@ -145,8 +145,8 @@ async function beginSession(id: number) {
     const subscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-        timeInterval: 2_000,
-        distanceInterval: 3,
+         timeInterval: 2_500,
+         distanceInterval: 5,
       },
       (position) => {
         if (id === session) applyPosition(position);

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,7 +18,12 @@ import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
-import type { RouteInstructionIcon, WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
+import {
+  WORLD_MAP_PROVIDER,
+  type RouteInstructionIcon,
+  type WorldMapMember,
+  type WorldMapMode,
+} from '@/src/lib/map-html';
 import {
   cumulativeDistances,
   formatInstructionDistance,
@@ -64,7 +69,9 @@ export default function NavigationScreen() {
   const { members: mapFriends } = useFriendsOnMap();
   const createChallenge = useCreateChallenge();
 
-  const [mode, setMode] = useState<WorldMapMode>('3d');
+  // El modo 2D es la opción fluida para el arranque; el usuario puede activar
+  // 3D bajo demanda desde el control del mapa sin pagar ese coste siempre.
+  const [mode, setMode] = useState<WorldMapMode>('2d');
   const [following, setFollowing] = useState(true);
   const [recenterToken, setRecenterToken] = useState(0);
   const [mapKey, setMapKey] = useState(0);
@@ -73,6 +80,7 @@ export default function NavigationScreen() {
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [northUp, setNorthUp] = useState(false);
+  const lastRerouteAtRef = useRef(0);
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
@@ -87,11 +95,19 @@ export default function NavigationScreen() {
     destination: destination ?? live.location,
     enabled: Boolean(destination),
   });
+  const retryRoute = route.retry;
   const roadInfo = useRoadInfo(live.location);
 
   const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
   const parkingSpot = useParking((state) => state.spot);
   const clearParking = useParking((state) => state.clearSpot);
+  const mapParking = useMemo(
+    () =>
+      parkingSpot
+        ? { latitude: parkingSpot.latitude, longitude: parkingSpot.longitude }
+        : null,
+    [parkingSpot],
+  );
   useParkingDetector(live.location);
   const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
   const showParking =
@@ -131,13 +147,17 @@ export default function NavigationScreen() {
     () => (route.route ? cumulativeDistances(route.route.coordinates) : []),
     [route.route],
   );
-  const progressM = useMemo(
+  const progressState = useMemo(
     () =>
       route.route
-        ? (routeProgress(route.route.coordinates, routeCumulative, { latitude, longitude })
-            ?.progressM ?? null)
+        ? routeProgress(route.route.coordinates, routeCumulative, { latitude, longitude })
         : null,
     [route.route, routeCumulative, latitude, longitude],
+  );
+  const progressM = progressState?.progressM ?? null;
+  const routeDistanceFromPathM = progressState?.distanceM ?? null;
+  const offRoute = Boolean(
+    route.route && routeDistanceFromPathM != null && routeDistanceFromPathM > 80,
   );
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),
@@ -268,7 +288,7 @@ export default function NavigationScreen() {
       longitude: parkingSpot.longitude,
       label: 'Mi coche',
     });
-    startNavigation();
+                       beginNavigation();
   };
 
   // Acciones sobre un amigo visto en el mapa.
@@ -338,6 +358,21 @@ export default function NavigationScreen() {
 
   const navigating = isNavigating && Boolean(destination);
 
+  const beginNavigation = useCallback(() => {
+    setMode('3d');
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
+    startNavigation();
+  }, [startNavigation]);
+
+  useEffect(() => {
+    if (!navigating || !offRoute || route.isLoading) return;
+    const now = Date.now();
+    if (now - lastRerouteAtRef.current < 15_000) return;
+    lastRerouteAtRef.current = now;
+    retryRoute();
+  }, [navigating, offRoute, retryRoute, route.isLoading]);
+
   return (
     <View style={styles.root}>
       <WorldMap
@@ -345,11 +380,7 @@ export default function NavigationScreen() {
         members={mapFriends}
         destination={destination}
         location={live.location}
-        parking={
-          parkingSpot
-            ? { latitude: parkingSpot.latitude, longitude: parkingSpot.longitude }
-            : null
-        }
+        parking={mapParking}
         travelMode={walking ? 'walking' : 'car'}
         northUp={northUp}
         route={route.route}
@@ -399,7 +430,9 @@ export default function NavigationScreen() {
               </View>
               <View style={styles.navMetaRow}>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-                  {routeLine
+                  {offRoute
+                    ? 'Fuera de ruta · recalculando…'
+                    : routeLine
                     ? `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)}${
                         arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''
                       }`
@@ -443,29 +476,51 @@ export default function NavigationScreen() {
                 N
               </AppText>
             </Pressable>
-            <View style={styles.navActions}>
-              <Pressable
-                style={styles.navButtonDark}
-                onPress={() => router.push('/destino' as Href)}
-                accessibilityRole="button"
-                accessibilityLabel="Cambiar ruta"
-              >
-                <Ionicons name="swap-horizontal" size={18} color={colors.text} />
-                <AppText variant="bodyStrong" color={colors.text}>
-                  Cambiar ruta
-                </AppText>
-              </Pressable>
-              <Pressable
-                style={styles.navButtonLime}
-                onPress={clearDestination}
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar ruta"
-              >
-                <Ionicons name="close" size={18} color="#120802" />
-                <AppText variant="bodyStrong" color="#120802">
-                  Cerrar ruta
-                </AppText>
-              </Pressable>
+            <View style={[styles.navBottomCard, { paddingBottom: insets.bottom + spacing.md }]}>
+              <View style={styles.navBottomSummary}>
+                <View style={styles.navBottomText}>
+                  <AppText variant="label" color={colors.muted}>DESTINO</AppText>
+                  <AppText variant="h3" numberOfLines={1}>
+                    {destination.label}
+                  </AppText>
+                  <AppText variant="caption" color={offRoute ? colors.accent : colors.textSoft} numberOfLines={1}>
+                    {offRoute
+                      ? 'Recalculando una ruta nueva…'
+                      : `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)}${arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''}`}
+                  </AppText>
+                </View>
+                <IconButton
+                  icon="close"
+                  size={38}
+                  tone="ghost"
+                  onPress={clearDestination}
+                  accessibilityLabel="Cerrar navegación"
+                />
+              </View>
+              <View style={styles.navActions}>
+                <Pressable
+                  style={styles.navButtonDark}
+                  onPress={() => router.push('/destino' as Href)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar ruta"
+                >
+                  <Ionicons name="swap-horizontal" size={18} color={colors.text} />
+                  <AppText variant="bodyStrong" color={colors.text}>
+                    Cambiar ruta
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.navButtonLime}
+                  onPress={clearDestination}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar ruta"
+                >
+                  <Ionicons name="close" size={18} color="#120802" />
+                  <AppText variant="bodyStrong" color="#120802">
+                    Cerrar ruta
+                  </AppText>
+                </Pressable>
+              </View>
             </View>
           </View>
         ) : (
@@ -495,27 +550,25 @@ export default function NavigationScreen() {
               />
             </View>
 
-            <Pressable
-              style={styles.searchPill}
-              onPress={() => router.push('/destino' as Href)}
-              accessibilityRole="button"
-              accessibilityLabel="Buscar destino"
-            >
-              <Ionicons
-                name={destination ? 'flag' : 'search'}
-                size={16}
-                color={destination ? colors.lime : colors.textSoft}
-              />
-              <AppText
-                variant="bodyStrong"
-                numberOfLines={1}
-                color={destination ? colors.text : colors.textSoft}
-                style={styles.searchText}
-              >
-                {destination ? destination.label : '¿A dónde vamos?'}
-              </AppText>
-              <Ionicons name="search" size={14} color={colors.muted} />
-            </Pressable>
+             {destination == null ? (
+               <Pressable
+                 style={styles.searchPill}
+                 onPress={() => router.push('/destino' as Href)}
+                 accessibilityRole="button"
+                 accessibilityLabel="Buscar destino"
+               >
+                 <Ionicons name="search" size={16} color={colors.textSoft} />
+                 <AppText
+                   variant="bodyStrong"
+                   numberOfLines={1}
+                   color={colors.textSoft}
+                   style={styles.searchText}
+                 >
+                   ¿A dónde vamos?
+                 </AppText>
+                 <Ionicons name="search" size={14} color={colors.muted} />
+               </Pressable>
+             ) : null}
 
             {destination == null && recentDestinations.length > 0 ? (
               <View style={styles.recentsRow}>
@@ -525,7 +578,6 @@ export default function NavigationScreen() {
                     style={styles.recentChip}
                     onPress={() => {
                       useChosenDestination.getState().setDestination(recent);
-                      startNavigation();
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={`Ir a ${recent.label}`}
@@ -694,7 +746,9 @@ export default function NavigationScreen() {
                       {destination.label}
                     </AppText>
                     <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-                      {route.isLoading
+                      {route.error
+                        ? route.error
+                        : route.isLoading
                         ? 'Buscando ruta por calles…'
                         : routeLine
                           ? `${routeLine} · ${routeSourceLabel}${arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''}`
@@ -705,11 +759,12 @@ export default function NavigationScreen() {
                 </View>
                 <View style={styles.destinationActions}>
                   <Button
-                    label="Navegar"
+                    label="Confirmar ruta"
                     variant="lime"
                     size="sm"
                     icon="navigate"
-                    onPress={startNavigation}
+                     onPress={beginNavigation}
+                    disabled={route.isLoading || !route.route}
                     style={styles.destinationAction}
                   />
                   <Button
@@ -776,7 +831,9 @@ export default function NavigationScreen() {
               onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
             >
               <AppText variant="caption" color={colors.dim} style={styles.attributionText}>
-                © OpenFreeMap · © OpenMapTiles · © OpenStreetMap · Relieve Mapzen
+                 {WORLD_MAP_PROVIDER === 'maptiler'
+                   ? '© MapTiler · © OpenStreetMap'
+                   : '© OpenFreeMap · © OpenMapTiles · © OpenStreetMap'}
               </AppText>
             </Pressable>
           </>
@@ -969,7 +1026,7 @@ const styles = StyleSheet.create({
   navCompass: {
     position: 'absolute',
     right: 0,
-    bottom: 96,
+    bottom: 164,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1066,7 +1123,7 @@ const styles = StyleSheet.create({
   navSpeed: {
     position: 'absolute',
     left: 0,
-    bottom: 96,
+    bottom: 164,
     alignItems: 'center',
     backgroundColor: 'rgba(6,8,11,0.72)',
     borderWidth: 1,
@@ -1076,11 +1133,28 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   navSpeedValue: { fontSize: 40, lineHeight: 44 },
-  navActions: {
+  navBottomCard: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'rgba(6,8,11,0.94)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(201,255,77,0.24)',
+    borderTopLeftRadius: radius['2xl'],
+    borderTopRightRadius: radius['2xl'],
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  navBottomSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  navBottomText: { flex: 1, gap: 2 },
+  navActions: {
     flexDirection: 'row',
     gap: 10,
   },

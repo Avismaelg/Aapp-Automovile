@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { friends as mockFriends } from '@/src/data/mock';
+import { isDemoMode } from '@/src/lib/demo';
 import type { FriendEntry, FriendshipRow } from '@/src/lib/friends';
 import {
   mapProfileRow,
@@ -8,12 +9,8 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
-
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
 
 function demoFriendProfile(friend: (typeof mockFriends)[number]): UserProfile {
   return {
@@ -42,7 +39,7 @@ function demoEntries(): FriendEntry[] {
 
 export function useFriends() {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['friendships', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
@@ -146,7 +143,7 @@ function friendlyFriendshipError(code: string | undefined, message: string) {
 export function useSendFriendRequest() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (targetId: string) => {
@@ -176,7 +173,7 @@ export function useSendFriendRequest() {
 export function useRespondFriendRequest() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
@@ -210,7 +207,7 @@ export function useRespondFriendRequest() {
 export function useRemoveFriend() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (friendshipId: string) => {
@@ -239,7 +236,7 @@ export function useRemoveFriend() {
 
 export function useSearchProfiles(rawQuery: string) {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const term = rawQuery.trim().replace(/[%,()]/g, '').slice(0, 40);
 
   const query = useQuery({

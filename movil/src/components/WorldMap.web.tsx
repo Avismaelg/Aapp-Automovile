@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useId, useRef } from 'react';
+import { createElement, memo, useCallback, useEffect, useId, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import {
@@ -37,7 +37,7 @@ type WorldMapProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-export function WorldMap({
+export const WorldMap = memo(function WorldMap({
   members,
   destination = null,
   location,
@@ -202,4 +202,4 @@ export function WorldMap({
       ...resolvedStyle,
     },
   } as never);
-}
+});

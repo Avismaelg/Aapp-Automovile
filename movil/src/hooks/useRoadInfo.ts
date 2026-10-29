@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { fetchWithTimeout } from '@/src/lib/network';
+
 export type RoadInfo = {
   limitKmh: number | null;
   roadName: string | null;
@@ -64,6 +66,11 @@ export function useRoadInfo(
   const lastQueryRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
 
   const { latitude, longitude, speedKmh } = location;
+  // La calle y el límite no necesitan precisión de cada fix GPS. Muestrear a
+  // ~11 m evita recrear el efecto en cada actualización del sensor.
+  const sampledLatitude = Number(latitude.toFixed(4));
+  const sampledLongitude = Number(longitude.toFixed(4));
+  const sampledSpeed = speedKmh == null ? null : Math.round(speedKmh / 5) * 5;
 
   useEffect(() => {
     if (!enabled) return;
@@ -71,10 +78,10 @@ export function useRoadInfo(
     const previous = lastQueryRef.current;
     if (previous) {
       if (now - previous.at < QUERY_MIN_INTERVAL_MS) return;
-      if (movedMeters(previous, { lat: latitude, lng: longitude }) < QUERY_MIN_DISTANCE_M) return;
-      if (speedKmh != null && speedKmh < 5) return;
+       if (movedMeters(previous, { lat: sampledLatitude, lng: sampledLongitude }) < QUERY_MIN_DISTANCE_M) return;
+       if (sampledSpeed != null && sampledSpeed < 5) return;
     }
-    lastQueryRef.current = { lat: latitude, lng: longitude, at: now };
+    lastQueryRef.current = { lat: sampledLatitude, lng: sampledLongitude, at: now };
 
     const controller = new AbortController();
 
@@ -82,8 +89,8 @@ export function useRoadInfo(
       try {
         const reverseUrl =
           'https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&extratags=1&accept-language=es' +
-          `&lat=${latitude.toFixed(5)}&lon=${longitude.toFixed(5)}`;
-        const reverse = await fetch(reverseUrl, {
+          `&lat=${sampledLatitude.toFixed(5)}&lon=${sampledLongitude.toFixed(5)}`;
+        const reverse = await fetchWithTimeout(reverseUrl, {
           signal: controller.signal,
           headers: requestHeaders(),
         });
@@ -96,7 +103,7 @@ export function useRoadInfo(
 
         // Si Nominatim no trae la etiqueta, se consulta la vía directa en OSM.
         if (limitKmh == null && place.osm_type === 'way' && place.osm_id) {
-          const wayResponse = await fetch(
+          const wayResponse = await fetchWithTimeout(
             `https://api.openstreetmap.org/api/0.6/way/${place.osm_id}.json`,
             { signal: controller.signal, headers: requestHeaders() },
           );
@@ -113,7 +120,7 @@ export function useRoadInfo(
     })();
 
     return () => controller.abort();
-  }, [latitude, longitude, speedKmh, enabled]);
+  }, [enabled, sampledLatitude, sampledLongitude, sampledSpeed]);
 
   return info;
 }

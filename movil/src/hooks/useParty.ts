@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
+import { isDemoMode } from '@/src/lib/demo';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
   mapProfileRow,
@@ -10,7 +11,7 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
 export type PartyRole = 'host' | 'member' | 'sweeper';
@@ -72,10 +73,6 @@ type PartyMemberRow = {
   is_muted: boolean;
   voice_channel_slug: PartyVoiceChannelSlug;
 };
-
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
 
 function fallbackProfile(id: string): UserProfile {
   return {
@@ -150,7 +147,7 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
 export function useActiveParty() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
   const query = useQuery({
@@ -276,7 +273,7 @@ export function useActiveParty() {
 export function useCreateParty() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (input: {
@@ -329,7 +326,7 @@ export function useCreateParty() {
 export function useJoinParty() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (code: string) => {
@@ -362,7 +359,7 @@ export function useJoinParty() {
 export function useLeaveParty() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ partyId, isHost }: { partyId: string; isHost: boolean }) => {
@@ -395,7 +392,7 @@ export function useLeaveParty() {
 export function useSetVoiceChannel() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({
@@ -425,7 +422,7 @@ export function useSetVoiceChannel() {
 export function useSetPartyDestination() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({
@@ -541,7 +538,7 @@ type PartyMessageRow = {
 export function usePartyMessages(partyId: string | undefined) {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
   const query = useQuery({
@@ -615,7 +612,7 @@ export function usePartyMessages(partyId: string | undefined) {
 export function useSendPartyMessage() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ partyId, body }: { partyId: string; body: string }) => {

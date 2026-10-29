@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import { create } from 'zustand';
 
 import { currentUser } from '@/src/data/mock';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { isProductionBuild, isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 
 const DEMO_KEY = 'caravana.auth.demo-mode';
 
@@ -59,6 +60,40 @@ const DEMO_ACCOUNT: Account = {
 
 let bootstrapped = false;
 let unsubscribeAuth: (() => void) | null = null;
+let unsubscribeDeepLink: (() => void) | null = null;
+
+function authCallbackUrl() {
+  return Linking.createURL('auth/callback');
+}
+
+async function consumeAuthUrl(rawUrl: string) {
+  if (!supabase) return false;
+
+  try {
+    const url = new URL(rawUrl);
+    const search = new URLSearchParams(url.search);
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const code = search.get('code') ?? hash.get('code');
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      return true;
+    }
+
+    const accessToken = hash.get('access_token') ?? search.get('access_token');
+    const refreshToken = hash.get('refresh_token') ?? search.get('refresh_token');
+    if (!accessToken || !refreshToken) return false;
+
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function cleanUsername(value: string) {
   const cleaned = value
@@ -93,7 +128,20 @@ function fallbackAccount(user: User): Account {
   };
 }
 
-async function loadAccount(user: User): Promise<Account> {
+// Al iniciar sesión, signIn y onAuthStateChange piden el perfil a la vez:
+// comparten la misma petición en lugar de lanzar dos.
+let accountRequest: { userId: string; promise: Promise<Account> } | null = null;
+
+function loadAccount(user: User): Promise<Account> {
+  if (accountRequest?.userId === user.id) return accountRequest.promise;
+  const promise = fetchAccount(user).finally(() => {
+    if (accountRequest?.promise === promise) accountRequest = null;
+  });
+  accountRequest = { userId: user.id, promise };
+  return promise;
+}
+
+async function fetchAccount(user: User): Promise<Account> {
   const fallback = fallbackAccount(user);
 
   if (!supabase) return fallback;
@@ -161,6 +209,14 @@ export const useAuth = create<AuthState>((set) => ({
       const storedDemo = await AsyncStorage.getItem(DEMO_KEY);
 
       if (!isSupabaseConfigured || !supabase) {
+        if (isProductionBuild) {
+          set({
+            status: 'unauthenticated',
+            account: null,
+            error: 'La configuración de producción está incompleta. Contacta con soporte.',
+          });
+          return;
+        }
         if (storedDemo === '0') {
           set({ status: 'unauthenticated', account: null });
           return;
@@ -172,6 +228,16 @@ export const useAuth = create<AuthState>((set) => ({
         set({ status: 'authenticated', account: DEMO_ACCOUNT });
         return;
       }
+
+      // Native no usa detectSessionInUrl: consume manualmente el enlace de
+      // confirmación/restablecimiento y deja que Supabase persista la sesión.
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) await consumeAuthUrl(initialUrl);
+      unsubscribeDeepLink?.();
+      const deepLinkSubscription = Linking.addEventListener('url', ({ url }) => {
+        void consumeAuthUrl(url);
+      });
+      unsubscribeDeepLink = () => deepLinkSubscription.remove();
 
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
@@ -281,6 +347,7 @@ export const useAuth = create<AuthState>((set) => ({
             display_name: displayName.trim().slice(0, 60),
             username: cleanUsername(username),
           },
+          emailRedirectTo: authCallbackUrl(),
         },
       });
 
@@ -311,6 +378,10 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   continueAsDemo: async () => {
+    if (isProductionBuild) {
+      set({ error: 'El modo demo no está disponible en producción.' });
+      return;
+    }
     await AsyncStorage.setItem(DEMO_KEY, '1');
     set({
       status: 'authenticated',

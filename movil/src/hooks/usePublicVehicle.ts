@@ -2,14 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import type { Vehicle } from '@/src/data/mock';
+import { isDemoMode } from '@/src/lib/demo';
 import { mapVehicleRow, type VehicleOwner, type VehicleRow } from '@/src/lib/vehicle-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 
 export function usePublicVehicle(slug?: string) {
   const account = useAuth((state) => state.account);
-  const demo = account?.mode === 'demo' || !isSupabaseConfigured || !supabase;
+  const demo = isDemoMode(account?.mode);
   const demoVehicles = useDemoGarage((state) => state.vehicles);
   const demoHydrated = useDemoGarage((state) => state.hydrated);
   const hydrateDemo = useDemoGarage((state) => state.hydrate);

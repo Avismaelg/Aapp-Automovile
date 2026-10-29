@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { maintenanceForVehicle } from '@/src/data/maintenance';
 import type { MaintenanceKind, MaintenanceRecord } from '@/src/data/mock';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { isDemoMode } from '@/src/lib/demo';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
 type MaintenanceRow = {
@@ -33,13 +34,9 @@ function mapMaintenanceRow(row: MaintenanceRow): MaintenanceRecord {
   };
 }
 
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
-
 export function useMaintenance(vehicleId?: string, enabled = true) {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['maintenance', vehicleId ?? 'none', demo ? 'demo' : 'supabase'],
@@ -82,7 +79,7 @@ export type NewMaintenanceInput = {
 export function useAddMaintenance() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (input: NewMaintenanceInput): Promise<MaintenanceRecord> => {

@@ -7,7 +7,8 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { isDemoMode } from '@/src/lib/demo';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
 export type PostComment = {
@@ -28,10 +29,6 @@ type CommentRow = {
   created_at: string;
 };
 
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
-
 function fallbackProfile(id: string): UserProfile {
   return {
     id,
@@ -50,7 +47,7 @@ function fallbackProfile(id: string): UserProfile {
 export function useComments(postId: string | undefined) {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
   const query = useQuery({
@@ -126,7 +123,7 @@ export function useComments(postId: string | undefined) {
 export function useAddComment() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ postId, body }: { postId: string; body: string }) => {
@@ -153,7 +150,7 @@ export function useAddComment() {
 export function useDeleteComment() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ id, postId }: { id: string; postId: string }) => {

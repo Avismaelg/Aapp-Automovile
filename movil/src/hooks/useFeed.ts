@@ -6,7 +6,8 @@ import {
   type ProfileRow,
   type UserProfile,
 } from '@/src/lib/profile-db';
-import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { isDemoMode } from '@/src/lib/demo';
+import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
 export type FeedPostKind = 'drive' | 'photo' | 'party' | 'achievement' | 'text';
@@ -36,13 +37,9 @@ type PostRow = {
   created_at: string;
 };
 
-function demoMode(mode: string | undefined) {
-  return mode === 'demo' || !isSupabaseConfigured || !supabase;
-}
-
 export function useFeed() {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['feed', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
@@ -118,11 +115,25 @@ export function useFeed() {
         }
       }
 
+      const likeCounts = new Map<string, number>();
+      const likedPostIds = new Set<string>();
+      for (const like of likeRows) {
+        likeCounts.set(like.post_id, (likeCounts.get(like.post_id) ?? 0) + 1);
+        if (like.user_id === account.id) likedPostIds.add(like.post_id);
+      }
+      const commentCounts = new Map<string, number>();
+      for (const comment of commentRows) {
+        commentCounts.set(comment.post_id, (commentCounts.get(comment.post_id) ?? 0) + 1);
+      }
+      const mediaByPost = new Map<string, { url: string }>();
+      for (const media of mediaRows) {
+        if (!mediaByPost.has(media.post_id)) mediaByPost.set(media.post_id, media);
+      }
+
       return posts.flatMap((post) => {
         const author = profileMap.get(post.user_id);
         if (!author) return [];
-        const postLikes = likeRows.filter((like) => like.post_id === post.id);
-        const media = mediaRows.find((row) => row.post_id === post.id);
+        const media = mediaByPost.get(post.id);
         return [
           {
             id: post.id,
@@ -135,9 +146,9 @@ export function useFeed() {
               ? vehicleMap.get(post.vehicle_id)
               : undefined,
             mediaUrl: media ? signedMap.get(media.url) : undefined,
-            likeCount: postLikes.length,
-            commentCount: commentRows.filter((comment) => comment.post_id === post.id).length,
-            likedByMe: postLikes.some((like) => like.user_id === account.id),
+            likeCount: likeCounts.get(post.id) ?? 0,
+            commentCount: commentCounts.get(post.id) ?? 0,
+            likedByMe: likedPostIds.has(post.id),
           },
         ];
       });
@@ -156,7 +167,7 @@ export function useFeed() {
 
 export function usePost(postId: string | undefined) {
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   const query = useQuery({
     queryKey: ['post', postId ?? 'none', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
@@ -243,7 +254,7 @@ export function usePost(postId: string | undefined) {
 export function useCreatePost() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async (input: {
@@ -323,7 +334,7 @@ export function useCreatePost() {
 export function useToggleLike() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
-  const demo = demoMode(account?.mode);
+  const demo = isDemoMode(account?.mode);
 
   return useMutation({
     mutationFn: async ({ postId, liked }: { postId: string; liked: boolean }) => {
