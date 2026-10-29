@@ -1,4 +1,4 @@
-import { MAP_FALLBACK_STYLE_URL, MAP_STYLE_URL } from '@/src/lib/map/config';
+import { MAP_FALLBACK_STYLES, MAP_STYLES } from '@/src/lib/map/config';
 
 // Estado del mapa, cámara, seguimiento, ruta, alternativas y próxima maniobra.
 // Se concatena con los demás fragmentos dentro de la misma IIFE.
@@ -7,8 +7,8 @@ export const MAP_SCRIPT_CORE = `(function () {
   // (≈2.8x en la mayoría de teléfonos); el mapa plano no necesita tanto.
   window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.0);
 
-  var STYLE_URL = '${MAP_STYLE_URL}';
-  var FALLBACK_STYLE_URL = '${MAP_FALLBACK_STYLE_URL}';
+  var STYLES = ${JSON.stringify(MAP_STYLES)};
+  var FALLBACK_STYLES = ${JSON.stringify(MAP_FALLBACK_STYLES)};
   var styleFallbackAttempted = false;
   var DEFAULT_CENTER = [-69.9312, 18.4861];
   var MAP_PIXEL_RATIO = 1.0;
@@ -30,8 +30,17 @@ export const MAP_SCRIPT_CORE = `(function () {
     vehicleKind: 'car',
     parking: null,
     travelMode: 'car',
-    northUp: false
+    northUp: false,
+    // Hasta que la app mande el cálculo solar, una estimación por la hora local.
+    theme: (function () {
+      var hour = new Date().getHours();
+      return hour >= 7 && hour < 19 ? 'day' : 'night';
+    })()
   };
+  // Tema del estilo cargado ahora; difiere de state.theme mientras se cambia.
+  var loadedTheme = state.theme;
+  var styleSwapping = false;
+  var alternativeTapBound = false;
   var map = null;
   var mapReady = false;
   var errorSent = false;
@@ -95,10 +104,20 @@ export const MAP_SCRIPT_CORE = `(function () {
     return String(name || '').split(' ')[0] || '';
   }
 
+  // Capa del estilo base bajo la que van las nuestras: la primera etiqueta que
+  // queda por encima de todas las calles y superficies. Algunos estilos (el
+  // oscuro) tienen etiquetas antes que las carreteras; usar la primera
+  // etiqueta dejaba la ruta tapada por las calles.
   function firstSymbolLayerId() {
     var layers = map.getStyle().layers || [];
+    var lastShape = -1;
     for (var i = 0; i < layers.length; i += 1) {
-      if (layers[i].type === 'symbol') return layers[i].id;
+      var type = layers[i].type;
+      if (layers[i].id.indexOf('caravana-') === 0) continue;
+      if (type === 'line' || type === 'fill' || type === 'fill-extrusion') lastShape = i;
+    }
+    for (var j = lastShape + 1; j < layers.length; j += 1) {
+      if (layers[j].type === 'symbol' && layers[j].id.indexOf('caravana-') !== 0) return layers[j].id;
     }
     return undefined;
   }
@@ -464,6 +483,7 @@ export const MAP_SCRIPT_CORE = `(function () {
       else if (message.type === 'fit') fitRoute(message.payload && message.payload.coordinates);
       else if (message.type === 'autofollow') setAutoFollow(message.payload);
       else if (message.type === 'recenter') recenter();
+      else if (message.type === 'theme') setTheme(message.payload);
     } catch (error) {
       fail('Mapa: ' + (error && error.message ? error.message : String(error)));
     }
@@ -491,6 +511,9 @@ export const MAP_SCRIPT_CORE = `(function () {
         'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 6, 16, 9, 18, 14]
       }
     }, before);
+    // El manejador va por id de capa y sobrevive a un cambio de estilo.
+    if (alternativeTapBound) return;
+    alternativeTapBound = true;
     map.on('click', 'caravana-alt-casing', function (event) {
       var feature = event.features && event.features[0];
       if (feature && typeof feature.properties.index === 'number') {
@@ -530,6 +553,7 @@ export const MAP_SCRIPT_CORE = `(function () {
   }
 
   function createRouteArrowIcon() {
+    if (map.hasImage('caravana-route-arrow')) return;
     var size = 36;
     var canvas = document.createElement('canvas');
     canvas.width = size;
@@ -539,10 +563,12 @@ export const MAP_SCRIPT_CORE = `(function () {
     context.lineWidth = size * 0.16;
     context.lineCap = 'round';
     context.lineJoin = 'round';
+    // Con symbol-placement 'line' el eje +x del icono sigue el sentido de la
+    // línea: el chevrón apunta a la derecha para señalar hacia delante.
     context.beginPath();
-    context.moveTo(size * 0.28, size * 0.58);
-    context.lineTo(size * 0.5, size * 0.34);
-    context.lineTo(size * 0.72, size * 0.58);
+    context.moveTo(size * 0.4, size * 0.26);
+    context.lineTo(size * 0.64, size * 0.5);
+    context.lineTo(size * 0.4, size * 0.74);
     context.stroke();
     var image = context.getImageData(0, 0, size, size);
     map.addImage('caravana-route-arrow', {

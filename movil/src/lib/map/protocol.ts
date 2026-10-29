@@ -81,6 +81,7 @@ export type WorldMapCommand =
   | { type: 'north'; payload: boolean }
   | { type: 'fit'; payload: { coordinates: [number, number][] } }
   | { type: 'autofollow'; payload: boolean }
+  | { type: 'theme'; payload: 'day' | 'night' }
   | { type: 'recenter' };
 
 export type WorldMapEvent =

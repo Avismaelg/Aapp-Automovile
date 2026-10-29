@@ -132,15 +132,21 @@ export default function ChallengesScreen() {
                   color={selected ? '#120802' : colors.muted}
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <AppText variant="bodyStrong" color={selected ? colors.text : colors.textSoft}>
+              <View style={styles.modeText}>
+                <AppText
+                  variant="bodyStrong"
+                  numberOfLines={1}
+                  color={selected ? colors.text : colors.textSoft}
+                >
                   {option.label}
                 </AppText>
                 <AppText variant="caption" color={selected ? colors.muted : colors.dim} numberOfLines={1}>
                   {option.detail}
                 </AppText>
               </View>
-              {selected ? <Ionicons name="checkmark-circle" size={17} color={colors.lime} /> : null}
+              {selected ? (
+                <Ionicons name="checkmark-circle" size={15} color={colors.lime} style={styles.modeCheck} />
+              ) : null}
             </Pressable>
           );
         })}
@@ -418,6 +424,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
   },
+  // El check va en la esquina para no robar ancho al título.
+  modeText: { flex: 1, minWidth: 0 },
+  modeCheck: { position: 'absolute', top: 6, right: 6 },
   modeOptionActive: {
     borderColor: 'rgba(201,255,77,0.35)',
     backgroundColor: 'rgba(201,255,77,0.06)',

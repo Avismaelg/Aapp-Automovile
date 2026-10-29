@@ -1,6 +1,8 @@
 // Estilos del documento del mapa (marcadores, HUD interno y capas).
 export const MAP_CSS = `  * { box-sizing: border-box; }
   html, body { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #e9edf1; }
+  body[data-theme='night'] { background: #0b0f14; }
+  body[data-theme='night'] .member-name { color: #e8edf4; background: rgba(6,8,11,0.8); border-color: rgba(255,255,255,0.14); }
   #map { position: fixed; inset: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .vehicle, .dest { pointer-events: none; }

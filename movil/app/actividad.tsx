@@ -53,8 +53,8 @@ const quickActions = [
 function HeroRoute() {
   return (
     <Svg
-      width={210}
-      height={170}
+      width={160}
+      height={130}
       viewBox="0 0 210 170"
       style={styles.heroRoute}
       pointerEvents="none"
@@ -259,7 +259,9 @@ export default function ActividadScreen() {
             <View style={[styles.quickIcon, { backgroundColor: `${action.color}1F`, borderColor: `${action.color}40` }]}>
               <Ionicons name={action.icon} size={21} color={action.color} />
             </View>
-            <AppText variant="caption" color={colors.textSoft}>{action.label}</AppText>
+            <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
+              {action.label}
+            </AppText>
           </Pressable>
         ))}
       </View>
@@ -450,7 +452,8 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     overflow: 'hidden',
   },
-  heroRoute: { position: 'absolute', right: -10, top: 20, opacity: 0.9 },
+  // Decoración arriba a la derecha: termina antes de las cifras para no cruzarlas.
+  heroRoute: { position: 'absolute', right: -6, top: 8, opacity: 0.8 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heroValueRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing.lg },
   heroStats: {
@@ -485,13 +488,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  // Cinco accesos por fila: nueve en una sola fila se montaban en móvil.
   quickGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     marginTop: spacing.xl,
-    gap: 6,
+    rowGap: spacing.md,
   },
-  quickItem: { flex: 1, alignItems: 'center', gap: 7 },
+  quickItem: { width: '20%', alignItems: 'center', gap: 6 },
   challengeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -513,8 +517,8 @@ const styles = StyleSheet.create({
   },
   challengeCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   quickIcon: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: radius.lg,
     borderWidth: 1,
     alignItems: 'center',

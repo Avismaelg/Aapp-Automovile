@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import {
+  Platform,
   ActivityIndicator,
   Image,
   Pressable,
@@ -665,6 +666,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     paddingVertical: 12,
+    // En web el navegador dibuja su propio recuadro de foco encima del campo.
+    ...(Platform.OS === 'web' ? { outlineWidth: 0 } : null),
   },
   inputError: {
     marginTop: 5,

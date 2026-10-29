@@ -273,6 +273,55 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
     setTimeout(forceSync, 2500);
   }
 
+  // Capas propias sobre el estilo base. Un cambio de estilo las borra, así
+  // que se vuelven a crear y a rellenar con el estado actual.
+  function addOverlays() {
+    addAccuracyLayer();
+    addRoute();
+    addParkingLine();
+    hideClutter();
+  }
+
+  function restoreOverlays() {
+    addOverlays();
+    accuracyValue = null;
+    if (state.location) updateAccuracy(state.location);
+    lastRouteProgressIndex = -1;
+    setRoute(state.route);
+    setAlternatives(state.alternatives);
+    updateParkingLine(true);
+  }
+
+  function applyTheme() {
+    document.body.setAttribute('data-theme', state.theme);
+    if (!mapReady || styleSwapping || loadedTheme === state.theme) return;
+    styleSwapping = true;
+    loadedTheme = state.theme;
+    styleFallbackAttempted = false;
+    // diff: false fuerza la recarga completa y el evento style.load; con el
+    // diff por defecto MapLibre puede quedarse a medias entre dos estilos.
+    map.setStyle(STYLES[state.theme], { diff: false });
+  }
+
+  function setTheme(theme) {
+    state.theme = theme === 'night' ? 'night' : 'day';
+    applyTheme();
+  }
+
+  function onStyleSwapped() {
+    if (!styleSwapping) return;
+    styleSwapping = false;
+    try {
+      restoreOverlays();
+      // Algunos WebView no repintan solos tras cambiar de estilo sin moverse.
+      map.triggerRepaint();
+    } catch (error) {
+      fail('Mapa: ' + (error && error.message ? error.message : String(error)));
+    }
+    // Si el tema cambió otra vez durante la carga, se aplica ahora.
+    applyTheme();
+  }
+
   function onLoad() {
     if (mapReady) return;
     mapReady = true;
@@ -283,13 +332,10 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
       if (map.setPixelRatio) map.setPixelRatio(MAP_PIXEL_RATIO);
       applyViewPadding();
       watchResize();
-      addAccuracyLayer();
-      addRoute();
-      hideClutter();
+      addOverlays();
       addVehicle();
       addDestination();
       addParking();
-      addParkingLine();
       setMembers(state.members);
       setDestination(state.destination);
       setRoute(state.route);
@@ -305,6 +351,7 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
       fail('Mapa: ' + (error && error.message ? error.message : String(error)));
     }
     post({ type: 'ready' });
+    applyTheme();
   }
 
   function webglAvailable() {
@@ -327,7 +374,7 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
     }
     map = new maplibregl.Map({
       container: 'map',
-      style: STYLE_URL,
+      style: STYLES[state.theme],
       center: state.location ? lngLatOf(state.location) : DEFAULT_CENTER,
       zoom: 16,
       pitch: 0,
@@ -345,11 +392,14 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
     map.on('load', onLoad);
     map.on('style.load', function () {
       if (!mapReady) onLoad();
+      else onStyleSwapped();
     });
     map.on('error', function (event) {
-      if (!mapReady && !styleFallbackAttempted && STYLE_URL !== FALLBACK_STYLE_URL) {
+      var loading = !mapReady || styleSwapping;
+      var fallback = FALLBACK_STYLES[loadedTheme];
+      if (loading && !styleFallbackAttempted && STYLES[loadedTheme] !== fallback && !event.sourceId) {
         styleFallbackAttempted = true;
-        map.setStyle(FALLBACK_STYLE_URL);
+        map.setStyle(fallback, { diff: false });
         return;
       }
       if (!mapReady && !event.sourceId) fail('No pudimos cargar el mapa. Revisa tu conexión.');
@@ -366,6 +416,7 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
   }
 
   document.body.setAttribute('data-follow', 'on');
+  document.body.setAttribute('data-theme', state.theme);
   window.addEventListener('message', handleMessage);
   document.addEventListener('message', handleMessage);
   createMap();

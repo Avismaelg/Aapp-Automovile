@@ -15,6 +15,7 @@ import {
   type WorldMapTravelMode,
   type WorldMapVehicleKind,
 } from '@/src/lib/map-html';
+import { useMapTheme } from '@/src/hooks/useMapTheme';
 import { colors } from '@/src/theme';
 
 // Valor por defecto estable: un [] nuevo en cada render reenviaría el mensaje.
@@ -66,13 +67,14 @@ export const WorldMap = memo(function WorldMap({
   const readyRef = useRef(false);
   const seqRef = useRef(0);
   const lastLocationKeyRef = useRef('');
-  const latestRef = useRef({ members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind });
+  const theme = useMapTheme(location);
+  const latestRef = useRef({ members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind, theme });
   const callbacksRef = useRef({ onFollowChange, onMemberPress, onAlternativePress, onError });
 
   useEffect(() => {
-    latestRef.current = { members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind };
+    latestRef.current = { members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind, theme };
     callbacksRef.current = { onFollowChange, onMemberPress, onAlternativePress, onError };
-  }, [members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onAlternativePress, onError]);
+  }, [members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind, theme, onFollowChange, onMemberPress, onAlternativePress, onError]);
 
   const getContentWindow = useCallback(() => {
     const doc = (globalThis as { document?: Document }).document;
@@ -102,6 +104,7 @@ export const WorldMap = memo(function WorldMap({
     send({ type: 'route', payload: latest.route });
     send({ type: 'alternatives', payload: latest.alternatives });
     send({ type: 'vehicle', payload: { color: latest.vehicleColor, kind: latest.vehicleKind } });
+    send({ type: 'theme', payload: latest.theme });
   }, [send]);
 
   useEffect(() => {
@@ -158,6 +161,10 @@ export const WorldMap = memo(function WorldMap({
   useEffect(() => {
     send({ type: 'vehicle', payload: { color: vehicleColor, kind: vehicleKind } });
   }, [send, vehicleColor, vehicleKind]);
+
+  useEffect(() => {
+    send({ type: 'theme', payload: theme });
+  }, [theme, send]);
 
   useEffect(() => {
     if (recenterToken > 0) send({ type: 'recenter' });

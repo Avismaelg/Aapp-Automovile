@@ -25,16 +25,36 @@ type PhotonFeature = {
   };
 };
 
+// Grupos de cercanía: primero lo de tu zona, luego tu región y al final el
+// resto del mundo. Dentro de cada grupo se respeta la relevancia de Photon.
+const PROXIMITY_BUCKETS_M = [50_000, 300_000];
+
+function proximityBucket(distanceM: number | null) {
+  if (distanceM == null) return PROXIMITY_BUCKETS_M.length;
+  const index = PROXIMITY_BUCKETS_M.findIndex((limit) => distanceM <= limit);
+  return index === -1 ? PROXIMITY_BUCKETS_M.length : index;
+}
+
+export function rankByProximity(places: SearchPlace[]) {
+  return places
+    .map((place, order) => ({ place, order, bucket: proximityBucket(place.distanceM) }))
+    .sort((a, b) => a.bucket - b.bucket || a.order - b.order)
+    .map((entry) => entry.place);
+}
+
 // Búsqueda de lugares con Photon (OpenStreetMap, sin API key).
 export async function searchPlaces(
   query: string,
   near: { latitude: number; longitude: number } | null,
   signal: AbortSignal,
 ): Promise<SearchPlace[]> {
-  const params = new URLSearchParams({ q: query.trim(), limit: '10' });
+  // Pedimos de más para tener candidatos cercanos que reordenar.
+  const params = new URLSearchParams({ q: query.trim(), limit: '20' });
   if (near) {
     params.set('lat', near.latitude.toFixed(5));
     params.set('lon', near.longitude.toFixed(5));
+    params.set('zoom', '10');
+    params.set('location_bias_scale', '0.5');
   }
 
   const response = await fetchWithTimeout(
@@ -74,9 +94,8 @@ export async function searchPlaces(
       detail: name ? detail : '',
       distanceM: near ? haversineMeters(near, { latitude, longitude }) : null,
     });
-    if (results.length >= 10) break;
   }
-  return results;
+  return rankByProximity(results).slice(0, 10);
 }
 
 export function formatSearchDistance(meters: number | null) {
