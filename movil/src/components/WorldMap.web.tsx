@@ -35,6 +35,7 @@ type WorldMapProps = {
   vehicleColor?: string;
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
+  focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;
   onAlternativePress?: (index: number) => void;
@@ -56,6 +57,7 @@ export const WorldMap = memo(function WorldMap({
   vehicleColor = '#ff5a1f',
   vehicleKind = 'car',
   recenterToken = 0,
+  focus = null,
   onFollowChange,
   onMemberPress,
   onAlternativePress,
@@ -169,6 +171,22 @@ export const WorldMap = memo(function WorldMap({
   useEffect(() => {
     if (recenterToken > 0) send({ type: 'recenter' });
   }, [recenterToken, send]);
+
+  // Encuadra un punto (el coche aparcado) con una caja de ~100 m.
+  useEffect(() => {
+    if (!focus) return;
+    const d = 0.0005;
+    send({
+      type: 'fit',
+      payload: {
+        coordinates: [
+          [focus.latitude - d, focus.longitude - d],
+          [focus.latitude + d, focus.longitude + d],
+        ],
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.token, send]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

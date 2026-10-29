@@ -6,13 +6,18 @@ import Mapbox, {
   LocationPuck,
   MapView,
   MarkerView,
+  ModelLayer,
+  Models,
   ShapeSource,
   UserTrackingMode,
 } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
+import { setModelPuck } from '@/modules/car-puck';
+
+import { useCarModel } from '@/src/hooks/useCarModel';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
 import {
   MAP_FALLBACK_STYLES,
@@ -45,6 +50,17 @@ const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_othe
 const NO_PADDING = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
 // En navegación la flecha va abajo, para ver más calle por delante.
 const NAV_PADDING = { paddingTop: 260, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
+// Coche 3D como indicador de posición (Android): tamaño fijo en pantalla y
+// giro para que el morro (+X del modelo) apunte hacia la marcha.
+const PUCK_SCALE = 22;
+const PUCK_ROTATION = 90;
+// El coche aparcado se dibuja en el mapa a escala de calle: ~45 pt de largo a
+// cualquier zoom (el factor se duplica por cada nivel que te alejas).
+const PARKED_SCALE: unknown = [
+  'interpolate', ['exponential', 2], ['zoom'],
+  12, ['literal', [368, 368, 368]],
+  20, ['literal', [1.44, 1.44, 1.44]],
+];
 
 type WorldMapProps = {
   members: WorldMapMember[];
@@ -60,6 +76,8 @@ type WorldMapProps = {
   vehicleColor?: string;
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
+  // Lleva la cámara a un punto (p. ej. el coche aparcado); token cambia en cada toque.
+  focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;
   onAlternativePress?: (index: number) => void;
@@ -151,7 +169,9 @@ export const WorldMap = memo(function WorldMap({
   autoFollow = true,
   route = null,
   alternatives = NO_ALTERNATIVES,
+  vehicleColor = '#ff5a1f',
   recenterToken = 0,
+  focus = null,
   onFollowChange,
   onMemberPress,
   onAlternativePress,
@@ -159,6 +179,8 @@ export const WorldMap = memo(function WorldMap({
   style,
 }: WorldMapProps) {
   const cameraRef = useRef<Camera>(null);
+  const mapRef = useRef<MapView>(null);
+  const carModel = useCarModel(vehicleColor);
   const theme = useMapTheme(location);
   const hasPermission = useLocationPermission();
   const [styleFailed, setStyleFailed] = useState(false);
@@ -194,6 +216,20 @@ export const WorldMap = memo(function WorldMap({
     }, 50);
     return () => clearTimeout(timer);
   }, [fitRoute, changeFollowing]);
+
+  useEffect(() => {
+    if (!focus) return;
+    changeFollowing(false);
+    cameraRef.current?.setCamera({
+      centerCoordinate: [focus.longitude, focus.latitude],
+      zoomLevel: 17.5,
+      heading: 0,
+      animationMode: 'flyTo',
+      animationDuration: 1200,
+    });
+    // Solo al pedirlo (token), no cuando cambian las coordenadas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.token, changeFollowing]);
 
   // Sin permiso de GPS (o en la demo) se centra en la posición que da la app.
   const lastCenteredRef = useRef('');
@@ -276,6 +312,20 @@ export const WorldMap = memo(function WorldMap({
   const headingUp = !northUp && !walking;
   const tracking = following && hasPermission;
 
+  // Cambia el punto azul por el coche 3D. Mapbox recrea su indicador al
+  // cargar un estilo, así que se vuelve a aplicar en cada carga.
+  const [styleLoads, setStyleLoads] = useState(0);
+  const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
+  useEffect(() => {
+    if (!useCarPuck || !carModel) return;
+    const timer = setTimeout(() => {
+      const tag = findNodeHandle(mapRef.current);
+      if (tag != null) void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [useCarPuck, carModel, styleLoads]);
+  const handleStyleLoaded = useCallback(() => setStyleLoads((count) => count + 1), []);
+
   const handleTrackingChange = useCallback(
     (event: { nativeEvent: { payload: { followUserLocation: boolean } } }) => {
       // El motor suelta el seguimiento cuando el usuario arrastra el mapa.
@@ -303,6 +353,7 @@ export const WorldMap = memo(function WorldMap({
   return (
     <View style={[styles.root, { backgroundColor: night ? '#0b0f14' : '#e9edf1' }, style]}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         styleURL={styleURL}
         pitchEnabled={false}
@@ -311,6 +362,7 @@ export const WorldMap = memo(function WorldMap({
         compassEnabled={false}
         scaleBarEnabled={false}
         onMapLoadingError={handleStyleError}
+        onDidFinishLoadingStyle={handleStyleLoaded}
       >
         <Camera
           ref={cameraRef}
@@ -398,8 +450,33 @@ export const WorldMap = memo(function WorldMap({
           />
         </ShapeSource>
 
+        {carModel ? <Models models={{ 'caravana-car': carModel }} /> : null}
+
+        {parking && carModel ? (
+          <ShapeSource
+            id="caravana-parked-car"
+            shape={{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: [parking.longitude, parking.latitude] },
+            }}
+          >
+            <ModelLayer
+              id="caravana-parked-car"
+              style={{
+                modelId: 'caravana-car',
+                modelScale: PARKED_SCALE as number[],
+                modelRotation: [0, 0, 0],
+                modelCastShadows: true,
+                modelEmissiveStrength: 0.6,
+              }}
+            />
+          </ShapeSource>
+        ) : null}
+
         {hasPermission ? (
           <LocationPuck
+            key={useCarPuck ? 'car' : 'dot'}
             puckBearingEnabled
             puckBearing={headingUp ? 'course' : 'heading'}
             pulsing={{ isEnabled: true, color: '#3d9bff', radius: 'accuracy' }}
@@ -448,18 +525,22 @@ export const WorldMap = memo(function WorldMap({
         ) : null}
 
         {parking ? (
+          // Con el coche 3D la etiqueta flota encima de él; sin modelo (aún
+          // generándose) se muestra la insignia redonda.
           <MarkerView
             coordinate={[parking.longitude, parking.latitude]}
-            anchor={{ x: 0.5, y: 0.3 }}
+            anchor={carModel ? { x: 0.5, y: 1 } : { x: 0.5, y: 0.3 }}
             allowOverlap
           >
-            <View style={styles.member}>
-              <View style={styles.parkingBadge}>
-                <Ionicons name="car-sport" size={20} color="#06131a" />
-              </View>
+            <View style={[styles.member, carModel ? styles.parkedLabelWrap : null]}>
+              {carModel ? null : (
+                <View style={styles.parkingBadge}>
+                  <Ionicons name="car-sport" size={20} color="#06131a" />
+                </View>
+              )}
               <Text style={styles.parkingLabel}>
                 {parkingDistance == null || parkingDistance < 25
-                  ? 'Tu coche'
+                  ? 'Aparcado aquí'
                   : parkingDistance < 1000
                     ? `Tu coche · ${parkingDistance} m`
                     : `Tu coche · ${(parkingDistance / 1000).toFixed(1).replace('.', ',')} km`}
@@ -535,6 +616,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     elevation: 4,
   },
+  parkedLabelWrap: { paddingBottom: 30 },
   parkingLabel: {
     marginTop: 3,
     color: '#4de1ff',

@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.caravana'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.carpuck"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // El SDK de Mapbox ya lo incluye @rnmapbox/maps en la app; aquí solo se
+  // compila contra él.
+  compileOnly "com.mapbox.maps:android-ndk27:11.23.1"
+}

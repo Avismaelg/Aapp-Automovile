@@ -287,6 +287,13 @@ export default function NavigationScreen() {
     clearChosenDestination();
   };
 
+  // Muestra el coche aparcado en el mapa (sin navegar).
+  const [parkingFocus, setParkingFocus] = useState<{ latitude: number; longitude: number; token: number } | null>(null);
+  const showParkedCar = () => {
+    if (!parkingSpot) return;
+    setParkingFocus({ latitude: parkingSpot.latitude, longitude: parkingSpot.longitude, token: Date.now() });
+  };
+
   const goToParkedCar = () => {
     if (!parkingSpot) return;
     useChosenDestination.getState().setDestination({
@@ -410,6 +417,7 @@ export default function NavigationScreen() {
         vehicleColor={primaryVehicle?.color}
         vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
+        focus={parkingFocus}
         onFollowChange={handleFollowChange}
         onMemberPress={handleFriendPress}
         onError={handleMapError}
@@ -528,29 +536,39 @@ export default function NavigationScreen() {
             ) : null}
 
             {showParking && parkingSpot ? (
-              <Pressable
-                style={styles.parkingPill}
-                onPress={goToParkedCar}
-                onLongPress={() =>
-                  Alert.alert('Coche aparcado', '¿Olvidar la ubicación guardada?', [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Olvidar', style: 'destructive', onPress: clearParking },
-                  ])
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Ir a mi coche aparcado"
-              >
-                <Ionicons name="car" size={15} color={colors.cyan} />
-                <AppText
-                  variant="caption"
-                  color={colors.textSoft}
-                  style={styles.parkingText}
-                  numberOfLines={1}
+              <View style={styles.parkingPill}>
+                <Pressable
+                  style={styles.parkingShow}
+                  onPress={showParkedCar}
+                  onLongPress={() =>
+                    Alert.alert('Coche aparcado', '¿Olvidar la ubicación guardada?', [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { text: 'Olvidar', style: 'destructive', onPress: clearParking },
+                    ])
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver mi coche aparcado en el mapa"
                 >
-                  Tu coche aparcado · {formatParkingDistance(parkingDistance)}
-                </AppText>
-                <Ionicons name="navigate" size={14} color={colors.cyan} />
-              </Pressable>
+                  <Ionicons name="car" size={15} color={colors.cyan} />
+                  <AppText
+                    variant="caption"
+                    color={colors.textSoft}
+                    style={styles.parkingText}
+                    numberOfLines={1}
+                  >
+                    Tu coche aparcado · {formatParkingDistance(parkingDistance)}
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  onPress={goToParkedCar}
+                  hitSlop={8}
+                  style={styles.parkingGo}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ir a mi coche aparcado"
+                >
+                  <Ionicons name="navigate" size={14} color={colors.cyan} />
+                </Pressable>
+              </View>
             ) : null}
 
             {!live.isLive ? (
@@ -742,10 +760,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(77,225,255,0.4)',
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingLeft: spacing.md,
+    paddingRight: 4,
+    paddingVertical: 4,
   },
+  parkingShow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, paddingVertical: 2 },
   parkingText: { flexShrink: 1 },
+  parkingGo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(77,225,255,0.16)',
+  },
   spacer: { flex: 1 },
   sideRow: {
     flexDirection: 'row',
