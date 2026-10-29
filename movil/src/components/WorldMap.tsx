@@ -107,6 +107,8 @@ type WorldMapProps = {
   // Alto de lo que tapa el borde inferior del mapa (tarjetas): el logo de
   // Mapbox se coloca justo encima para que siempre se vea.
   ornamentBottom?: number;
+  // Línea de conducción (tramos con propiedad level: go, ease o brake).
+  drivingLine?: GeoJSON.FeatureCollection | null;
   // Lleva la cámara a un punto (p. ej. el coche aparcado); token cambia en cada toque.
   focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
@@ -203,6 +205,7 @@ export const WorldMap = memo(function WorldMap({
   vehicleColor = '#ff5a1f',
   recenterToken = 0,
   ornamentBottom = 4,
+  drivingLine = null,
   focus = null,
   onFollowChange,
   onMemberPress,
@@ -459,6 +462,22 @@ export const WorldMap = memo(function WorldMap({
               lineJoin: 'round',
               lineColor: ['case', ['==', ['get', 'segment'], 'past'], '#c3cbd4', '#3d9bff'],
               lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 8.5, 16, 12.5, 18, 18],
+            }}
+          />
+        </ShapeSource>
+
+        {/* Línea de conducción encima de la ruta: trazos azul, amarillo y rojo. */}
+        <ShapeSource id="caravana-driving-line" shape={drivingLine ?? EMPTY}>
+          <LineLayer
+            id="caravana-driving-line"
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'butt',
+              lineJoin: 'round',
+              lineColor: ['match', ['get', 'level'], 'brake', '#ef4444', 'ease', '#facc15', '#38bdf8'],
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 13, 4, 16, 9, 18, 14],
+              lineDasharray: [1.4, 0.9],
+              lineOpacity: 0.95,
             }}
           />
         </ShapeSource>

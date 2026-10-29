@@ -36,6 +36,7 @@ type WorldMapProps = {
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
   ornamentBottom?: number;
+  drivingLine?: GeoJSON.FeatureCollection | null;
   focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;

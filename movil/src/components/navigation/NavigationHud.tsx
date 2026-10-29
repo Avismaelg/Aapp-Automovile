@@ -37,6 +37,8 @@ type Props = {
   destinationLabel: string;
   speedLabel: string;
   limitKmh: number | null;
+  // Próxima curva de la línea de conducción que pide bajar la velocidad.
+  curve: { distanceM: number; speedKmh: number } | null;
   northUp: boolean;
   muted: boolean;
   bottomInset: number;
@@ -59,6 +61,7 @@ export function NavigationHud({
   destinationLabel,
   speedLabel,
   limitKmh,
+  curve,
   northUp,
   muted,
   bottomInset,
@@ -68,6 +71,8 @@ export function NavigationHud({
   onClose,
 }: Props) {
   const overLimit = limitKmh != null && Number(speedLabel) > limitKmh + 5;
+  const speedNow = Number(speedLabel);
+  const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > curve.speedKmh + 15;
 
   return (
     <View pointerEvents="box-none" style={styles.navLayer}>
@@ -109,6 +114,15 @@ export function NavigationHud({
             Luego
           </AppText>
           <Ionicons name={instructionIcons[following.icon]} size={16} color="#ffffff" />
+        </View>
+      ) : null}
+
+      {curve ? (
+        <View style={[styles.curveBadge, curveUrgent && styles.curveBadgeUrgent]}>
+          <Ionicons name="warning" size={14} color={curveUrgent ? '#ffffff' : '#1f1300'} />
+          <AppText variant="label" color={curveUrgent ? '#ffffff' : '#1f1300'} style={styles.curveText}>
+            Curva {curve.distanceM < 1000 ? `${Math.round(curve.distanceM / 10) * 10} m` : '1 km'} · {curve.speedKmh} km/h
+          </AppText>
         </View>
       ) : null}
 
@@ -234,6 +248,21 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   speedBubbleOver: { backgroundColor: '#e5394a', borderColor: '#e5394a' },
+  curveBadge: {
+    position: 'absolute',
+    left: 0,
+    bottom: 228,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#facc15',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    elevation: 5,
+  },
+  curveBadgeUrgent: { backgroundColor: '#e5394a' },
+  curveText: { fontSize: 11 },
   speedValue: { fontSize: 26, lineHeight: 28 },
   speedUnit: { fontSize: 8 },
   speedLimit: {

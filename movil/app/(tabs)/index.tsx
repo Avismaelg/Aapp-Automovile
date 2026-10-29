@@ -25,6 +25,7 @@ import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { useVoiceGuidance } from '@/src/hooks/useVoiceGuidance';
 import { showError } from '@/src/lib/alerts';
+import { buildDrivingLine } from '@/src/lib/driving-line';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import type { WorldMapAlternative, WorldMapMember } from '@/src/lib/map-html';
@@ -404,6 +405,17 @@ export default function NavigationScreen() {
 
   const [bottomHeight, setBottomHeight] = useState(0);
 
+  // Línea de conducción por delante (azul, amarillo, rojo según la velocidad
+  // a la que se puede tomar cada tramo), solo navegando en coche.
+  const speedKmhNow = Math.round(live.location.speedKmh ?? 0);
+  const drivingLine = useMemo(
+    () =>
+      navigating && !walking && route.route && progressState && !offRoute
+        ? buildDrivingLine(route.route.coordinates, progressState.nearestIndex, speedKmhNow, roadInfo.limitKmh ?? null)
+        : null,
+    [navigating, walking, route.route, progressState, offRoute, speedKmhNow, roadInfo.limitKmh],
+  );
+
   // Los controles se ven claros sobre el mapa de día y oscuros de noche.
   const chrome = useMapTheme(live.location) === 'day' ? DAY_CHROME : NIGHT_CHROME;
   const parkingTint = chrome.day ? '#0891b2' : colors.cyan;
@@ -425,6 +437,7 @@ export default function NavigationScreen() {
         vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
         focus={parkingFocus}
+        drivingLine={drivingLine?.data ?? null}
         ornamentBottom={navigating ? 4 : bottomHeight + spacing.md + 6}
         onFollowChange={handleFollowChange}
         onMemberPress={handleFriendPress}
@@ -452,6 +465,7 @@ export default function NavigationScreen() {
             destinationLabel={destination.label}
             speedLabel={speedLabel}
             limitKmh={roadInfo.limitKmh ?? null}
+            curve={drivingLine?.nextCurve ?? null}
             northUp={northUp}
             muted={voiceMuted}
             bottomInset={insets.bottom}
