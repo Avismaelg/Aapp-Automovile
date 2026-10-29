@@ -104,7 +104,7 @@ Archivos principales:
 | Archivo | Función |
 |---|---|
 | `movil/src/lib/map-html.ts` y `movil/src/lib/map/` | HTML estático del mapa, estilo, capas, cámara y protocolo |
-| `movil/src/components/WorldMap.tsx` | WebView nativo y envío de comandos |
+| `movil/src/components/WorldMap.tsx` | mapa nativo (MapLibre Android/iOS): cámara, capas y marcadores |
 | `movil/src/components/WorldMap.web.tsx` | iframe web y envío de comandos |
 | `movil/src/hooks/useLiveLocation.ts` | suscripción GPS compartida |
 | `movil/src/hooks/useGraphHopperRoute.ts` | ruta compartida y deduplicada |
@@ -115,6 +115,29 @@ Archivos principales:
 ---
 
 ## 2. Arquitectura del mapa
+
+### Android e iOS: MapLibre nativo
+
+Desde octubre de 2026 el móvil usa `@maplibre/maplibre-react-native` (v11) en
+lugar del WebView, con la misma API de props que antes:
+
+- **Seguimiento nativo**: `Camera trackUserLocation="course"` (o `"default"`
+  con norte arriba o a pie). El motor nativo lee el GPS (fused, alta precisión,
+  1 s) y anima cámara e indicador a 60 fps; no pasa nada por el hilo de JS.
+- **Indicador de posición nativo** (`NativeUserLocation`, flecha de rumbo en
+  coche y punto con brújula a pie) con su círculo de precisión. Solo se monta
+  con permiso de ubicación concedido; sin permiso (demo) la cámara se centra en
+  la posición que da la app.
+- Zoom por velocidad y cercanía de la maniobra (`zoomForSpeed`); en navegación
+  la cámara deja 260 pt arriba para que la flecha quede abajo.
+- Arrastrar el mapa suelta el seguimiento (`onTrackUserLocationChange` → null)
+  y el botón de recentrar (`recenterToken`) lo recupera.
+- Ruta, alternativas (tocables), punto de maniobra y línea al aparcamiento son
+  `GeoJSONSource` + `Layer`, bajo las etiquetas de calles del estilo.
+- Miembros, destino y aparcamiento son `Marker` con vistas de React Native.
+- Día/noche cambia `mapStyle`; si el estilo falla se usa OpenFreeMap.
+
+### Web: MapLibre GL JS en iframe
 
 El HTML se construye una sola vez y **no se recarga** con cada actualización.
 React Native y el mapa se comunican con `postMessage`:
@@ -228,8 +251,9 @@ Mapa
 
 ## 5. Límites actuales
 
-- El mapa usa WebView + WebGL; en equipos de gama baja puede consumir batería y
-  memoria. Hay un aviso si WebGL no está disponible.
+- En móvil el mapa es nativo; la web sigue con MapLibre GL JS en un iframe.
+- No hay tráfico en tiempo real ni avisos de la comunidad: requieren un
+  proveedor de pago (p. ej. TomTom o HERE).
 - La pestaña Party monta un segundo mapa mientras está abierta. Al volver al
   mapa principal se conserva el primero.
 - MapLibre se carga desde unpkg y el estilo/teselas desde OpenFreeMap o
