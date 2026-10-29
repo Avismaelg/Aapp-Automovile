@@ -123,7 +123,10 @@ function handleWatchError(id: number) {
 
 async function beginSession(id: number) {
   try {
-    const permission = await Location.requestForegroundPermissionsAsync();
+    // Pedir el permiso abre (y cierra) una pantalla del sistema aunque ya esté
+    // concedido; eso pausa la app y dispara AppState. Solo se pide si falta.
+    const current = await Location.getForegroundPermissionsAsync();
+    const permission = current.granted ? current : await Location.requestForegroundPermissionsAsync();
     if (id !== session) return;
 
     if (permission.status !== 'granted') {
@@ -238,6 +241,9 @@ export function retryLiveLocation() {
 // posición fresca en lugar de seguir mostrando la anterior.
 export function refreshStaleLocation(maxAgeMs = 20_000) {
   if (subscribers === 0) return;
+  // Una sesión recién arrancada aún no ha tenido tiempo de dar posición:
+  // reiniciarla otra vez entraría en bucle (cada reinicio pausa la app).
+  if (Date.now() - sessionStartedAt < 15_000) return;
   const noFixForAWhile = lastFixAt === 0 && Date.now() - sessionStartedAt > 15_000;
   const staleFix = lastFixAt > 0 && Date.now() - lastFixAt > maxAgeMs;
   if (!noFixForAWhile && !staleFix) return;
