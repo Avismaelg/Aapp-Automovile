@@ -2,13 +2,15 @@ import * as Location from 'expo-location';
 import { useEffect } from 'react';
 import { create } from 'zustand';
 
+import { isSimulating, useSimulator } from '@/src/lib/simulator';
+
 export type LiveLocation = {
   latitude: number;
   longitude: number;
   heading: number | null;
   accuracy: number | null;
   speedKmh: number | null;
-  source: 'gps' | 'demo';
+  source: 'gps' | 'demo' | 'sim';
 };
 
 export type LiveLocationStatus = 'locating' | 'live' | 'demo' | 'denied' | 'error';
@@ -36,6 +38,27 @@ const useLiveLocationState = create<LiveLocationState>(() => ({
   message: LOCATING_MESSAGE,
 }));
 
+// Mientras hay simulación, su posición sustituye a la del GPS; al pararla se
+// pide una posición real nueva.
+useSimulator.subscribe((state, previous) => {
+  if (state.active && state.fix && state.fix !== previous.fix) {
+    useLiveLocationState.setState({
+      status: 'live',
+      message: 'Simulación',
+      location: {
+        latitude: state.fix.latitude,
+        longitude: state.fix.longitude,
+        heading: state.fix.heading,
+        accuracy: 5,
+        speedKmh: state.fix.speedKmh,
+        source: 'sim',
+      },
+    });
+  } else if (!state.active && previous.active) {
+    retryLiveLocation();
+  }
+});
+
 // Una sola suscripción GPS para el mapa y la party; se cierra cuando nadie la usa.
 let subscribers = 0;
 let session = 0;
@@ -60,6 +83,7 @@ function clearFallbackTimer() {
 }
 
 function applyPosition(position: Location.LocationObject) {
+  if (isSimulating()) return;
   clearFallbackTimer();
   lastFixAt = Date.now();
   const speedKmh = validSpeedKmh(position.coords.speed);
@@ -85,6 +109,7 @@ function applyPosition(position: Location.LocationObject) {
 // La brújula da el rumbo real del teléfono cuando vamos despacio o parados;
 // en marcha manda el rumbo del GPS.
 function applyCompassHeading(value: number) {
+  if (isSimulating()) return;
   if (!Number.isFinite(value) || value < 0) return;
   const current = useLiveLocationState.getState();
   const speed = current.location.speedKmh ?? 0;

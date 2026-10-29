@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Mapbox, {
   Camera,
   CircleLayer,
+  CustomLocationProvider,
   LineLayer,
   LocationPuck,
   MapView,
@@ -18,6 +19,7 @@ import { addModel, resetPuck, setModelPuck } from '@/modules/car-puck';
 
 import { useCarModel } from '@/src/hooks/useCarModel';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
+import { useSimulator } from '@/src/lib/simulator';
 import {
   MAP_FALLBACK_STYLES,
   MAPBOX_ACCESS_TOKEN,
@@ -81,7 +83,7 @@ const TRAFFIC_COLOR: unknown = [
 // Coche 3D como indicador de posición (Android): tamaño fijo en pantalla
 // (~45 pt de largo) y giro para que el morro apunte hacia la marcha.
 const PUCK_SCALE = 11;
-const PUCK_ROTATION = 180;
+const PUCK_ROTATION = 270;
 // El coche aparcado está en el mapa (metros): para que mida ~45 pt a
 // cualquier zoom, la escala se duplica por cada nivel que te alejas. Va por
 // escalones de medio nivel porque Mapbox no interpola listas.
@@ -232,6 +234,11 @@ export const WorldMap = memo(function WorldMap({
   const cameraRef = useRef<Camera>(null);
   const mapRef = useRef<MapView>(null);
   const carModel = useCarModel(vehicleColor);
+  // Un id por color: Mapbox no recarga un modelo ya registrado con el mismo id.
+  // Sale del archivo (que lleva el color), no del color pedido: el archivo
+  // nuevo llega un momento después.
+  const carModelId = `caravana-${(carModel ?? 'car').split('/').pop()}`;
+  const simulating = useSimulator((state) => state.active);
   const theme = useMapTheme(location);
   const hasPermission = useLocationPermission();
   const [styleFailed, setStyleFailed] = useState(false);
@@ -367,10 +374,10 @@ export const WorldMap = memo(function WorldMap({
   // cargar un estilo, así que se vuelve a aplicar en cada carga.
   const [styleLoads, setStyleLoads] = useState(0);
   const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
-  // Si el coche 3D no se pudo poner, se ve el punto azul mientras se
-  // reintenta (cada 3 s y al volver la app a primer plano: en segundo plano
-  // el mapa no está en pantalla y siempre falla).
-  const [carPuckFailed, setCarPuckFailed] = useState(false);
+  // Si el coche 3D no se pudo poner se reintenta cada 3 s y al volver la app
+  // a primer plano (en segundo plano el mapa no está en pantalla y falla).
+  // No se monta el punto de rnmapbox como respaldo: al desmontarse apaga el
+  // indicador nativo entero, coche incluido.
   const [retryTick, setRetryTick] = useState(0);
   const puckIsModelRef = useRef(false);
   useEffect(() => {
@@ -386,11 +393,10 @@ export const WorldMap = memo(function WorldMap({
       const tag = findNodeHandle(mapRef.current);
       if (tag == null) return;
       // El modelo del coche aparcado se registra en cada estilo cargado.
-      void addModel(tag, 'caravana-car', carModel);
+      void addModel(tag, carModelId, carModel);
       if (useCarPuck) {
         void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then((applied) => {
           puckIsModelRef.current = applied;
-          setCarPuckFailed(!applied);
           if (!applied) retry = setTimeout(() => setRetryTick((tick) => tick + 1), 3_000);
         });
       } else if (puckIsModelRef.current) {
@@ -404,7 +410,7 @@ export const WorldMap = memo(function WorldMap({
       clearTimeout(timer);
       if (retry) clearTimeout(retry);
     };
-  }, [useCarPuck, carModel, styleLoads, retryTick]);
+  }, [useCarPuck, carModel, carModelId, styleLoads, retryTick]);
   const handleStyleLoaded = useCallback(() => setStyleLoads((count) => count + 1), []);
 
   const handleTrackingChange = useCallback(
@@ -571,9 +577,9 @@ export const WorldMap = memo(function WorldMap({
             <ModelLayer
               id="caravana-parked-car"
               style={{
-                modelId: 'caravana-car',
+                modelId: carModelId,
                 modelScale: PARKED_SCALE as number[],
-                modelRotation: [0, 0, 180],
+                modelRotation: [0, 0, 270],
                 modelCastShadows: true,
                 modelEmissiveStrength: 0.6,
               }}
@@ -581,7 +587,14 @@ export const WorldMap = memo(function WorldMap({
           </ShapeSource>
         ) : null}
 
-        {hasPermission && (!useCarPuck || carPuckFailed) ? (
+        {simulating ? (
+          <CustomLocationProvider
+            coordinate={[location.longitude, location.latitude]}
+            heading={location.heading ?? 0}
+          />
+        ) : null}
+
+        {hasPermission && !useCarPuck ? (
           <LocationPuck puckBearingEnabled puckBearing={headingUp ? 'course' : 'heading'} pulsing={PUCK_PULSING} />
         ) : null}
 

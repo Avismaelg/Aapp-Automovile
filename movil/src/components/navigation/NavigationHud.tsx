@@ -40,6 +40,9 @@ type Props = {
   // Próxima curva de la línea de conducción que pide bajar la velocidad.
   curve: { distanceM: number; speedKmh: number } | null;
   northUp: boolean;
+  // false cuando has movido el mapa a mano: aparece «Centrar».
+  mapFollowing: boolean;
+  onRecenter: () => void;
   muted: boolean;
   bottomInset: number;
   onToggleNorth: () => void;
@@ -63,6 +66,8 @@ export function NavigationHud({
   limitKmh,
   curve,
   northUp,
+  mapFollowing,
+  onRecenter,
   muted,
   bottomInset,
   onToggleNorth,
@@ -143,6 +148,19 @@ export function NavigationHud({
       ) : null}
 
       <View style={styles.sideButtons}>
+        {!mapFollowing ? (
+          <Pressable
+            style={styles.recenterButton}
+            onPress={onRecenter}
+            accessibilityRole="button"
+            accessibilityLabel="Recentrar en tu posición"
+          >
+            <Ionicons name="navigate" size={18} color={ROUTE_BLUE} />
+            <AppText variant="bodyStrong" color={INK} style={styles.recenterText}>
+              Centrar
+            </AppText>
+          </Pressable>
+        ) : null}
         <Pressable
           style={[styles.roundButton, northUp && styles.roundButtonActive]}
           onPress={onToggleNorth}
@@ -284,7 +302,19 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 128,
     gap: spacing.sm,
+    alignItems: 'flex-end',
   },
+  recenterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    backgroundColor: '#ffffff',
+    elevation: 5,
+  },
+  recenterText: { fontSize: 14 },
   roundButton: {
     width: 48,
     height: 48,

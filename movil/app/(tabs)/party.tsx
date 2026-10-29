@@ -33,6 +33,7 @@ import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useSimulator } from '@/src/lib/simulator';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import {
   partyVoiceChannels,
@@ -46,7 +47,12 @@ export default function PartyScreen() {
   const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();
   const live = useLiveLocation();
-  const { party, isDemo, isLoading: partyLoading, isError: partyError, refetch } = useActiveParty();
+  const { party, isDemo: demoAccount, isLoading: partyLoading, isError: partyError, refetch } = useActiveParty();
+  // Party simulada (Perfil › Simulador): sin party real se muestra como la demo
+  // pero con los amigos simulados moviéndose en convoy.
+  const simMembers = useSimulator((state) => state.members);
+  const simParty = useSimulator((state) => state.party) && !party;
+  const isDemo = demoAccount || simParty;
   const leaveParty = useLeaveParty();
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
@@ -93,7 +99,9 @@ export default function PartyScreen() {
 
   const mapMembers = useMemo(
     () =>
-      isDemo
+      simParty
+        ? simMembers
+        : isDemo
         ? partyMembers
             .filter((member) => member.username !== currentUser.username)
             .map((member) => ({
@@ -118,7 +126,7 @@ export default function PartyScreen() {
               longitude: member.lastLng as number,
               isTalking: false,
             })),
-    [currentUser.username, isDemo, party],
+    [currentUser.username, isDemo, party, simParty, simMembers],
   );
 
   const destination = useMemo(() => {

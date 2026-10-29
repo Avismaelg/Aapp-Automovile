@@ -29,6 +29,11 @@ class CarPuckModule : Module() {
         puckBearingEnabled = true
         puckBearing = PuckBearing.COURSE
         pulsingEnabled = false
+        // Mapbox no recarga el modelo si solo cambia el archivo (p. ej. otro
+        // color): se pasa un momento por el indicador 2D para forzarlo.
+        if ((locationPuck as? LocationPuck3D)?.modelUri != uri) {
+          locationPuck = createDefault2DPuck(withBearing = true)
+        }
         locationPuck = LocationPuck3D(
           modelUri = uri,
           modelScale = listOf(size, size, size),

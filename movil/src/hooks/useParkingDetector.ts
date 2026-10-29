@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { haversineMeters } from '@/src/lib/geo';
 import { whenHydrated } from '@/src/lib/hydration';
+import { isSimulating } from '@/src/lib/simulator';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { useTrips } from '@/src/store/trips';
 
@@ -71,7 +72,7 @@ export function useParkingDetector(location: {
     }
 
     if (!lastMovingRef.current || !lastMovingAtRef.current) return;
-    if (now - lastMovingAtRef.current < PARK_AFTER_MS) return;
+    if (now - lastMovingAtRef.current < (isSimulating() ? 10_000 : PARK_AFTER_MS)) return;
 
     const parked = lastMovingRef.current;
     const existing = useParking.getState().spot;

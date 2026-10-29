@@ -21,12 +21,13 @@ import { useLiveLocation, refreshStaleLocation } from '@/src/hooks/useLiveLocati
 import { useMapTheme } from '@/src/hooks/useMapTheme';
 import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
 import { useRoadInfo } from '@/src/hooks/useRoadInfo';
-import { useActiveParty } from '@/src/hooks/useParty';
+import { useActiveParty, usePartyLocation } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { useVoiceGuidance } from '@/src/hooks/useVoiceGuidance';
 import { showError } from '@/src/lib/alerts';
 import { buildDrivingLine } from '@/src/lib/driving-line';
+import { driveRoute, PHASE_LABELS, stopSimulation, useSimulator } from '@/src/lib/simulator';
 import { haversineMeters } from '@/src/lib/geo';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
@@ -57,7 +58,13 @@ export default function NavigationScreen() {
   const live = useLiveLocation();
   const { party, isDemo } = useActiveParty();
   const { vehicles } = useGarageVehicles();
-  const { members: mapFriends } = useFriendsOnMap();
+  const { members: realFriends } = useFriendsOnMap();
+  // En simulación de party, los amigos simulados se suman a los reales.
+  const simMembers = useSimulator((state) => state.members);
+  const mapFriends = useMemo(
+    () => (simMembers.length > 0 ? [...realFriends, ...simMembers] : realFriends),
+    [realFriends, simMembers],
+  );
   const createChallenge = useCreateChallenge();
 
   const [voiceMuted, setVoiceMuted] = useState(false);
@@ -98,6 +105,14 @@ export default function NavigationScreen() {
     [parkingSpot],
   );
   useParkingDetector(live.location);
+  const sim = useSimulator();
+  const simulating = sim.active;
+  // Tu posición en la party (solo GPS real: nunca la de demo ni la simulada).
+  usePartyLocation(
+    party?.id,
+    live.location,
+    Boolean(party) && !isDemo && live.isLive && live.location.source === 'gps',
+  );
   const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
   const showParking =
     Boolean(parkingSpot) && parkingDistance != null && parkingDistance > 40;
@@ -111,7 +126,10 @@ export default function NavigationScreen() {
   const vehicleName = primaryVehicle
     ? `${primaryVehicle.make} ${primaryVehicle.model}`
     : undefined;
-  const { active: activeTrip } = useTripRecorder(live.location, vehicleName, { walking });
+  // Los viajes simulados no se graban.
+  const { active: activeTrip } = useTripRecorder(live.location, vehicleName, {
+    walking: walking || simulating,
+  });
   const vehicleLabel = primaryVehicle
     ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
     : 'Añade tu vehículo';
@@ -421,6 +439,12 @@ export default function NavigationScreen() {
     return () => clearTimeout(timer);
   }, [arrivedLabel]);
 
+  // Simulación de ruta: en cuanto hay ruta calculada, el coche la recorre.
+  useEffect(() => {
+    if (sim.phase !== 'waiting-route' || !navigating || !route.route) return;
+    driveRoute(route.route.coordinates);
+  }, [sim.phase, navigating, route.route]);
+
   const beginNavigation = useCallback(() => {
     setFollowing(true);
     setRecenterToken((value) => value + 1);
@@ -499,6 +523,8 @@ export default function NavigationScreen() {
             limitKmh={roadInfo.limitKmh ?? null}
             curve={drivingLine?.nextCurve ?? null}
             northUp={northUp}
+            mapFollowing={following}
+            onRecenter={recenter}
             muted={voiceMuted}
             bottomInset={insets.bottom}
             onToggleNorth={toggleNorthUp}
@@ -584,6 +610,26 @@ export default function NavigationScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
+            ) : null}
+
+            {simulating ? (
+              <View style={[styles.banner, chrome.surface, styles.simBanner]}>
+                <Ionicons name="flask" size={16} color="#7c3aed" />
+                <AppText variant="caption" color={chrome.textSoft} numberOfLines={1} style={styles.bannerText}>
+                  SIMULACIÓN · {PHASE_LABELS[sim.phase]} · {Math.round(sim.fix?.speedKmh ?? 0)} km/h
+                  {sim.party ? ' · party' : ''}
+                </AppText>
+                <Pressable onPress={() => router.push('/simulador' as Href)} hitSlop={8}>
+                  <AppText variant="label" color="#7c3aed" style={styles.retryText}>
+                    OPCIONES
+                  </AppText>
+                </Pressable>
+                <Pressable onPress={stopSimulation} hitSlop={8}>
+                  <AppText variant="label" color={colors.accent} style={styles.retryText}>
+                    PARAR
+                  </AppText>
+                </Pressable>
+              </View>
             ) : null}
 
             {arrivedLabel ? (
@@ -773,6 +819,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
+  simBanner: { borderColor: '#7c3aed', borderWidth: 1.5 },
   arrivedBanner: { borderColor: '#16a34a', borderWidth: 1.5 },
   bannerError: { borderColor: 'rgba(255,90,31,0.4)' },
   bannerDot: {

@@ -361,6 +361,26 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.settingDivider} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Simulador de pruebas"
+              onPress={() => router.push('/simulador' as Href)}
+              style={({ pressed }) => pressed && { opacity: 0.72 }}
+            >
+              <View style={styles.settingRow}>
+                <View style={styles.settingIcon}>
+                  <Ionicons name="flask-outline" size={17} color="#a78bfa" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyStrong">Simulador de pruebas</AppText>
+                  <AppText variant="caption" color={colors.muted}>
+                    Rutas, aparcamiento y party sin conducir
+                  </AppText>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.dim} />
+              </View>
+            </Pressable>
+            <View style={styles.settingDivider} />
             {profileSettings.map((setting, index) => (
               <Pressable
                 key={setting.label}
