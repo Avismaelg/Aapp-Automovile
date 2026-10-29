@@ -47,14 +47,23 @@ class CarPuckModule : Module() {
     }.runOnQueue(Queues.MAIN)
   }
 
+  // Primero por el tag de la vista; si no se resuelve (pasa con Fabric según
+  // el contenedor), se busca el MapView visible en la ventana de la app.
   private fun mapViewFor(viewTag: Int): MapView? {
-    val root = appContext.findView<View>(viewTag) ?: return null
-    return findMapView(root)
+    val byTag = try {
+      appContext.findView<View>(viewTag)?.let { findMapView(it) }
+    } catch (_: Exception) {
+      null
+    }
+    if (byTag != null) return byTag
+    val decor = appContext.currentActivity?.window?.decorView ?: return null
+    return findMapView(decor, visibleOnly = true)
   }
 
   // El tag puede ser el contenedor de rnmapbox (RNMBXMapView), que expone el
   // MapView con getMapView(), o una vista que lo contiene.
-  private fun findMapView(view: View): MapView? {
+  private fun findMapView(view: View, visibleOnly: Boolean = false): MapView? {
+    if (visibleOnly && !view.isShown) return null
     if (view is MapView) return view
     try {
       val method = view.javaClass.getMethod("getMapView")
@@ -64,7 +73,7 @@ class CarPuckModule : Module() {
     }
     if (view is ViewGroup) {
       for (index in 0 until view.childCount) {
-        findMapView(view.getChildAt(index))?.let { return it }
+        findMapView(view.getChildAt(index), visibleOnly)?.let { return it }
       }
     }
     return null

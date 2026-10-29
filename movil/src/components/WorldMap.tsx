@@ -351,6 +351,8 @@ export const WorldMap = memo(function WorldMap({
   // cargar un estilo, así que se vuelve a aplicar en cada carga.
   const [styleLoads, setStyleLoads] = useState(0);
   const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
+  // Si el coche 3D no se pudo poner, se vuelve al punto azul.
+  const [carPuckFailed, setCarPuckFailed] = useState(false);
   useEffect(() => {
     if (Platform.OS !== 'android' || !carModel || styleLoads === 0) return;
     const timer = setTimeout(() => {
@@ -360,6 +362,7 @@ export const WorldMap = memo(function WorldMap({
       void addModel(tag, 'caravana-car', carModel);
       if (useCarPuck) {
         void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then((applied) => {
+          setCarPuckFailed(!applied);
           if (!applied) console.warn('[mapa] no se pudo poner el coche 3D');
         });
       }
@@ -542,7 +545,7 @@ export const WorldMap = memo(function WorldMap({
           </ShapeSource>
         ) : null}
 
-        {hasPermission && !useCarPuck ? (
+        {hasPermission && (!useCarPuck || carPuckFailed) ? (
           <LocationPuck puckBearingEnabled puckBearing={headingUp ? 'course' : 'heading'} pulsing={PUCK_PULSING} />
         ) : null}
 
