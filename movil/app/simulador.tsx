@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { AppText, Button, Card, IconButton, Screen, SectionHeader } from '@/src/components/ui';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import {
+  armDetour,
   offsetPoint,
   PHASE_LABELS,
   runParkingScenario,
@@ -47,6 +48,14 @@ export default function SimulatorScreen() {
   const testRoute = () => {
     const from = sim.fix ?? live.location;
     const [latitude, longitude] = offsetPoint([from.latitude, from.longitude], 40, 1500);
+    routeTo({ latitude, longitude, label: 'Destino de prueba' });
+  };
+
+  const detour = () => {
+    const from = sim.fix ?? live.location;
+    const [latitude, longitude] = offsetPoint([from.latitude, from.longitude], 40, 1500);
+    ensureStarted();
+    armDetour();
     routeTo({ latitude, longitude, label: 'Destino de prueba' });
   };
 
@@ -113,6 +122,12 @@ export default function SimulatorScreen() {
             onPress={() => routeTo(destination)}
           />
         ) : null}
+        <Test
+          icon="git-branch"
+          title="Salirse de la ruta"
+          detail="Conduce un tramo, se desvía 250 m por otra calle y comprueba que la ruta se recalcula y sigue."
+          onPress={detour}
+        />
         <Test
           icon="car"
           title="Aparcar, caminar y volver"

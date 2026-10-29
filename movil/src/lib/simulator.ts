@@ -19,7 +19,8 @@ export type SimPhase =
   | 'walking-away'
   | 'away'
   | 'walking-back'
-  | 'driving-off';
+  | 'driving-off'
+  | 'detour';
 
 export type SimFix = {
   latitude: number;
@@ -67,6 +68,7 @@ export const PHASE_LABELS: Record<SimPhase, string> = {
   away: 'Lejos del coche',
   'walking-back': 'Volviendo al coche',
   'driving-off': 'Arrancando',
+  detour: 'Saliéndote de la ruta',
 };
 
 const TICK_MS = 1_000;
@@ -148,6 +150,9 @@ class PathWalker {
 let timer: ReturnType<typeof setInterval> | null = null;
 let script: (() => void) | null = null;
 let trail: LatLng[] = [];
+// Prueba de desvío: tras unos metros de ruta se sale por una calle lateral
+// para comprobar que la app recalcula.
+let detourPending = false;
 
 function setFix(fix: SimFix, phase?: SimPhase) {
   trail.push([fix.latitude, fix.longitude]);
@@ -273,21 +278,37 @@ export function setSimParty(enabled: boolean) {
   useSimulator.setState((state) => ({ party: enabled, members: enabled ? convoy(state.members) : [] }));
 }
 
-// La pantalla del mapa llama a esto cuando hay una ruta calculada.
+// La pantalla del mapa llama a esto cuando hay una ruta calculada. Solo se
+// acepta una ruta que empiece donde estás (tras un desvío, la vieja no vale:
+// hay que esperar a la recalculada).
 export function driveRoute(points: LatLng[]) {
-  if (points.length < 2) return;
-  const start = points[0];
+  if (points.length < 2) return false;
   const fix = useSimulator.getState().fix;
-  // Si estás lejos del inicio de la ruta, se empieza en él.
-  if (!fix || metersBetween([fix.latitude, fix.longitude], start) > 80) {
-    trail = [start];
+  if (fix && metersBetween([fix.latitude, fix.longitude], points[0]) > 150) return false;
+  if (detourPending) {
+    detourPending = false;
+    const walker = new PathWalker(points);
+    const until = Math.min(350, walker.length * 0.4);
+    const partial: LatLng[] = [];
+    for (let d = 0; d <= until; d += 10) partial.push(walker.at(d).point);
+    const { point, heading } = walker.at(until);
+    drive(partial, 'driving', () => {
+      // Gira 90° y se aleja 250 m de la ruta; luego espera la recalculada.
+      drive([point, offsetPoint(point, heading + 90, 250)], 'detour', () => waitForRoute());
+    });
+    return true;
   }
   useSimulator.setState({ label: 'Ruta al destino' });
   drive(points, 'driving');
+  return true;
 }
 
 export function waitForRoute() {
   useSimulator.setState({ phase: 'waiting-route', label: 'Ruta al destino' });
+}
+
+export function armDetour() {
+  detourPending = true;
 }
 
 // Aparcar (parado lo justo para que se detecte), alejarse andando 150 m,
