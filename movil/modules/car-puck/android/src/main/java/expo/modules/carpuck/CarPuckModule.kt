@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import com.mapbox.maps.MapView
 import com.mapbox.maps.plugin.LocationPuck3D
 import com.mapbox.maps.plugin.PuckBearing
+import com.mapbox.maps.plugin.locationcomponent.createDefault2DPuck
 import com.mapbox.maps.plugin.locationcomponent.location
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
@@ -36,6 +37,17 @@ class CarPuckModule : Module() {
           modelReceiveShadows = false,
           modelEmissiveStrength = 0.6f,
         )
+      }
+      true
+    }.runOnQueue(Queues.MAIN)
+
+    // Vuelve al punto azul (a pie): sin esto el coche 3D seguía pegado a ti.
+    AsyncFunction("resetPuck") { viewTag: Int ->
+      val mapView = mapViewFor(viewTag) ?: return@AsyncFunction false
+      mapView.location.apply {
+        locationPuck = createDefault2DPuck(withBearing = true)
+        puckBearing = PuckBearing.HEADING
+        pulsingEnabled = true
       }
       true
     }.runOnQueue(Queues.MAIN)

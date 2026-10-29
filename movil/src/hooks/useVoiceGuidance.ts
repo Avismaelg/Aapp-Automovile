@@ -34,6 +34,8 @@ export function useVoiceGuidance({
     if (previous && previous.key === key && previous.stage >= stage) return;
     spokenRef.current = { key, stage };
     if (stage === 0) return;
+    // La llegada la anuncia la pantalla del mapa al terminar la ruta.
+    if (upcoming.icon === 'arrive' && stage === 3) return;
     Speech.stop();
     Speech.speak(spokenInstruction(upcoming.text, upcoming.remainingM), {
       language: 'es-ES',

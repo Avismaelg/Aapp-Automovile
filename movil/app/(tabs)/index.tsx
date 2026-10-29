@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { useVoiceGuidance } from '@/src/hooks/useVoiceGuidance';
 import { showError } from '@/src/lib/alerts';
 import { buildDrivingLine } from '@/src/lib/driving-line';
+import { haversineMeters } from '@/src/lib/geo';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import type { WorldMapAlternative, WorldMapMember } from '@/src/lib/map-html';
@@ -389,6 +391,36 @@ export default function NavigationScreen() {
     speedKmh: live.location.speedKmh ?? null,
   });
 
+  // Llegada: a menos de 40 m del destino (o al final de la ruta) se termina
+  // la navegación sola y se avisa, como Waze.
+  const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
+  const destinationDistanceM = destination ? haversineMeters(live.location, destination) : null;
+  const arrived =
+    navigating &&
+    destination != null &&
+    ((destinationDistanceM != null && destinationDistanceM < 40) ||
+      (remainingRouteM != null && remainingRouteM < 20 && (routeDistanceFromPathM ?? 999) < 40));
+  useEffect(() => {
+    if (!arrived || !destination) return;
+    const label = destination.label;
+    // Fuera del cuerpo del efecto: terminar la ruta re-renderiza la pantalla.
+    const timer = setTimeout(() => {
+      setArrivedLabel(label);
+      useChosenDestination.getState().stopNavigation();
+      clearChosenDestination();
+      // La guía por voz se calla al terminar la ruta: el aviso va después.
+      if (!voiceMuted) {
+        setTimeout(() => Speech.speak(`Has llegado a ${label}`, { language: 'es-ES' }), 600);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [arrived, destination, voiceMuted, clearChosenDestination]);
+  useEffect(() => {
+    if (!arrivedLabel) return;
+    const timer = setTimeout(() => setArrivedLabel(null), 8_000);
+    return () => clearTimeout(timer);
+  }, [arrivedLabel]);
+
   const beginNavigation = useCallback(() => {
     setFollowing(true);
     setRecenterToken((value) => value + 1);
@@ -552,6 +584,18 @@ export default function NavigationScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
+            ) : null}
+
+            {arrivedLabel ? (
+              <View style={[styles.banner, chrome.surface, styles.arrivedBanner]}>
+                <Ionicons name="flag" size={18} color="#16a34a" />
+                <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={styles.bannerText}>
+                  Has llegado a {arrivedLabel}
+                </AppText>
+                <Pressable onPress={() => setArrivedLabel(null)} hitSlop={8} accessibilityLabel="Cerrar aviso">
+                  <Ionicons name="close" size={18} color={chrome.muted} />
+                </Pressable>
+              </View>
             ) : null}
 
             {activeTrip ? (
@@ -729,6 +773,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
+  arrivedBanner: { borderColor: '#16a34a', borderWidth: 1.5 },
   bannerError: { borderColor: 'rgba(255,90,31,0.4)' },
   bannerDot: {
     width: 7,

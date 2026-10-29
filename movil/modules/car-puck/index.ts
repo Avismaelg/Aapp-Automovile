@@ -3,6 +3,7 @@ import { requireOptionalNativeModule } from 'expo';
 type CarPuckNative = {
   setModelPuck(viewTag: number, uri: string, scale: number, rotation: number): Promise<boolean>;
   addModel(viewTag: number, modelId: string, uri: string): Promise<boolean>;
+  resetPuck(viewTag: number): Promise<boolean>;
 };
 
 // Solo existe en Android; en iOS y web se queda el indicador 2D.
@@ -14,6 +15,11 @@ export function setModelPuck(viewTag: number, uri: string, scale: number, rotati
     console.warn('[car-puck]', error instanceof Error ? error.message : String(error));
     return false;
   });
+}
+
+export function resetPuck(viewTag: number) {
+  if (!native) return Promise.resolve(false);
+  return native.resetPuck(viewTag).catch(() => false);
 }
 
 export function addModel(viewTag: number, modelId: string, uri: string) {

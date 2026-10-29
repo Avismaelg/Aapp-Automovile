@@ -12,9 +12,9 @@ import Mapbox, {
 } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { AppState, findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { addModel, setModelPuck } from '@/modules/car-puck';
+import { addModel, resetPuck, setModelPuck } from '@/modules/car-puck';
 
 import { useCarModel } from '@/src/hooks/useCarModel';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
@@ -367,10 +367,21 @@ export const WorldMap = memo(function WorldMap({
   // cargar un estilo, así que se vuelve a aplicar en cada carga.
   const [styleLoads, setStyleLoads] = useState(0);
   const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
-  // Si el coche 3D no se pudo poner, se vuelve al punto azul.
+  // Si el coche 3D no se pudo poner, se ve el punto azul mientras se
+  // reintenta (cada 3 s y al volver la app a primer plano: en segundo plano
+  // el mapa no está en pantalla y siempre falla).
   const [carPuckFailed, setCarPuckFailed] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
+  const puckIsModelRef = useRef(false);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setRetryTick((tick) => tick + 1);
+    });
+    return () => subscription.remove();
+  }, []);
   useEffect(() => {
     if (Platform.OS !== 'android' || !carModel || styleLoads === 0) return;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
       const tag = findNodeHandle(mapRef.current);
       if (tag == null) return;
@@ -378,13 +389,22 @@ export const WorldMap = memo(function WorldMap({
       void addModel(tag, 'caravana-car', carModel);
       if (useCarPuck) {
         void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then((applied) => {
+          puckIsModelRef.current = applied;
           setCarPuckFailed(!applied);
-          if (!applied) console.warn('[mapa] no se pudo poner el coche 3D');
+          if (!applied) retry = setTimeout(() => setRetryTick((tick) => tick + 1), 3_000);
+        });
+      } else if (puckIsModelRef.current) {
+        // A pie: el coche se queda aparcado y tú vuelves a ser el punto azul.
+        void resetPuck(tag).then((reset) => {
+          if (reset) puckIsModelRef.current = false;
         });
       }
     }, 150);
-    return () => clearTimeout(timer);
-  }, [useCarPuck, carModel, styleLoads]);
+    return () => {
+      clearTimeout(timer);
+      if (retry) clearTimeout(retry);
+    };
+  }, [useCarPuck, carModel, styleLoads, retryTick]);
   const handleStyleLoaded = useCallback(() => setStyleLoads((count) => count + 1), []);
 
   const handleTrackingChange = useCallback(
@@ -539,7 +559,7 @@ export const WorldMap = memo(function WorldMap({
             ))
           : null}
 
-        {parking && carModel && (parkingDistance == null || parkingDistance > 30) ? (
+        {parking && carModel && walking ? (
           <ShapeSource
             id="caravana-parked-car"
             shape={{
@@ -606,7 +626,7 @@ export const WorldMap = memo(function WorldMap({
           </MarkerView>
         ) : null}
 
-        {parking ? (
+        {parking && walking ? (
           // Con el coche 3D la etiqueta flota encima de él; sin modelo (aún
           // generándose) se muestra la insignia redonda.
           <MarkerView
