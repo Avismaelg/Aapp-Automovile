@@ -25,10 +25,15 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { activeChallenge, feed, friends } from '@/src/data/mock';
+import { activeChallenge, feed, friends as demoFriends } from '@/src/data/mock';
+import type { Friend } from '@/src/types/models';
+import { useChallenges } from '@/src/hooks/useChallenges';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFeed, useToggleLike } from '@/src/hooks/useFeed';
+import { useFriends } from '@/src/hooks/useFriends';
 import { showError } from '@/src/lib/alerts';
+import { realChallengeToChallenge } from '@/src/lib/challenge-db';
+import { profileColor } from '@/src/lib/profile-db';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useSession } from '@/src/store/session';
 import { colors, radius, spacing } from '@/src/theme';
@@ -91,6 +96,29 @@ export default function ActividadScreen() {
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const firstName = me.name.split(' ')[0];
+  // Fuera del modo demo, el banner y los amigos salen de la cuenta real.
+  const { active: realActive, isDemo: challengesDemo } = useChallenges();
+  const bannerChallenge = challengesDemo
+    ? activeChallenge
+    : realActive
+      ? realChallengeToChallenge(realActive)
+      : null;
+  const bannerLeader = bannerChallenge
+    ? [...bannerChallenge.participants].sort((a, b) => b.progress - a.progress)[0]
+    : null;
+  const { friends: friendEntries, isDemo: friendsDemo } = useFriends();
+  const roadFriends: Friend[] = friendsDemo
+    ? demoFriends
+    : friendEntries.map((entry) => ({
+        id: entry.profile.id,
+        name: entry.profile.displayName,
+        username: entry.profile.username,
+        color: profileColor(entry.profile.username),
+        car: `@${entry.profile.username}`,
+        vehicleKind: 'car',
+        online: false,
+        status: entry.profile.city || 'Amigo',
+      }));
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -236,30 +264,32 @@ export default function ActividadScreen() {
         ))}
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.challengeBanner, pressed && { opacity: 0.85 }]}
-        onPress={() => router.push('/(tabs)/challenges')}
-      >
-        <View style={styles.challengeIcon}>
-          <Ionicons name="flag" size={20} color={colors.lime} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>
-            RETO EN CURSO · {activeChallenge.participants.length} PARTICIPANTES
-          </AppText>
-          <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
-            {activeChallenge.title}
-          </AppText>
-          <AppText variant="caption" color={colors.muted} style={{ marginTop: 1 }}>
-            {activeChallenge.fromLabel} → {activeChallenge.toLabel} ·{' '}
-            {activeChallenge.participants[0].name.split(' ')[0]} lidera
-          </AppText>
-        </View>
-        <View style={styles.challengeCta}>
-          <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>VER</AppText>
-          <Ionicons name="chevron-forward" size={13} color={colors.textSoft} />
-        </View>
-      </Pressable>
+      {bannerChallenge ? (
+        <Pressable
+          style={({ pressed }) => [styles.challengeBanner, pressed && { opacity: 0.85 }]}
+          onPress={() => router.push('/(tabs)/challenges')}
+        >
+          <View style={styles.challengeIcon}>
+            <Ionicons name="flag" size={20} color={colors.lime} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>
+              {bannerChallenge.status === 'live' ? 'RETO EN CURSO' : 'RETO PENDIENTE'} · {bannerChallenge.participants.length} PARTICIPANTES
+            </AppText>
+            <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
+              {bannerChallenge.title}
+            </AppText>
+            <AppText variant="caption" color={colors.muted} style={{ marginTop: 1 }}>
+              {bannerChallenge.fromLabel} → {bannerChallenge.toLabel} ·{' '}
+              {bannerLeader ? `${bannerLeader.isMe ? 'Tú' : bannerLeader.name.split(' ')[0]} lidera` : ''}
+            </AppText>
+          </View>
+          <View style={styles.challengeCta}>
+            <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>VER</AppText>
+            <Ionicons name="chevron-forward" size={13} color={colors.textSoft} />
+          </View>
+        </Pressable>
+      ) : null}
 
       <SectionHeader title="En la carretera" action="Ver party" onAction={() => router.push('/(tabs)/party')} />
       <ScrollView
@@ -267,7 +297,14 @@ export default function ActividadScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 10, paddingRight: spacing.xl }}
       >
-        {friends.map((friend) => (
+        {roadFriends.length === 0 ? (
+          <Pressable onPress={() => router.push('/friends')} style={styles.friendCard}>
+            <Ionicons name="person-add-outline" size={22} color={colors.accent} />
+            <AppText variant="bodyStrong" style={{ marginTop: 10 }}>Añade amigos</AppText>
+            <AppText variant="caption" color={colors.muted}>Verás aquí a tu gente.</AppText>
+          </Pressable>
+        ) : null}
+        {roadFriends.map((friend) => (
           <Pressable
             key={friend.id}
             onPress={() => router.push('/(tabs)/party')}

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
@@ -24,6 +24,8 @@ import {
 } from '@/src/components/ui';
 import { activeChallenge, activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { isDemoMode } from '@/src/lib/demo';
+import { useAuth } from '@/src/store/auth';
 import { formatClock } from '@/src/lib/format';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -67,7 +69,15 @@ function DriveRoute({ compact }: { compact?: boolean }) {
   );
 }
 
+// Con una cuenta real la conducción vive en el mapa principal; esta pantalla
+// es una maqueta con la party y el reto de ejemplo, solo para el modo demo.
 export default function DriveScreen() {
+  const account = useAuth((state) => state.account);
+  if (!isDemoMode(account?.mode)) return <Redirect href="/" />;
+  return <DemoDriveScreen />;
+}
+
+function DemoDriveScreen() {
   const router = useRouter();
   const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();

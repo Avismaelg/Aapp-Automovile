@@ -15,16 +15,18 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { achievements } from '@/src/data/mock';
+import { achievements as demoAchievements } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriends } from '@/src/hooks/useFriends';
 import { useMyProfile } from '@/src/hooks/useProfile';
+import { tripAchievements, tripStats } from '@/src/lib/achievements';
 import { showError } from '@/src/lib/alerts';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
+import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 
 const settings = [
@@ -46,6 +48,9 @@ export default function ProfileScreen() {
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const isDemo = account?.mode === 'demo';
+  const trips = useTrips((state) => state.trips);
+  const achievements = isDemo ? demoAchievements : tripAchievements(trips);
+  const stats = isDemo ? me.stats : tripStats(trips);
   const displayName = profile?.displayName || me.name;
   const username = profile?.username || me.username;
   const city = profile?.city || me.city;
@@ -169,26 +174,32 @@ export default function ProfileScreen() {
           <AppText variant="h1">{displayName}</AppText>
           <View style={styles.usernameRow}>
             <AppText variant="caption" color={colors.accent}>@{username}</AppText>
-            <View style={styles.metaDot} />
-            <Ionicons name="location-outline" size={12} color={colors.muted} />
-            <AppText variant="caption" color={colors.muted}>{city}</AppText>
+            {city ? (
+              <>
+                <View style={styles.metaDot} />
+                <Ionicons name="location-outline" size={12} color={colors.muted} />
+                <AppText variant="caption" color={colors.muted}>{city}</AppText>
+              </>
+            ) : null}
           </View>
-          <AppText variant="body" color={colors.textSoft} style={{ marginTop: 8 }}>
-            {bio}
-          </AppText>
+          {bio ? (
+            <AppText variant="body" color={colors.textSoft} style={{ marginTop: 8 }}>
+              {bio}
+            </AppText>
+          ) : null}
         </View>
 
         <Card style={styles.statsCard}>
           <View style={styles.statItem}>
-            <Stat value={String(me.stats.drives)} label="rutas" align="center" />
+            <Stat value={String(stats.drives)} label="rutas" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={`${(me.stats.km / 1000).toFixed(1)}k`} label="kilómetros" align="center" />
+            <Stat value={stats.km >= 1000 ? `${(stats.km / 1000).toFixed(1)}k` : String(Math.round(stats.km))} label="kilómetros" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Stat value={`${me.stats.hours} h`} label="al volante" align="center" />
+            <Stat value={`${stats.hours} h`} label="al volante" align="center" />
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -222,8 +233,13 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <SectionHeader title="Logros" action="Ver todos" />
+          <SectionHeader title="Logros" />
           <View style={styles.achievements}>
+            {achievements.length === 0 ? (
+              <AppText variant="caption" color={colors.muted}>
+                Tus logros aparecerán cuando grabes tus primeros viajes.
+              </AppText>
+            ) : null}
             {achievements.map((achievement) => (
               <View key={achievement.id} style={styles.achievement}>
                 <View style={styles.achievementIcon}>
