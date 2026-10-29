@@ -1,6 +1,7 @@
-import { Linking, Pressable, type StyleProp, type ViewStyle } from 'react-native';
+import { Linking, Platform, Pressable, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
+import { MAPBOX_ACCESS_TOKEN } from '@/src/lib/map/config';
 import { WORLD_MAP_PROVIDER } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
 
@@ -10,7 +11,9 @@ const ATTRIBUTION =
     : '© OpenFreeMap · © OpenMapTiles · © OpenStreetMap';
 
 // Atribución obligatoria de las teselas, según el proveedor configurado.
+// En el móvil con Mapbox la atribución la pone el propio SDK (logo e «i»).
 export function MapAttribution({ style }: { style?: StyleProp<ViewStyle> }) {
+  if (Platform.OS !== 'web' && MAPBOX_ACCESS_TOKEN) return null;
   return (
     <Pressable
       style={style}

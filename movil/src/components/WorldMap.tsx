@@ -1,20 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import {
+import Mapbox, {
   Camera,
-  type CameraRef,
-  GeoJSONSource,
-  Layer,
-  Map,
-  Marker,
-  NativeUserLocation,
-  type TrackUserLocation,
-} from '@maplibre/maplibre-react-native';
+  CircleLayer,
+  LineLayer,
+  LocationPuck,
+  MapView,
+  MarkerView,
+  ShapeSource,
+  UserTrackingMode,
+} from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { useMapTheme } from '@/src/hooks/useMapTheme';
-import { MAP_FALLBACK_STYLES, MAP_STYLES, WORLD_MAP_PROVIDER } from '@/src/lib/map/config';
+import {
+  MAP_FALLBACK_STYLES,
+  MAPBOX_ACCESS_TOKEN,
+  NATIVE_LABEL_LAYER,
+  NATIVE_MAP_STYLES,
+} from '@/src/lib/map/config';
 import type {
   WorldMapAlternative,
   WorldMapDestination,
@@ -28,18 +33,18 @@ import type {
 import { cumulativeDistances, metersBetween, nextInstruction, routeProgress } from '@/src/lib/route-instructions';
 import { colors } from '@/src/theme';
 
-// Mapa nativo (MapLibre Android/iOS): la cámara de seguimiento y el indicador
-// de posición los anima el motor nativo a 60 fps, como en Waze o Google Maps.
+// Mapa nativo (Mapbox Maps SDK v11 vía @rnmapbox/maps): la cámara de
+// seguimiento y el indicador de posición los anima el motor nativo a 60 fps.
 // En web se usa WorldMap.web.tsx (MapLibre GL JS).
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN || null);
 
 const NO_ALTERNATIVES: WorldMapAlternative[] = [];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 const MANEUVER_ZOOM_M = 250;
-
-// Las capas propias van bajo la primera etiqueta que queda encima de las
-// calles, para que los nombres se lean sobre la ruta. Los ids salen de los
-// estilos de OpenFreeMap; con otro proveedor se pintan encima de todo.
 const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_other' };
+const NO_PADDING = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
+// En navegación la flecha va abajo, para ver más calle por delante.
+const NAV_PADDING = { paddingTop: 260, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
 
 type WorldMapProps = {
   members: WorldMapMember[];
@@ -96,7 +101,8 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function boundsOf(points: [number, number][]): [number, number, number, number] {
+// Esquinas noreste y suroeste en [longitud, latitud], como pide fitBounds.
+function cornersOf(points: [number, number][]) {
   let west = Infinity;
   let south = Infinity;
   let east = -Infinity;
@@ -107,10 +113,11 @@ function boundsOf(points: [number, number][]): [number, number, number, number] 
     south = Math.min(south, lat);
     north = Math.max(north, lat);
   }
-  return [west, south, east, north];
+  return { ne: [east, north], sw: [west, south] };
 }
 
 // El indicador nativo lee el GPS por su cuenta: solo se activa con permiso.
+// Solo consulta el permiso, nunca lo pide (eso lo hace useLiveLocation).
 function useLocationPermission() {
   const [granted, setGranted] = useState(false);
   useEffect(() => {
@@ -151,7 +158,7 @@ export const WorldMap = memo(function WorldMap({
   onError,
   style,
 }: WorldMapProps) {
-  const cameraRef = useRef<CameraRef>(null);
+  const cameraRef = useRef<Camera>(null);
   const theme = useMapTheme(location);
   const hasPermission = useLocationPermission();
   const [styleFailed, setStyleFailed] = useState(false);
@@ -181,15 +188,9 @@ export const WorldMap = memo(function WorldMap({
     if (!fitRoute || fitRoute.length < 2) return;
     changeFollowing(false);
     const timer = setTimeout(() => {
-      try {
-        cameraRef.current?.fitBounds(boundsOf(fitRoute), {
-          padding: { top: 140, right: 48, bottom: 280, left: 48 },
-          duration: 900,
-          easing: 'ease',
-        });
-      } catch {
-        // La cámara aún no existe: el encuadre se pierde, no es grave.
-      }
+      const { ne, sw } = cornersOf(fitRoute);
+      // Relleno [arriba, derecha, abajo, izquierda]: deja sitio a las tarjetas.
+      cameraRef.current?.fitBounds(ne, sw, [140, 48, 280, 48], 900);
     }, 50);
     return () => clearTimeout(timer);
   }, [fitRoute, changeFollowing]);
@@ -201,11 +202,11 @@ export const WorldMap = memo(function WorldMap({
     const key = `${location.latitude.toFixed(5)}|${location.longitude.toFixed(5)}`;
     if (key === lastCenteredRef.current) return;
     lastCenteredRef.current = key;
-    try {
-      cameraRef.current?.easeTo({ center: [location.longitude, location.latitude], duration: 600 });
-    } catch {
-      // Ídem.
-    }
+    cameraRef.current?.setCamera({
+      centerCoordinate: [location.longitude, location.latitude],
+      animationMode: 'easeTo',
+      animationDuration: 600,
+    });
   }, [following, hasPermission, location.latitude, location.longitude]);
 
   const cumulative = useMemo(
@@ -272,26 +273,19 @@ export const WorldMap = memo(function WorldMap({
   const nearManeuver = upcoming != null && upcoming.remainingM < MANEUVER_ZOOM_M;
   const zoom = zoomForSpeed(speedKmh, walking, nearManeuver);
   const navigating = Boolean(route) && !walking;
-
-  // En navegación la flecha va abajo, para ver más calle por delante.
-  const padding = useMemo(
-    () => (navigating && following && !northUp ? { top: 260, right: 0, bottom: 0, left: 0 } : { top: 0, right: 0, bottom: 0, left: 0 }),
-    [navigating, following, northUp],
-  );
-
-  const trackUserLocation: TrackUserLocation | undefined =
-    following && hasPermission ? (northUp || walking ? 'default' : 'course') : undefined;
+  const headingUp = !northUp && !walking;
+  const tracking = following && hasPermission;
 
   const handleTrackingChange = useCallback(
-    (event: { nativeEvent: { trackUserLocation: TrackUserLocation | null } }) => {
+    (event: { nativeEvent: { payload: { followUserLocation: boolean } } }) => {
       // El motor suelta el seguimiento cuando el usuario arrastra el mapa.
-      if (event.nativeEvent.trackUserLocation == null) changeFollowing(false);
+      if (!event.nativeEvent.payload.followUserLocation) changeFollowing(false);
     },
     [changeFollowing],
   );
 
-  const handleAlternativePress = useCallback((event: { nativeEvent: { features: GeoJSON.Feature[] } }) => {
-    const index = event.nativeEvent.features[0]?.properties?.index;
+  const handleAlternativePress = useCallback((event: { features: GeoJSON.Feature[] }) => {
+    const index = event.features[0]?.properties?.index;
     if (typeof index === 'number') callbacksRef.current.onAlternativePress?.(index);
   }, []);
 
@@ -302,119 +296,124 @@ export const WorldMap = memo(function WorldMap({
     });
   }, []);
 
-  const mapStyle = (styleFailed ? MAP_FALLBACK_STYLES : MAP_STYLES)[theme];
-  const beforeId = styleFailed || WORLD_MAP_PROVIDER === 'openfreemap' ? OPENFREEMAP_LABEL_LAYER[theme] : undefined;
+  const styleURL = (styleFailed ? MAP_FALLBACK_STYLES : NATIVE_MAP_STYLES)[theme];
+  const belowLayerID = (styleFailed ? OPENFREEMAP_LABEL_LAYER : NATIVE_LABEL_LAYER)[theme];
   const night = theme === 'night';
 
   return (
     <View style={[styles.root, { backgroundColor: night ? '#0b0f14' : '#e9edf1' }, style]}>
-      <Map
+      <MapView
         style={styles.map}
-        mapStyle={mapStyle}
-        touchPitch={false}
-        attribution={false}
-        logo={false}
-        compass={false}
-        scaleBar={false}
-        onDidFailLoadingMap={handleStyleError}
+        styleURL={styleURL}
+        pitchEnabled={false}
+        attributionPosition={{ bottom: 4, left: 4 }}
+        logoPosition={{ bottom: 4, right: 4 }}
+        compassEnabled={false}
+        scaleBarEnabled={false}
+        onMapLoadingError={handleStyleError}
       >
         <Camera
           ref={cameraRef}
-          initialViewState={{ center: [location.longitude, location.latitude], zoom: 15 }}
-          trackUserLocation={trackUserLocation}
-          onTrackUserLocationChange={handleTrackingChange}
-          zoom={following ? zoom : undefined}
-          bearing={following && (northUp || walking) ? 0 : undefined}
-          pitch={0}
-          padding={padding}
-          duration={800}
-          easing="ease"
+          defaultSettings={{ centerCoordinate: [location.longitude, location.latitude], zoomLevel: 15 }}
+          followUserLocation={tracking}
+          followUserMode={headingUp ? UserTrackingMode.FollowWithCourse : UserTrackingMode.Follow}
+          followZoomLevel={zoom}
+          followPitch={0}
+          followHeading={headingUp ? undefined : 0}
+          followPadding={navigating && headingUp ? NAV_PADDING : NO_PADDING}
+          onUserTrackingModeChange={handleTrackingChange}
         />
 
-        <GeoJSONSource key={`alt-${theme}`} id="caravana-alternatives" data={alternativesData} onPress={handleAlternativePress}>
-          <Layer
+        <ShapeSource id="caravana-alternatives" shape={alternativesData} onPress={handleAlternativePress}>
+          <LineLayer
             id="caravana-alt-casing"
-            type="line"
-            beforeId={beforeId}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{
-              'line-color': '#6f7f93',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 6, 14, 9, 16, 13, 18, 19],
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineColor: '#6f7f93',
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 6, 14, 9, 16, 13, 18, 19],
             }}
           />
-          <Layer
+          <LineLayer
             id="caravana-alt-line"
-            type="line"
-            beforeId={beforeId}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{
-              'line-color': '#b4c2d3',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 6, 16, 9, 18, 14],
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineColor: '#b4c2d3',
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 6, 16, 9, 18, 14],
             }}
           />
-        </GeoJSONSource>
+        </ShapeSource>
 
-        <GeoJSONSource key={`route-${theme}`} id="caravana-route" data={routeData}>
-          <Layer
+        <ShapeSource id="caravana-route" shape={routeData}>
+          <LineLayer
             id="caravana-route-casing"
-            type="line"
-            beforeId={beforeId}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{
-              'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#8a96a4', '#1458b8'],
-              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 8, 14, 12, 16, 17, 18, 24],
-              'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.6, 1],
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineColor: ['case', ['==', ['get', 'segment'], 'past'], '#8a96a4', '#1458b8'],
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 8, 14, 12, 16, 17, 18, 24],
+              lineOpacity: ['case', ['==', ['get', 'segment'], 'past'], 0.6, 1],
             }}
           />
-          <Layer
+          <LineLayer
             id="caravana-route-line"
-            type="line"
-            beforeId={beforeId}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{
-              'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#c3cbd4', '#3d9bff'],
-              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 8.5, 16, 12.5, 18, 18],
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineColor: ['case', ['==', ['get', 'segment'], 'past'], '#c3cbd4', '#3d9bff'],
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 8.5, 16, 12.5, 18, 18],
             }}
           />
-        </GeoJSONSource>
+        </ShapeSource>
 
-        <GeoJSONSource key={`maneuver-${theme}`} id="caravana-maneuver" data={maneuverData}>
-          <Layer
+        <ShapeSource id="caravana-maneuver" shape={maneuverData}>
+          <CircleLayer
             id="caravana-maneuver"
-            type="circle"
-            paint={{
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 8],
-              'circle-color': '#ffffff',
-              'circle-stroke-color': '#1458b8',
-              'circle-stroke-width': 3,
+            style={{
+              circleRadius: ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 8],
+              circleColor: '#ffffff',
+              circleStrokeColor: '#1458b8',
+              circleStrokeWidth: 3,
             }}
           />
-        </GeoJSONSource>
+        </ShapeSource>
 
-        <GeoJSONSource key={`parking-${theme}`} id="caravana-parking-line" data={parkingLineData}>
-          <Layer
+        <ShapeSource id="caravana-parking-line" shape={parkingLineData}>
+          <LineLayer
             id="caravana-parking-line"
-            type="line"
-            beforeId={beforeId}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{ 'line-color': '#4de1ff', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.9 }}
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineColor: '#4de1ff',
+              lineWidth: 4,
+              lineDasharray: [2, 2],
+              lineOpacity: 0.9,
+            }}
           />
-        </GeoJSONSource>
+        </ShapeSource>
 
         {hasPermission ? (
-          <NativeUserLocation mode={walking || northUp ? 'heading' : 'course'} androidPreferredFramesPerSecond={60} />
+          <LocationPuck
+            puckBearingEnabled
+            puckBearing={headingUp ? 'course' : 'heading'}
+            pulsing={{ isEnabled: true, color: '#3d9bff', radius: 'accuracy' }}
+          />
         ) : null}
 
         {members.map((member) => (
-          <Marker
+          <MarkerView
             key={member.id}
-            id={`member-${member.id}`}
-            lngLat={[member.longitude, member.latitude]}
-            anchor="top"
-            offset={[0, -22]}
-            onPress={() => callbacksRef.current.onMemberPress?.(member.id)}
+            coordinate={[member.longitude, member.latitude]}
+            anchor={{ x: 0.5, y: 0.25 }}
+            allowOverlap
           >
-            <View style={styles.member}>
+            <Pressable style={styles.member} onPress={() => callbacksRef.current.onMemberPress?.(member.id)}>
               <View
                 style={[
                   styles.memberDot,
@@ -427,12 +426,16 @@ export const WorldMap = memo(function WorldMap({
               <Text style={[styles.memberName, night ? styles.memberNameNight : null]} numberOfLines={1}>
                 {member.name.split(' ')[0]}
               </Text>
-            </View>
-          </Marker>
+            </Pressable>
+          </MarkerView>
         ))}
 
         {destination ? (
-          <Marker id="destination" lngLat={[destination.longitude, destination.latitude]} anchor="top" offset={[0, -20]}>
+          <MarkerView
+            coordinate={[destination.longitude, destination.latitude]}
+            anchor={{ x: 0.5, y: 0.3 }}
+            allowOverlap
+          >
             <View style={styles.member}>
               <View style={styles.destIcon}>
                 <Ionicons name="flag" size={18} color="#101603" />
@@ -441,11 +444,15 @@ export const WorldMap = memo(function WorldMap({
                 {destination.label}
               </Text>
             </View>
-          </Marker>
+          </MarkerView>
         ) : null}
 
         {parking ? (
-          <Marker id="parking" lngLat={[parking.longitude, parking.latitude]} anchor="top" offset={[0, -19]}>
+          <MarkerView
+            coordinate={[parking.longitude, parking.latitude]}
+            anchor={{ x: 0.5, y: 0.3 }}
+            allowOverlap
+          >
             <View style={styles.member}>
               <View style={styles.parkingBadge}>
                 <Ionicons name="car-sport" size={20} color="#06131a" />
@@ -458,9 +465,9 @@ export const WorldMap = memo(function WorldMap({
                     : `Tu coche · ${(parkingDistance / 1000).toFixed(1).replace('.', ',')} km`}
               </Text>
             </View>
-          </Marker>
+          </MarkerView>
         ) : null}
-      </Map>
+      </MapView>
     </View>
   );
 });

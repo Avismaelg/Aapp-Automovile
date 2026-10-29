@@ -92,7 +92,7 @@
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "expo-web-browser",
-      "@maplibre/maplibre-react-native"
+      "@rnmapbox/maps"
     ],
     "experiments": {
       "typedRoutes": true

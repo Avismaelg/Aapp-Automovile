@@ -104,7 +104,7 @@ Archivos principales:
 | Archivo | Función |
 |---|---|
 | `movil/src/lib/map-html.ts` y `movil/src/lib/map/` | HTML estático del mapa, estilo, capas, cámara y protocolo |
-| `movil/src/components/WorldMap.tsx` | mapa nativo (MapLibre Android/iOS): cámara, capas y marcadores |
+| `movil/src/components/WorldMap.tsx` | mapa nativo (Mapbox, Android/iOS): cámara, capas y marcadores |
 | `movil/src/components/WorldMap.web.tsx` | iframe web y envío de comandos |
 | `movil/src/hooks/useLiveLocation.ts` | suscripción GPS compartida |
 | `movil/src/hooks/useGraphHopperRoute.ts` | ruta compartida y deduplicada |
@@ -116,26 +116,35 @@ Archivos principales:
 
 ## 2. Arquitectura del mapa
 
-### Android e iOS: MapLibre nativo
+### Android e iOS: Mapbox
 
-Desde octubre de 2026 el móvil usa `@maplibre/maplibre-react-native` (v11) en
-lugar del WebView, con la misma API de props que antes:
+El móvil usa `@rnmapbox/maps` (10.3.7, Mapbox Maps SDK v11) con la misma API
+de props de `WorldMap`; el resto de la app no importa Mapbox.
 
-- **Seguimiento nativo**: `Camera trackUserLocation="course"` (o `"default"`
-  con norte arriba o a pie). El motor nativo lee el GPS (fused, alta precisión,
-  1 s) y anima cámara e indicador a 60 fps; no pasa nada por el hilo de JS.
-- **Indicador de posición nativo** (`NativeUserLocation`, flecha de rumbo en
-  coche y punto con brújula a pie) con su círculo de precisión. Solo se monta
-  con permiso de ubicación concedido; sin permiso (demo) la cámara se centra en
-  la posición que da la app.
-- Zoom por velocidad y cercanía de la maniobra (`zoomForSpeed`); en navegación
-  la cámara deja 260 pt arriba para que la flecha quede abajo.
-- Arrastrar el mapa suelta el seguimiento (`onTrackUserLocationChange` → null)
-  y el botón de recentrar (`recenterToken`) lo recupera.
-- Ruta, alternativas (tocables), punto de maniobra y línea al aparcamiento son
-  `GeoJSONSource` + `Layer`, bajo las etiquetas de calles del estilo.
-- Miembros, destino y aparcamiento son `Marker` con vistas de React Native.
-- Día/noche cambia `mapStyle`; si el estilo falla se usa OpenFreeMap.
+- **Token**: `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` (pk.) en `movil/.env`, que no
+  se sube al repositorio. Sin token se usa OpenFreeMap. Ya no hace falta token
+  secreto (sk.) para descargar el SDK; si alguna vez se necesitara, se define
+  `RNMAPBOX_MAPS_DOWNLOAD_TOKEN` en el entorno al compilar.
+- **Estilos**: `navigation-day-v1` / `navigation-night-v1`, que cambian solos
+  con la salida y la puesta de sol (`useMapTheme`).
+- **Seguimiento nativo**: `Camera followUserLocation` con
+  `followUserMode="course"` (norte arriba o a pie: `"normal"`),
+  `followZoomLevel` según velocidad y maniobra y `followPadding` de 260 pt
+  arriba en navegación. Arrastrar el mapa suelta el seguimiento
+  (`onUserTrackingModeChange`) y `recenterToken` lo recupera.
+- **Indicador**: `LocationPuck` con rumbo de marcha (o brújula a pie) y halo
+  de precisión. Lee el GPS del sistema por su cuenta; la lógica de la app
+  (`useLiveLocation`, tracking, party, voz) no cambia.
+- Ruta, alternativas (tocables), maniobra y línea al aparcamiento son
+  `ShapeSource` + `LineLayer`/`CircleLayer` bajo `road-intersection`, así los
+  nombres de calles quedan encima.
+- Miembros, destino y aparcamiento son `MarkerView` con vistas RN.
+- Si el estilo de Mapbox no carga se usa OpenFreeMap.
+- Equivalencias con la versión anterior (MapLibre nativo): `Map`→`MapView`,
+  `trackUserLocation`→`followUserLocation`+`followUserMode`,
+  `NativeUserLocation`→`LocationPuck`, `GeoJSONSource`→`ShapeSource`,
+  `Layer paint`→`LineLayer style` (camelCase), `beforeId`→`belowLayerID`,
+  `Marker`→`MarkerView`, `fitBounds([w,s,e,n])`→`fitBounds(ne, sw, padding, ms)`.
 
 ### Web: MapLibre GL JS en iframe
 
@@ -251,7 +260,8 @@ Mapa
 
 ## 5. Límites actuales
 
-- En móvil el mapa es nativo; la web sigue con MapLibre GL JS en un iframe.
+- En móvil el mapa es Mapbox nativo (gratis hasta 25.000 usuarios activos al
+  mes); la web sigue con MapLibre GL JS y OpenFreeMap en un iframe.
 - No hay tráfico en tiempo real ni avisos de la comunidad: requieren un
   proveedor de pago (p. ej. TomTom o HERE).
 - La pestaña Party monta un segundo mapa mientras está abierta. Al volver al

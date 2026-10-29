@@ -17,3 +17,18 @@ export const MAP_STYLES = MAPTILER_KEY
   : MAP_FALLBACK_STYLES;
 
 export const WORLD_MAP_PROVIDER = MAPTILER_KEY ? 'maptiler' : 'openfreemap';
+
+// Móvil (Android/iOS): estilos de navegación de Mapbox, pensados para
+// conducir. Sin token se usan los mismos de OpenFreeMap que en la web.
+export const MAPBOX_ACCESS_TOKEN = (process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '').trim();
+export const NATIVE_MAP_STYLES = MAPBOX_ACCESS_TOKEN
+  ? {
+      day: 'mapbox://styles/mapbox/navigation-day-v1',
+      night: 'mapbox://styles/mapbox/navigation-night-v1',
+    }
+  : MAP_FALLBACK_STYLES;
+// Capa del estilo bajo la que van ruta y líneas propias (encima quedan los
+// nombres de calles). Es la misma en los estilos de día y de noche.
+export const NATIVE_LABEL_LAYER = MAPBOX_ACCESS_TOKEN
+  ? { day: 'road-intersection', night: 'road-intersection' }
+  : { day: 'waterway_line_label', night: 'place_other' };
