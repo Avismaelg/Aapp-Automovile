@@ -13,6 +13,22 @@ function json(body: unknown, status = 200) {
   });
 }
 
+type StorageClient = ReturnType<typeof createClient>['storage'];
+
+// Rutas de todos los archivos bajo una carpeta, incluidas subcarpetas
+// (las fotos de vehículos viven en {usuario}/{vehículo}/archivo).
+async function listFilesDeep(storage: StorageClient, bucket: string, folder: string) {
+  const paths: string[] = [];
+  const { data } = await storage.from(bucket).list(folder, { limit: 1000 });
+  for (const entry of data ?? []) {
+    const path = `${folder}/${entry.name}`;
+    // Las carpetas no tienen id en la respuesta de list().
+    if (entry.id) paths.push(path);
+    else paths.push(...(await listFilesDeep(storage, bucket, path)));
+  }
+  return paths;
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -53,7 +69,7 @@ Deno.serve(async (request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Borrar primero las imágenes del feed; las filas se eliminan por cascada.
+  // Borrar primero los archivos; las filas se eliminan por cascada.
   const { data: posts } = await admin
     .from('posts')
     .select('id')
@@ -67,6 +83,12 @@ Deno.serve(async (request) => {
         .from('posts')
         .remove(files.map((file) => `${postId}/${file.name}`));
     }
+  }
+
+  // Fotos de vehículos y avatar: buckets públicos organizados por usuario.
+  for (const bucket of ['vehicles', 'avatars']) {
+    const paths = await listFilesDeep(admin.storage, bucket, user.id);
+    if (paths.length > 0) await admin.storage.from(bucket).remove(paths);
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);

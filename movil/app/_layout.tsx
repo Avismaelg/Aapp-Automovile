@@ -16,10 +16,12 @@ import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
+import { installWebAlert } from '@/src/lib/web-alert';
 import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
 SplashScreen.preventAutoHideAsync();
+installWebAlert();
 
 const queryClient = new QueryClient({
   defaultOptions: {

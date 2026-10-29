@@ -229,8 +229,8 @@ Mapa
 - Mientras hay una party activa, las coordenadas se guardan en Supabase y solo
   las leen el anfitrión y los miembros (RLS).
 - El QR público no contiene ubicación.
-- El tracking en segundo plano es independiente del mapa y solo se activa desde
-  la pantalla Actividad.
+- El tracking en segundo plano es independiente del mapa; se activa o pausa
+  desde Perfil o Actividad y la preferencia se recuerda.
 
 ---
 

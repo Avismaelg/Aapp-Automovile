@@ -145,8 +145,8 @@ async function beginSession(id: number) {
     const subscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-         timeInterval: 2_500,
-         distanceInterval: 5,
+        timeInterval: 2_500,
+        distanceInterval: 5,
       },
       (position) => {
         if (id === session) applyPosition(position);

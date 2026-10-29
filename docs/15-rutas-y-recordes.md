@@ -14,7 +14,9 @@ Archivos:
 | Archivo | Función |
 |---|---|
 | `movil/src/store/trips.ts` | Store local de viajes: inicio/fin automático, puntos y estadísticas |
-| `movil/src/lib/background-location.ts` | Servicio de ubicación en segundo plano (TaskManager) |
+| `movil/src/lib/tracking.ts` | Tarea de ubicación en segundo plano (TaskManager), arranque/parada/reanudación |
+| `movil/src/lib/background-points.ts` | Lotes de puntos grabados en segundo plano y su recogida |
+| `movil/src/hooks/useBackgroundTracking.ts` | Relanza o detiene el servicio al abrir la app según la preferencia |
 | `movil/src/hooks/useTripRecorder.ts` | Une GPS, segundo plano y publicación de récords |
 | `movil/app/rutas.tsx` | Pantalla **Mis rutas** |
 
@@ -30,9 +32,24 @@ Archivos:
 - **Puntos**: uno cada 15 m como mínimo, con velocidad y hora. Se guardan como
   máximo 700 puntos (se simplifican) y se conservan las últimas 30 rutas.
 - **Estadísticas**: distancia, duración, velocidad media y máxima.
-- **Segundo plano**: `expo-task-manager` + `expo-location` con `foregroundService`
-  (Android) escriben los puntos en una cola local que se fusiona al abrir la app.
-  Solo se activa si el usuario ya concedió el permiso "siempre".
+- **Segundo plano (24/7)**: `expo-task-manager` + `expo-location` con
+  `foregroundService` (Android, sigue aunque se cierre la app desde recientes).
+  - La tarea se define al cargar `app/_layout.tsx`, para que exista cuando el
+    sistema despierta la app en segundo plano.
+  - Cada lote de puntos se guarda en su propia clave (`caravana.bg-points.*`).
+    La app los recoge al abrir, al volver a primer plano y cada 2 min, los
+    ordena y los pasa al mismo grabador que el GPS en primer plano. Las muestras
+    repetidas o anteriores a la última se ignoran.
+  - Se descartan fixes con más de 100 m de error; si un punto llega sin
+    velocidad se calcula con el anterior.
+  - Si pasan más de 10 min sin muestras el viaje se cierra donde se perdió la
+    señal. Los viajes recuperados del segundo plano se ordenan por inicio.
+  - La preferencia de tracking se guarda (`caravana.session.v1`). Al abrir la
+    app se relanza el servicio si el sistema lo paró (reinicio, ahorro de
+    batería); sin permiso "siempre" se muestra en pausa.
+  - Límites del sistema: en iOS, cerrar la app deslizándola detiene el GPS
+    hasta reabrirla; en Android, tras reiniciar el teléfono hay que abrir la app
+    una vez. Algunas marcas cortan servicios por ahorro de batería.
 - La pantalla **Inicio** muestra una píldora "Grabando ruta · N min · X km"
   mientras hay un viaje activo.
 
