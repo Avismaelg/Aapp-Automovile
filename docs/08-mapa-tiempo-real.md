@@ -11,8 +11,12 @@
 ## 1. Qué se implementó
 
 - Mapa vectorial 2D con **MapLibre GL JS 5.24.0**.
-  - Estilo claro de calles: **MapTiler `streets-v2`** si hay clave
-    (`EXPO_PUBLIC_MAPTILER_KEY`) y, si no, **OpenFreeMap `liberty`** sin API key.
+  - **Modo día/noche automático**: de día, estilo claro (**MapTiler
+    `streets-v2`** si hay clave `EXPO_PUBLIC_MAPTILER_KEY`, si no **OpenFreeMap
+    `liberty`**); de noche, oscuro (`streets-v2-dark` / OpenFreeMap `dark`).
+    Se decide con la salida y puesta de sol en tu posición
+    (`src/lib/daylight.ts`, revisado cada minuto) y cambia en caliente: el mapa
+    recarga el estilo y vuelve a dibujar ruta, alternativas y capas propias.
   - Siempre plano: `maxPitch: 0` y el gesto de inclinar desactivado.
   - Se ocultan negocios, números de portal y flechas de sentido; los nombres de
     calles se mantienen.
