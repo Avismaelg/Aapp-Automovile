@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { QRCard } from '@/src/components/QRCard';
@@ -17,7 +17,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { type Vehicle } from '@/src/data/mock';
+import { showError } from '@/src/lib/alerts';
+import type { Vehicle } from '@/src/types/models';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useGarageVehicles, pickVehiclePhoto, useSetVehiclePhoto } from '@/src/hooks/useGarage';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
@@ -64,10 +65,7 @@ export default function GarageScreen() {
       if (!uri) return;
       await setPhoto.mutateAsync({ vehicleId: vehicle.id, photo: uri });
     } catch (error) {
-      Alert.alert(
-        'Foto del vehículo',
-        error instanceof Error ? error.message : 'No pudimos actualizar la foto.',
-      );
+      showError('Foto del vehículo', error, 'No pudimos actualizar la foto.');
     }
   };
 

@@ -20,7 +20,7 @@ import {
   Input,
   Pill,
 } from '@/src/components/ui';
-import type { FuelKind, VehicleKind } from '@/src/data/mock';
+import type { FuelKind, VehicleKind } from '@/src/types/models';
 import { useCreateVehicle, useGarageVehicles, useUpdateVehicle } from '@/src/hooks/useGarage';
 import { DEFAULT_VEHICLE_COLORS } from '@/src/lib/vehicle-db';
 import { vehicleKinds, vehicleKindMeta } from '@/src/lib/vehicles';

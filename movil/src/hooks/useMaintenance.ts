@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { maintenanceForVehicle } from '@/src/data/maintenance';
-import type { MaintenanceKind, MaintenanceRecord } from '@/src/data/mock';
+import type { MaintenanceKind, MaintenanceRecord } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';

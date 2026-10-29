@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 
-import type { FuelLog, MaintenanceRecord, Vehicle } from '@/src/data/mock';
+import type { FuelLog, MaintenanceRecord, Vehicle } from '@/src/types/models';
 import { logEnergy } from '@/src/lib/fuel';
 
 export type MaintenanceStatus = 'ok' | 'soon' | 'due';

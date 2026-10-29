@@ -24,7 +24,8 @@ import {
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
-import { type FuelLog, type Vehicle } from '@/src/data/mock';
+import { showError } from '@/src/lib/alerts';
+import type { FuelLog, Vehicle } from '@/src/types/models';
 import { useAddFuelLog, useFuelLogs } from '@/src/hooks/useFuelLogs';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { formatMoney, formatNumber } from '@/src/lib/format';
@@ -358,10 +359,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         )}. El consumo se recalcula en el próximo registro.`,
       );
     } catch (error) {
-      Alert.alert(
-        'No pudimos guardar el registro',
-        error instanceof Error ? error.message : 'Revisa tu conexión e inténtalo de nuevo.',
-      );
+      showError('No pudimos guardar el registro', error, 'Revisa tu conexión e inténtalo de nuevo.');
     }
   };
 

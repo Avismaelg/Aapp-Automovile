@@ -1,11 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import {
-  friends as mockFriends,
-  type ChallengeCategory,
-  type VehicleKind,
-} from '@/src/data/mock';
+import { friends as mockFriends } from '@/src/data/mock';
+import type { ChallengeCategory, VehicleKind } from '@/src/types/models';
 import {
   realChallengeToChallenge,
   type ChallengeFriend,

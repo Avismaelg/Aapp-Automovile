@@ -16,6 +16,7 @@ import { useRoadInfo } from '@/src/hooks/useRoadInfo';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
+import { showError } from '@/src/lib/alerts';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
 import {
@@ -337,10 +338,7 @@ export default function NavigationScreen() {
               })
               .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
               .catch((error: unknown) =>
-                Alert.alert(
-                  'Reto',
-                  error instanceof Error ? error.message : 'No pudimos crear el reto.',
-                ),
+                showError('Reto', error, 'No pudimos crear el reto.'),
               );
           },
         },

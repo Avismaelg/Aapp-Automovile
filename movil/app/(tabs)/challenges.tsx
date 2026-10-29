@@ -24,13 +24,9 @@ import {
   Screen,
   SectionHeader,
 } from '@/src/components/ui';
-import {
-  activeChallenge,
-  challengeRoutes,
-  recentChallenges,
-  type Challenge,
-  type ChallengeCategory,
-} from '@/src/data/mock';
+import { activeChallenge, challengeRoutes, recentChallenges } from '@/src/data/mock';
+import { showError } from '@/src/lib/alerts';
+import type { Challenge, ChallengeCategory } from '@/src/types/models';
 import {
   useChallengeFriends,
   useChallenges,
@@ -341,10 +337,7 @@ export default function ChallengesScreen() {
           `${rival.name.split(' ')[0]} recibió la invitación. Código ${result.code}. Cuando la acepte, podrás iniciar la salida.`,
         );
       } catch (error) {
-        Alert.alert(
-          'No pudimos enviar el reto',
-          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        );
+        showError('No pudimos enviar el reto', error);
       }
       return;
     }
@@ -456,10 +449,7 @@ export default function ChallengesScreen() {
           `${selectedInstantFriends.length + 1} pilotos invitados hacia ${route.toLabel}. Código ${result.code}. Compártelo para que se unan.`,
         );
       } catch (error) {
-        Alert.alert(
-          'No pudimos crear la sala',
-          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        );
+        showError('No pudimos crear la sala', error);
       }
       return;
     }
@@ -554,10 +544,7 @@ export default function ChallengesScreen() {
         setSentTo(null);
         Alert.alert('Reto iniciado', 'La salida está en marcha. Comparte el código con los pilotos.');
       } catch (error) {
-        Alert.alert(
-          'No pudimos iniciar el reto',
-          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        );
+        showError('No pudimos iniciar el reto', error);
       }
       return;
     }
@@ -585,10 +572,7 @@ export default function ChallengesScreen() {
         await finishRealChallenge.mutateAsync(realActive.id);
         Alert.alert('Reto finalizado', 'El resultado quedó guardado en el historial.');
       } catch (error) {
-        Alert.alert(
-          'No pudimos finalizar el reto',
-          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        );
+        showError('No pudimos finalizar el reto', error);
       }
       return;
     }
@@ -614,10 +598,7 @@ export default function ChallengesScreen() {
           : 'La invitación quedó rechazada. No se notificará a los demás pilotos.',
       );
     } catch (error) {
-      Alert.alert(
-        'No pudimos responder',
-        error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-      );
+      showError('No pudimos responder', error);
     }
   };
 

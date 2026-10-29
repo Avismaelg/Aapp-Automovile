@@ -1,4 +1,4 @@
-import type { FuelLog } from '@/src/data/mock';
+import type { FuelLog } from '@/src/types/models';
 
 export type EfficiencyUnit = 'km_l' | 'l_100km' | 'mpg';
 export type PriceUnit = 'l' | 'gal';

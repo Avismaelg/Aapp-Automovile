@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthNotice } from '@/src/components/auth';
 import { AppText, Avatar, Button, Card, IconButton, Input } from '@/src/components/ui';
 import { useActiveParty, usePartyMessages, useSendPartyMessage } from '@/src/hooks/useParty';
+import { errorMessage } from '@/src/lib/alerts';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, radius, spacing } from '@/src/theme';
@@ -40,7 +41,7 @@ export default function PartyChatScreen() {
       setBody('');
     } catch (sendError) {
       setError(
-        sendError instanceof Error ? sendError.message : 'No pudimos enviar el mensaje.',
+        errorMessage(sendError, 'No pudimos enviar el mensaje.'),
       );
     }
   };

@@ -1,12 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import {
-  currentUser,
-  friends,
-  vehicles as mockVehicles,
-  type Vehicle,
-} from '@/src/data/mock';
+import { currentUser, friends, vehicles as mockVehicles } from '@/src/data/mock';
+import type { Vehicle } from '@/src/types/models';
 import {
   mapProfileRow,
   PROFILE_COLUMNS,

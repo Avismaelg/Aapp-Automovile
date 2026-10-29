@@ -19,6 +19,7 @@ import { achievements } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriends } from '@/src/hooks/useFriends';
 import { useMyProfile } from '@/src/hooks/useProfile';
+import { showError } from '@/src/lib/alerts';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
@@ -69,10 +70,7 @@ export default function ProfileScreen() {
       else await stopTracking();
       setTrackingEnabled(next);
     } catch (error) {
-      Alert.alert(
-        'No se pudo cambiar el tracking',
-        error instanceof Error ? error.message : 'Revisa los permisos de ubicación.',
-      );
+      showError('No se pudo cambiar el tracking', error, 'Revisa los permisos de ubicación.');
     }
   };
 

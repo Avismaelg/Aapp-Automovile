@@ -29,6 +29,7 @@ import {
   useDeleteComment,
 } from '@/src/hooks/useComments';
 import { usePost, useToggleLike } from '@/src/hooks/useFeed';
+import { errorMessage } from '@/src/lib/alerts';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, spacing } from '@/src/theme';
@@ -58,7 +59,7 @@ export default function PostDetailScreen() {
       setBody('');
     } catch (sendError) {
       setError(
-        sendError instanceof Error ? sendError.message : 'No pudimos comentar.',
+        errorMessage(sendError, 'No pudimos comentar.'),
       );
     }
   };

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 
-import type { Vehicle, VehicleKind } from '@/src/data/mock';
+import type { Vehicle, VehicleKind } from '@/src/types/models';
 import { colors } from '@/src/theme';
 
 export const vehicleKindMeta: Record<

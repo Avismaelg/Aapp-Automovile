@@ -1,4 +1,4 @@
-import type { FuelKind, FuelLog, Vehicle, VehicleKind } from '@/src/data/mock';
+import type { FuelKind, FuelLog, Vehicle, VehicleKind } from '@/src/types/models';
 import { vehicleUrl } from '@/src/lib/qr';
 
 export type VehicleRow = {

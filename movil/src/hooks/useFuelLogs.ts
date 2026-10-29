@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { fuelLogs as mockFuelLogs, type FuelLog, type Vehicle } from '@/src/data/mock';
+import { fuelLogs as mockFuelLogs } from '@/src/data/mock';
+import type { FuelLog, Vehicle } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
 import { mapFuelLogRow, type FuelLogRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';

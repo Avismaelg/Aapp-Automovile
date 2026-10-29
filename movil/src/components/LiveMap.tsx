@@ -14,7 +14,7 @@ import Svg, {
 } from 'react-native-svg';
 
 import { Avatar, AppText, Pill } from '@/src/components/ui';
-import type { PartyMember } from '@/src/data/mock';
+import type { PartyMember } from '@/src/types/models';
 import { colors, radius, spacing } from '@/src/theme';
 
 function Pulse({ color }: { color: string }) {

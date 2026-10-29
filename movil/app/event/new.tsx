@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, Card, IconButton, Input } from '@/src/components/ui';
+import { errorMessage } from '@/src/lib/alerts';
 import { fetchRouteThrough } from '@/src/lib/event-routes';
 import type { EventRoute } from '@/src/lib/events';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
@@ -121,7 +122,7 @@ export default function NewEventScreen() {
           if (controller.signal.aborted) return;
           setRoute(null);
           setRouteError(
-            error instanceof Error ? error.message : 'No pudimos calcular la ruta del evento.',
+            errorMessage(error, 'No pudimos calcular la ruta del evento.'),
           );
         } finally {
           if (!controller.signal.aborted) setCalculating(false);
@@ -184,7 +185,7 @@ export default function NewEventScreen() {
       router.replace(`/event/${created.id}` as Href);
     } catch (error) {
       setFormError(
-        error instanceof Error ? error.message : 'No pudimos guardar el evento.',
+        errorMessage(error, 'No pudimos guardar el evento.'),
       );
     }
   };

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AppText, Avatar, Card, Pill } from '@/src/components/ui';
-import type { FeedItem } from '@/src/data/mock';
+import type { FeedItem } from '@/src/types/models';
 import { timeAgo } from '@/src/lib/format';
 import { colors, radius, spacing } from '@/src/theme';
 

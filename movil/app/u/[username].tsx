@@ -30,6 +30,7 @@ import {
   useSendFriendRequest,
 } from '@/src/hooks/useFriends';
 import { usePublicProfile, usePublicProfileVehicles } from '@/src/hooks/useProfile';
+import { errorMessage } from '@/src/lib/alerts';
 import { relationForTarget } from '@/src/lib/friends';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
@@ -85,7 +86,7 @@ export default function PublicProfileScreen() {
       }
     } catch (error) {
       setFriendError(
-        error instanceof Error ? error.message : 'No pudimos enviar la solicitud.',
+        errorMessage(error, 'No pudimos enviar la solicitud.'),
       );
     }
   };

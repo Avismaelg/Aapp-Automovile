@@ -9,6 +9,7 @@ import { AuthNotice } from '@/src/components/auth';
 import { AppText, Avatar, Button, Card, IconButton, Pill } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useJoinParty } from '@/src/hooks/useParty';
+import { errorMessage } from '@/src/lib/alerts';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -28,7 +29,7 @@ export default function JoinPartyScreen() {
       router.replace('/(tabs)/party');
     } catch (joinError) {
       setError(
-        joinError instanceof Error ? joinError.message : 'No pudimos unirnos a la party.',
+        errorMessage(joinError, 'No pudimos unirnos a la party.'),
       );
     }
   };

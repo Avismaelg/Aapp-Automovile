@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import type { Vehicle } from '@/src/data/mock';
+import type { Vehicle } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
 import { mapVehicleRow, type VehicleOwner, type VehicleRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';

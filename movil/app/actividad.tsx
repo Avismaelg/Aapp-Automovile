@@ -28,6 +28,7 @@ import {
 import { activeChallenge, feed, friends } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFeed, useToggleLike } from '@/src/hooks/useFeed';
+import { showError } from '@/src/lib/alerts';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useSession } from '@/src/store/session';
 import { colors, radius, spacing } from '@/src/theme';
@@ -110,10 +111,7 @@ export default function ActividadScreen() {
       else await stopTracking();
       setTrackingEnabled(next);
     } catch (error) {
-      Alert.alert(
-        'No se pudo cambiar el tracking',
-        error instanceof Error ? error.message : 'Revisa los permisos de ubicación.',
-      );
+      showError('No se pudo cambiar el tracking', error, 'Revisa los permisos de ubicación.');
     }
   };
 

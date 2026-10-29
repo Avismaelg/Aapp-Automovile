@@ -21,7 +21,7 @@ import {
   Input,
   Pill,
 } from '@/src/components/ui';
-import type { MaintenanceKind, Vehicle } from '@/src/data/mock';
+import type { MaintenanceKind, Vehicle } from '@/src/types/models';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useAddMaintenance } from '@/src/hooks/useMaintenance';
 import { useAuth } from '@/src/store/auth';

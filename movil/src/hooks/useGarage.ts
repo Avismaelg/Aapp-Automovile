@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 
-import type { Vehicle } from '@/src/data/mock';
+import type { Vehicle } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
 import {
   demoQrSlug,

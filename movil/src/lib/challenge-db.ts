@@ -4,7 +4,7 @@ import type {
   ChallengeParticipant,
   Friend,
   VehicleKind,
-} from '@/src/data/mock';
+} from '@/src/types/models';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
 
 export type ChallengeMode = 'instant' | 'scheduled';

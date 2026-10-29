@@ -23,6 +23,7 @@ import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/compone
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
+import { showError } from '@/src/lib/alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
@@ -201,10 +202,7 @@ export default function PartyScreen() {
     try {
       await setVoiceChannel.mutateAsync({ partyId: party.id, channelSlug: slug });
     } catch (error) {
-      Alert.alert(
-        'No pudimos cambiar de canal',
-        error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-      );
+      showError('No pudimos cambiar de canal', error);
     }
   };
 
@@ -269,10 +267,7 @@ export default function PartyScreen() {
               })
               .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
               .catch((error: unknown) =>
-                Alert.alert(
-                  'Reto',
-                  error instanceof Error ? error.message : 'No pudimos crear el reto.',
-                ),
+                showError('Reto', error, 'No pudimos crear el reto.'),
               );
           },
         },
@@ -291,10 +286,7 @@ export default function PartyScreen() {
         await leaveParty.mutateAsync({ partyId: party.id, isHost: party.isHost });
         router.replace('/');
       } catch (error) {
-        Alert.alert(
-          'No pudimos salir',
-          error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        );
+        showError('No pudimos salir', error);
       }
     };
 

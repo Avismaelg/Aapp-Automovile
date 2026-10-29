@@ -2,7 +2,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
-import type { FuelLog, MaintenanceRecord, Vehicle } from '@/src/data/mock';
+import type { FuelLog, MaintenanceRecord, Vehicle } from '@/src/types/models';
 import {
   logEnergy,
   logPriceUnit,

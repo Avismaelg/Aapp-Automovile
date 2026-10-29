@@ -1,11 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import {
-  currentUser,
-  vehicles as seedVehicles,
-  type Vehicle,
-} from '@/src/data/mock';
+import { currentUser, vehicles as seedVehicles } from '@/src/data/mock';
+import type { Vehicle } from '@/src/types/models';
 
 const STORAGE_KEY = 'caravana.demo.vehicles';
 

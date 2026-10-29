@@ -1,4 +1,4 @@
-import type { MaintenanceRecord } from '@/src/data/mock';
+import type { MaintenanceRecord } from '@/src/types/models';
 
 export const maintenanceRecords: MaintenanceRecord[] = [
   {
