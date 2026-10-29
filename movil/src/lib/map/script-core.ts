@@ -3,15 +3,14 @@ import { MAP_FALLBACK_STYLES, MAP_STYLES } from '@/src/lib/map/config';
 // Estado del mapa, cámara, seguimiento, ruta, alternativas y próxima maniobra.
 // Se concatena con los demás fragmentos dentro de la misma IIFE.
 export const MAP_SCRIPT_CORE = `(function () {
-  // Rendimiento: el WebView renderiza a la resolución física del panel
-  // (≈2.8x en la mayoría de teléfonos); el mapa plano no necesita tanto.
-  window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.0);
+  // Nitidez frente a GPU: el panel suele ser ≈2.8x; a 1x el mapa se veía
+  // borroso y a resolución completa cuesta el triple. 1.75x es el equilibrio.
+  var MAP_PIXEL_RATIO = Math.min(window.devicePixelRatio || 1, 1.75);
 
   var STYLES = ${JSON.stringify(MAP_STYLES)};
   var FALLBACK_STYLES = ${JSON.stringify(MAP_FALLBACK_STYLES)};
   var styleFallbackAttempted = false;
   var DEFAULT_CENTER = [-69.9312, 18.4861];
-  var MAP_PIXEL_RATIO = 1.0;
   var MOVING_KMH = 5;
   var LOAD_TIMEOUT_MS = 25000;
   var EMPTY_ROUTE = { type: 'FeatureCollection', features: [] };
@@ -61,6 +60,14 @@ export const MAP_SCRIPT_CORE = `(function () {
   var accuracyUpdatedAt = 0;
   var parkingLineAt = 0;
   var lastRouteProgressIndex = -1;
+  var routeProgressAt = 0;
+  // Movimiento continuo: entre dos señales GPS el coche y la cámara se
+  // interpolan fotograma a fotograma en vez de saltar.
+  var shown = null;
+  var motion = null;
+  var motionFrame = 0;
+  var lastFixAt = 0;
+  var lastFrameAt = 0;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -152,15 +159,8 @@ export const MAP_SCRIPT_CORE = `(function () {
       : state.heading !== null
         ? state.heading
         : map.getBearing();
-    var center = lngLatOf(point);
+    var center = shown ? [shown.lng, shown.lat] : lngLatOf(point);
     var moving = !walking && typeof point.speedKmh === 'number' && point.speedKmh >= MOVING_KMH;
-
-    // Movimiento continuo: en vez de saltar a cada señal GPS, proyectamos a
-    // donde estará el coche y la cámara desliza hasta ese punto.
-    if (moving) {
-      var meters = (point.speedKmh / 3.6) * 2.2;
-      center = aheadLngLat(point, bearing, meters);
-    }
 
     var targetZoom = zoomForSpeed();
     var zoomOff = Math.abs(map.getZoom() - targetZoom) > 0.25;
@@ -219,8 +219,6 @@ export const MAP_SCRIPT_CORE = `(function () {
       state.heading = smoothedHeading;
     }
     if (!mapReady) return;
-    vehicleMarker.setLngLat(lngLatOf(location));
-    if (state.heading !== null) vehicleMarker.setRotation(state.heading);
     updateAccuracy(location);
     if (personMarker && state.travelMode === 'walking') {
       personMarker.setLngLat(lngLatOf(location));
@@ -228,7 +226,93 @@ export const MAP_SCRIPT_CORE = `(function () {
     updateRouteProgress(false);
     updateManeuver();
     updateParkingLine();
-    if (state.following) follow(true, firstFix);
+    if (firstFix || !shown) {
+      placeShown(location.longitude, location.latitude, state.heading);
+      if (state.following) follow(false, true);
+      return;
+    }
+    animateTo(location);
+  }
+
+  function placeShown(lng, lat, heading) {
+    shown = { lng: lng, lat: lat, heading: heading };
+    motion = null;
+    vehicleMarker.setLngLat([lng, lat]);
+    if (heading !== null) vehicleMarker.setRotation(heading);
+  }
+
+  function shortestTurn(from, to) {
+    return ((to - from + 540) % 360) - 180;
+  }
+
+  // Desliza del punto mostrado al nuevo durante el tiempo entre señales: así
+  // el coche no se para a esperar la siguiente.
+  function animateTo(location) {
+    var now = performance.now();
+    var gap = lastFixAt ? now - lastFixAt : 1000;
+    lastFixAt = now;
+    var targetHeading = state.heading !== null ? state.heading : shown.heading;
+    var jump = haversineLngLat([shown.lng, shown.lat], lngLatOf(location));
+    // Un salto enorme (túnel, vuelta de segundo plano) no se anima.
+    if (jump > 400) {
+      placeShown(location.longitude, location.latitude, targetHeading);
+      if (state.following) follow(false, false);
+      return;
+    }
+    motion = {
+      from: { lng: shown.lng, lat: shown.lat, heading: shown.heading },
+      to: { lng: location.longitude, lat: location.latitude, heading: targetHeading },
+      start: now,
+      duration: Math.max(350, Math.min(1600, gap))
+    };
+    if (!motionFrame) {
+      lastFrameAt = now;
+      motionFrame = requestAnimationFrame(stepMotion);
+    }
+  }
+
+  function stepMotion(now) {
+    motionFrame = 0;
+    if (!motion || !mapReady) return;
+    var dt = Math.min(100, now - lastFrameAt);
+    lastFrameAt = now;
+    var t = Math.min(1, (now - motion.start) / motion.duration);
+    var from = motion.from;
+    var to = motion.to;
+    var heading = to.heading;
+    if (from.heading !== null && to.heading !== null) {
+      heading = (from.heading + shortestTurn(from.heading, to.heading) * t + 360) % 360;
+    }
+    shown = {
+      lng: from.lng + (to.lng - from.lng) * t,
+      lat: from.lat + (to.lat - from.lat) * t,
+      heading: heading
+    };
+    vehicleMarker.setLngLat([shown.lng, shown.lat]);
+    if (heading !== null) vehicleMarker.setRotation(heading);
+    if (state.following) followFrame(dt);
+    if (t < 1) {
+      motionFrame = requestAnimationFrame(stepMotion);
+    } else {
+      motion = null;
+    }
+  }
+
+  // Cámara pegada al coche mostrado; el zoom se acerca suavemente al de la
+  // velocidad para no dar tirones.
+  function followFrame(dt) {
+    var options = {
+      center: [shown.lng, shown.lat],
+      bearing: state.northUp ? 0 : shown.heading !== null ? shown.heading : map.getBearing()
+    };
+    var speed = state.location && typeof state.location.speedKmh === 'number' ? state.location.speedKmh : 0;
+    if (state.travelMode !== 'walking' && speed >= MOVING_KMH) {
+      var zoom = map.getZoom();
+      var target = zoomForSpeed();
+      if (Math.abs(target - zoom) > 0.02) options.zoom = zoom + (target - zoom) * Math.min(1, dt / 900);
+    }
+    lastFollow = { center: options.center, bearing: options.bearing };
+    map.jumpTo(options);
   }
 
   function buildMemberElement(member) {
@@ -363,6 +447,10 @@ export const MAP_SCRIPT_CORE = `(function () {
     var split = state.location ? nearestRouteIndex(lngLatOf(state.location)) : 0;
     routeProgressM = routeCumulative[split] || 0;
     if (!force && split === lastRouteProgressIndex) return;
+    // Rehacer la geometría de la ruta cuesta: como mucho una vez por segundo.
+    var now = Date.now();
+    if (!force && now - routeProgressAt < 1000) return;
+    routeProgressAt = now;
     lastRouteProgressIndex = split;
     map.getSource('caravana-route').setData(routeDataForProgress(split));
   }
@@ -619,6 +707,15 @@ export const MAP_SCRIPT_CORE = `(function () {
     var layers = map.getStyle().layers || [];
     for (var index = 0; index < layers.length; index += 1) {
       var layer = layers[index];
+      // Edificios en relieve: el mapa es plano y solo gastaban GPU.
+      if (layer.type === 'fill-extrusion') {
+        try {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        } catch (error) {
+          // Se deja como está.
+        }
+        continue;
+      }
       if (layer.type !== 'symbol') continue;
       var sourceLayer = layer['source-layer'] || '';
       if (

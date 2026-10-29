@@ -144,9 +144,11 @@ async function beginSession(id: number) {
 
     const subscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 2_500,
-        distanceInterval: 5,
+        // Una señal por segundo mientras el mapa está abierto: el mapa anima
+        // entre señales, pero con 2,5 s el coche iba siempre por detrás.
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1_000,
+        distanceInterval: 1,
       },
       (position) => {
         if (id === session) applyPosition(position);

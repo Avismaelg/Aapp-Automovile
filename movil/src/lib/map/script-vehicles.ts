@@ -1,6 +1,5 @@
-// Datos del vehículo propio (color y tipo) y utilidades geométricas. Solo
-// declara funciones, que usan el estado de MAP_SCRIPT_CORE por estar en la
-// misma IIFE.
+// Datos del vehículo propio (color y tipo). Solo declara funciones, que usan
+// el estado de MAP_SCRIPT_CORE por estar en la misma IIFE.
 export const MAP_VEHICLE_SCRIPT = `  function normalizeColor(value) {
     var color = typeof value === 'string' ? value.trim() : '';
     if (/^#[0-9a-f]{6}$/i.test(color)) return color;
@@ -20,14 +19,5 @@ export const MAP_VEHICLE_SCRIPT = `  function normalizeColor(value) {
     state.vehicleColor = normalizeColor(input && input.color);
     state.vehicleKind = normalizeKind(input && input.kind);
     if (vehicleMarker) vehicleMarker.getElement().style.setProperty('--car-color', state.vehicleColor);
-  }
-
-  function aheadLngLat(location, heading, meters) {
-    var radians = heading * Math.PI / 180;
-    var latitude = location.latitude;
-    return [
-      location.longitude + meters * Math.sin(radians) / (111320 * Math.cos(latitude * Math.PI / 180)),
-      latitude + meters * Math.cos(radians) / 111320
-    ];
   }
 `;

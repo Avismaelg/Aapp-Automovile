@@ -380,6 +380,9 @@ export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
       pitch: 0,
       bearing: 0,
       maxPitch: 0,
+      pixelRatio: MAP_PIXEL_RATIO,
+      // Menos teselas en cola al moverse: el WebView no da para más.
+      fadeDuration: 0,
       pitchWithRotate: false,
       attributionControl: false
     });
