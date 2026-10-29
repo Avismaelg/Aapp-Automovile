@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar, Button, IconButton } from '@/src/components/ui';
+import { useMapChrome } from '@/src/components/navigation/glass';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -15,8 +16,9 @@ export function FriendSheet({
   onChallenge: () => void;
   onClose: () => void;
 }) {
+  const chrome = useMapChrome();
   return (
-    <View style={styles.friendSheet}>
+    <View style={[styles.friendSheet, chrome.surface]}>
       <View style={styles.friendRow}>
         <Avatar
           name={friend.name}
@@ -26,10 +28,10 @@ export function FriendSheet({
           ring={colors.border}
         />
         <View style={styles.friendText}>
-          <AppText variant="bodyStrong" numberOfLines={1}>
+          <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
             {friend.name}
           </AppText>
-          <AppText variant="caption" color={colors.muted}>
+          <AppText variant="caption" color={chrome.muted}>
             En el mapa ahora
           </AppText>
         </View>
@@ -37,6 +39,7 @@ export function FriendSheet({
           icon="close"
           size={30}
           tone="ghost"
+          color={chrome.muted}
           onPress={onClose}
         />
       </View>
@@ -70,9 +73,6 @@ const styles = StyleSheet.create({
   destinationAction: { flexShrink: 1 },
   friendSheet: {
     marginTop: spacing.sm,
-    backgroundColor: 'rgba(11,15,20,0.96)',
-    borderWidth: 1,
-    borderColor: 'rgba(201,255,77,0.3)',
     borderRadius: radius['2xl'],
     padding: spacing.lg,
     gap: spacing.md,

@@ -7,7 +7,6 @@ import Mapbox, {
   MapView,
   MarkerView,
   ModelLayer,
-  Models,
   ShapeSource,
   UserTrackingMode,
 } from '@rnmapbox/maps';
@@ -15,7 +14,7 @@ import * as Location from 'expo-location';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { setModelPuck } from '@/modules/car-puck';
+import { addModel, setModelPuck } from '@/modules/car-puck';
 
 import { useCarModel } from '@/src/hooks/useCarModel';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
@@ -47,9 +46,38 @@ const NO_ALTERNATIVES: WorldMapAlternative[] = [];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 const MANEUVER_ZOOM_M = 250;
 const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_other' };
+// Halo del punto azul (a pie o sin coche 3D).
+const PUCK_PULSING = { isEnabled: true, color: '#3d9bff', radius: 'accuracy' } as const;
 const NO_PADDING = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
 // En navegación la flecha va abajo, para ver más calle por delante.
 const NAV_PADDING = { paddingTop: 260, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
+// Capas de tráfico del estilo de navegación de Mapbox. Por defecto pintan de
+// verde las calles sin atasco; aquí solo se colorean las retenciones, como
+// en Google Maps.
+const TRAFFIC_LAYERS = [
+  'traffic-tunnel-link-navigation',
+  'traffic-tunnel-minor-navigation',
+  'traffic-tunnel-street-navigation',
+  'traffic-tunnel-secondary-tertiary-navigation',
+  'traffic-tunnel-primary-navigation',
+  'traffic-tunnel-major-link-navigation',
+  'traffic-tunnel-motorway-trunk-navigation',
+  'traffic-bridge-road-link-navigation',
+  'traffic-bridge-road-minor-navigation',
+  'traffic-bridge-road-street-navigation',
+  'traffic-bridge-road-secondary-tertiary-navigation',
+  'traffic-bridge-road-primary-navigation',
+  'traffic-bridge-road-major-link-navigation',
+  'traffic-bridge-road-motorway-trunk-navigation',
+];
+const TRAFFIC_COLOR: unknown = [
+  'match', ['get', 'congestion'],
+  'moderate', '#f59e0b',
+  'heavy', '#ef4444',
+  'severe', '#991b1b',
+  'rgba(0,0,0,0)',
+];
+
 // Coche 3D como indicador de posición (Android): tamaño fijo en pantalla y
 // giro para que el morro (+X del modelo) apunte hacia la marcha.
 const PUCK_SCALE = 22;
@@ -76,6 +104,9 @@ type WorldMapProps = {
   vehicleColor?: string;
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
+  // Alto de lo que tapa el borde inferior del mapa (tarjetas): el logo de
+  // Mapbox se coloca justo encima para que siempre se vea.
+  ornamentBottom?: number;
   // Lleva la cámara a un punto (p. ej. el coche aparcado); token cambia en cada toque.
   focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
@@ -171,6 +202,7 @@ export const WorldMap = memo(function WorldMap({
   alternatives = NO_ALTERNATIVES,
   vehicleColor = '#ff5a1f',
   recenterToken = 0,
+  ornamentBottom = 4,
   focus = null,
   onFollowChange,
   onMemberPress,
@@ -317,10 +349,17 @@ export const WorldMap = memo(function WorldMap({
   const [styleLoads, setStyleLoads] = useState(0);
   const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
   useEffect(() => {
-    if (!useCarPuck || !carModel) return;
+    if (Platform.OS !== 'android' || !carModel || styleLoads === 0) return;
     const timer = setTimeout(() => {
       const tag = findNodeHandle(mapRef.current);
-      if (tag != null) void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION);
+      if (tag == null) return;
+      // El modelo del coche aparcado se registra en cada estilo cargado.
+      void addModel(tag, 'caravana-car', carModel);
+      if (useCarPuck) {
+        void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then((applied) => {
+          if (!applied) console.warn('[mapa] no se pudo poner el coche 3D');
+        });
+      }
     }, 150);
     return () => clearTimeout(timer);
   }, [useCarPuck, carModel, styleLoads]);
@@ -346,6 +385,7 @@ export const WorldMap = memo(function WorldMap({
     });
   }, []);
 
+  const usingMapbox = Boolean(MAPBOX_ACCESS_TOKEN) && !styleFailed;
   const styleURL = (styleFailed ? MAP_FALLBACK_STYLES : NATIVE_MAP_STYLES)[theme];
   const belowLayerID = (styleFailed ? OPENFREEMAP_LABEL_LAYER : NATIVE_LABEL_LAYER)[theme];
   const night = theme === 'night';
@@ -357,8 +397,8 @@ export const WorldMap = memo(function WorldMap({
         style={styles.map}
         styleURL={styleURL}
         pitchEnabled={false}
-        attributionPosition={{ bottom: 4, left: 4 }}
-        logoPosition={{ bottom: 4, right: 4 }}
+        logoPosition={{ bottom: ornamentBottom, left: 8 }}
+        attributionPosition={{ bottom: ornamentBottom, left: 96 }}
         compassEnabled={false}
         scaleBarEnabled={false}
         onMapLoadingError={handleStyleError}
@@ -450,7 +490,16 @@ export const WorldMap = memo(function WorldMap({
           />
         </ShapeSource>
 
-        {carModel ? <Models models={{ 'caravana-car': carModel }} /> : null}
+        {usingMapbox
+          ? TRAFFIC_LAYERS.map((id) => (
+              <LineLayer
+                key={`${id}-${theme}`}
+                id={id}
+                existing
+                style={{ lineColor: TRAFFIC_COLOR as string }}
+              />
+            ))
+          : null}
 
         {parking && carModel ? (
           <ShapeSource
@@ -474,13 +523,8 @@ export const WorldMap = memo(function WorldMap({
           </ShapeSource>
         ) : null}
 
-        {hasPermission ? (
-          <LocationPuck
-            key={useCarPuck ? 'car' : 'dot'}
-            puckBearingEnabled
-            puckBearing={headingUp ? 'course' : 'heading'}
-            pulsing={{ isEnabled: true, color: '#3d9bff', radius: 'accuracy' }}
-          />
+        {hasPermission && !useCarPuck ? (
+          <LocationPuck puckBearingEnabled puckBearing={headingUp ? 'course' : 'heading'} pulsing={PUCK_PULSING} />
         ) : null}
 
         {members.map((member) => (

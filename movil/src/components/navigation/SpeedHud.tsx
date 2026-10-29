@@ -1,9 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
-import { GLASS } from '@/src/components/navigation/glass';
-import { colors, radius, spacing } from '@/src/theme';
+import { useMapChrome } from '@/src/components/navigation/glass';
+import { colors, radius } from '@/src/theme';
 
+// Velocímetro compacto: burbuja con la velocidad, señal de límite al lado y,
+// si se conoce, la calle actual.
 export function SpeedHud({
   speedLabel,
   limitKmh,
@@ -15,76 +17,75 @@ export function SpeedHud({
   isLive: boolean;
   street: string | null;
 }) {
+  const chrome = useMapChrome();
+  const speed = Number(speedLabel);
+  const over = limitKmh != null && Number.isFinite(speed) && speed > limitKmh + 5;
+
   return (
-    <View style={styles.speedHud}>
-      <View style={styles.speedRow}>
-        <AppText variant="display" style={styles.speedValue}>
-          {speedLabel}
-        </AppText>
+    <View style={styles.wrap}>
+      <View style={styles.row}>
+        <View style={[styles.bubble, chrome.surface, over && styles.bubbleOver]}>
+          <AppText variant="display" color={over ? '#ffffff' : chrome.text} style={styles.value}>
+            {speedLabel}
+          </AppText>
+          <View style={styles.unitRow}>
+            <View style={[styles.liveDot, !isLive && styles.liveDotOff]} />
+            <AppText variant="label" color={over ? '#ffe4e6' : chrome.muted} style={styles.unit}>
+              {isLive ? 'km/h' : 'demo'}
+            </AppText>
+          </View>
+        </View>
         {limitKmh != null ? (
-          <View style={styles.speedLimit}>
-            <AppText variant="label" style={styles.speedLimitText}>
+          <View style={styles.limit}>
+            <AppText variant="label" style={styles.limitText}>
               {limitKmh}
             </AppText>
           </View>
         ) : null}
       </View>
-      <View style={styles.speedMeta}>
-        <View style={[styles.liveDot, !isLive && styles.liveDotOff]} />
-        <AppText variant="label" color={colors.muted} style={styles.speedUnit}>
-          km/h · {isLive ? 'GPS' : 'DEMO'}
-        </AppText>
-      </View>
       {street ? (
-        <AppText
-          variant="caption"
-          color={colors.textSoft}
-          numberOfLines={1}
-          style={styles.streetName}
-        >
-          {street}
-        </AppText>
+        <View style={[styles.street, chrome.surface]}>
+          <AppText variant="caption" color={chrome.textSoft} numberOfLines={1} style={styles.streetText}>
+            {street}
+          </AppText>
+        </View>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  speedHud: {
-    minWidth: 128,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  speedValue: { fontSize: 40, lineHeight: 44 },
-  speedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  speedLimit: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: '#ff4d5e',
-    backgroundColor: '#f4f6f9',
+  wrap: { alignItems: 'flex-start', gap: 6, flexShrink: 1 },
+  row: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  bubble: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  speedLimitText: { fontSize: 11, color: '#0b0f14' },
-  streetName: { marginTop: 2, fontSize: 9, maxWidth: 160 },
-  speedMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.green,
-  },
+  bubbleOver: { backgroundColor: '#e11d48', borderColor: '#e11d48' },
+  value: { fontSize: 24, lineHeight: 27 },
+  unitRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  unit: { fontSize: 8 },
+  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green },
   liveDotOff: { backgroundColor: colors.dim },
-  speedUnit: { fontSize: 9 },
+  limit: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 4,
+    borderColor: '#e11d48',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  limitText: { fontSize: 12, color: '#0b0f14' },
+  street: {
+    maxWidth: 200,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  streetText: { fontSize: 11 },
 });

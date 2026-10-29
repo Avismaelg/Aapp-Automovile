@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapAttribution } from '@/src/components/MapAttribution';
@@ -11,12 +11,13 @@ import { FriendSheet } from '@/src/components/navigation/FriendSheet';
 import { MapControls } from '@/src/components/navigation/MapControls';
 import { NavigationHud } from '@/src/components/navigation/NavigationHud';
 import { SpeedHud } from '@/src/components/navigation/SpeedHud';
-import { AppText, Avatar, IconButton } from '@/src/components/ui';
+import { AppText, Avatar } from '@/src/components/ui';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriendsOnMap } from '@/src/hooks/useFriendsOnMap';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation, refreshStaleLocation } from '@/src/hooks/useLiveLocation';
+import { useMapTheme } from '@/src/hooks/useMapTheme';
 import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
 import { useRoadInfo } from '@/src/hooks/useRoadInfo';
 import { useActiveParty } from '@/src/hooks/useParty';
@@ -35,7 +36,7 @@ import {
 } from '@/src/lib/route-instructions';
 import { useChosenDestination } from '@/src/store/destination';
 import { useParking } from '@/src/store/parking';
-import { GLASS } from '@/src/components/navigation/glass';
+import { DAY_CHROME, MapChromeContext, NIGHT_CHROME } from '@/src/components/navigation/glass';
 import { colors, radius, spacing } from '@/src/theme';
 
 function formatParkingDistance(meters: number | null) {
@@ -401,6 +402,12 @@ export default function NavigationScreen() {
     retryRoute();
   }, [navigating, offRoute, retryRoute, route.isLoading]);
 
+  const [bottomHeight, setBottomHeight] = useState(0);
+
+  // Los controles se ven claros sobre el mapa de día y oscuros de noche.
+  const chrome = useMapTheme(live.location) === 'day' ? DAY_CHROME : NIGHT_CHROME;
+  const parkingTint = chrome.day ? '#0891b2' : colors.cyan;
+
   return (
     <View style={styles.root}>
       <WorldMap
@@ -418,12 +425,14 @@ export default function NavigationScreen() {
         vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
         focus={parkingFocus}
+        ornamentBottom={navigating ? 4 : bottomHeight + spacing.md + 6}
         onFollowChange={handleFollowChange}
         onMemberPress={handleFriendPress}
         onError={handleMapError}
         style={StyleSheet.absoluteFill}
       />
 
+      <MapChromeContext.Provider value={chrome}>
       <View
         pointerEvents="box-none"
         style={[
@@ -464,56 +473,63 @@ export default function NavigationScreen() {
                   online={live.isLive}
                 />
               </Pressable>
-              <Pressable style={styles.vehiclePill} onPress={() => router.push('/(tabs)/garage')}>
+              <Pressable style={[styles.vehiclePill, chrome.surface]} onPress={() => router.push('/(tabs)/garage')}>
                 <Ionicons name="car-sport" size={16} color={colors.accent} />
-                <AppText variant="bodyStrong" numberOfLines={1} style={styles.vehicleText}>
+                <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1} style={styles.vehicleText}>
                   {vehicleLabel}
                 </AppText>
-                <Ionicons name="chevron-down" size={14} color={colors.muted} />
+                <Ionicons name="chevron-down" size={14} color={chrome.muted} />
               </Pressable>
-              <IconButton
-                icon="newspaper-outline"
-                size={42}
+              <Pressable
+                style={[styles.roundButton, chrome.surface]}
                 onPress={() => router.push('/actividad' as Href)}
-              />
+                accessibilityRole="button"
+                accessibilityLabel="Actividad"
+              >
+                <Ionicons name="newspaper-outline" size={19} color={chrome.text} />
+              </Pressable>
             </View>
 
             {destination == null ? (
               <Pressable
-                style={styles.searchPill}
+                style={[styles.searchPill, chrome.surface]}
                 onPress={() => router.push('/destino' as Href)}
                 accessibilityRole="button"
                 accessibilityLabel="Buscar destino"
               >
-                <Ionicons name="search" size={16} color={colors.textSoft} />
+                <Ionicons name="search" size={19} color="#2f8cff" />
                 <AppText
                   variant="bodyStrong"
                   numberOfLines={1}
-                  color={colors.textSoft}
+                  color={chrome.muted}
                   style={styles.searchText}
                 >
                   ¿A dónde vamos?
                 </AppText>
-                <Ionicons name="search" size={14} color={colors.muted} />
               </Pressable>
             ) : null}
 
             {destination == null && recentDestinations.length > 0 ? (
-              <View style={styles.recentsRow}>
-                {recentDestinations.slice(0, 3).map((recent) => (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.recentsScroll}
+                contentContainerStyle={styles.recentsRow}
+              >
+                {recentDestinations.slice(0, 5).map((recent) => (
                   <Pressable
                     key={`${recent.label}-${recent.latitude.toFixed(5)}`}
-                    style={styles.recentChip}
+                    style={[styles.recentChip, chrome.surface]}
                     onPress={() => {
                       useChosenDestination.getState().setDestination(recent);
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={`Ir a ${recent.label}`}
                   >
-                    <Ionicons name="time-outline" size={11} color={colors.muted} />
+                    <Ionicons name="time-outline" size={13} color={chrome.muted} />
                     <AppText
                       variant="caption"
-                      color={colors.textSoft}
+                      color={chrome.textSoft}
                       numberOfLines={1}
                       style={styles.recentChipText}
                     >
@@ -521,13 +537,13 @@ export default function NavigationScreen() {
                     </AppText>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             ) : null}
 
             {activeTrip ? (
-              <View style={styles.recordingPill}>
+              <View style={[styles.recordingPill, chrome.surface]}>
                 <View style={styles.recordingDot} />
-                <AppText variant="caption" color={colors.textSoft}>
+                <AppText variant="caption" color={chrome.textSoft}>
                   Grabando ruta ·{' '}
                   {Math.max(1, Math.round((recordingNow - activeTrip.startedAt) / 60_000))} min ·{' '}
                   {(activeTrip.distanceM / 1000).toFixed(1).replace('.', ',')} km
@@ -536,7 +552,7 @@ export default function NavigationScreen() {
             ) : null}
 
             {showParking && parkingSpot ? (
-              <View style={styles.parkingPill}>
+              <View style={[styles.parkingPill, chrome.surface, { borderColor: parkingTint }]}>
                 <Pressable
                   style={styles.parkingShow}
                   onPress={showParkedCar}
@@ -549,10 +565,10 @@ export default function NavigationScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Ver mi coche aparcado en el mapa"
                 >
-                  <Ionicons name="car" size={15} color={colors.cyan} />
+                  <Ionicons name="car" size={15} color={parkingTint} />
                   <AppText
                     variant="caption"
-                    color={colors.textSoft}
+                    color={chrome.textSoft}
                     style={styles.parkingText}
                     numberOfLines={1}
                   >
@@ -566,20 +582,20 @@ export default function NavigationScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Ir a mi coche aparcado"
                 >
-                  <Ionicons name="navigate" size={14} color={colors.cyan} />
+                  <Ionicons name="navigate" size={14} color={parkingTint} />
                 </Pressable>
               </View>
             ) : null}
 
             {!live.isLive ? (
-              <View style={styles.banner}>
+              <View style={[styles.banner, chrome.surface]}>
                 <View style={styles.bannerDot} />
-                <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+                <AppText variant="caption" color={chrome.textSoft} numberOfLines={2} style={styles.bannerText}>
                   {live.message}
                 </AppText>
                 {live.status !== 'locating' ? (
                   <Pressable onPress={live.retry} hitSlop={8}>
-                    <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                    <AppText variant="label" color={chrome.day ? '#2f8cff' : colors.lime} style={styles.retryText}>
                       REINTENTAR
                     </AppText>
                   </Pressable>
@@ -588,13 +604,13 @@ export default function NavigationScreen() {
             ) : null}
 
             {mapError ? (
-              <View style={[styles.banner, styles.bannerError]}>
+              <View style={[styles.banner, chrome.surface, styles.bannerError]}>
                 <Ionicons name="warning-outline" size={16} color={colors.accent} />
-                <AppText variant="caption" color={colors.textSoft} numberOfLines={2} style={styles.bannerText}>
+                <AppText variant="caption" color={chrome.textSoft} numberOfLines={2} style={styles.bannerText}>
                   {mapError}
                 </AppText>
                 <Pressable onPress={retryMap} hitSlop={8}>
-                  <AppText variant="label" color={colors.lime} style={styles.retryText}>
+                  <AppText variant="label" color={chrome.day ? '#2f8cff' : colors.lime} style={styles.retryText}>
                     REINTENTAR
                   </AppText>
                 </Pressable>
@@ -603,6 +619,11 @@ export default function NavigationScreen() {
 
             <View style={styles.spacer} pointerEvents="none" />
 
+            <View
+              pointerEvents="box-none"
+              style={styles.bottomCluster}
+              onLayout={(event) => setBottomHeight(Math.round(event.nativeEvent.layout.height))}
+            >
             <View style={styles.sideRow}>
               <SpeedHud
                 speedLabel={speedLabel}
@@ -642,10 +663,13 @@ export default function NavigationScreen() {
               />
             ) : null}
 
+            </View>
+
             <MapAttribution style={styles.attribution} />
           </>
         )}
       </View>
+      </MapChromeContext.Provider>
     </View>
   );
 }
@@ -671,21 +695,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     minHeight: 42,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
   },
   vehicleText: { flex: 1 },
+  roundButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.sm,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -704,10 +729,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.sm,
-    minHeight: 44,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    minHeight: 50,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
   },
@@ -718,28 +740,18 @@ const styles = StyleSheet.create({
     gap: 6,
     alignSelf: 'flex-start',
     marginTop: spacing.sm,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
   recentChipText: { flexShrink: 1 },
-  recentsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: spacing.sm,
-    flexWrap: 'wrap',
-  },
+  recentsScroll: { marginTop: spacing.xs, marginHorizontal: -spacing.lg, flexGrow: 0 },
+  recentsRow: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 6 },
   recentChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    maxWidth: '48%',
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    maxWidth: 180,
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -756,9 +768,6 @@ const styles = StyleSheet.create({
     gap: 6,
     alignSelf: 'flex-start',
     marginTop: spacing.sm,
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(77,225,255,0.4)',
     borderRadius: radius.pill,
     paddingLeft: spacing.md,
     paddingRight: 4,
@@ -775,6 +784,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(77,225,255,0.16)',
   },
   spacer: { flex: 1 },
+  bottomCluster: { gap: 0 },
   sideRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

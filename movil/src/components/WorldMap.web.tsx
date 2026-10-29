@@ -35,6 +35,7 @@ type WorldMapProps = {
   vehicleColor?: string;
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
+  ornamentBottom?: number;
   focus?: { latitude: number; longitude: number; token: number } | null;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;

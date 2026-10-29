@@ -13,10 +13,11 @@ export function useCarModel(color: string) {
     let active = true;
     const load = async () => {
       try {
-        // v2: cambia el nombre si cambia la geometría para no usar una vieja.
-        const file = new File(Paths.cache, `car-v2-${key}.glb`);
+        // El nombre lleva versión: si cambia la geometría no se usa un archivo viejo.
+        const file = new File(Paths.cache, `car-v3-${key}.glb`);
         if (!file.exists) await file.write(buildCarGlb(`#${key}`));
-        if (active) setUri(file.uri);
+        // Mapbox solo abre rutas locales con «file:///»; Expo puede dar «file:/».
+        if (active) setUri(file.uri.replace(/^file:\/*/, 'file:///'));
       } catch {
         if (active) setUri(null);
       }

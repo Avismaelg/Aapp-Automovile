@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
-import { GLASS } from '@/src/components/navigation/glass';
+import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, spacing } from '@/src/theme';
 
 export function MapControls({
@@ -16,30 +16,31 @@ export function MapControls({
   onToggleNorth: () => void;
   onRecenter: () => void;
 }) {
+  const chrome = useMapChrome();
   return (
     <View style={styles.controls}>
       <Pressable
-        style={[styles.roundControl, northUp && styles.roundControlLime]}
+        style={[styles.roundControl, chrome.surface, northUp && styles.active]}
         onPress={onToggleNorth}
         accessibilityRole="button"
         accessibilityLabel="Orientar el mapa al norte"
       >
-        <AppText
-          variant="label"
-          color={northUp ? '#120802' : colors.text}
-          style={styles.modeText}
-        >
+        <Ionicons name="compass-outline" size={20} color={northUp ? '#120802' : chrome.text} />
+        <AppText variant="label" color={northUp ? '#120802' : chrome.muted} style={styles.modeText}>
           N
         </AppText>
       </Pressable>
       {!following ? (
         <Pressable
-          style={[styles.roundControl, styles.roundControlAccent]}
+          style={[styles.recenter, chrome.surface]}
           onPress={onRecenter}
           accessibilityRole="button"
           accessibilityLabel="Recentrar mapa"
         >
-          <Ionicons name="navigate" size={20} color="#120802" />
+          <Ionicons name="navigate" size={18} color="#2f8cff" />
+          <AppText variant="bodyStrong" color={chrome.text} style={styles.recenterText}>
+            Centrar
+          </AppText>
         </Pressable>
       ) : null}
     </View>
@@ -48,26 +49,25 @@ export function MapControls({
 
 const styles = StyleSheet.create({
   controls: {
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: spacing.sm,
   },
   roundControl: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: GLASS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
-  roundControlAccent: {
-    backgroundColor: colors.lime,
-    borderColor: colors.lime,
+  active: { backgroundColor: colors.lime, borderColor: colors.lime },
+  modeText: { fontSize: 8, marginTop: -2 },
+  recenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: 21,
+    paddingHorizontal: 14,
   },
-  roundControlLime: {
-    backgroundColor: colors.lime,
-    borderColor: colors.lime,
-  },
-  modeText: { fontSize: 11 },
+  recenterText: { fontSize: 14 },
 });

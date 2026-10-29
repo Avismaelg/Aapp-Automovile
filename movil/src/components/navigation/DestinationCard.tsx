@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, IconButton } from '@/src/components/ui';
+import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, radius, spacing } from '@/src/theme';
 
 export type RouteOption = {
@@ -32,21 +33,22 @@ export function DestinationCard({
   onShare: () => void;
   onClose: () => void;
 }) {
+  const chrome = useMapChrome();
   return (
-    <View style={styles.destinationCard}>
+    <View style={[styles.destinationCard, chrome.surface]}>
       <View style={styles.destinationRow}>
         <View style={styles.destinationIcon}>
           <Ionicons name="flag" size={15} color="#120802" />
         </View>
         <View style={styles.destinationText}>
-          <AppText variant="bodyStrong" numberOfLines={1}>
+          <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
             {label}
           </AppText>
-          <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+          <AppText variant="caption" color={chrome.muted} numberOfLines={1}>
             {status}
           </AppText>
         </View>
-        <IconButton icon="close" size={30} tone="ghost" onPress={onClose} />
+        <IconButton icon="close" size={30} tone="ghost" color={chrome.muted} onPress={onClose} />
       </View>
       {options.length > 1 ? (
         <ScrollView
@@ -59,21 +61,21 @@ export function DestinationCard({
             return (
               <Pressable
                 key={index}
-                style={[styles.option, active && styles.optionActive]}
+                style={[styles.option, { borderColor: chrome.border, backgroundColor: chrome.chip }, active && styles.optionActive]}
                 onPress={() => onSelect(index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`Ruta ${index + 1}: ${option.timeLabel}, ${option.distanceLabel}`}
               >
-                <AppText variant="bodyStrong" color={active ? '#ffffff' : colors.text}>
+                <AppText variant="bodyStrong" color={active ? '#ffffff' : chrome.text}>
                   {option.timeLabel}
                 </AppText>
-                <AppText variant="caption" color={active ? '#e3efff' : colors.muted}>
+                <AppText variant="caption" color={active ? '#e3efff' : chrome.muted}>
                   {option.distanceLabel}
                 </AppText>
                 <AppText
                   variant="label"
-                  color={active ? '#ffffff' : option.extraMinutes === 0 ? colors.lime : colors.muted}
+                  color={active ? '#ffffff' : option.extraMinutes === 0 ? (chrome.day ? '#16a34a' : colors.lime) : chrome.muted}
                   style={styles.optionTag}
                 >
                   {option.extraMinutes === 0 ? 'MÁS RÁPIDA' : `+${option.extraMinutes} MIN`}
@@ -108,9 +110,6 @@ export function DestinationCard({
 
 const styles = StyleSheet.create({
   destinationCard: {
-    backgroundColor: 'rgba(11,15,20,0.94)',
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius['2xl'],
     padding: spacing.lg,
     gap: spacing.md,
@@ -133,7 +132,6 @@ const styles = StyleSheet.create({
   option: {
     minWidth: 104,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
