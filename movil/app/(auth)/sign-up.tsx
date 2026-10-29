@@ -124,7 +124,7 @@ export default function SignUpScreen() {
           </AppText>
           <AuthNotice
             tone="info"
-            message="Si no aparece en unos minutos, revisa la carpeta de spam. Para el MVP puedes desactivar la confirmación por correo en Supabase."
+            message="Si no aparece en unos minutos, revisa la carpeta de spam o de promociones."
           />
         </Card>
       </AuthFormLayout>

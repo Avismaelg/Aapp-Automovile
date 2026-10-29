@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -7,12 +6,10 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
 
 import {
   AppText,
@@ -35,6 +32,12 @@ import {
   useRespondChallenge,
   useStartChallenge,
 } from '@/src/hooks/useChallenges';
+import { ActiveChallengeCard } from '@/src/components/challenges/ActiveChallengeCard';
+import { CategoryPicker } from '@/src/components/challenges/CategoryPicker';
+import { ChallengeStandings } from '@/src/components/challenges/ChallengeStandings';
+import { FriendPicker } from '@/src/components/challenges/FriendPicker';
+import { RecentResults } from '@/src/components/challenges/RecentResults';
+import { RoutePicker } from '@/src/components/challenges/RoutePicker';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import {
@@ -46,11 +49,7 @@ import { formatClock, timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { challengeUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
-import {
-  vehicleCategoryLabel,
-  vehicleKindMeta,
-  vehicleKinds,
-} from '@/src/lib/vehicles';
+import { vehicleCategoryLabel } from '@/src/lib/vehicles';
 
 function challengeId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
@@ -76,71 +75,6 @@ const modeOptions: { key: ChallengeMode; label: string; icon: keyof typeof Ionic
     detail: 'Invita a un rival y espera',
   },
 ];
-
-const categoryOptions: {
-  key: ChallengeCategory;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  { key: 'mixed', label: 'Mixto', icon: 'shuffle' },
-  ...vehicleKinds.map((kind) => ({
-    key: kind,
-    label: vehicleKindMeta[kind].shortLabel,
-    icon: vehicleKindMeta[kind].icon,
-  })),
-];
-
-function RouteMini({
-  fromLabel,
-  toLabel,
-  distanceKm,
-}: {
-  fromLabel: string;
-  toLabel: string;
-  distanceKm: number;
-}) {
-  return (
-    <View style={styles.routeMini}>
-      <Svg width="100%" height={86} viewBox="0 0 320 86" preserveAspectRatio="none">
-        <Path d="M0 26 C 52 22, 74 8, 120 18 S 200 58, 246 48 S 290 26, 320 30" stroke="#17212B" strokeWidth={14} fill="none" />
-        <Path
-          d="M18 70 C 70 70, 74 34, 138 34 S 222 68, 300 20"
-          stroke={colors.accent}
-          strokeWidth={10}
-          fill="none"
-          opacity={0.12}
-          strokeLinecap="round"
-        />
-        <Path
-          d="M18 70 C 70 70, 74 34, 138 34 S 222 68, 300 20"
-          stroke={colors.accent}
-          strokeWidth={3}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray="8 7"
-        />
-        <Circle cx={18} cy={70} r={7} fill={colors.lime} />
-        <Circle cx={18} cy={70} r={13} fill={colors.lime} opacity={0.2} />
-        <Circle cx={300} cy={20} r={7} fill={colors.accent} />
-        <Circle cx={300} cy={20} r={13} fill={colors.accent} opacity={0.2} />
-      </Svg>
-      <View style={styles.routeMiniLabels}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>SALIDA</AppText>
-          <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>{fromLabel}</AppText>
-        </View>
-        <View style={styles.routeDistance}>
-          <Ionicons name="navigate" size={11} color={colors.muted} />
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 9 }}>{distanceKm} KM</AppText>
-        </View>
-        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>META</AppText>
-          <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>{toLabel}</AppText>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 export default function ChallengesScreen() {
   const router = useRouter();
@@ -611,17 +545,6 @@ export default function ChallengesScreen() {
     });
   };
 
-  const categoryNote =
-    category === 'mixed'
-      ? 'Mixto: coches, motos, EV y camiones compiten por llegada. Sin premios por velocidad máxima.'
-      : category === 'ev'
-        ? 'EV: cuenta la autonomía y las paradas de carga. La batería forma parte del reto.'
-        : category === 'truck'
-          ? 'Camiones: categoría propia, con límites de peso y conducción profesional.'
-          : category === 'motorcycle'
-            ? 'Motos: categoría propia. Equipo completo y conducción defensiva.'
-            : 'Coches: categoría propia. Gana quien llega primero respetando las normas.';
-
   const recentResults = isDemo
     ? recentChallenges
     : realHistory.map((challenge) => {
@@ -717,194 +640,23 @@ export default function ChallengesScreen() {
       </View>
 
       {hasActive ? (
-        <LinearGradient
-          colors={['#2A170F', '#17181D', '#0E1217']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.liveCard}
-        >
-          <View style={styles.liveGlow} />
-          <View style={styles.liveTop}>
-            <Pill
-              label={
-                active.status === 'live'
-                  ? 'Reto en vivo'
-                  : active.status === 'pending'
-                    ? activeIsInvite
-                      ? 'Invitación recibida'
-                      : activeIsWaiting
-                        ? 'Esperando salida'
-                        : 'Invitación pendiente'
-                    : 'Reto finalizado'
-              }
-              tone={
-                active.status === 'live'
-                  ? 'danger'
-                  : active.status === 'pending'
-                    ? 'accent'
-                    : 'neutral'
-              }
-              icon={
-                active.status === 'live'
-                  ? 'radio'
-                  : active.status === 'pending'
-                    ? activeIsWaiting
-                      ? 'time-outline'
-                      : 'mail-unread'
-                    : 'checkmark-circle'
-              }
-            />
-            <Pill
-              label={active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
-              tone="dark"
-            />
-          </View>
-
-          <AppText variant="h2" style={{ marginTop: spacing.lg }}>{active.title}</AppText>
-          <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
-            {active.status === 'live'
-              ? activeIsInvite
-                ? 'Sala en marcha. Acepta para unirte a la salida.'
-                : `${active.mode === 'instant' ? 'Sala rápida' : 'En curso'} · ${standings.length} participantes · código ${active.code}`
-              : active.status === 'pending'
-                ? activeIsInvite
-                  ? 'Te invitaron a este reto. Acepta para unirte.'
-                  : activeIsWaiting
-                    ? 'Estás dentro. El anfitrión iniciará la salida.'
-                    : activeReadyToStart
-                      ? 'Ya hay rivales listos. Puedes iniciar la salida.'
-                      : activeHostReady
-                        ? 'No hay rivales aceptados. Invita a otro piloto.'
-                        : 'Esperando que tus rivales acepten el reto'
-                : 'Resultado final del reto'}
-          </AppText>
-
-          <RouteMini
-            fromLabel={active.fromLabel}
-            toLabel={active.toLabel}
-            distanceKm={active.distanceKm}
-          />
-
-          <View style={styles.liveStats}>
-            <View style={[styles.liveStat, styles.liveStatTime]}>
-              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>TIEMPO</AppText>
-              <AppText
-                variant="mono"
-                color={colors.accent}
-                numberOfLines={1}
-                style={{ fontSize: 15 }}
-              >
-                {formatClock(active.elapsedSeconds)}
-              </AppText>
-            </View>
-            <View style={styles.liveDivider} />
-            <View style={styles.liveStat}>
-              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>DISTANCIA</AppText>
-              <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-                {active.distanceKm} km
-              </AppText>
-            </View>
-            <View style={styles.liveDivider} />
-            <View style={styles.liveStat}>
-              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>LÍDER</AppText>
-              <AppText variant="h3" color={colors.lime} numberOfLines={1} style={{ fontSize: 18 }}>
-                {standings[0]?.isMe ? 'Tú' : standings[0]?.name.split(' ')[0] ?? '—'}
-              </AppText>
-            </View>
-            <View style={styles.liveDivider} />
-            <View style={styles.liveStat}>
-              <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>CATEGORÍA</AppText>
-              <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-                {active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
-              </AppText>
-            </View>
-          </View>
-
-          <View style={styles.liveActions}>
-            {activeIsInvite ? (
-              <>
-                <Button
-                  label="Aceptar reto"
-                  icon="checkmark-circle-outline"
-                  loading={respondChallenge.isPending}
-                  onPress={() => void respondToChallenge(true)}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="Rechazar"
-                  icon="close"
-                  variant="secondary"
-                  full={false}
-                  onPress={() => void respondToChallenge(false)}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              </>
-            ) : active.status === 'pending' && activeIsWaiting ? (
-              <>
-                <Button
-                  label="Esperando al anfitrión"
-                  icon="time-outline"
-                  disabled
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="Compartir"
-                  icon="share-social-outline"
-                  variant="secondary"
-                  full={false}
-                  onPress={shareChallenge}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              </>
-            ) : active.status === 'pending' ? (
-              <>
-                <Button
-                  label="Iniciar reto"
-                  icon="flag"
-                  loading={startRealChallenge.isPending}
-                  disabled={!isDemo && !activeReadyToStart}
-                  onPress={() => void startChallenge()}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="Compartir"
-                  icon="share-social-outline"
-                  variant="secondary"
-                  full={false}
-                  onPress={shareChallenge}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              </>
-            ) : active.status === 'live' ? (
-              <>
-                <Button
-                  label={activeIsHost ? 'Finalizar reto' : 'Compartir reto'}
-                  icon={activeIsHost ? 'stop-circle-outline' : 'share-social-outline'}
-                  loading={activeIsHost ? finishRealChallenge.isPending : false}
-                  onPress={() => void (activeIsHost ? finishChallenge() : shareChallenge())}
-                  style={{ flex: 1 }}
-                />
-                {activeIsHost ? (
-                  <Button
-                    label="Compartir"
-                    icon="share-social-outline"
-                    variant="secondary"
-                    full={false}
-                    onPress={shareChallenge}
-                    style={{ paddingHorizontal: 16 }}
-                  />
-                ) : null}
-              </>
-            ) : (
-              <Button
-                label="Compartir resultado"
-                icon="share-outline"
-                onPress={shareChallenge}
-                style={{ flex: 1 }}
-              />
-            )}
-          </View>
-        </LinearGradient>
+        <ActiveChallengeCard
+          active={active}
+          standings={standings}
+          isDemo={isDemo}
+          activeIsInvite={activeIsInvite}
+          activeIsWaiting={activeIsWaiting}
+          activeIsHost={activeIsHost}
+          activeHostReady={activeHostReady}
+          activeReadyToStart={activeReadyToStart}
+          respondPending={respondChallenge.isPending}
+          startPending={startRealChallenge.isPending}
+          finishPending={finishRealChallenge.isPending}
+          onRespond={(accept) => void respondToChallenge(accept)}
+          onStart={() => void startChallenge()}
+          onFinish={() => void finishChallenge()}
+          onShare={() => void shareChallenge()}
+        />
       ) : (
         <Card style={styles.emptyActive}>
           <View style={styles.emptyActiveIcon}>
@@ -912,8 +664,8 @@ export default function ChallengesScreen() {
           </View>
           <AppText variant="h2" align="center">Tu próximo reto empieza abajo</AppText>
           <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Elige una ruta, una categoría y un piloto. La invitación se guarda en Supabase y
-            llega a tu amigo al instante.
+            Elige una ruta, una categoría y un piloto. La invitación llega a tu amigo al
+            instante.
           </AppText>
         </Card>
       )}
@@ -933,64 +685,7 @@ export default function ChallengesScreen() {
         </Card>
       ) : null}
 
-      {hasActive ? (
-        <>
-          <SectionHeader title="Clasificación" action={active.status === 'live' ? 'En vivo' : undefined} />
-          <Card style={styles.standingsCard}>
-        {standings.map((participant, index) => {
-          const kind = vehicleKindMeta[participant.vehicleKind];
-          return (
-            <View
-              key={participant.id}
-              style={[styles.standingRow, participant.isMe && styles.standingMe]}
-            >
-              <View style={[styles.rank, index === 0 && styles.rankFirst]}>
-                <AppText variant="label" color={index === 0 ? '#120802' : colors.muted} style={{ fontSize: 10 }}>
-                  {index + 1}
-                </AppText>
-              </View>
-              <Avatar name={participant.name} color={participant.color} size={38} online />
-              <View style={styles.standingMain}>
-                <View style={styles.standingNameRow}>
-                  <AppText variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {participant.isMe ? 'Tú' : participant.name.split(' ')[0]}
-                  </AppText>
-                  <View style={[styles.kindBadge, { borderColor: `${kind.color}55` }]}>
-                    <Ionicons name={kind.icon} size={10} color={kind.color} />
-                    <AppText variant="label" color={kind.color} style={{ fontSize: 8 }}>
-                      {kind.shortLabel.toUpperCase()}
-                    </AppText>
-                  </View>
-                </View>
-                <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-                  {participant.vehicle}
-                </AppText>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${participant.progress}%`,
-                        backgroundColor: participant.isMe ? colors.accent : kind.color,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-              <View style={styles.standingRight}>
-                <AppText variant="bodyStrong" color={participant.isMe ? colors.accent : colors.text}>
-                  {participant.progress}%
-                </AppText>
-                <AppText variant="caption" color={colors.muted}>
-                  {active.status === 'finished' ? 'llegada' : `ETA ${participant.etaMin} m`}
-                </AppText>
-              </View>
-            </View>
-          );
-        })}
-          </Card>
-        </>
-      ) : null}
+      {hasActive ? <ChallengeStandings standings={standings} status={active.status} /> : null}
 
       <SectionHeader
         title={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
@@ -1025,66 +720,16 @@ export default function ChallengesScreen() {
           </View>
         </View>
 
-        <AppText variant="label" color={colors.muted} style={styles.stepLabel}>1 · RUTA</AppText>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {challengeRoutes.map((item) => {
-            const selected = item.id === selectedRouteId;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => {
-                  setSelectedRouteId(item.id);
-                  setSentTo(null);
-                }}
-                style={[styles.routeChip, selected && styles.routeChipActive]}
-              >
-                <AppText variant="caption" color={selected ? colors.text : colors.textSoft} numberOfLines={1}>
-                  {item.fromLabel.split(',')[0]} → {item.toLabel}
-                </AppText>
-                <AppText variant="label" color={selected ? colors.accent : colors.dim} style={{ fontSize: 8, marginTop: 2 }}>
-                  {item.distanceKm} KM · {item.etaMin} MIN
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <RoutePicker
+          routes={challengeRoutes}
+          selectedId={selectedRouteId}
+          onSelect={(id) => {
+            setSelectedRouteId(id);
+            setSentTo(null);
+          }}
+        />
 
-        <AppText variant="label" color={colors.muted} style={styles.stepLabel}>2 · CATEGORÍA</AppText>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {categoryOptions.map((option) => {
-            const selected = option.key === category;
-            const tint =
-              option.key === 'mixed' ? colors.accent : vehicleKindMeta[option.key].color;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => chooseCategory(option.key)}
-                style={[
-                  styles.categoryChip,
-                  selected && { borderColor: tint, backgroundColor: `${tint}14` },
-                ]}
-              >
-                <Ionicons name={option.icon} size={17} color={selected ? tint : colors.muted} />
-                <AppText variant="caption" color={selected ? colors.text : colors.muted}>
-                  {option.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <View style={styles.categoryNote}>
-          <Ionicons name="information-circle-outline" size={15} color={colors.cyan} />
-          <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>{categoryNote}</AppText>
-        </View>
+        <CategoryPicker value={category} onSelect={chooseCategory} />
 
         <View style={styles.friendHeader}>
           <AppText variant="label" color={colors.muted} style={styles.stepLabel}>
@@ -1114,76 +759,27 @@ export default function ChallengesScreen() {
           </Pressable>
         </View>
 
-        {friendsLoading ? (
-          <View style={styles.noRivals}>
-            <ActivityIndicator size="small" color={colors.accent} />
-            <AppText variant="caption" color={colors.muted}>
-              Cargando tus amigos y vehículos…
-            </AppText>
-          </View>
-        ) : filteredFriends.length === 0 ? (
-          <View style={styles.noRivals}>
-            <Ionicons name="people-outline" size={22} color={colors.dim} />
-            <AppText variant="caption" color={colors.muted}>
-              No tienes amigos con {vehicleCategoryLabel(category).toLowerCase()}. Invita a uno o cambia de categoría.
-            </AppText>
-            {!isDemo && challengeFriends.length === 0 ? (
-              <Button
-                label="Buscar amigos"
-                size="sm"
-                variant="secondary"
-                icon="person-add-outline"
-                onPress={() => router.push('/friends')}
-                style={{ marginTop: spacing.sm }}
-              />
-            ) : null}
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.friendRow}
-          >
-            {filteredFriends.map((friend) => {
-              const kind = vehicleKindMeta[friend.vehicleKind];
-              const selected =
-                challengeMode === 'instant'
-                  ? instantSelectedIds.includes(friend.id)
-                  : friend.id === selectedFriendId;
-              return (
-                <Pressable
-                  key={friend.id}
-                  onPress={() => {
-                    if (challengeMode === 'instant') {
-                      toggleInstantFriend(friend.id);
-                      return;
-                    }
-                    setSelectedFriendId(friend.id);
-                    setMatchedFriend(null);
-                    setSentTo(null);
-                  }}
-                  style={[styles.friendCard, selected && styles.friendCardActive]}
-                >
-                  <Avatar name={friend.name} color={friend.color} size={44} online={friend.online} />
-                  <AppText variant="caption" color={colors.textSoft} numberOfLines={1} style={{ marginTop: 6 }}>
-                    {friend.name.split(' ')[0]}
-                  </AppText>
-                  <View style={styles.friendKind}>
-                    <Ionicons name={kind.icon} size={10} color={kind.color} />
-                    <AppText variant="label" color={kind.color} style={{ fontSize: 7 }}>
-                      {kind.shortLabel.toUpperCase()}
-                    </AppText>
-                  </View>
-                  {selected ? (
-                    <View style={styles.friendCheck}>
-                      <Ionicons name="checkmark" size={10} color="#120802" />
-                    </View>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
+        <FriendPicker
+          loading={friendsLoading}
+          friends={filteredFriends}
+          category={category}
+          showFindFriends={!isDemo && challengeFriends.length === 0}
+          isSelected={(friend) =>
+            challengeMode === 'instant'
+              ? instantSelectedIds.includes(friend.id)
+              : friend.id === selectedFriendId
+          }
+          onPress={(friend) => {
+            if (challengeMode === 'instant') {
+              toggleInstantFriend(friend.id);
+              return;
+            }
+            setSelectedFriendId(friend.id);
+            setMatchedFriend(null);
+            setSentTo(null);
+          }}
+          onFindFriends={() => router.push('/friends')}
+        />
 
         {challengeMode === 'instant' ? (
           <>
@@ -1270,39 +866,7 @@ export default function ChallengesScreen() {
         title="Resultados recientes"
         action={isDemo ? 'Ver todos' : recentResults.length ? `${recentResults.length}` : undefined}
       />
-      {recentResults.length === 0 ? (
-        <Card style={styles.emptyHistory}>
-          <Ionicons name="trophy-outline" size={21} color={colors.dim} />
-          <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-            Aún no hay retos finalizados. Cuando cierres uno, el resultado quedará aquí.
-          </AppText>
-        </Card>
-      ) : (
-        recentResults.map((item) => (
-          <Card key={item.id} style={styles.recentCard}>
-            <View style={[styles.recentIcon, { backgroundColor: `${item.winnerColor}1A` }]}>
-              <Ionicons name="trophy" size={18} color={item.winnerColor} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.recentTop}>
-                <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>{item.title}</AppText>
-                <Pill label={vehicleCategoryLabel(item.category)} tone="neutral" />
-              </View>
-              <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-                {item.fromLabel} → {item.toLabel} · {item.distanceKm} km
-              </AppText>
-              <View style={styles.recentBottom}>
-                <Ionicons name="trophy-outline" size={11} color={item.winnerColor} />
-                <AppText variant="caption" color={item.winnerColor}>Ganó {item.winner}</AppText>
-                <View style={styles.metaDot} />
-                <AppText variant="caption" color={colors.dim}>{item.time}</AppText>
-                <View style={styles.metaDot} />
-                <AppText variant="caption" color={colors.dim}>{item.date}</AppText>
-              </View>
-            </View>
-          </Card>
-        ))
-      )}
+      <RecentResults results={recentResults} />
 
       <Card style={styles.safetyCard}>
         <View style={styles.safetyIcon}>
@@ -1377,14 +941,6 @@ const styles = StyleSheet.create({
   modeIconActive: {
     backgroundColor: colors.lime,
   },
-  liveCard: {
-    marginTop: spacing.lg,
-    borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.25)',
-    padding: spacing.xl,
-    overflow: 'hidden',
-  },
   emptyActive: {
     marginTop: spacing.lg,
     alignItems: 'center',
@@ -1400,47 +956,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  liveGlow: {
-    position: 'absolute',
-    top: -150,
-    right: -80,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(255,90,31,0.12)',
-  },
-  liveTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  routeMini: {
-    marginTop: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.sm,
-    overflow: 'hidden',
-  },
-  routeMiniLabels: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  routeDistance: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  liveStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  liveStat: { flex: 1, gap: 2 },
-  liveStatTime: { flex: 1.45 },
-  liveDivider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 8 },
-  liveActions: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   sentCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1456,45 +971,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  standingsCard: { paddingVertical: 4, paddingHorizontal: spacing.md },
-  standingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  standingMe: {},
-  rank: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rankFirst: { backgroundColor: colors.lime },
-  standingMain: { flex: 1, minWidth: 0 },
-  standingNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kindBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    overflow: 'hidden',
-    marginTop: 6,
-  },
-  progressFill: { height: '100%', borderRadius: 2 },
-  standingRight: { alignItems: 'flex-end', minWidth: 52 },
   matchCard: { gap: 4 },
   matchHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   matchIcon: {
@@ -1506,39 +982,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepLabel: { marginTop: spacing.lg, marginBottom: 8 },
-  chipRow: { gap: 8, paddingRight: spacing.lg },
-  routeChip: {
-    width: 176,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  routeChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-  },
-  categoryNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 7,
-    marginTop: spacing.md,
-    backgroundColor: 'rgba(77,225,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(77,225,255,0.12)',
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
   friendHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1551,39 +994,6 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 6,
     paddingLeft: 8,
-  },
-  noRivals: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  friendRow: { gap: 8, paddingRight: spacing.lg },
-  friendCard: {
-    width: 80,
-    alignItems: 'center',
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 8,
-  },
-  friendCardActive: { borderColor: colors.lime, backgroundColor: colors.limeSoft },
-  friendKind: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
-  friendCheck: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.lime,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rivalCard: {
     flexDirection: 'row',
@@ -1627,29 +1037,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginTop: spacing.md,
   },
-  recentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: 8,
-    paddingVertical: 13,
-  },
-  emptyHistory: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: 8,
-  },
-  recentIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  recentBottom: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5, flexWrap: 'wrap' },
-  metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.dim },
   safetyCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',

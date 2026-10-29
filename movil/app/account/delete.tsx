@@ -112,8 +112,8 @@ export default function DeleteAccountScreen() {
               </View>
             ))}
             <AppText variant="caption" color={colors.dim} style={{ marginTop: spacing.md }}>
-              Las imágenes del feed se borran de Storage. Los datos en Supabase se
-              eliminan por cascada.
+              También se borran tus fotos publicadas y todos los datos asociados
+              a tu cuenta en nuestros servidores.
             </AppText>
           </Card>
 

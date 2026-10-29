@@ -39,8 +39,8 @@ export default function EventsScreen() {
         <Card style={styles.notice}>
           <Ionicons name="cloud-offline-outline" size={16} color={colors.accent} />
           <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-            Los eventos se guardan en tu dispositivo. Aplica la migración de
-            eventos en Supabase para publicarlos para todos.
+            Por ahora tus eventos se guardan en este dispositivo. Se publicarán
+            para todos en cuanto el servidor esté disponible.
           </AppText>
         </Card>
       ) : null}
