@@ -2,23 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
-import type { WorldMapMode } from '@/src/lib/map-html';
 import { GLASS } from '@/src/components/navigation/glass';
 import { colors, spacing } from '@/src/theme';
 
 export function MapControls({
   northUp,
-  mode,
   following,
   onToggleNorth,
-  onToggleMode,
   onRecenter,
 }: {
   northUp: boolean;
-  mode: WorldMapMode;
   following: boolean;
   onToggleNorth: () => void;
-  onToggleMode: () => void;
   onRecenter: () => void;
 }) {
   return (
@@ -35,16 +30,6 @@ export function MapControls({
           style={styles.modeText}
         >
           N
-        </AppText>
-      </Pressable>
-      <Pressable
-        style={styles.roundControl}
-        onPress={onToggleMode}
-        accessibilityRole="button"
-        accessibilityLabel={mode === '3d' ? 'Cambiar a vista 2D' : 'Cambiar a vista 3D'}
-      >
-        <AppText variant="label" color={colors.text} style={styles.modeText}>
-          {mode === '3d' ? '3D' : '2D'}
         </AppText>
       </Pressable>
       {!following ? (

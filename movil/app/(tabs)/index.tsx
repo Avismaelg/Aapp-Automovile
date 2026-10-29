@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapAttribution } from '@/src/components/MapAttribution';
 import { WorldMap } from '@/src/components/WorldMap';
-import { DestinationCard } from '@/src/components/navigation/DestinationCard';
+import { DestinationCard, type RouteOption } from '@/src/components/navigation/DestinationCard';
 import { FriendSheet } from '@/src/components/navigation/FriendSheet';
 import { MapControls } from '@/src/components/navigation/MapControls';
 import { NavigationHud } from '@/src/components/navigation/NavigationHud';
@@ -22,12 +22,14 @@ import { useRoadInfo } from '@/src/hooks/useRoadInfo';
 import { useActiveParty } from '@/src/hooks/useParty';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { useTripRecorder } from '@/src/hooks/useTripRecorder';
+import { useVoiceGuidance } from '@/src/hooks/useVoiceGuidance';
 import { showError } from '@/src/lib/alerts';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
-import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
+import type { WorldMapAlternative, WorldMapMember } from '@/src/lib/map-html';
 import {
   cumulativeDistances,
+  followingInstruction,
   nextInstruction,
   routeProgress,
 } from '@/src/lib/route-instructions';
@@ -54,9 +56,7 @@ export default function NavigationScreen() {
   const { members: mapFriends } = useFriendsOnMap();
   const createChallenge = useCreateChallenge();
 
-  // El modo 2D es la opción fluida para el arranque; el usuario puede activar
-  // 3D bajo demanda desde el control del mapa sin pagar ese coste siempre.
-  const [mode, setMode] = useState<WorldMapMode>('2d');
+  const [voiceMuted, setVoiceMuted] = useState(false);
   const [following, setFollowing] = useState(true);
   const [recenterToken, setRecenterToken] = useState(0);
   const [mapKey, setMapKey] = useState(0);
@@ -98,7 +98,7 @@ export default function NavigationScreen() {
   const showParking =
     Boolean(parkingSpot) && parkingDistance != null && parkingDistance > 40;
   // Con el coche aparcado y caminando, el mapa muestra un peatón en tu
-  // posición y deja el coche 3D fijo en el aparcamiento.
+  // posición y deja el coche fijo en el aparcamiento.
   const walking =
     Boolean(parkingSpot) &&
     parkingDistance != null &&
@@ -116,6 +116,16 @@ export default function NavigationScreen() {
   const routeLine = route.route
     ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
     : null;
+  const fastestTimeMs = route.routes[0]?.timeMs ?? 0;
+  const routeOptions = useMemo<RouteOption[]>(
+    () =>
+      route.routes.map((option) => ({
+        timeLabel: formatRouteTime(option.timeMs),
+        distanceLabel: formatRouteDistance(option.distanceM),
+        extraMinutes: Math.max(0, Math.round((option.timeMs - fastestTimeMs) / 60_000)),
+      })),
+    [route.routes, fastestTimeMs],
+  );
   const routeSourceLabel = route.route
     ? route.route.source === 'graphhopper'
       ? 'GraphHopper'
@@ -147,6 +157,10 @@ export default function NavigationScreen() {
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),
     [route.route, progressM],
+  );
+  const thenInstruction = useMemo(
+    () => followingInstruction(route.route?.instructions, upcoming),
+    [route.route, upcoming],
   );
   const remainingRouteM =
     route.route && progressM != null ? Math.max(0, route.route.distanceM - progressM) : null;
@@ -233,9 +247,6 @@ export default function NavigationScreen() {
           minute: '2-digit',
         })
       : null;
-  const remainingLabel = `${formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)} · ${formatRouteDistance(
-    remainingRouteM ?? route.route?.distanceM ?? 0,
-  )}${arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''}`;
   const destinationStatus = route.error
     ? route.error
     : route.isLoading
@@ -250,8 +261,6 @@ export default function NavigationScreen() {
     setFollowing(true);
     setRecenterToken((value) => value + 1);
   };
-
-  const toggleMode = () => setMode((value) => (value === '3d' ? '2d' : '3d'));
 
   const retryMap = () => {
     setMapError(null);
@@ -352,8 +361,26 @@ export default function NavigationScreen() {
 
   const navigating = isNavigating && Boolean(destination);
 
+  // Antes de salir se ven las alternativas en gris; durante la navegación,
+  // solo la ruta elegida.
+  const mapAlternatives = useMemo<WorldMapAlternative[]>(
+    () =>
+      navigating
+        ? []
+        : route.routes
+            .map((option, index) => ({ index, coordinates: option.coordinates }))
+            .filter((option) => option.index !== route.selected),
+    [navigating, route.routes, route.selected],
+  );
+  const selectRoute = route.select;
+
+  useVoiceGuidance({
+    upcoming: offRoute ? null : upcoming,
+    enabled: navigating && !voiceMuted,
+    speedKmh: live.location.speedKmh ?? null,
+  });
+
   const beginNavigation = useCallback(() => {
-    setMode('3d');
     setFollowing(true);
     setRecenterToken((value) => value + 1);
     startNavigation();
@@ -378,7 +405,8 @@ export default function NavigationScreen() {
         travelMode={walking ? 'walking' : 'car'}
         northUp={northUp}
         route={route.route}
-        mode={mode}
+        alternatives={mapAlternatives}
+        onAlternativePress={selectRoute}
         vehicleColor={primaryVehicle?.color}
         vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
@@ -398,15 +426,20 @@ export default function NavigationScreen() {
         {navigating && destination ? (
           <NavigationHud
             upcoming={upcoming ?? null}
+            following={thenInstruction}
             offRoute={offRoute}
             hasRoute={Boolean(routeLine)}
-            remainingLabel={remainingLabel}
+            arrivalLabel={arrivalLabel}
+            remainingTimeLabel={formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)}
+            remainingDistanceLabel={formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)}
             destinationLabel={destination.label}
             speedLabel={speedLabel}
             limitKmh={roadInfo.limitKmh ?? null}
             northUp={northUp}
+            muted={voiceMuted}
             bottomInset={insets.bottom}
             onToggleNorth={toggleNorthUp}
+            onToggleMute={() => setVoiceMuted((value) => !value)}
             onChangeRoute={() => router.push('/destino' as Href)}
             onClose={clearDestination}
           />
@@ -562,10 +595,8 @@ export default function NavigationScreen() {
 
               <MapControls
                 northUp={northUp}
-                mode={mode}
                 following={following}
                 onToggleNorth={toggleNorthUp}
-                onToggleMode={toggleMode}
                 onRecenter={recenter}
               />
             </View>
@@ -574,6 +605,9 @@ export default function NavigationScreen() {
               <DestinationCard
                 label={destination.label}
                 status={destinationStatus}
+                options={routeOptions}
+                selected={route.selected}
+                onSelect={selectRoute}
                 canConfirm={!route.isLoading && Boolean(route.route)}
                 onConfirm={beginNavigation}
                 onShare={() => void shareRouteLink()}

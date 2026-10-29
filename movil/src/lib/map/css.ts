@@ -1,6 +1,6 @@
 // Estilos del documento del mapa (marcadores, HUD interno y capas).
 export const MAP_CSS = `  * { box-sizing: border-box; }
-  html, body { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #06080b; }
+  html, body { height: 100%; width: 100%; margin: 0; overflow: hidden; background: #e9edf1; }
   #map { position: fixed; inset: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .vehicle, .dest { pointer-events: none; }
@@ -10,11 +10,8 @@ export const MAP_CSS = `  * { box-sizing: border-box; }
     position: absolute; left: 14px; top: 14px; width: 36px; height: 36px; border-radius: 50%;
     background: var(--car-color); animation: halo 2s ease-out infinite;
   }
-  .vehicle-arrow { position: absolute; left: 0; top: 0; width: 64px; height: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
+  .vehicle-arrow { position: absolute; left: 0; top: 0; width: 64px; height: 64px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35)); }
   .vehicle-arrow path { fill: var(--car-color); stroke: #ffffff; stroke-width: 4; stroke-linejoin: round; }
-  .vehicle.is-3d .vehicle-arrow { display: none; }
-  .guide-arrow { pointer-events: none; width: 44px; height: 44px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
-  .guide-arrow path { fill: #c9ff4d; stroke: #06080b; stroke-width: 3; stroke-linejoin: round; }
   .parking { pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .parking-badge {
     width: 38px; height: 38px; border-radius: 50%; background: #4de1ff;
@@ -47,8 +44,8 @@ export const MAP_CSS = `  * { box-sizing: border-box; }
   .member.talking .member-dot { animation: talk 1.4s ease-out infinite; }
   .member-name {
     position: absolute; top: 44px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-    color: #e8edf4; font-size: 9px; font-weight: 700;
-    background: rgba(6,8,11,0.75); border: 1px solid rgba(255,255,255,0.12);
+    color: #1b2430; font-size: 9px; font-weight: 700;
+    background: rgba(255,255,255,0.92); border: 1px solid rgba(20,30,45,0.15);
     padding: 2px 5px; border-radius: 5px;
   }
   .dest { position: relative; width: 44px; height: 44px; }

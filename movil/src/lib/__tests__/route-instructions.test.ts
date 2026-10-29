@@ -2,10 +2,12 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   cumulativeDistances,
+  followingInstruction,
   formatInstructionDistance,
   instructionsFromOsrm,
   nextInstruction,
   routeProgress,
+  spokenInstruction,
 } from '@/src/lib/route-instructions';
 
 describe('route instructions', () => {
@@ -42,5 +44,23 @@ describe('route instructions', () => {
 
     expect(next?.icon).toBe('right');
     expect(next?.remainingM).toBeGreaterThan(0);
+  });
+
+  it('anuncia la maniobra siguiente solo si está cerca de la próxima', () => {
+    const list = [
+      { icon: 'right' as const, text: 'Gira a la derecha', atDistanceM: 500 },
+      { icon: 'left' as const, text: 'Gira a la izquierda', atDistanceM: 650 },
+      { icon: 'arrive' as const, text: 'Has llegado a tu destino', atDistanceM: 2_000 },
+    ];
+    expect(followingInstruction(list, list[0])?.icon).toBe('left');
+    expect(followingInstruction(list, list[1])).toBeNull();
+    expect(followingInstruction(list, null)).toBeNull();
+  });
+
+  it('dice la distancia antes de la maniobra y solo la orden al llegar', () => {
+    expect(spokenInstruction('Gira a la derecha por Av. Duarte', 300)).toBe(
+      'En 300 metros, gira a la derecha por Av. Duarte',
+    );
+    expect(spokenInstruction('Gira a la derecha', 40)).toBe('Gira a la derecha');
   });
 });

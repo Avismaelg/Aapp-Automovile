@@ -196,3 +196,23 @@ export function nextInstruction(
     remainingM: Math.max(0, upcoming.atDistanceM - progressM),
   };
 }
+
+// Maniobra que viene justo después de la próxima, solo si está tan cerca que
+// conviene anunciarla ya ("Luego, gira a la derecha").
+export function followingInstruction(
+  instructions: RouteInstruction[] | undefined,
+  upcoming: RouteInstruction | null,
+  maxGapM = 400,
+) {
+  if (!instructions || !upcoming) return null;
+  const index = instructions.findIndex((item) => item.atDistanceM === upcoming.atDistanceM);
+  const next = index >= 0 ? instructions[index + 1] : undefined;
+  if (!next || next.atDistanceM - upcoming.atDistanceM > maxGapM) return null;
+  return next;
+}
+
+// Texto que se dice en voz alta según lo que falta para la maniobra.
+export function spokenInstruction(text: string, remainingM: number) {
+  if (remainingM <= 60) return text;
+  return `En ${formatInstructionDistance(remainingM).replace(' m', ' metros').replace(' km', ' kilómetros')}, ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}

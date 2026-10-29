@@ -5,17 +5,20 @@ import {
   encodeWorldMapCommand,
   parseWorldMapEvent,
   WORLD_MAP_HTML,
+  type WorldMapAlternative,
   type WorldMapCommand,
   type WorldMapDestination,
   type WorldMapLocation,
   type WorldMapMember,
-  type WorldMapMode,
   type WorldMapParking,
   type WorldMapRoute,
   type WorldMapTravelMode,
   type WorldMapVehicleKind,
 } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
+
+// Valor por defecto estable: un [] nuevo en cada render reenviaría el mensaje.
+const NO_ALTERNATIVES: WorldMapAlternative[] = [];
 
 type WorldMapProps = {
   members: WorldMapMember[];
@@ -27,12 +30,13 @@ type WorldMapProps = {
   fitRoute?: [number, number][] | null;
   autoFollow?: boolean;
   route?: WorldMapRoute | null;
-  mode?: WorldMapMode;
+  alternatives?: WorldMapAlternative[];
   vehicleColor?: string;
   vehicleKind?: WorldMapVehicleKind;
   recenterToken?: number;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;
+  onAlternativePress?: (index: number) => void;
   onError?: (message: string) => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -47,12 +51,13 @@ export const WorldMap = memo(function WorldMap({
   fitRoute = null,
   autoFollow = true,
   route = null,
-  mode = '3d',
+  alternatives = NO_ALTERNATIVES,
   vehicleColor = '#ff5a1f',
   vehicleKind = 'car',
   recenterToken = 0,
   onFollowChange,
   onMemberPress,
+  onAlternativePress,
   onError,
   style,
 }: WorldMapProps) {
@@ -61,13 +66,13 @@ export const WorldMap = memo(function WorldMap({
   const readyRef = useRef(false);
   const seqRef = useRef(0);
   const lastLocationKeyRef = useRef('');
-  const latestRef = useRef({ members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, mode, vehicleColor, vehicleKind });
-  const callbacksRef = useRef({ onFollowChange, onMemberPress, onError });
+  const latestRef = useRef({ members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind });
+  const callbacksRef = useRef({ onFollowChange, onMemberPress, onAlternativePress, onError });
 
   useEffect(() => {
-    latestRef.current = { members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, mode, vehicleColor, vehicleKind };
-    callbacksRef.current = { onFollowChange, onMemberPress, onError };
-  }, [members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, mode, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onError]);
+    latestRef.current = { members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind };
+    callbacksRef.current = { onFollowChange, onMemberPress, onAlternativePress, onError };
+  }, [members, destination, location, parking, travelMode, northUp, fitRoute, autoFollow, route, alternatives, vehicleColor, vehicleKind, onFollowChange, onMemberPress, onAlternativePress, onError]);
 
   const getContentWindow = useCallback(() => {
     const doc = (globalThis as { document?: Document }).document;
@@ -95,7 +100,7 @@ export const WorldMap = memo(function WorldMap({
     send({ type: 'autofollow', payload: latest.autoFollow });
     if (latest.fitRoute) send({ type: 'fit', payload: { coordinates: latest.fitRoute } });
     send({ type: 'route', payload: latest.route });
-    send({ type: 'mode', payload: latest.mode });
+    send({ type: 'alternatives', payload: latest.alternatives });
     send({ type: 'vehicle', payload: { color: latest.vehicleColor, kind: latest.vehicleKind } });
   }, [send]);
 
@@ -147,8 +152,8 @@ export const WorldMap = memo(function WorldMap({
   }, [route, send]);
 
   useEffect(() => {
-    send({ type: 'mode', payload: mode });
-  }, [mode, send]);
+    send({ type: 'alternatives', payload: alternatives });
+  }, [alternatives, send]);
 
   useEffect(() => {
     send({ type: 'vehicle', payload: { color: vehicleColor, kind: vehicleKind } });
@@ -177,6 +182,10 @@ export const WorldMap = memo(function WorldMap({
       }
       if (message.type === 'memberTap') {
         callbacksRef.current.onMemberPress?.(message.id);
+        return;
+      }
+      if (message.type === 'alternativeTap') {
+        callbacksRef.current.onAlternativePress?.(message.index);
         return;
       }
       callbacksRef.current.onError?.(message.message);

@@ -1,41 +1,29 @@
-import { MAP_STYLE_URL } from '@/src/lib/map/config';
+import { MAP_FALLBACK_STYLE_URL, MAP_STYLE_URL } from '@/src/lib/map/config';
 
-// Estado del mapa, cámara, seguimiento, ruta, guía y asistencia de frenado.
+// Estado del mapa, cámara, seguimiento, ruta, alternativas y próxima maniobra.
 // Se concatena con los demás fragmentos dentro de la misma IIFE.
 export const MAP_SCRIPT_CORE = `(function () {
   // Rendimiento: el WebView renderiza a la resolución física del panel
-  // (≈2.8x en la mayoría de teléfonos). El modo 2D es el arranque ligero y
-  // el modo 3D se activa bajo demanda.
+  // (≈2.8x en la mayoría de teléfonos); el mapa plano no necesita tanto.
   window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.0);
 
   var STYLE_URL = '${MAP_STYLE_URL}';
-  var FALLBACK_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+  var FALLBACK_STYLE_URL = '${MAP_FALLBACK_STYLE_URL}';
   var styleFallbackAttempted = false;
   var DEFAULT_CENTER = [-69.9312, 18.4861];
   var MAP_PIXEL_RATIO = 1.0;
-  var CRUISE_PITCH = 65;
-  var FOLLOW_ZOOM = 17;
   var MOVING_KMH = 5;
   var LOAD_TIMEOUT_MS = 25000;
   var EMPTY_ROUTE = { type: 'FeatureCollection', features: [] };
-  var THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
-  var CAR_LENGTH_PX = 60;
-  var CAR_LOOKAHEAD_M = 20;
-  var CAMERA_DISTANCE = 1000;
-  var GUIDE_CHECKPOINT_MIN_M = 500;
-  var GUIDE_MAX_CHECKPOINTS = 40;
-  var GUIDE_ARROW_AHEAD_M = 45;
-  var BRAKE_LOOKAHEAD_M = 400;
-  var BRAKE_RED_M = 150;
-  var BRAKE_RED_DEG = 55;
-  var BRAKE_YELLOW_DEG = 25;
+  // A menos de esta distancia de una maniobra la cámara se acerca.
+  var MANEUVER_ZOOM_M = 250;
 
   var state = {
     location: null,
     members: [],
     destination: null,
     route: null,
-    mode: '2d',
+    alternatives: [],
     following: true,
     heading: null,
     vehicleColor: '#ff5a1f',
@@ -52,23 +40,18 @@ export const MAP_SCRIPT_CORE = `(function () {
   var destinationMarker = null;
   var destinationLabel = null;
   var memberMarkers = new Map();
-  var THREE = null;
-  var car3d = null;
   var routePoints = [];
-  var guideMarker = null;
+  var routeCumulative = [];
+  var routeProgressM = null;
+  var maneuverDistanceM = null;
   var parkingMarker = null;
   var personMarker = null;
   var lastFollow = null;
   var smoothedHeading = null;
-  var carRenderWarned = false;
   var accuracyValue = null;
   var accuracyUpdatedAt = 0;
   var parkingLineAt = 0;
-  var lastCarKey = '';
   var lastRouteProgressIndex = -1;
-  // El canvas del vehículo usa una resolución moderada para no competir con
-  // el mapa por la GPU del teléfono.
-  var caravanaPerfScale = 1;
 
   function post(message) {
     var payload = JSON.stringify(message);
@@ -92,11 +75,6 @@ export const MAP_SCRIPT_CORE = `(function () {
     } catch (error) {
       return null;
     }
-  }
-
-  function pitchFor(mode) {
-    if (state.travelMode === 'walking') return 45;
-    return mode === '2d' ? 0 : CRUISE_PITCH;
   }
 
   function lngLatOf(point) {
@@ -132,6 +110,20 @@ export const MAP_SCRIPT_CORE = `(function () {
     post({ type: 'follow', value: value });
   }
 
+  // Zoom automático: cerca a poca velocidad, más lejos en autopista para ver
+  // lo que viene, y cerca otra vez justo antes de girar.
+  function zoomForSpeed() {
+    if (state.travelMode === 'walking') return 17.5;
+    var speed = state.location && typeof state.location.speedKmh === 'number'
+      ? state.location.speedKmh
+      : 0;
+    var zoom = speed < 25 ? 17 : speed < 50 ? 16.5 : speed < 80 ? 16 : 15.3;
+    if (maneuverDistanceM != null && maneuverDistanceM < MANEUVER_ZOOM_M && speed < 80) {
+      zoom = Math.max(zoom, 17);
+    }
+    return zoom;
+  }
+
   function follow(animate, zoomIn) {
     if (!mapReady || !state.location) return;
     var point = state.location;
@@ -151,42 +143,39 @@ export const MAP_SCRIPT_CORE = `(function () {
       center = aheadLngLat(point, bearing, meters);
     }
 
+    var targetZoom = zoomForSpeed();
+    var zoomOff = Math.abs(map.getZoom() - targetZoom) > 0.25;
+
     if (lastFollow && !zoomIn) {
       var moved = haversineLngLat(lastFollow.center, center);
       var turned = Math.abs(((bearing - lastFollow.bearing + 540) % 360) - 180);
       var minMove = walking ? 3 : 8;
       var minTurn = walking ? 4 : 6;
-      if (moved < minMove && turned < minTurn) return;
+      if (moved < minMove && turned < minTurn && !(moving && zoomOff)) return;
     }
     lastFollow = { center: center, bearing: bearing };
-
-    var targetZoom = walking ? FOLLOW_ZOOM + 0.5 : FOLLOW_ZOOM;
 
     // Failsafe: si la cámara está lejos (arranque, vuelta de segundo plano o
     // una animación cancelada), saltamos directamente a tu posición.
     var mapCenter = map.getCenter();
     var offCenter = haversineLngLat([mapCenter.lng, mapCenter.lat], center);
     if (offCenter > 800) {
-      map.jumpTo({
-        center: center,
-        zoom: targetZoom,
-        pitch: pitchFor(state.mode),
-        bearing: bearing
-      });
+      map.jumpTo({ center: center, zoom: targetZoom, pitch: 0, bearing: bearing });
       return;
     }
 
     var options = {
       center: center,
-      pitch: pitchFor(state.mode),
+      pitch: 0,
       bearing: bearing,
-       // La señal GPS llega cada pocos segundos; una animación de 1.9 s se
-       // solapaba con la siguiente y producía sensación de mapa pesado.
-       duration: animate ? (moving ? 850 : 450) : 0,
+      // La señal GPS llega cada pocos segundos; una animación larga se
+      // solapaba con la siguiente y producía sensación de mapa pesado.
+      duration: animate ? (moving ? 850 : 450) : 0,
       essential: true
     };
     if (moving) options.easing = function (t) { return t; };
-    if (zoomIn || map.getZoom() < targetZoom - 0.5) options.zoom = targetZoom;
+    // Parado respetamos el zoom que elija el usuario; en marcha manda la velocidad.
+    if (zoomIn || (moving && zoomOff) || map.getZoom() < targetZoom - 1.5) options.zoom = targetZoom;
     map.easeTo(options);
   }
 
@@ -196,11 +185,10 @@ export const MAP_SCRIPT_CORE = `(function () {
     if (firstFix) {
       // Al abrir la app o recargar el mapa, la primera posición siempre
       // reengancha el seguimiento: la cámara nunca se queda en el centro por
-      // defecto (Kennedy) aunque antes se hubiera soltado.
+      // defecto aunque antes se hubiera soltado.
       setFollowing(true);
     }
     state.location = location;
-    var moving = typeof location.speedKmh !== 'number' || location.speedKmh >= MOVING_KMH;
     if (typeof location.heading === 'number' && location.heading >= 0) {
       // Filtro simple: el GPS y la brújula tiemblan; la cámara no debe bailar.
       if (smoothedHeading === null) {
@@ -218,10 +206,8 @@ export const MAP_SCRIPT_CORE = `(function () {
     if (personMarker && state.travelMode === 'walking') {
       personMarker.setLngLat(lngLatOf(location));
     }
-    renderCar();
     updateRouteProgress(false);
-    updateBrakeAssist();
-    updateGuideArrow();
+    updateManeuver();
     updateParkingLine();
     if (state.following) follow(true, firstFix);
   }
@@ -290,10 +276,35 @@ export const MAP_SCRIPT_CORE = `(function () {
     if (!mapReady) return;
     var points = state.route && state.route.coordinates ? state.route.coordinates : [];
     routePoints = points.map(function (point) { return [point[1], point[0]]; });
+    routeCumulative = [0];
+    for (var i = 1; i < routePoints.length; i += 1) {
+      routeCumulative.push(routeCumulative[i - 1] + haversineLngLat(routePoints[i - 1], routePoints[i]));
+    }
     lastRouteProgressIndex = -1;
     updateRouteProgress(true);
-    updateGuide();
+    updateManeuver();
     if (!hadRoute && routePoints.length > 1) focusRoute();
+  }
+
+  // Rutas alternativas (sin elegir) en gris bajo la principal; se pueden tocar.
+  function setAlternatives(list) {
+    state.alternatives = Array.isArray(list) ? list : [];
+    if (!mapReady || !map.getSource('caravana-alternatives')) return;
+    map.getSource('caravana-alternatives').setData({
+      type: 'FeatureCollection',
+      features: state.alternatives
+        .filter(function (item) { return item && Array.isArray(item.coordinates) && item.coordinates.length > 1; })
+        .map(function (item) {
+          return {
+            type: 'Feature',
+            properties: { index: item.index },
+            geometry: {
+              type: 'LineString',
+              coordinates: item.coordinates.map(function (point) { return [point[1], point[0]]; })
+            }
+          };
+        })
+    });
   }
 
   function routeDataForProgress(splitIndex) {
@@ -303,19 +314,18 @@ export const MAP_SCRIPT_CORE = `(function () {
     var features = [];
     var past = routePoints.slice(0, split + 1);
     var future = routePoints.slice(split);
-    var kind = state.route.source;
 
     if (past.length > 1) {
       features.push({
         type: 'Feature',
-        properties: { kind: kind, segment: 'past' },
+        properties: { segment: 'past' },
         geometry: { type: 'LineString', coordinates: past }
       });
     }
     if (future.length > 1) {
       features.push({
         type: 'Feature',
-        properties: { kind: kind, segment: 'future' },
+        properties: { segment: 'future' },
         geometry: { type: 'LineString', coordinates: future }
       });
     }
@@ -326,18 +336,68 @@ export const MAP_SCRIPT_CORE = `(function () {
     if (!mapReady || !map.getSource('caravana-route')) return;
     if (!state.route || routePoints.length < 2) {
       lastRouteProgressIndex = -1;
+      routeProgressM = null;
       map.getSource('caravana-route').setData(EMPTY_ROUTE);
       return;
     }
 
     var split = state.location ? nearestRouteIndex(lngLatOf(state.location)) : 0;
+    routeProgressM = routeCumulative[split] || 0;
     if (!force && split === lastRouteProgressIndex) return;
     lastRouteProgressIndex = split;
     map.getSource('caravana-route').setData(routeDataForProgress(split));
   }
 
-  // Reencuadre corto: el coche queda en el centro y el tramo inmediato de la
-  // ruta ocupa la vista, en lugar de mostrar la ruta completa diminuta.
+  // Punto de la ruta a cierta distancia desde el inicio.
+  function pointAtDistance(meters) {
+    for (var i = 1; i < routePoints.length; i += 1) {
+      if (routeCumulative[i] >= meters) {
+        var span = routeCumulative[i] - routeCumulative[i - 1];
+        var t = span > 0 ? (meters - routeCumulative[i - 1]) / span : 0;
+        var a = routePoints[i - 1];
+        var b = routePoints[i];
+        return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      }
+    }
+    return routePoints[routePoints.length - 1];
+  }
+
+  // Marca en el mapa el punto exacto de la próxima maniobra.
+  function updateManeuver() {
+    if (!mapReady || !map.getSource('caravana-maneuver')) return;
+    var instructions = state.route && Array.isArray(state.route.instructions)
+      ? state.route.instructions
+      : [];
+    var progress = routeProgressM;
+    var next = null;
+    if (progress != null && routePoints.length > 1) {
+      for (var i = 0; i < instructions.length; i += 1) {
+        var item = instructions[i];
+        if (item.icon === 'depart' || item.icon === 'straight') continue;
+        if (item.atDistanceM > progress + 10) {
+          next = item;
+          break;
+        }
+      }
+    }
+    if (!next) {
+      maneuverDistanceM = null;
+      map.getSource('caravana-maneuver').setData(EMPTY_ROUTE);
+      return;
+    }
+    maneuverDistanceM = next.atDistanceM - progress;
+    map.getSource('caravana-maneuver').setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Point', coordinates: pointAtDistance(next.atDistanceM) }
+      }]
+    });
+  }
+
+  // Reencuadre corto: el coche queda abajo y el tramo inmediato de la ruta
+  // ocupa la vista, en lugar de mostrar la ruta completa diminuta.
   function focusRoute() {
     if (!mapReady || !state.location) return;
     var center = lngLatOf(state.location);
@@ -349,8 +409,8 @@ export const MAP_SCRIPT_CORE = `(function () {
     lastFollow = { center: center, bearing: bearing };
     map.easeTo({
       center: center,
-      zoom: Math.max(17.5, map.getZoom()),
-      pitch: pitchFor(state.mode),
+      zoom: Math.max(zoomForSpeed(), map.getZoom()),
+      pitch: 0,
       bearing: bearing,
       duration: 650,
       essential: true
@@ -368,94 +428,6 @@ export const MAP_SCRIPT_CORE = `(function () {
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
-  function bearingLngLat(a, b) {
-    var dLng = (b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180);
-    var dLat = b[1] - a[1];
-    var deg = Math.atan2(dLng, dLat) * 180 / Math.PI;
-    return (deg + 360) % 360;
-  }
-
-  // Banderas de checkpoint repartidas a lo largo de la ruta, estilo Forza.
-  function computeCheckpoints(points) {
-    var cumulative = [];
-    var total = 0;
-    for (var i = 1; i < points.length; i += 1) {
-      total += haversineLngLat(points[i - 1], points[i]);
-      cumulative.push(total);
-    }
-    if (total < GUIDE_CHECKPOINT_MIN_M * 2) return [];
-
-    var spacing = Math.max(GUIDE_CHECKPOINT_MIN_M, total / GUIDE_MAX_CHECKPOINTS);
-    var result = [];
-    var next = spacing;
-    var index = 1;
-    while (next < total - spacing * 0.6) {
-      while (index < cumulative.length && cumulative[index - 1] < next) index += 1;
-      if (index >= points.length) break;
-      var before = index === 1 ? 0 : cumulative[index - 2];
-      var span = cumulative[index - 1] - before;
-      var t = span > 0 ? (next - before) / span : 0;
-      var a = points[index - 1];
-      var b = points[index];
-      result.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-      next += spacing;
-    }
-    return result;
-  }
-
-  // Punto de la ruta a X metros delante del coche, con el rumbo de ese tramo.
-  function pointAheadOnRoute(origin, meters) {
-    var nearest = 0;
-    var nearestDistance = Infinity;
-    for (var i = 0; i < routePoints.length; i += 1) {
-      var d = haversineLngLat(origin, routePoints[i]);
-      if (d < nearestDistance) {
-        nearestDistance = d;
-        nearest = i;
-      }
-    }
-
-    var walked = 0;
-    for (var j = nearest; j < routePoints.length - 1; j += 1) {
-      var a = routePoints[j];
-      var b = routePoints[j + 1];
-      var span = haversineLngLat(a, b);
-      if (walked + span >= meters) {
-        var t = span > 0 ? (meters - walked) / span : 0;
-        return {
-          point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
-          bearing: bearingLngLat(a, b)
-        };
-      }
-      walked += span;
-    }
-
-    var last = routePoints[routePoints.length - 1];
-    var before = routePoints[routePoints.length - 2];
-    return { point: last, bearing: bearingLngLat(before, last) };
-  }
-
-  function updateGuide() {
-    if (!mapReady || !map.getSource('caravana-guide')) return;
-    var checkpoints = routePoints.length > 2 ? computeCheckpoints(routePoints) : [];
-    map.getSource('caravana-guide').setData(
-      checkpoints.length
-        ? {
-            type: 'FeatureCollection',
-            features: checkpoints.map(function (point) {
-              return {
-                type: 'Feature',
-                properties: {},
-                geometry: { type: 'Point', coordinates: point }
-              };
-            })
-          }
-        : EMPTY_ROUTE
-    );
-    updateBrakeAssist();
-    updateGuideArrow();
-  }
-
   function nearestRouteIndex(origin) {
     var nearest = 0;
     var nearestDistance = Infinity;
@@ -467,188 +439,6 @@ export const MAP_SCRIPT_CORE = `(function () {
       }
     }
     return nearest;
-  }
-
-  // Curva siguiente: cambio de rumbo y distancia desde el coche.
-  function brakeLevel(deltaDeg, distanceM) {
-    if (deltaDeg >= BRAKE_RED_DEG && distanceM <= BRAKE_RED_M) return 'red';
-    if (deltaDeg >= BRAKE_YELLOW_DEG) return 'yellow';
-    return 'green';
-  }
-
-  // Asistencia de frenado: pinta los próximos metros de ruta en
-  // verde (sin problema), amarillo (suelta el acelerador) o rojo (frena ya).
-  function updateBrakeAssist() {
-    if (!mapReady || !map.getSource('caravana-brake')) return;
-    if (routePoints.length < 3 || !state.location) {
-      map.getSource('caravana-brake').setData(EMPTY_ROUTE);
-      return;
-    }
-
-    var origin = lngLatOf(state.location);
-    var start = nearestRouteIndex(origin);
-    var segments = [];
-    var walked = 0;
-    var i = start;
-
-    while (i < routePoints.length - 1 && walked < BRAKE_LOOKAHEAD_M) {
-      var a = routePoints[i];
-      var b = routePoints[i + 1];
-      var span = haversineLngLat(a, b);
-      if (span === 0) {
-        i += 1;
-        continue;
-      }
-
-      // Rumbo de entrada y de salida en la curva que sigue a este tramo.
-      var before = routePoints[Math.max(0, i - 1)];
-      var delta = Math.abs(bearingLngLat(before, a) - bearingLngLat(a, b));
-      if (delta > 180) delta = 360 - delta;
-      var level = brakeLevel(delta, walked + span);
-
-      segments.push({
-        type: 'Feature',
-        properties: { level: level },
-        geometry: { type: 'LineString', coordinates: [a, b] }
-      });
-      walked += span;
-      i += 1;
-    }
-
-    map.getSource('caravana-brake').setData({
-      type: 'FeatureCollection',
-      features: segments
-    });
-  }
-
-  function addBrakeLayer() {
-    map.addSource('caravana-brake', { type: 'geojson', data: EMPTY_ROUTE });
-    map.addLayer({
-      id: 'caravana-brake-line',
-      type: 'line',
-      source: 'caravana-brake',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': [
-          'match',
-          ['get', 'level'],
-          'red',
-          '#ff4d5e',
-          'yellow',
-          '#ffc94d',
-          '#3ddc84'
-        ],
-        'line-width': 5,
-        'line-opacity': 0.92
-      }
-    }, firstSymbolLayerId());
-  }
-
-  // Nivel de la primera curva que exige frenar más adelante.
-  function nextBrakeLevel() {
-    var origin = lngLatOf(state.location);
-    var start = nearestRouteIndex(origin);
-    var walked = 0;
-    var i = start;
-    while (i < routePoints.length - 1 && walked < BRAKE_LOOKAHEAD_M) {
-      var a = routePoints[i];
-      var b = routePoints[i + 1];
-      var before = routePoints[Math.max(0, i - 1)];
-      var delta = Math.abs(bearingLngLat(before, a) - bearingLngLat(a, b));
-      if (delta > 180) delta = 360 - delta;
-      var span = haversineLngLat(a, b);
-      var level = brakeLevel(delta, walked + span);
-      if (level !== 'green') return level;
-      walked += span;
-      i += 1;
-    }
-    return 'green';
-  }
-
-  function updateGuideArrow() {
-    if (!mapReady) return;
-    var show = routePoints.length >= 2 && Boolean(state.location);
-    if (!show) {
-      if (guideMarker) guideMarker.getElement().style.display = 'none';
-      return;
-    }
-    var target = pointAheadOnRoute(lngLatOf(state.location), GUIDE_ARROW_AHEAD_M);
-    if (!guideMarker) {
-      var element = document.createElement('div');
-      element.className = 'guide-arrow';
-      element.innerHTML =
-        '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 L34 34 L20 27 L6 34 Z"></path></svg>';
-      guideMarker = new maplibregl.Marker({
-        element: element,
-        rotationAlignment: 'map',
-        pitchAlignment: 'viewport'
-      }).setLngLat(target.point).addTo(map);
-    }
-    guideMarker.getElement().style.display = '';
-    guideMarker.setLngLat(target.point);
-    guideMarker.setRotation(target.bearing);
-    var level = nextBrakeLevel();
-    var arrowPath = guideMarker.getElement().querySelector('path');
-    if (arrowPath) {
-      arrowPath.setAttribute(
-        'fill',
-        level === 'red' ? '#ff4d5e' : level === 'yellow' ? '#ffc94d' : '#c9ff4d'
-      );
-    }
-  }
-
-  function createFlagIcon() {
-    var size = 60;
-    var canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    var context = canvas.getContext('2d');
-    context.fillStyle = 'rgba(6,8,11,0.9)';
-    context.fillRect(size * 0.42, size * 0.14, size * 0.07, size * 0.72);
-    context.beginPath();
-    context.moveTo(size * 0.49, size * 0.16);
-    context.lineTo(size * 0.86, size * 0.3);
-    context.lineTo(size * 0.49, size * 0.46);
-    context.closePath();
-    context.fillStyle = '#c9ff4d';
-    context.fill();
-    context.strokeStyle = 'rgba(6,8,11,0.85)';
-    context.lineWidth = size * 0.05;
-    context.stroke();
-    context.beginPath();
-    context.arc(size * 0.455, size * 0.87, size * 0.09, 0, Math.PI * 2);
-    context.fillStyle = 'rgba(201,255,77,0.9)';
-    context.fill();
-    var image = context.getImageData(0, 0, size, size);
-    map.addImage('caravana-guide-flag', {
-      width: size,
-      height: size,
-      data: new Uint8Array(image.data.buffer)
-    });
-  }
-
-  function addGuideLayer() {
-    createFlagIcon();
-    map.addSource('caravana-guide', { type: 'geojson', data: EMPTY_ROUTE });
-    map.addLayer({
-      id: 'caravana-guide-flags',
-      type: 'symbol',
-      source: 'caravana-guide',
-      layout: {
-        'icon-image': 'caravana-guide-flag',
-        'icon-size': 0.85,
-        'icon-allow-overlap': true,
-        'icon-ignore-placement': true
-      }
-    }, firstSymbolLayerId());
-  }
-
-  function setMode(mode) {
-    state.mode = mode === '2d' ? '2d' : '3d';
-    document.body.setAttribute('data-mode', state.mode);
-    if (!mapReady) return;
-    renderCar();
-    map.easeTo({ pitch: pitchFor(state.mode), duration: 700, essential: true });
   }
 
   function recenter() {
@@ -666,7 +456,7 @@ export const MAP_SCRIPT_CORE = `(function () {
       else if (message.type === 'members') setMembers(message.payload);
       else if (message.type === 'destination') setDestination(message.payload);
       else if (message.type === 'route') setRoute(message.payload);
-      else if (message.type === 'mode') setMode(message.payload);
+      else if (message.type === 'alternatives') setAlternatives(message.payload);
       else if (message.type === 'vehicle') setVehicleInput(message.payload);
       else if (message.type === 'parking') setParking(message.payload);
       else if (message.type === 'travel') setTravelMode(message.payload);
@@ -679,18 +469,50 @@ export const MAP_SCRIPT_CORE = `(function () {
     }
   }
 
+  function addAlternatives(before) {
+    map.addSource('caravana-alternatives', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-alt-casing',
+      type: 'line',
+      source: 'caravana-alternatives',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#6f7f93',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 6, 14, 9, 16, 13, 18, 19]
+      }
+    }, before);
+    map.addLayer({
+      id: 'caravana-alt-line',
+      type: 'line',
+      source: 'caravana-alternatives',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#b4c2d3',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 6, 16, 9, 18, 14]
+      }
+    }, before);
+    map.on('click', 'caravana-alt-casing', function (event) {
+      var feature = event.features && event.features[0];
+      if (feature && typeof feature.properties.index === 'number') {
+        post({ type: 'alternativeTap', index: feature.properties.index });
+      }
+    });
+  }
+
+  // Ruta principal: cinta azul gruesa con borde oscuro; lo ya recorrido en gris.
   function addRoute() {
-    map.addSource('caravana-route', { type: 'geojson', data: EMPTY_ROUTE });
     var before = firstSymbolLayerId();
+    addAlternatives(before);
+    map.addSource('caravana-route', { type: 'geojson', data: EMPTY_ROUTE });
     map.addLayer({
       id: 'caravana-route-casing',
       type: 'line',
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#101820', '#061008'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 14, 11, 16, 15, 18, 22],
-        'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.55, 0.96]
+        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#8a96a4', '#1458b8'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 8, 14, 12, 16, 17, 18, 24],
+        'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.6, 1]
       }
     }, before);
     map.addLayer({
@@ -699,23 +521,12 @@ export const MAP_SCRIPT_CORE = `(function () {
       source: 'caravana-route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#596778', '#baff3f'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 8, 16, 12, 18, 17]
-      }
-    }, before);
-    // Brillo interior: da volumen a la cinta, como la ruta de Waze.
-    map.addLayer({
-      id: 'caravana-route-core',
-      type: 'line',
-      source: 'caravana-route',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#9aa7b8', '#f2ffc1'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 14, 2, 16, 3, 18, 4],
-        'line-opacity': ['case', ['==', ['get', 'segment'], 'past'], 0.35, 0.95]
+        'line-color': ['case', ['==', ['get', 'segment'], 'past'], '#c3cbd4', '#3d9bff'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 8.5, 16, 12.5, 18, 18]
       }
     }, before);
     addRouteArrows(before);
+    addManeuverLayer();
   }
 
   function createRouteArrowIcon() {
@@ -724,7 +535,7 @@ export const MAP_SCRIPT_CORE = `(function () {
     canvas.width = size;
     canvas.height = size;
     var context = canvas.getContext('2d');
-    context.strokeStyle = 'rgba(240,248,255,0.92)';
+    context.strokeStyle = 'rgba(255,255,255,0.95)';
     context.lineWidth = size * 0.16;
     context.lineCap = 'round';
     context.lineJoin = 'round';
@@ -750,37 +561,46 @@ export const MAP_SCRIPT_CORE = `(function () {
       filter: ['==', ['get', 'segment'], 'future'],
       layout: {
         'symbol-placement': 'line',
-        'symbol-spacing': 90,
+        'symbol-spacing': 110,
         'icon-image': 'caravana-route-arrow',
-        'icon-size': 0.75,
+        'icon-size': 0.7,
         'icon-rotation-alignment': 'map',
-        'icon-pitch-alignment': 'map',
         'icon-allow-overlap': true,
         'icon-ignore-placement': true
       }
     }, before);
   }
 
-  // Estilo tipo Waze: menos ruido de etiquetas de negocios y calles más
-  // legibles, con las arterias resaltadas sobre la base.
+  // Punto blanco con borde azul donde hay que girar.
+  function addManeuverLayer() {
+    map.addSource('caravana-maneuver', { type: 'geojson', data: EMPTY_ROUTE });
+    map.addLayer({
+      id: 'caravana-maneuver',
+      type: 'circle',
+      source: 'caravana-maneuver',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8, 18, 11],
+        'circle-color': '#ffffff',
+        'circle-stroke-color': '#1458b8',
+        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3.5, 18, 5]
+      }
+    });
+  }
+
+  // Mapa limpio: fuera negocios, números de portal y flechas de sentido; los
+  // nombres de calles se quedan, que es lo que se lee al conducir.
   function hideClutter() {
     var layers = map.getStyle().layers || [];
     for (var index = 0; index < layers.length; index += 1) {
       var layer = layers[index];
       if (layer.type !== 'symbol') continue;
       var sourceLayer = layer['source-layer'] || '';
-       var keepPlaceLabel =
-         layer.id === 'place_city' ||
-         layer.id === 'place_city_large' ||
-         layer.id === 'place_country_major' ||
-         layer.id === 'highway_name_motorway';
-       if (
-         sourceLayer === 'poi' ||
-         sourceLayer === 'housenumber' ||
-         sourceLayer === 'transportation' ||
-         (sourceLayer === 'transportation_name' && !keepPlaceLabel) ||
-         (sourceLayer === 'place' && !keepPlaceLabel)
-       ) {
+      if (
+        sourceLayer === 'poi' ||
+        sourceLayer === 'housenumber' ||
+        sourceLayer === 'aerodrome_label' ||
+        sourceLayer === 'transportation'
+      ) {
         try {
           map.setLayoutProperty(layer.id, 'visibility', 'none');
         } catch (error) {
@@ -790,53 +610,17 @@ export const MAP_SCRIPT_CORE = `(function () {
     }
   }
 
-  function addRoadStyle() {
-    var style = map.getStyle();
-    var sources = style.sources || {};
-    var sourceId = Object.keys(sources).filter(function (id) {
-      return sources[id].type === 'vector';
-    })[0];
-    if (!sourceId) return;
-    var before = firstSymbolLayerId();
-    map.addLayer({
-      id: 'caravana-arteries',
-      type: 'line',
-      source: sourceId,
-      'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['primary', 'secondary', 'tertiary']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#4b5670',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 14, 3, 16, 6, 18, 11],
-        'line-opacity': 0.95
-      }
-    }, before);
-    map.addLayer({
-      id: 'caravana-highways',
-      type: 'line',
-      source: sourceId,
-      'source-layer': 'transportation',
-      filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk']]],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#5d6a86',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 14, 4, 16, 7.5, 18, 13],
-        'line-opacity': 0.95
-      }
-    }, before);
-  }
-
   function addVehicle() {
     var element = document.createElement('div');
     element.className = 'vehicle';
     element.style.setProperty('--car-color', state.vehicleColor);
     element.innerHTML =
       '<div class="vehicle-halo"></div>' +
-      '<svg class="vehicle-arrow" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 L50 56 L32 46 L14 56 Z"></path></svg>';
+      '<svg class="vehicle-arrow" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 L52 56 L32 45 L12 56 Z"></path></svg>';
     vehicleMarker = new maplibregl.Marker({
       element: element,
       rotationAlignment: 'map',
-      pitchAlignment: 'viewport'
+      pitchAlignment: 'map'
     })
       .setLngLat(state.location ? lngLatOf(state.location) : DEFAULT_CENTER)
       .addTo(map);

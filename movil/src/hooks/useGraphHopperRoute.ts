@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import {
-  fetchStreetRoute,
+  fetchStreetRoutes,
   isGraphHopperConfigured,
 } from '@/src/lib/graphhopper';
 import type { WorldMapRoute } from '@/src/lib/map-html';
@@ -13,14 +13,17 @@ type GeoPoint = {
 };
 
 type RouteState = {
-  route: WorldMapRoute | null;
+  // Opciones de la más rápida a la más lenta; selected es la elegida.
+  routes: WorldMapRoute[];
+  selected: number;
   isLoading: boolean;
   error: string | null;
 };
 
 // Compartida entre el mapa y la party: una sola petición a GraphHopper por cambio.
 const useRouteState = create<RouteState>(() => ({
-  route: null,
+  routes: [],
+  selected: 0,
   isLoading: false,
   error: null,
 }));
@@ -72,21 +75,24 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
     useRouteState.setState({ isLoading: true, error: null });
 
     try {
-      const route = await fetchStreetRoute({
+      const routes = await fetchStreetRoutes({
         origin,
         destination,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
+      // Al recalcular se vuelve a la más rápida desde la posición actual.
       useRouteState.setState({
-        route,
+        routes,
+        selected: 0,
         isLoading: false,
         error: null,
       });
     } catch {
       if (controller.signal.aborted) return;
       useRouteState.setState({
-        route: null,
+        routes: [],
+        selected: 0,
         isLoading: false,
         error: 'No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.',
       });
@@ -97,7 +103,12 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
 function clearRoute() {
   cancelPending();
   requested = null;
-  useRouteState.setState({ route: null, isLoading: false, error: null });
+  useRouteState.setState({ routes: [], selected: 0, isLoading: false, error: null });
+}
+
+function selectRoute(index: number) {
+  const { routes } = useRouteState.getState();
+  if (index >= 0 && index < routes.length) useRouteState.setState({ selected: index });
 }
 
 function retryRoute() {
@@ -121,7 +132,8 @@ export function useGraphHopperRoute({
   const originLongitude = origin.longitude;
   const destinationLatitude = destination.latitude;
   const destinationLongitude = destination.longitude;
-  const { route, isLoading, error } = useRouteState();
+  const { routes, selected, isLoading, error } = useRouteState();
+  const route = routes[selected] ?? null;
 
   useEffect(() => {
     if (!enabled) {
@@ -137,6 +149,9 @@ export function useGraphHopperRoute({
 
   return {
     route,
+    routes,
+    selected,
+    select: selectRoute,
     isLoading,
     error,
     configured: isGraphHopperConfigured,

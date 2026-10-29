@@ -54,7 +54,11 @@ export type WorldMapRoute = {
   instructions?: RouteInstruction[];
 };
 
-export type WorldMapMode = '2d' | '3d';
+// Ruta alternativa que se pinta en gris; index es su posición en la lista.
+export type WorldMapAlternative = {
+  index: number;
+  coordinates: [number, number][];
+};
 
 export type WorldMapVehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';
 
@@ -70,7 +74,7 @@ export type WorldMapCommand =
   | { type: 'members'; payload: WorldMapMember[] }
   | { type: 'destination'; payload: WorldMapDestination | null }
   | { type: 'route'; payload: WorldMapRoute | null }
-  | { type: 'mode'; payload: WorldMapMode }
+  | { type: 'alternatives'; payload: WorldMapAlternative[] }
   | { type: 'vehicle'; payload: { color: string; kind?: WorldMapVehicleKind } }
   | { type: 'parking'; payload: WorldMapParking | null }
   | { type: 'travel'; payload: WorldMapTravelMode }
@@ -83,6 +87,7 @@ export type WorldMapEvent =
   | { type: 'ready' }
   | { type: 'follow'; value: boolean }
   | { type: 'memberTap'; id: string }
+  | { type: 'alternativeTap'; index: number }
   | { type: 'error'; message: string };
 
 export function encodeWorldMapCommand(seq: number, command: WorldMapCommand) {
@@ -100,13 +105,22 @@ export function parseWorldMapEvent(raw: unknown): WorldMapEvent | null {
   }
   if (!data || typeof data !== 'object') return null;
 
-  const event = data as { type?: unknown; value?: unknown; id?: unknown; message?: unknown };
+  const event = data as {
+    type?: unknown;
+    value?: unknown;
+    id?: unknown;
+    index?: unknown;
+    message?: unknown;
+  };
   if (event.type === 'ready') return { type: 'ready' };
   if (event.type === 'follow' && typeof event.value === 'boolean') {
     return { type: 'follow', value: event.value };
   }
   if (event.type === 'memberTap' && typeof event.id === 'string') {
     return { type: 'memberTap', id: event.id };
+  }
+  if (event.type === 'alternativeTap' && typeof event.index === 'number') {
+    return { type: 'alternativeTap', index: event.index };
   }
   if (event.type === 'error' && typeof event.message === 'string') {
     return { type: 'error', message: event.message };

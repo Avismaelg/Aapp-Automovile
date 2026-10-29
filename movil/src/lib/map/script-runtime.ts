@@ -1,91 +1,5 @@
-// Render del vehículo, capas del mapa, mensajes de la app y arranque.
-export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas con la misma cámara inclinada que el mapa.
-  // La posición sale de map.project() y el giro, de un punto 20 m por delante del coche.
-  function renderCar() {
-    if (!car3d || !mapReady) return;
-    try {
-    var container = map.getContainer();
-    if (container.clientWidth !== car3d.width || container.clientHeight !== car3d.height) sizeCar();
-
-    var located = Boolean(state.location);
-    var moving = state.location && typeof state.location.speedKmh === 'number' && state.location.speedKmh >= MOVING_KMH;
-    var use3d = located && state.mode === '3d' && (Boolean(state.route || state.destination) || moving);
-    car3d.canvas.style.display = use3d ? 'block' : 'none';
-    if (vehicleMarker) {
-      var element = vehicleMarker.getElement();
-      element.classList.toggle('is-3d', use3d);
-      // Con relieve e inclinación MapLibre puede colocar el marcador DOM en
-      // posiciones raras; escondido no molesta.
-      element.style.opacity = use3d ? '0' : '';
-      element.style.display = use3d ? 'none' : '';
-    }
-    if (!use3d) return;
-
-    var pitch = map.getPitch() * Math.PI / 180;
-    var sinPitch = Math.sin(pitch);
-    var cosPitch = Math.cos(pitch);
-    var heading = state.heading !== null ? state.heading : map.getBearing();
-    var walking = state.travelMode === 'walking' && Boolean(state.parking);
-    var referenced = walking ? state.parking : state.location;
-    var anchor = map.project(lngLatOf(referenced));
-    var ahead = map.project(aheadLngLat(referenced, heading, CAR_LOOKAHEAD_M));
-    var onScreen = Math.atan2(ahead.x - anchor.x, anchor.y - ahead.y);
-    var turn = Math.atan2(Math.sin(onScreen), Math.cos(onScreen) / cosPitch);
-    var offsetX = anchor.x - car3d.width / 2;
-    var offsetY = car3d.height / 2 - anchor.y;
-
-    // Si el encuadre y el vehículo no cambiaron, el canvas ya tiene el frame
-    // correcto: no gastamos GPU redibujando.
-    var frameKey = [
-      offsetX.toFixed(1),
-      offsetY.toFixed(1),
-      turn.toFixed(3),
-      map.getBearing().toFixed(1),
-      map.getPitch().toFixed(1),
-      car3d.width + 'x' + car3d.height,
-      state.vehicleColor,
-      car3d.kind
-    ].join('|');
-    if (frameKey === lastCarKey) return;
-    lastCarKey = frameKey;
-
-    car3d.camera.up.set(0, sinPitch, -cosPitch);
-    car3d.camera.position.set(0, CAMERA_DISTANCE * cosPitch, CAMERA_DISTANCE * sinPitch);
-    car3d.camera.lookAt(0, 0, 0);
-    car3d.model.position.set(offsetX, offsetY * sinPitch, -offsetY * cosPitch);
-    car3d.model.rotation.y = Math.PI / 2 - turn;
-    car3d.renderer.render(car3d.scene, car3d.camera);
-    } catch (error) {
-      if (!carRenderWarned) {
-        carRenderWarned = true;
-        console.warn('Caravana: no se pudo dibujar el coche 3D en este frame.', error);
-      }
-    }
-  }
-
-  async function initCar3D() {
-    if (THREE || car3d) return;
-    try {
-      THREE = await import(THREE_MODULE_URL);
-    } catch (error) {
-      console.warn('Caravana: no se pudo cargar Three.js; se usa la flecha 2D.', error);
-      return;
-    }
-    if (!mapReady || car3d) return;
-    try {
-      createCar3D();
-      map.on('render', renderCar);
-      document.body.setAttribute('data-car', '3d');
-      renderCar();
-    } catch (error) {
-      console.warn('Caravana: no se pudo crear el coche 3D; se usa la flecha 2D.', error);
-      if (car3d) car3d.canvas.remove();
-      car3d = null;
-      document.body.setAttribute('data-car', '2d');
-    }
-  }
-
-  function addPerson() {
+// Capas del mapa, mensajes de la app y arranque.
+export const MAP_SCRIPT_RUNTIME = `  function addPerson() {
     var element = document.createElement('div');
     element.className = 'person';
     element.style.display = 'none';
@@ -112,9 +26,9 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
     } else if (personMarker) {
       personMarker.getElement().style.display = 'none';
     }
-
-    renderCar();
-    map.easeTo({ pitch: pitchFor(state.mode), duration: 600, essential: true });
+    // Caminando, el coche se queda en el aparcamiento y tú eres el peatón.
+    if (vehicleMarker) vehicleMarker.getElement().style.display = walking ? 'none' : '';
+    if (state.following) follow(true, true);
   }
 
   function setNorthUp(value) {
@@ -152,7 +66,7 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
     var zoom = spanM > 0
       ? Math.min(16, Math.max(10.5, Math.log(160000000 / Math.max(spanM, 400)) / Math.LN2))
       : 14;
-    map.jumpTo({ center: center, zoom: zoom, pitch: 45, bearing: 0 });
+    map.jumpTo({ center: center, zoom: zoom, pitch: 0, bearing: 0 });
   }
 
   function setAutoFollow(value) {
@@ -308,8 +222,8 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
     destinationMarker = new maplibregl.Marker({ element: element });
   }
 
-  // Cámara de persecución: el coche queda abajo en pantalla y se ve hacia
-  // adelante, como una cámara 360 montada detrás del vehículo.
+  // El coche queda en el tercio inferior de la pantalla para ver más calle
+  // por delante que por detrás.
   function applyViewPadding() {
     var container = map.getContainer();
     var height = container.clientHeight || 800;
@@ -369,12 +283,8 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
       if (map.setPixelRatio) map.setPixelRatio(MAP_PIXEL_RATIO);
       applyViewPadding();
       watchResize();
-      map.setPitch(pitchFor(state.mode));
       addAccuracyLayer();
-      addRoadStyle();
       addRoute();
-      addGuideLayer();
-      addBrakeLayer();
       hideClutter();
       addVehicle();
       addDestination();
@@ -383,6 +293,7 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
       setMembers(state.members);
       setDestination(state.destination);
       setRoute(state.route);
+      setAlternatives(state.alternatives);
       setParking(state.parking);
       setTravelMode(state.travelMode);
       if (state.location) {
@@ -394,7 +305,6 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
       fail('Mapa: ' + (error && error.message ? error.message : String(error)));
     }
     post({ type: 'ready' });
-    void initCar3D();
   }
 
   function webglAvailable() {
@@ -408,11 +318,11 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
 
   function createMap() {
     if (typeof maplibregl === 'undefined') {
-      fail('No pudimos cargar el motor del mapa 3D. Revisa tu conexión.');
+      fail('No pudimos cargar el motor del mapa. Revisa tu conexión.');
       return;
     }
     if (!webglAvailable()) {
-      fail('Este dispositivo no soporta mapas 3D (WebGL).');
+      fail('Este dispositivo no soporta el mapa (WebGL).');
       return;
     }
     map = new maplibregl.Map({
@@ -420,11 +330,14 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
       style: STYLE_URL,
       center: state.location ? lngLatOf(state.location) : DEFAULT_CENTER,
       zoom: 16,
-      pitch: pitchFor(state.mode),
+      pitch: 0,
       bearing: 0,
-      maxPitch: 70,
+      maxPitch: 0,
+      pitchWithRotate: false,
       attributionControl: false
     });
+    // Mapa siempre plano: ni el gesto de dos dedos lo inclina.
+    if (map.touchPitch) map.touchPitch.disable();
     window.caravanaMap = map;
     map.on('styleimagemissing', function (event) {
       if (!map.hasImage(event.id)) map.addImage(event.id, { width: 1, height: 1, data: new Uint8Array(4) });
@@ -447,17 +360,12 @@ export const MAP_SCRIPT_RUNTIME = `  // Dibujamos el coche en su propio canvas c
     map.on('rotatestart', function (event) {
       if (event.originalEvent) setFollowing(false);
     });
-    map.on('pitchstart', function (event) {
-      if (event.originalEvent) setFollowing(false);
-    });
     setTimeout(function () {
       if (!mapReady) fail('El mapa tarda demasiado en cargar. Revisa tu conexión.');
     }, LOAD_TIMEOUT_MS);
   }
 
   document.body.setAttribute('data-follow', 'on');
-  document.body.setAttribute('data-mode', state.mode);
-  document.body.setAttribute('data-car', '2d');
   window.addEventListener('message', handleMessage);
   document.addEventListener('message', handleMessage);
   createMap();
