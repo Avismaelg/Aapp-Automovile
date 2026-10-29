@@ -1,7 +1,7 @@
 import type { Ionicons } from '@expo/vector-icons';
 
 import { formatNumber } from '@/src/lib/format';
-import type { Trip } from '@/src/store/trips';
+import type { Trip, TripTotals } from '@/src/store/trips';
 
 export type Achievement = {
   id: string;
@@ -13,12 +13,17 @@ export type Achievement = {
 const DAY_MS = 24 * 3_600_000;
 
 // Logros calculados con los viajes grabados en el dispositivo. Nunca premian
-// la velocidad: solo distancia y constancia.
-export function tripAchievements(trips: Trip[], now = Date.now()): Achievement[] {
+// la velocidad: solo distancia y constancia. Los totales cubren toda la vida
+// del dispositivo; el viaje más largo y la constancia, el historial guardado.
+export function tripAchievements(
+  trips: Trip[],
+  totals: TripTotals,
+  now = Date.now(),
+): Achievement[] {
   const finished = trips.filter((trip) => trip.endedAt != null);
-  if (finished.length === 0) return [];
+  if (finished.length === 0 || totals.drives === 0) return [];
 
-  const totalKm = finished.reduce((sum, trip) => sum + trip.distanceM, 0) / 1000;
+  const totalKm = totals.distanceM / 1000;
   const longest = finished.reduce((best, trip) => (trip.distanceM > best.distanceM ? trip : best));
   const activeDays = new Set(
     finished
@@ -30,7 +35,7 @@ export function tripAchievements(trips: Trip[], now = Date.now()): Achievement[]
     {
       id: 'distance',
       title: `${formatNumber(totalKm, 0)} km grabados`,
-      detail: `${finished.length} ${finished.length === 1 ? 'viaje' : 'viajes'} en tu historial`,
+      detail: `${totals.drives} ${totals.drives === 1 ? 'viaje' : 'viajes'} en total`,
       icon: 'map',
     },
     {
@@ -51,10 +56,10 @@ export function tripAchievements(trips: Trip[], now = Date.now()): Achievement[]
   return list;
 }
 
-// Totales de los viajes guardados en el dispositivo (los últimos 30).
-export function tripStats(trips: Trip[]) {
-  const finished = trips.filter((trip) => trip.endedAt != null);
-  const km = finished.reduce((sum, trip) => sum + trip.distanceM, 0) / 1000;
-  const ms = finished.reduce((sum, trip) => sum + ((trip.endedAt ?? trip.startedAt) - trip.startedAt), 0);
-  return { drives: finished.length, km, hours: Math.round(ms / 3_600_000) };
+export function tripStats(totals: TripTotals) {
+  return {
+    drives: totals.drives,
+    km: totals.distanceM / 1000,
+    hours: Math.round(totals.durationMs / 3_600_000),
+  };
 }

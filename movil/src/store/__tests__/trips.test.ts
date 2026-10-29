@@ -28,7 +28,12 @@ describe('registro automático de rutas', () => {
     jest.setSystemTime(new Date('2026-10-28T12:00:00Z'));
     await AsyncStorage.clear();
     resetTripDetection();
-    useTrips.setState({ active: null, trips: [], hydrated: true });
+    useTrips.setState({
+      active: null,
+      trips: [],
+      totals: { drives: 0, distanceM: 0, durationMs: 0 },
+      hydrated: true,
+    });
   });
 
   afterEach(() => {
@@ -117,5 +122,26 @@ describe('registro automático de rutas', () => {
     const active = useTrips.getState().active;
     expect(active?.startedAt).toBe(background[0].at);
     expect(active?.distanceM).toBeGreaterThan(400);
+  });
+
+  it('los totales cuentan todos los viajes aunque el historial guarde solo 30', async () => {
+    const old = Array.from({ length: 30 }, (_, index) => ({
+      id: `old${index}`,
+      startedAt: index,
+      endedAt: index + 1,
+      distanceM: 1_000,
+      maxSpeedKmh: 0,
+      avgSpeedKmh: 0,
+      points: [],
+    }));
+    useTrips.setState({ trips: old, totals: { drives: 30, distanceM: 30_000, durationMs: 30 } });
+
+    drive(0, 6, Date.now());
+    await useTrips.getState().stopTrip();
+
+    const { trips, totals } = useTrips.getState();
+    expect(trips).toHaveLength(30);
+    expect(totals.drives).toBe(31);
+    expect(totals.distanceM).toBeGreaterThan(30_400);
   });
 });

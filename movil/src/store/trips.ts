@@ -22,8 +22,17 @@ export type Trip = {
   recordsSubmitted?: boolean;
 };
 
+// Totales de toda la vida del dispositivo: el historial solo guarda los
+// últimos MAX_TRIPS viajes.
+export type TripTotals = {
+  drives: number;
+  distanceM: number;
+  durationMs: number;
+};
+
 type TripsState = {
   trips: Trip[];
+  totals: TripTotals;
   active: Trip | null;
   hydrated: boolean;
   hydrate: () => Promise<void>;
@@ -93,8 +102,8 @@ async function persistActive() {
 
 async function persistArchive() {
   try {
-    const { trips } = useTrips.getState();
-    await AsyncStorage.setItem(ARCHIVE_KEY, JSON.stringify({ trips }));
+    const { trips, totals } = useTrips.getState();
+    await AsyncStorage.setItem(ARCHIVE_KEY, JSON.stringify({ trips, totals }));
   } catch {
     // Se reintenta al terminar el siguiente viaje.
   }
@@ -125,11 +134,37 @@ function finishTrip(trip: Trip, now: number): Trip {
 // Archiva el viaje si es una ruta real (no una maniobra de aparcamiento).
 // Los viajes recuperados del segundo plano pueden ser anteriores a otros ya
 // archivados, por eso se ordena por inicio.
-function archiveTrip(trips: Trip[], trip: Trip, endedAt: number): Trip[] {
-  if (trip.distanceM < MIN_TRIP_DISTANCE_M) return trips;
-  return [finishTrip(trip, endedAt), ...trips]
-    .sort((a, b) => b.startedAt - a.startedAt)
-    .slice(0, MAX_TRIPS);
+function archiveTrip(
+  state: { trips: Trip[]; totals: TripTotals },
+  trip: Trip,
+  endedAt: number,
+): { trips: Trip[]; totals: TripTotals } {
+  if (trip.distanceM < MIN_TRIP_DISTANCE_M) return { trips: state.trips, totals: state.totals };
+  const finished = finishTrip(trip, endedAt);
+  return {
+    trips: [finished, ...state.trips]
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .slice(0, MAX_TRIPS),
+    totals: {
+      drives: state.totals.drives + 1,
+      distanceM: state.totals.distanceM + finished.distanceM,
+      durationMs: state.totals.durationMs + (endedAt - finished.startedAt),
+    },
+  };
+}
+
+const EMPTY_TOTALS: TripTotals = { drives: 0, distanceM: 0, durationMs: 0 };
+
+// Versiones anteriores no guardaban totales: se parte de los viajes guardados.
+function totalsFromTrips(trips: Trip[]): TripTotals {
+  return trips.reduce(
+    (totals, trip) => ({
+      drives: totals.drives + 1,
+      distanceM: totals.distanceM + trip.distanceM,
+      durationMs: totals.durationMs + ((trip.endedAt ?? trip.startedAt) - trip.startedAt),
+    }),
+    EMPTY_TOTALS,
+  );
 }
 
 function lastPointAt(trip: Trip) {
@@ -140,12 +175,14 @@ function lastPointAt(trip: Trip) {
 // en segundo plano (los puntos del servicio de fondo se fusionan al abrir).
 export const useTrips = create<TripsState>((set, get) => ({
   trips: [],
+  totals: EMPTY_TOTALS,
   active: null,
   hydrated: false,
 
   hydrate: async () => {
     if (get().hydrated) return;
     let trips: Trip[] = [];
+    let totals: TripTotals | null = null;
     let active: Trip | null = null;
     try {
       const [rawArchive, rawActive] = await Promise.all([
@@ -154,8 +191,13 @@ export const useTrips = create<TripsState>((set, get) => ({
       ]);
 
       if (rawArchive) {
-        const parsed = JSON.parse(rawArchive) as { trips?: Trip[]; active?: Trip | null };
+        const parsed = JSON.parse(rawArchive) as {
+          trips?: Trip[];
+          totals?: TripTotals;
+          active?: Trip | null;
+        };
         if (Array.isArray(parsed.trips)) trips = parsed.trips;
+        if (parsed.totals && Number.isFinite(parsed.totals.drives)) totals = parsed.totals;
         // Compatibilidad con la versión anterior que guardaba el viaje activo aquí.
         if (!rawActive && parsed.active) active = parsed.active;
       }
@@ -170,7 +212,7 @@ export const useTrips = create<TripsState>((set, get) => ({
       lastSampleAt = lastPointAt(active);
       lastMovingAt = lastSampleAt;
     }
-    set({ trips, active, hydrated: true });
+    set({ trips, totals: totals ?? totalsFromTrips(trips), active, hydrated: true });
     liveBlocked = true;
 
     // Primero se fusiona lo grabado con la app cerrada: puede continuar el
@@ -181,7 +223,7 @@ export const useTrips = create<TripsState>((set, get) => ({
     // crash o un viaje corto que nunca se cerró), se archiva o se descarta.
     const current = get().active;
     if (current && Date.now() - lastPointAt(current) > STALE_TRIP_MS) {
-      set({ active: null, trips: archiveTrip(get().trips, current, lastPointAt(current)) });
+      set({ active: null, ...archiveTrip(get(), current, lastPointAt(current)) });
       void persistAll();
     }
   },
@@ -215,7 +257,7 @@ export const useTrips = create<TripsState>((set, get) => ({
       fastSamples = 0;
       pendingStart = null;
       if (active) {
-        set({ active: null, trips: archiveTrip(get().trips, active, lastPointAt(active)) });
+        set({ active: null, ...archiveTrip(get(), active, lastPointAt(active)) });
         void persistAll();
         active = null;
       }
@@ -280,7 +322,7 @@ export const useTrips = create<TripsState>((set, get) => ({
 
     if (!driving && now - lastMovingAt > STOP_AFTER_MS) {
       const ending = { ...active, points, distanceM, maxSpeedKmh };
-      set({ active: null, trips: archiveTrip(get().trips, ending, now) });
+      set({ active: null, ...archiveTrip(get(), ending, now) });
       void persistAll();
       return;
     }
@@ -311,7 +353,7 @@ export const useTrips = create<TripsState>((set, get) => ({
   stopTrip: async () => {
     const active = get().active;
     if (!active) return;
-    set({ active: null, trips: archiveTrip(get().trips, active, Date.now()) });
+    set({ active: null, ...archiveTrip(get(), active, Date.now()) });
     await persistAll();
   },
 

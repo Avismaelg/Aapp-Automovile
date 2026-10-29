@@ -49,8 +49,9 @@ export default function ProfileScreen() {
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const isDemo = account?.mode === 'demo';
   const trips = useTrips((state) => state.trips);
-  const achievements = isDemo ? demoAchievements : tripAchievements(trips);
-  const stats = isDemo ? me.stats : tripStats(trips);
+  const tripTotals = useTrips((state) => state.totals);
+  const achievements = isDemo ? demoAchievements : tripAchievements(trips, tripTotals);
+  const stats = isDemo ? me.stats : tripStats(tripTotals);
   const displayName = profile?.displayName || me.name;
   const username = profile?.username || me.username;
   const city = profile?.city || me.city;
