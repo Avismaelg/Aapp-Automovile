@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MapAttribution } from '@/src/components/MapAttribution';
 import { WorldMap } from '@/src/components/WorldMap';
 import { DestinationCard } from '@/src/components/navigation/DestinationCard';
 import { FriendSheet } from '@/src/components/navigation/FriendSheet';
@@ -24,11 +25,7 @@ import { useTripRecorder } from '@/src/hooks/useTripRecorder';
 import { showError } from '@/src/lib/alerts';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { partyUrl } from '@/src/lib/qr';
-import {
-  WORLD_MAP_PROVIDER,
-  type WorldMapMember,
-  type WorldMapMode,
-} from '@/src/lib/map-html';
+import type { WorldMapMember, WorldMapMode } from '@/src/lib/map-html';
 import {
   cumulativeDistances,
   nextInstruction,
@@ -593,17 +590,7 @@ export default function NavigationScreen() {
               />
             ) : null}
 
-            <Pressable
-              style={styles.attribution}
-              hitSlop={6}
-              onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
-            >
-              <AppText variant="caption" color={colors.dim} style={styles.attributionText}>
-                {WORLD_MAP_PROVIDER === 'maptiler'
-                  ? '© MapTiler · © OpenStreetMap'
-                  : '© OpenFreeMap · © OpenMapTiles · © OpenStreetMap'}
-              </AppText>
-            </Pressable>
+            <MapAttribution style={styles.attribution} />
           </>
         )}
       </View>
@@ -736,5 +723,4 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: spacing.sm,
   },
-  attributionText: { fontSize: 9 },
 });

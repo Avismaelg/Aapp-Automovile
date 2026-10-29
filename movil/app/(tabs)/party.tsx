@@ -2,24 +2,27 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MapAttribution } from '@/src/components/MapAttribution';
 import { PartyLobby } from '@/src/components/PartyLobby';
 import { PTTButton } from '@/src/components/PTTButton';
+import { ElapsedClock } from '@/src/components/party/ElapsedClock';
+import { PartyMembersRow, type DisplayMember } from '@/src/components/party/PartyMembersRow';
+import { PartyTitle } from '@/src/components/party/PartyTitle';
+import { PartyVoicePanel } from '@/src/components/party/PartyVoicePanel';
 import { WorldMap } from '@/src/components/WorldMap';
-import { AppText, Avatar, Button, IconButton, Pill, Screen } from '@/src/components/ui';
+import { AppText, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
@@ -30,7 +33,6 @@ import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
-import { formatClock } from '@/src/lib/format';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import {
   partyVoiceChannels,
@@ -38,18 +40,6 @@ import {
 } from '@/src/lib/party';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
-
-type DisplayMember = {
-  id: string;
-  name: string;
-  username: string;
-  color: string;
-  battery?: number;
-  isTalking: boolean;
-  isMe?: boolean;
-  lastSeenAt?: string | null;
-  voiceChannelSlug?: PartyVoiceChannelSlug;
-};
 
 export default function PartyScreen() {
   const router = useRouter();
@@ -68,22 +58,9 @@ export default function PartyScreen() {
     channelSlug: voiceChannel,
     enabled: Boolean(party) && !isDemo,
   });
-  const [elapsed, setElapsed] = useState(activeParty.elapsedSeconds);
-  const [now, setNow] = useState(() => Date.now());
+  // En demo el convoy "empezó" hace activeParty.elapsedSeconds.
+  const [demoStartedAt] = useState(() => Date.now() - activeParty.elapsedSeconds * 1000);
   const [recenterToken, setRecenterToken] = useState(0);
-
-  useEffect(() => {
-    if (isDemo) {
-      const timer = setInterval(() => setElapsed((value) => value + 1), 1000);
-      return () => clearInterval(timer);
-    }
-  }, [isDemo]);
-
-  useEffect(() => {
-    if (isDemo || !party?.id) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [isDemo, party?.id]);
 
   const displayMembers = useMemo<DisplayMember[]>(() => {
     if (isDemo) {
@@ -180,11 +157,22 @@ export default function PartyScreen() {
   const routeDuration = graphHopper.route
     ? formatRouteTime(graphHopper.route.timeMs)
     : '—';
-  const displayElapsed = isDemo
-    ? elapsed
+  const elapsedSince = isDemo
+    ? demoStartedAt
     : party?.startsAt
-      ? Math.max(0, Math.floor((now - Date.parse(party.startsAt)) / 1000))
-      : 0;
+      ? Date.parse(party.startsAt)
+      : null;
+  const routeStatus = !destination
+    ? 'Sin destino · comparte solo la caravana en vivo'
+    : graphHopper.isLoading
+      ? 'Calculando ruta por calles…'
+      : graphHopper.error
+        ? 'No encontramos una calle transitable'
+        : graphHopper.source === 'graphhopper'
+          ? `GraphHopper · ${routeDistance} · ${routeDuration}`
+          : graphHopper.source === 'osrm'
+            ? `Calles OSM · ${routeDistance} · ${routeDuration}`
+            : 'Sin ruta por calles';
   const partyName = isDemo ? activeParty.name : party?.name ?? 'Party';
   const partyCode = isDemo ? activeParty.code : party?.code ?? '';
   const partyDestination = isDemo
@@ -397,64 +385,15 @@ export default function PartyScreen() {
           </View>
         </View>
 
-        <View style={styles.titleBlock}>
-          <AppText variant="h2">{partyName}</AppText>
-          <View style={styles.destinationRow}>
-            <Ionicons name="location" size={13} color={colors.accent} />
-            <AppText variant="caption" color={colors.textSoft}>
-              {partyDestination} · ETA {routeDuration}
-            </AppText>
-          </View>
-          <View style={styles.gpsRow}>
-            <View
-              style={[
-                styles.gpsDot,
-                { backgroundColor: live.isLive ? colors.lime : colors.accent },
-              ]}
-            />
-            <AppText
-              variant="caption"
-              color={colors.textSoft}
-              numberOfLines={1}
-              style={{ flexShrink: 1 }}
-            >
-              {live.message}
-            </AppText>
-            {live.status === 'denied' || live.status === 'error' || live.status === 'demo' ? (
-              <Pressable onPress={live.retry} hitSlop={8}>
-                <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
-                  REINTENTAR
-                </AppText>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View style={styles.routeEngineRow}>
-            <Ionicons
-              name={graphHopper.source === 'graphhopper' ? 'git-network-outline' : 'git-branch-outline'}
-              size={13}
-              color={graphHopper.source === 'graphhopper' ? colors.lime : colors.muted}
-            />
-            <AppText
-              variant="caption"
-              color={graphHopper.error ? colors.accent : colors.muted}
-              numberOfLines={1}
-              style={{ flexShrink: 1 }}
-            >
-              {!destination
-                ? 'Sin destino · comparte solo la caravana en vivo'
-                : graphHopper.isLoading
-                  ? 'Calculando ruta por calles…'
-                  : graphHopper.error
-                    ? 'No encontramos una calle transitable'
-                    : graphHopper.source === 'graphhopper'
-                      ? `GraphHopper · ${routeDistance} · ${routeDuration}`
-                      : graphHopper.source === 'osrm'
-                        ? `Calles OSM · ${routeDistance} · ${routeDuration}`
-                        : 'Sin ruta por calles'}
-            </AppText>
-          </View>
-        </View>
+        <PartyTitle
+          name={partyName}
+          destination={partyDestination}
+          duration={routeDuration}
+          routeStatus={routeStatus}
+          streetRouting={graphHopper.source === 'graphhopper'}
+          routeError={Boolean(graphHopper.error)}
+          live={live}
+        />
       </View>
 
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 14 }]}>
@@ -466,9 +405,7 @@ export default function PartyScreen() {
               Caravana en curso
             </AppText>
             <View style={styles.metaRow}>
-              <AppText variant="mono" color={colors.text} style={{ fontSize: 17 }}>
-                {formatClock(displayElapsed)}
-              </AppText>
+              <ElapsedClock since={elapsedSince} />
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
                 {routeDistance}
@@ -488,45 +425,11 @@ export default function PartyScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.memberRow}
-        >
-          {displayMembers.map((member) => (
-            <Pressable
-              key={member.id}
-              onPress={() => challengePilots(`Reto a ${member.name.split(' ')[0]}`, [member])}
-              disabled={member.isMe}
-              style={({ pressed }) => [styles.member, pressed && { opacity: 0.75 }]}
-              accessibilityRole="button"
-              accessibilityLabel={`Retar a ${member.name}`}
-            >
-              <Avatar
-                name={member.name}
-                color={member.color}
-                size={38}
-                online
-                ring={member.isTalking ? colors.accent : colors.border}
-              />
-              <View style={{ flex: 1 }}>
-                <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-                  {member.isMe ? 'Tú' : member.name.split(' ')[0]}
-                </AppText>
-                <AppText variant="label" color={member.isTalking ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
-                  {member.isTalking
-                    ? 'HABLANDO'
-                    : member.battery != null
-                      ? `${member.battery}%`
-                      : 'EN VIVO'}
-                </AppText>
-              </View>
-            </Pressable>
-          ))}
-          <Pressable style={styles.addMember} onPress={() => void shareParty()}>
-            <Ionicons name="add" size={20} color={colors.muted} />
-          </Pressable>
-        </ScrollView>
+        <PartyMembersRow
+          members={displayMembers}
+          onChallenge={(member) => challengePilots(`Reto a ${member.name.split(' ')[0]}`, [member])}
+          onInvite={() => void shareParty()}
+        />
 
         <View style={styles.convoyActions}>
           <Button
@@ -565,82 +468,13 @@ export default function PartyScreen() {
           </View>
         </View>
 
-        <View style={styles.voiceSection}>
-          <View style={styles.voiceHeader}>
-            <AppText variant="label" color={colors.muted}>CANALES DE VOZ · 3</AppText>
-            <Pill
-              label={
-                isDemo
-                  ? 'Demo'
-                  : voice.status === 'connected'
-                    ? `Voz ${voice.participantCount}`
-                    : voice.status === 'connecting'
-                      ? 'Conectando'
-                      : voice.status === 'error'
-                        ? 'Sin configurar'
-                        : 'Inactivo'
-              }
-              tone={
-                voice.status === 'connected'
-                  ? 'lime'
-                  : voice.status === 'error'
-                    ? 'danger'
-                    : 'neutral'
-              }
-              icon="mic-outline"
-            />
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.channelRow}
-          >
-            {partyVoiceChannels.map((channel) => {
-              const selected = channel.slug === voiceChannel;
-              return (
-                <Pressable
-                  key={channel.slug}
-                  onPress={() => void switchChannel(channel.slug)}
-                  style={[styles.channelChip, selected && styles.channelChipActive]}
-                >
-                  <Ionicons
-                    name={
-                      channel.slug === 'convoy'
-                        ? 'radio-outline'
-                        : channel.slug === 'route'
-                          ? 'navigate-outline'
-                          : 'chatbubbles-outline'
-                    }
-                    size={15}
-                    color={selected ? colors.accent : colors.muted}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="caption" color={selected ? colors.text : colors.textSoft}>
-                      {channel.name}
-                    </AppText>
-                    <AppText variant="label" color={selected ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
-                      {channelCount(channel.slug)} EN CANAL
-                    </AppText>
-                  </View>
-                  {selected ? <View style={styles.channelDot} /> : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          {voice.error && !isDemo ? (
-            <AppText variant="caption" color={colors.accent} numberOfLines={2}>
-              {voice.error}
-            </AppText>
-          ) : (
-            <AppText variant="caption" color={colors.dim} numberOfLines={1}>
-              {isDemo
-                ? 'Voz de ejemplo en modo demo.'
-                : voice.status === 'connected'
-                  ? `PTT real en ${partyVoiceChannels.find((channel) => channel.slug === voiceChannel)?.name ?? 'Convoy'}.`
-                  : 'Conectando el PTT de voz de la party…'}
-            </AppText>
-          )}
-        </View>
+        <PartyVoicePanel
+          isDemo={isDemo}
+          voice={voice}
+          current={voiceChannel}
+          channelCount={channelCount}
+          onSelect={(slug) => void switchChannel(slug)}
+        />
 
         <PTTButton
           talking={isTalkingNow}
@@ -652,7 +486,6 @@ export default function PartyScreen() {
           <Pressable style={styles.bottomAction} onPress={() => router.push('/party/chat')}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
             <AppText variant="caption" color={colors.textSoft}>Chat</AppText>
-            <View style={styles.unread} />
           </Pressable>
           <Pressable
             style={styles.bottomAction}
@@ -671,14 +504,7 @@ export default function PartyScreen() {
           </Pressable>
         </View>
 
-        <Pressable
-          onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}
-          style={styles.attribution}
-        >
-          <AppText variant="caption" color={colors.dim} style={{ fontSize: 9 }}>
-            © OpenStreetMap contributors
-          </AppText>
-        </Pressable>
+        <MapAttribution style={styles.attribution} />
       </View>
 
       <LinearGradient
@@ -715,34 +541,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  titleBlock: { marginTop: spacing.lg },
-  destinationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  gpsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(6,8,11,0.62)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    maxWidth: '100%',
-  },
-  gpsDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  routeEngineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
-    paddingLeft: 2,
   },
   attribution: {
     alignSelf: 'flex-end',
@@ -787,65 +585,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  memberRow: { gap: 8, paddingVertical: spacing.md, paddingRight: spacing.lg },
   convoyActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  member: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: 7,
-    paddingVertical: 5,
-    minWidth: 118,
-  },
-  addMember: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voiceSection: {
-    marginTop: spacing.sm,
-    gap: 7,
-  },
-  voiceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  channelRow: {
-    gap: 7,
-    paddingRight: spacing.lg,
-  },
-  channelChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    minWidth: 116,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  channelChipActive: {
-    borderColor: 'rgba(255,90,31,0.42)',
-    backgroundColor: colors.accentSoft,
-  },
-  channelDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.lime,
-  },
   routeCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -865,13 +605,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   bottomAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  unread: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-    marginLeft: -3,
-  },
   leaveAction: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 },
   topFade: {
     position: 'absolute',
