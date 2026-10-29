@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { create } from 'zustand';
 
 import { fuelLogs as mockFuelLogs } from '@/src/data/mock';
 import type { FuelLog, Vehicle } from '@/src/types/models';
@@ -8,9 +9,16 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 
+// Registros añadidos en modo demo durante la sesión (no hay backend).
+const useDemoFuelLogs = create<{ logs: FuelLog[]; add: (log: FuelLog) => void }>((set) => ({
+  logs: [],
+  add: (log) => set((state) => ({ logs: [log, ...state.logs] })),
+}));
+
 export function useFuelLogs(availableVehicles: Vehicle[]) {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
+  const demoAdded = useDemoFuelLogs((state) => state.logs);
 
   const vehicleKey = availableVehicles
     .map((vehicle) => vehicle.id)
@@ -40,7 +48,7 @@ export function useFuelLogs(availableVehicles: Vehicle[]) {
   });
 
   return {
-    logs: demo ? mockFuelLogs : query.data ?? [],
+    logs: demo ? [...demoAdded, ...mockFuelLogs] : query.data ?? [],
     isDemo: demo,
     isLoading: demo ? false : query.isLoading,
     isError: demo ? false : query.isError,
@@ -69,7 +77,7 @@ export function useAddFuelLog() {
     mutationFn: async (input: NewFuelLogInput): Promise<FuelLog> => {
       if (demo) {
         await setDemoOdometer(input.vehicle.id, input.odometer);
-        return {
+        const log: FuelLog = {
           id: `fl_${Date.now()}`,
           vehicleId: input.vehicle.id,
           kind: input.vehicle.fuel === 'electric' ? 'electric' : 'fuel',
@@ -84,6 +92,8 @@ export function useAddFuelLog() {
           odometer: input.odometer,
           fullTank: input.fullTank ?? true,
         };
+        useDemoFuelLogs.getState().add(log);
+        return log;
       }
 
       if (!supabase || !account) {

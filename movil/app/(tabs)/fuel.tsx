@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,9 +24,8 @@ import {
   Screen,
   SectionHeader,
 } from '@/src/components/ui';
-import { showError } from '@/src/lib/alerts';
-import type { FuelLog, Vehicle } from '@/src/types/models';
-import { useAddFuelLog, useFuelLogs } from '@/src/hooks/useFuelLogs';
+import type { Vehicle } from '@/src/types/models';
+import { useFuelLogs } from '@/src/hooks/useFuelLogs';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import {
@@ -116,18 +115,8 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
   const [efficiencyUnit, setEfficiencyUnit] = useState<EfficiencyUnit>('km_l');
   const [electricUnit, setElectricUnit] = useState<ElectricEfficiencyUnit>('kwh_100km');
   const [priceUnit, setPriceUnit] = useState<PriceUnit>('gal');
-  const { logs: savedLogs } = useFuelLogs(availableVehicles);
-  const addFuelLog = useAddFuelLog();
-  const [pendingLogs, setPendingLogs] = useState<FuelLog[]>([]);
-
-  const logs = useMemo(() => {
-    const seen = new Set<string>();
-    return [...pendingLogs, ...savedLogs].filter((log) => {
-      if (seen.has(log.id)) return false;
-      seen.add(log.id);
-      return true;
-    });
-  }, [pendingLogs, savedLogs]);
+  const router = useRouter();
+  const { logs } = useFuelLogs(availableVehicles);
 
   const vehicleLogs = logs.filter((log) => log.vehicleId === vehicle.id);
 
@@ -214,41 +203,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
     setPrice(formatNumber(converted, 2));
   };
 
-  const saveFillup = async () => {
-    if (resultEnergy <= 0) {
-      Alert.alert('Faltan datos', 'Completa la distancia, el consumo y el precio.');
-      return;
-    }
-
-    const odometer =
-      (vehicleLogs[0]?.odometer ?? vehicle.odometerKm) +
-      (Number(distance.replace(',', '.')) || 0);
-
-    try {
-      const saved = await addFuelLog.mutateAsync({
-        vehicle,
-        volume: electric ? electricResult.kwh : liquidResult.liters,
-        pricePerUnit: electric
-          ? Number(price.replace(',', '.')) || 0
-          : liquidResult.pricePerLiter,
-        total: resultCost,
-        odometer,
-        station: electric ? 'Carga registrada' : 'Repostaje registrado',
-        fullTank: true,
-      });
-
-      setPendingLogs((current) => [saved, ...current]);
-      Alert.alert(
-        electric ? 'Carga guardada' : 'Repostaje guardado',
-        `${formatNumber(resultEnergy, 2)} ${electric ? 'kWh' : 'L'} · ${formatMoney(
-          saved.total,
-          'DOP',
-        )}. El consumo se recalcula en el próximo registro.`,
-      );
-    } catch (error) {
-      showError('No pudimos guardar el registro', error, 'Revisa tu conexión e inténtalo de nuevo.');
-    }
-  };
+  const openNewLog = () => router.push(`/vehicle/fuel/new?vehicleId=${vehicle.id}` as Href);
 
   const exportPdf = async () => {
     if (vehicleLogs.length === 0) {
@@ -427,24 +382,23 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         </View>
 
         <Button
-          label={electric ? 'Guardar carga' : 'Guardar repostaje'}
-          icon={electric ? 'flash-outline' : 'add-circle-outline'}
-          loading={addFuelLog.isPending}
-          onPress={saveFillup}
-          style={{ marginTop: spacing.lg }}
-        />
-        <Button
           label="Exportar PDF"
           icon="document-text-outline"
           variant="ghost"
           onPress={exportPdf}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: spacing.lg }}
         />
       </Card>
 
       <SectionHeader
         title={electric ? 'Historial de cargas' : 'Historial'}
         action={vehicleLogs.length ? `${vehicleLogs.length} registros` : undefined}
+      />
+      <Button
+        label={electric ? 'Registrar carga' : 'Registrar repostaje'}
+        icon={electric ? 'flash-outline' : 'add-circle-outline'}
+        onPress={openNewLog}
+        style={{ marginBottom: spacing.md }}
       />
       <FuelLogList logs={vehicleLogs} electric={electric} />
 
