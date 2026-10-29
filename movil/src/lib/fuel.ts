@@ -128,3 +128,38 @@ export function consumptionBetweenFillups(
     mpg: kmPerL / MPG_TO_KM_PER_L,
   };
 }
+
+/**
+ * Consumo real entre registros consecutivos (método de tanque lleno): la
+ * energía de cada repostaje cubre los km recorridos desde el anterior.
+ * Devuelve, del más antiguo al más reciente, km/L para combustible y
+ * kWh/100 km para eléctricos.
+ */
+export function realEfficiencyHistory(logs: FuelLog[]): number[] {
+  const sorted = logs
+    .filter((log) => logEnergy(log) > 0 && Number.isFinite(log.odometer))
+    .sort((a, b) => a.odometer - b.odometer);
+  const history: number[] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const current = sorted[index];
+    if (!current.fullTank) continue;
+    const km = current.odometer - sorted[index - 1].odometer;
+    const energy = logEnergy(current);
+    if (km <= 0) continue;
+    history.push(current.kind === 'electric' ? (energy / km) * 100 : km / energy);
+  }
+  return history;
+}
+
+/**
+ * Variación porcentual del último consumo frente al anterior, en positivo
+ * cuando mejora (más km/L o menos kWh/100 km). null si no hay dos registros.
+ */
+export function efficiencyChangePercent(history: number[], electric: boolean): number | null {
+  if (history.length < 2) return null;
+  const latest = history[history.length - 1];
+  const previous = history[history.length - 2];
+  if (previous <= 0) return null;
+  const change = ((latest - previous) / previous) * 100;
+  return electric ? -change : change;
+}
