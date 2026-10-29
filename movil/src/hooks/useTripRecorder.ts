@@ -35,7 +35,10 @@ export function useTripRecorder(
     if (!hydrated) return;
     const ingest = () => void ingestBackground();
     const subscription = AppState.addEventListener('change', (state) => {
+      // Al salir, los puntos llegan por el servicio de fondo; al volver se
+      // recogen antes de aceptar de nuevo el GPS en vivo.
       if (state === 'active') ingest();
+      else useTrips.getState().blockLive();
     });
     const timer = setInterval(ingest, INGEST_EVERY_MS);
     return () => {

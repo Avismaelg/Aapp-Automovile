@@ -28,11 +28,13 @@ type TripsState = {
   hydrated: boolean;
   hydrate: () => Promise<void>;
   ingestBackground: () => Promise<void>;
+  blockLive: () => void;
   recordPoint: (input: {
     latitude: number;
     longitude: number;
     speedKmh: number | null;
     at?: number;
+    source?: 'live' | 'background';
   }) => void;
   stopTrip: () => Promise<void>;
   markRecordsSubmitted: (tripId: string) => void;
@@ -61,6 +63,10 @@ let lastPersistAt = 0;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let fastSamples = 0;
 let pendingStart: TripPoint | null = null;
+// Mientras hay puntos de segundo plano sin recoger (al arrancar o al volver de
+// segundo plano) se ignora el GPS en vivo: un fix nuevo haría que los puntos
+// pendientes, más antiguos, se descartaran como repetidos.
+let liveBlocked = true;
 
 // Solo para tests: el estado de detección vive fuera del store.
 export function resetTripDetection() {
@@ -68,6 +74,7 @@ export function resetTripDetection() {
   lastSampleAt = 0;
   fastSamples = 0;
   pendingStart = null;
+  liveBlocked = false;
 }
 
 // El viaje activo se guarda solo (pocos KB) cada 12 s; el archivo completo
@@ -164,6 +171,7 @@ export const useTrips = create<TripsState>((set, get) => ({
       lastMovingAt = lastSampleAt;
     }
     set({ trips, active, hydrated: true });
+    liveBlocked = true;
 
     // Primero se fusiona lo grabado con la app cerrada: puede continuar el
     // viaje activo o contener viajes completos.
@@ -180,13 +188,18 @@ export const useTrips = create<TripsState>((set, get) => ({
 
   ingestBackground: async () => {
     const points = await drainBackgroundPoints();
-    if (points.length === 0) return;
     const { recordPoint } = get();
-    for (const point of points) recordPoint(point);
-    await persistAll();
+    for (const point of points) recordPoint({ ...point, source: 'background' });
+    liveBlocked = false;
+    if (points.length > 0) await persistAll();
   },
 
-  recordPoint: ({ latitude, longitude, speedKmh, at }) => {
+  blockLive: () => {
+    liveBlocked = true;
+  },
+
+  recordPoint: ({ latitude, longitude, speedKmh, at, source = 'live' }) => {
+    if (source === 'live' && liveBlocked) return;
     const now = at ?? Date.now();
     // El GPS en primer plano y los lotes del servicio de fondo se solapan:
     // una muestra igual o anterior a la última ya está contada.

@@ -97,4 +97,25 @@ describe('registro automático de rutas', () => {
     const keys = await AsyncStorage.getAllKeys();
     expect(keys.some((key) => key.includes('bg-points'))).toBe(false);
   });
+
+  it('al volver de segundo plano no pierde los puntos pendientes por un fix en vivo', async () => {
+    const start = Date.now() - 20 * 60_000;
+    const background = Array.from({ length: 6 }, (_, index) => ({
+      latitude: north(index),
+      longitude: LNG,
+      speedKmh: 30,
+      at: start + index * 15_000,
+    }));
+    await saveBackgroundBatch(background);
+
+    const { blockLive, recordPoint, ingestBackground } = useTrips.getState();
+    blockLive();
+    // El GPS en vivo responde antes que la recogida de lotes.
+    recordPoint({ latitude: north(40), longitude: LNG, speedKmh: 30 });
+    await ingestBackground();
+
+    const active = useTrips.getState().active;
+    expect(active?.startedAt).toBe(background[0].at);
+    expect(active?.distanceM).toBeGreaterThan(400);
+  });
 });
