@@ -196,10 +196,18 @@ function drive(points: LatLng[], phase: SimPhase, onDone?: () => void) {
       done ? 'arrived' : phase,
     );
     if (done) {
-      if (timer) clearInterval(timer);
-      timer = null;
-      onDone?.();
+      if (onDone) onDone();
+      else idle();
     }
+  });
+}
+
+// Parado: sigue enviando la posición cada segundo, como un GPS real (si no,
+// la app la daría por caducada).
+function idle() {
+  runEvery(() => {
+    const fix = useSimulator.getState().fix;
+    if (fix) setFix({ ...fix, speedKmh: 0 });
   });
 }
 
@@ -268,6 +276,7 @@ export function startSimulation(origin: { latitude: number; longitude: number })
     label: 'Simulación lista',
     fix: { latitude: origin.latitude, longitude: origin.longitude, speedKmh: 0, heading: 0 },
   });
+  idle();
 }
 
 export function setCruiseKmh(kmh: number) {
@@ -278,13 +287,15 @@ export function setSimParty(enabled: boolean) {
   useSimulator.setState((state) => ({ party: enabled, members: enabled ? convoy(state.members) : [] }));
 }
 
-// La pantalla del mapa llama a esto cuando hay una ruta calculada. Solo se
-// acepta una ruta que empiece donde estás (tras un desvío, la vieja no vale:
-// hay que esperar a la recalculada).
+// La pantalla del mapa llama a esto cuando llega una ruta nueva. Si empieza
+// lejos (p. ej. a pie, la ruta sale del coche aparcado) se salta a su inicio.
 export function driveRoute(points: LatLng[]) {
   if (points.length < 2) return false;
   const fix = useSimulator.getState().fix;
-  if (fix && metersBetween([fix.latitude, fix.longitude], points[0]) > 150) return false;
+  if (!fix || metersBetween([fix.latitude, fix.longitude], points[0]) > 40) {
+    trail = [points[0]];
+    setFix({ latitude: points[0][0], longitude: points[0][1], speedKmh: 0, heading: fix?.heading ?? 0 });
+  }
   if (detourPending) {
     detourPending = false;
     const walker = new PathWalker(points);
@@ -304,6 +315,8 @@ export function driveRoute(points: LatLng[]) {
 }
 
 export function waitForRoute() {
+  // Cancela lo que estuviera haciendo (otra prueba) y espera parado.
+  idle();
   useSimulator.setState({ phase: 'waiting-route', label: 'Ruta al destino' });
 }
 

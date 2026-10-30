@@ -28,4 +28,13 @@ describe('búsqueda de destinos', () => {
       'sin-distancia',
     ]);
   });
+
+  it('lo que está a menos de 3 km va antes que lo más relevante de la ciudad', () => {
+    const ranked = rankByProximity([
+      place('relevante-lejos', 9_500),
+      place('cerca', 800),
+      place('cerca-2', 2_100),
+    ]);
+    expect(ranked.map((item) => item.id)).toEqual(['cerca', 'cerca-2', 'relevante-lejos']);
+  });
 });

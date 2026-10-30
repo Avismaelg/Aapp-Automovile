@@ -21,6 +21,7 @@ import { useParking } from '@/src/store/parking';
 import { colors, radius, spacing } from '@/src/theme';
 
 const SPEEDS = [30, 50, 80, 110];
+const TEST_LABEL = 'Destino de prueba';
 
 // Herramienta de pruebas: mueve tu posición sin conducir para revisar rutas,
 // llegada, aparcamiento, coche 3D, línea de conducción y party.
@@ -39,7 +40,10 @@ export default function SimulatorScreen() {
   const routeTo = (target: { latitude: number; longitude: number; label: string }) => {
     ensureStarted();
     const store = useChosenDestination.getState();
+    // Los destinos de prueba no se guardan en tus recientes.
+    const recents = store.recents.filter((item) => item.label !== TEST_LABEL);
     store.setDestination(target);
+    useChosenDestination.setState({ recents });
     store.startNavigation();
     waitForRoute();
     toMap();
@@ -48,7 +52,7 @@ export default function SimulatorScreen() {
   const testRoute = () => {
     const from = sim.fix ?? live.location;
     const [latitude, longitude] = offsetPoint([from.latitude, from.longitude], 40, 1500);
-    routeTo({ latitude, longitude, label: 'Destino de prueba' });
+    routeTo({ latitude, longitude, label: TEST_LABEL });
   };
 
   const detour = () => {
@@ -56,7 +60,7 @@ export default function SimulatorScreen() {
     const [latitude, longitude] = offsetPoint([from.latitude, from.longitude], 40, 1500);
     ensureStarted();
     armDetour();
-    routeTo({ latitude, longitude, label: 'Destino de prueba' });
+    routeTo({ latitude, longitude, label: TEST_LABEL });
   };
 
   const parking = () => {

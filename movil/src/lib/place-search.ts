@@ -25,9 +25,10 @@ type PhotonFeature = {
   };
 };
 
-// Grupos de cercanía: primero lo de tu zona, luego tu región y al final el
-// resto del mundo. Dentro de cada grupo se respeta la relevancia de Photon.
-const PROXIMITY_BUCKETS_M = [50_000, 300_000];
+// Grupos de cercanía: primero lo que tienes a mano (3 km), luego tu ciudad,
+// tu zona, tu región y al final el resto del mundo. Dentro de cada grupo se
+// respeta la relevancia de Photon.
+const PROXIMITY_BUCKETS_M = [3_000, 15_000, 50_000, 300_000];
 
 function proximityBucket(distanceM: number | null) {
   if (distanceM == null) return PROXIMITY_BUCKETS_M.length;
@@ -53,8 +54,10 @@ export async function searchPlaces(
   if (near) {
     params.set('lat', near.latitude.toFixed(5));
     params.set('lon', near.longitude.toFixed(5));
-    params.set('zoom', '10');
-    params.set('location_bias_scale', '0.5');
+    // Sesgo fuerte hacia tu posición: «farmacia» debe dar las de tu barrio,
+    // no las más «relevantes» del país (con zoom 10 salían a 10-130 km).
+    params.set('zoom', '14');
+    params.set('location_bias_scale', '0.2');
   }
 
   const response = await fetchWithTimeout(

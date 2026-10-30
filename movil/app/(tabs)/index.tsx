@@ -439,11 +439,25 @@ export default function NavigationScreen() {
     return () => clearTimeout(timer);
   }, [arrivedLabel]);
 
-  // Simulación de ruta: en cuanto hay ruta calculada, el coche la recorre.
+  // Simulación de ruta: en cuanto llega una ruta nueva, el coche la recorre.
+  // La que ya había al empezar a esperar (de otro destino o la de antes de un
+  // desvío) no vale.
+  const staleRouteRef = useRef<typeof route.route | undefined>(undefined);
   useEffect(() => {
-    if (sim.phase !== 'waiting-route' || !navigating || !route.route) return;
+    if (sim.phase !== 'waiting-route') {
+      staleRouteRef.current = undefined;
+      return;
+    }
+    if (staleRouteRef.current === undefined) {
+      staleRouteRef.current = route.route;
+      // Pide una ruta nueva desde donde estás: si el destino no cambió, la
+      // anterior seguiría siendo la misma y la simulación esperaría para siempre.
+      retryRoute();
+      return;
+    }
+    if (!navigating || !route.route || route.route === staleRouteRef.current) return;
     driveRoute(route.route.coordinates);
-  }, [sim.phase, navigating, route.route]);
+  }, [sim.phase, navigating, route.route, retryRoute]);
 
   const beginNavigation = useCallback(() => {
     setFollowing(true);
@@ -752,6 +766,8 @@ export default function NavigationScreen() {
                 selected={route.selected}
                 onSelect={selectRoute}
                 canConfirm={!route.isLoading && Boolean(route.route)}
+                failed={Boolean(route.error)}
+                onRetry={retryRoute}
                 onConfirm={beginNavigation}
                 onShare={() => void shareRouteLink()}
                 onClose={clearDestination}

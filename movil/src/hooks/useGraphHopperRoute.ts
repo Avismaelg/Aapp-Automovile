@@ -29,8 +29,12 @@ const useRouteState = create<RouteState>(() => ({
 }));
 
 let requested: { origin: GeoPoint; destination: GeoPoint; at: number } | null = null;
+// Última posición conocida: al recalcular (p. ej. por salirte de la ruta) se
+// parte de donde estás ahora, no de donde se pidió la ruta anterior.
+let latestOrigin: GeoPoint | null = null;
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingController: AbortController | null = null;
+let offlineRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function distanceMeters(a: GeoPoint, b: GeoPoint) {
   const R = 6371000;
@@ -52,11 +56,14 @@ function samePoint(a: GeoPoint, b: GeoPoint) {
 function cancelPending() {
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingTimer = null;
+  if (offlineRetryTimer) clearTimeout(offlineRetryTimer);
+  offlineRetryTimer = null;
   pendingController?.abort();
   pendingController = null;
 }
 
 function requestRoute(origin: GeoPoint, destination: GeoPoint) {
+  latestOrigin = origin;
   const previous = requested;
   const unchanged =
     previous !== null &&
@@ -88,16 +95,37 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
         isLoading: false,
         error: null,
       });
-    } catch {
+    } catch (error) {
       if (controller.signal.aborted) return;
+      const offline = isNetworkError(error);
       useRouteState.setState({
         routes: [],
         selected: 0,
         isLoading: false,
-        error: 'No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.',
+        error: offline
+          ? 'Sin conexión: no pudimos calcular la ruta. Reintentando…'
+          : 'No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.',
       });
+      // Sin conexión se reintenta solo hasta que vuelva la red.
+      if (offline) {
+        const pending = requested;
+        offlineRetryTimer = setTimeout(() => {
+          offlineRetryTimer = null;
+          if (requested === pending) retryRoute();
+        }, 8_000);
+      }
     }
   }, 700);
+}
+
+// Fallo de red (sin datos, sin wifi, tiempo agotado), no «no hay calle».
+function isNetworkError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return (
+    error instanceof TypeError ||
+    error.name === 'AbortError' ||
+    /network|failed to fetch|timeout|internet/i.test(error.message)
+  );
 }
 
 function clearRoute() {
@@ -113,7 +141,8 @@ function selectRoute(index: number) {
 
 function retryRoute() {
   if (!requested) return;
-  const { origin, destination } = requested;
+  const { destination } = requested;
+  const origin = latestOrigin ?? requested.origin;
   cancelPending();
   requested = null;
   requestRoute(origin, destination);

@@ -18,6 +18,8 @@ export function DestinationCard({
   options,
   selected,
   canConfirm,
+  failed = false,
+  onRetry,
   onSelect,
   onConfirm,
   onShare,
@@ -28,6 +30,9 @@ export function DestinationCard({
   options: RouteOption[];
   selected: number;
   canConfirm: boolean;
+  // Si la ruta falló: el botón principal pasa a «Reintentar».
+  failed?: boolean;
+  onRetry?: () => void;
   onSelect: (index: number) => void;
   onConfirm: () => void;
   onShare: () => void;
@@ -86,15 +91,26 @@ export function DestinationCard({
         </ScrollView>
       ) : null}
       <View style={styles.destinationActions}>
-        <Button
-          label="Ir ahora"
-          variant="lime"
-          size="sm"
-          icon="navigate"
-          onPress={onConfirm}
-          disabled={!canConfirm}
-          style={styles.destinationAction}
-        />
+        {failed && onRetry ? (
+          <Button
+            label="Reintentar"
+            variant="lime"
+            size="sm"
+            icon="refresh"
+            onPress={onRetry}
+            style={styles.destinationAction}
+          />
+        ) : (
+          <Button
+            label="Ir ahora"
+            variant="lime"
+            size="sm"
+            icon="navigate"
+            onPress={onConfirm}
+            disabled={!canConfirm}
+            style={styles.destinationAction}
+          />
+        )}
         <Button
           label="Compartir"
           variant="secondary"

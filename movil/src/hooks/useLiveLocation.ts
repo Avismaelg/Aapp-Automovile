@@ -130,12 +130,14 @@ function applyCompassHeading(value: number) {
 }
 
 function fallBackToDemo(status: 'denied' | 'error', message: string) {
+  // En simulación manda la posición simulada, aunque el GPS real falle.
+  if (isSimulating()) return;
   clearFallbackTimer();
   useLiveLocationState.setState({ status, message, location: DEMO_LOCATION });
 }
 
 function handleWatchError(id: number) {
-  if (id !== session) return;
+  if (id !== session || isSimulating()) return;
   if (useLiveLocationState.getState().location.source === 'gps') {
     useLiveLocationState.setState({
       status: 'error',
@@ -221,11 +223,13 @@ function startSession(message?: string) {
   const id = session;
   sessionStartedAt = Date.now();
   clearFallbackTimer();
-  useLiveLocationState.setState({ status: 'locating', message: message || LOCATING_MESSAGE });
+  if (!isSimulating()) {
+    useLiveLocationState.setState({ status: 'locating', message: message || LOCATING_MESSAGE });
+  }
 
   // No bloquear la pantalla si el permiso o el GPS tardan en responder.
   fallbackTimer = setTimeout(() => {
-    if (id !== session) return;
+    if (id !== session || isSimulating()) return;
     if (useLiveLocationState.getState().status !== 'locating') return;
     useLiveLocationState.setState({
       status: 'demo',
@@ -265,7 +269,8 @@ export function retryLiveLocation() {
 // posición es vieja (o nunca llegó), se reinicia la sesión para obtener una
 // posición fresca en lugar de seguir mostrando la anterior.
 export function refreshStaleLocation(maxAgeMs = 20_000) {
-  if (subscribers === 0) return;
+  // En simulación el GPS real se ignora: no hay nada que refrescar.
+  if (subscribers === 0 || isSimulating()) return;
   // Una sesión recién arrancada aún no ha tenido tiempo de dar posición:
   // reiniciarla otra vez entraría en bucle (cada reinicio pausa la app).
   if (Date.now() - sessionStartedAt < 15_000) return;
