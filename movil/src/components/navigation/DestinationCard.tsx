@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, IconButton } from '@/src/components/ui';
+import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
-import { colors, radius, spacing } from '@/src/theme';
+import { radius, spacing } from '@/src/theme';
 
 export type RouteOption = {
   timeLabel: string;
@@ -12,13 +12,22 @@ export type RouteOption = {
   extraMinutes: number;
 };
 
+const GO = '#1a73e8';
+const FAST = '#16a34a';
+
+// Vista previa de la ruta: hoja inferior con el tiempo en grande, las
+// opciones de ruta y un único botón principal para empezar.
 export function DestinationCard({
   label,
-  status,
+  timeLabel,
+  distanceLabel,
+  arrivalLabel,
+  loading,
+  error,
   options,
   selected,
   canConfirm,
-  failed = false,
+  bottomInset,
   onRetry,
   onSelect,
   onConfirm,
@@ -26,138 +35,180 @@ export function DestinationCard({
   onClose,
 }: {
   label: string;
-  status: string;
+  timeLabel: string | null;
+  distanceLabel: string | null;
+  arrivalLabel: string | null;
+  loading: boolean;
+  error: string | null;
   options: RouteOption[];
   selected: number;
   canConfirm: boolean;
-  // Si la ruta falló: el botón principal pasa a «Reintentar».
-  failed?: boolean;
-  onRetry?: () => void;
+  bottomInset: number;
+  onRetry: () => void;
   onSelect: (index: number) => void;
   onConfirm: () => void;
   onShare: () => void;
   onClose: () => void;
 }) {
   const chrome = useMapChrome();
+  const failed = Boolean(error) && !loading;
+
   return (
-    <View style={[styles.destinationCard, chrome.surface]}>
-      <View style={styles.destinationRow}>
-        <View style={styles.destinationIcon}>
-          <Ionicons name="flag" size={15} color="#120802" />
-        </View>
-        <View style={styles.destinationText}>
-          <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
+    <View style={[styles.sheet, chrome.surface, { paddingBottom: bottomInset + spacing.lg }]}>
+      <View style={[styles.handle, { backgroundColor: chrome.border }]} />
+
+      <View style={styles.header}>
+        <View style={styles.titleBlock}>
+          <AppText variant="caption" color={chrome.muted}>
+            Destino
+          </AppText>
+          <AppText variant="h2" color={chrome.text} numberOfLines={1} style={styles.title}>
             {label}
           </AppText>
-          <AppText variant="caption" color={chrome.muted} numberOfLines={1}>
-            {status}
+        </View>
+        <Pressable
+          onPress={onShare}
+          hitSlop={6}
+          style={[styles.iconButton, { backgroundColor: chrome.chip }]}
+          accessibilityRole="button"
+          accessibilityLabel="Compartir ruta"
+        >
+          <Ionicons name="share-outline" size={19} color={chrome.text} />
+        </Pressable>
+        <Pressable
+          onPress={onClose}
+          hitSlop={6}
+          style={[styles.iconButton, { backgroundColor: chrome.chip }]}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
+        >
+          <Ionicons name="close" size={20} color={chrome.text} />
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <View style={styles.stateRow}>
+          <ActivityIndicator color={GO} />
+          <AppText variant="body" color={chrome.muted}>
+            Buscando la mejor ruta…
           </AppText>
         </View>
-        <IconButton icon="close" size={30} tone="ghost" color={chrome.muted} onPress={onClose} />
-      </View>
-      {options.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.options}
-        >
+      ) : failed ? (
+        <View style={styles.stateRow}>
+          <Ionicons name="cloud-offline-outline" size={20} color="#e11d48" />
+          <AppText variant="body" color={chrome.textSoft} numberOfLines={2} style={styles.flex}>
+            {error}
+          </AppText>
+        </View>
+      ) : timeLabel ? (
+        <View style={styles.summary}>
+          <AppText variant="display" color={FAST} style={styles.time}>
+            {timeLabel}
+          </AppText>
+          <AppText variant="body" color={chrome.muted} style={styles.summaryDetail}>
+            {distanceLabel}
+            {arrivalLabel ? ` · llegas ${arrivalLabel}` : ''}
+          </AppText>
+        </View>
+      ) : null}
+
+      {options.length > 1 && !loading ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.options}>
           {options.map((option, index) => {
             const active = index === selected;
             return (
               <Pressable
                 key={index}
-                style={[styles.option, { borderColor: chrome.border, backgroundColor: chrome.chip }, active && styles.optionActive]}
+                style={[
+                  styles.option,
+                  { borderColor: active ? GO : chrome.border, backgroundColor: active ? `${GO}14` : 'transparent' },
+                ]}
                 onPress={() => onSelect(index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`Ruta ${index + 1}: ${option.timeLabel}, ${option.distanceLabel}`}
               >
-                <AppText variant="bodyStrong" color={active ? '#ffffff' : chrome.text}>
+                <AppText variant="bodyStrong" color={active ? GO : chrome.text}>
                   {option.timeLabel}
                 </AppText>
-                <AppText variant="caption" color={active ? '#e3efff' : chrome.muted}>
-                  {option.distanceLabel}
-                </AppText>
-                <AppText
-                  variant="label"
-                  color={active ? '#ffffff' : option.extraMinutes === 0 ? (chrome.day ? '#16a34a' : colors.lime) : chrome.muted}
-                  style={styles.optionTag}
-                >
-                  {option.extraMinutes === 0 ? 'MÁS RÁPIDA' : `+${option.extraMinutes} MIN`}
+                <AppText variant="caption" color={chrome.muted}>
+                  {option.extraMinutes === 0 ? 'Más rápida' : `+${option.extraMinutes} min`} · {option.distanceLabel}
                 </AppText>
               </Pressable>
             );
           })}
         </ScrollView>
       ) : null}
-      <View style={styles.destinationActions}>
-        {failed && onRetry ? (
-          <Button
-            label="Reintentar"
-            variant="lime"
-            size="sm"
-            icon="refresh"
-            onPress={onRetry}
-            style={styles.destinationAction}
-          />
-        ) : (
-          <Button
-            label="Ir ahora"
-            variant="lime"
-            size="sm"
-            icon="navigate"
-            onPress={onConfirm}
-            disabled={!canConfirm}
-            style={styles.destinationAction}
-          />
-        )}
-        <Button
-          label="Compartir"
-          variant="secondary"
-          size="sm"
-          icon="share-social-outline"
-          onPress={onShare}
-          style={styles.destinationAction}
-        />
-      </View>
+
+      {failed ? (
+        <Pressable
+          onPress={onRetry}
+          style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+          accessibilityRole="button"
+        >
+          <Ionicons name="refresh" size={20} color="#ffffff" />
+          <AppText variant="bodyStrong" color="#ffffff" style={styles.primaryText}>
+            Reintentar
+          </AppText>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={onConfirm}
+          disabled={!canConfirm}
+          style={({ pressed }) => [styles.primary, !canConfirm && styles.disabled, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canConfirm }}
+        >
+          <Ionicons name="navigate" size={20} color="#ffffff" />
+          <AppText variant="bodyStrong" color="#ffffff" style={styles.primaryText}>
+            Iniciar
+          </AppText>
+        </Pressable>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  destinationCard: {
-    borderRadius: radius['2xl'],
-    padding: spacing.lg,
+  sheet: {
+    marginHorizontal: -spacing.lg,
+    marginBottom: -spacing.md,
+    borderTopLeftRadius: radius['2xl'],
+    borderTopRightRadius: radius['2xl'],
+    borderBottomWidth: 0,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
     gap: spacing.md,
   },
-  destinationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  destinationIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.lime,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  destinationText: { flex: 1 },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: spacing.xs },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  titleBlock: { flex: 1 },
+  title: { fontSize: 22, lineHeight: 28 },
+  iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  stateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
+  flex: { flex: 1 },
+  summary: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md, flexWrap: 'wrap' },
+  time: { fontSize: 34, lineHeight: 40 },
+  summaryDetail: { fontSize: 15 },
   options: { gap: spacing.sm },
   option: {
-    minWidth: 104,
-    borderWidth: 1,
+    minWidth: 128,
+    borderWidth: 1.5,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: 2,
   },
-  optionActive: { backgroundColor: '#2f8cff', borderColor: '#2f8cff' },
-  optionTag: { fontSize: 9, marginTop: 2 },
-  destinationActions: {
+  primary: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: GO,
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  destinationAction: { flexShrink: 1 },
+  primaryText: { fontSize: 17 },
+  disabled: { opacity: 0.45 },
+  pressed: { opacity: 0.85 },
 });

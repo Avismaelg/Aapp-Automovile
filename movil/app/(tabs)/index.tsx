@@ -130,9 +130,6 @@ export default function NavigationScreen() {
   const { active: activeTrip } = useTripRecorder(live.location, vehicleName, {
     walking: walking || simulating,
   });
-  const vehicleLabel = primaryVehicle
-    ? primaryVehicle.nickname.trim() || `${primaryVehicle.make} ${primaryVehicle.model}`
-    : 'Añade tu vehículo';
   const speedLabel =
     live.location.speedKmh == null ? '--' : String(Math.round(live.location.speedKmh));
   const routeLine = route.route
@@ -148,13 +145,6 @@ export default function NavigationScreen() {
       })),
     [route.routes, fastestTimeMs],
   );
-  const routeSourceLabel = route.route
-    ? route.route.source === 'graphhopper'
-      ? 'GraphHopper'
-      : route.route.source === 'osrm'
-        ? 'Calles OSM'
-        : 'Ruta directa'
-    : null;
 
   // Progreso sobre la ruta y próxima maniobra, como Waze. Se recalcula solo
   // cuando cambia la posición, no en cada actualización de rumbo.
@@ -269,14 +259,6 @@ export default function NavigationScreen() {
           minute: '2-digit',
         })
       : null;
-  const destinationStatus = route.error
-    ? route.error
-    : route.isLoading
-      ? 'Buscando ruta por calles…'
-      : routeLine
-        ? `${routeLine} · ${routeSourceLabel}${arrivalLabel ? ` · Llegada ${arrivalLabel}` : ''}`
-        : 'Sin ruta todavía';
-
   const toggleNorthUp = () => setNorthUp((value) => !value);
 
   const recenter = () => {
@@ -548,51 +530,39 @@ export default function NavigationScreen() {
           />
         ) : (
           <>
-            <View style={styles.topRow}>
-              <Pressable onPress={() => router.push('/(tabs)/profile')} hitSlop={6}>
-                <Avatar
-                  name={me.name}
-                  color={me.color}
-                  size={42}
-                  uri={me.avatarUrl}
-                  ring={colors.border}
-                  online={live.isLive}
-                />
-              </Pressable>
-              <Pressable style={[styles.vehiclePill, chrome.surface]} onPress={() => router.push('/(tabs)/garage')}>
-                <Ionicons name="car-sport" size={16} color={colors.accent} />
-                <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1} style={styles.vehicleText}>
-                  {vehicleLabel}
-                </AppText>
-                <Ionicons name="chevron-down" size={14} color={chrome.muted} />
-              </Pressable>
-              <Pressable
-                style={[styles.roundButton, chrome.surface]}
-                onPress={() => router.push('/actividad' as Href)}
-                accessibilityRole="button"
-                accessibilityLabel="Actividad"
-              >
-                <Ionicons name="newspaper-outline" size={19} color={chrome.text} />
-              </Pressable>
-            </View>
-
+            {/* Inicio minimalista: un solo buscador con tu avatar. El vehículo se
+                elige en Garaje y la actividad está en el icono del buscador. */}
             {destination == null ? (
-              <Pressable
-                style={[styles.searchPill, chrome.surface]}
-                onPress={() => router.push('/destino' as Href)}
-                accessibilityRole="button"
-                accessibilityLabel="Buscar destino"
-              >
-                <Ionicons name="search" size={19} color="#2f8cff" />
-                <AppText
-                  variant="bodyStrong"
-                  numberOfLines={1}
-                  color={chrome.muted}
-                  style={styles.searchText}
+              <View style={[styles.searchBar, chrome.surface]}>
+                <Pressable
+                  style={styles.searchTap}
+                  onPress={() => router.push('/destino' as Href)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Buscar destino"
                 >
-                  ¿A dónde vamos?
-                </AppText>
-              </Pressable>
+                  <Ionicons name="search" size={20} color="#1a73e8" />
+                  <AppText variant="bodyStrong" numberOfLines={1} color={chrome.muted} style={styles.searchText}>
+                    ¿A dónde vamos?
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/actividad' as Href)}
+                  hitSlop={8}
+                  style={styles.searchIcon}
+                  accessibilityRole="button"
+                  accessibilityLabel="Actividad"
+                >
+                  <Ionicons name="pulse" size={20} color={chrome.textSoft} />
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/(tabs)/profile')}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tu perfil"
+                >
+                  <Avatar name={me.name} color={me.color} size={36} uri={me.avatarUrl} online={live.isLive} />
+                </Pressable>
+              </View>
             ) : null}
 
             {destination == null && recentDestinations.length > 0 ? (
@@ -612,7 +582,7 @@ export default function NavigationScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Ir a ${recent.label}`}
                   >
-                    <Ionicons name="time-outline" size={13} color={chrome.muted} />
+                    <Ionicons name="time-outline" size={14} color={chrome.muted} />
                     <AppText
                       variant="caption"
                       color={chrome.textSoft}
@@ -761,13 +731,17 @@ export default function NavigationScreen() {
             {destination ? (
               <DestinationCard
                 label={destination.label}
-                status={destinationStatus}
+                timeLabel={route.route ? formatRouteTime(route.route.timeMs) : null}
+                distanceLabel={route.route ? formatRouteDistance(route.route.distanceM) : null}
+                arrivalLabel={arrivalLabel}
+                loading={route.isLoading}
+                error={route.error}
                 options={routeOptions}
                 selected={route.selected}
-                onSelect={selectRoute}
                 canConfirm={!route.isLoading && Boolean(route.route)}
-                failed={Boolean(route.error)}
+                bottomInset={0}
                 onRetry={retryRoute}
+                onSelect={selectRoute}
                 onConfirm={beginNavigation}
                 onShare={() => void shareRouteLink()}
                 onClose={clearDestination}
@@ -804,21 +778,17 @@ const styles = StyleSheet.create({
     left: 0,
     paddingHorizontal: spacing.lg,
   },
-  topRow: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+    minHeight: 56,
+    borderRadius: 28,
+    paddingLeft: spacing.lg,
+    paddingRight: 10,
   },
-  vehiclePill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 42,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-  },
-  vehicleText: { flex: 1 },
+  searchTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 },
+  searchIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   roundButton: {
     width: 42,
     height: 42,
@@ -846,15 +816,6 @@ const styles = StyleSheet.create({
   },
   bannerText: { flex: 1 },
   retryText: { fontSize: 9 },
-  searchPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    minHeight: 50,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-  },
   searchText: { flex: 1 },
   recordingPill: {
     flexDirection: 'row',

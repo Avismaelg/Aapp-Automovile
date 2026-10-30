@@ -23,8 +23,14 @@ const instructionIcons: Record<RouteInstructionIcon, keyof typeof Ionicons.glyph
   depart: 'navigate',
 };
 
-const ROUTE_BLUE = '#2f8cff';
+// Paleta de navegación: verde oscuro para la maniobra (se lee de un vistazo
+// de día y de noche) y tarjeta blanca abajo.
+const MANEUVER = '#0f5132';
+const MANEUVER_DARK = '#0a3d26';
 const INK = '#0b1422';
+const SOFT = '#5b6675';
+const FAST = '#16a34a';
+const ALERT = '#e11d48';
 
 type Props = {
   upcoming: UpcomingInstruction | null;
@@ -51,8 +57,8 @@ type Props = {
   onClose: () => void;
 };
 
-// Navegación activa: la maniobra manda arriba (distancia grande, calle
-// debajo) y abajo solo lo esencial: hora de llegada, tiempo y distancia.
+// Navegación activa: la maniobra manda arriba (flecha y distancia grandes,
+// calle debajo) y abajo solo lo esencial: tiempo, distancia y llegada.
 export function NavigationHud({
   upcoming,
   following,
@@ -75,34 +81,33 @@ export function NavigationHud({
   onChangeRoute,
   onClose,
 }: Props) {
-  const overLimit = limitKmh != null && Number(speedLabel) > limitKmh + 5;
   const speedNow = Number(speedLabel);
+  const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > limitKmh + 5;
   const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > curve.speedKmh + 15;
+  const recalculating = offRoute || !hasRoute;
 
   return (
     <View pointerEvents="box-none" style={styles.navLayer}>
       <View style={styles.maneuverCard}>
-        {offRoute || !hasRoute ? (
+        {recalculating ? (
           <View style={styles.maneuverRow}>
-            <Ionicons name="reload" size={30} color="#ffffff" />
-            <AppText variant="h2" color="#ffffff" style={styles.maneuverFlex}>
-              {offRoute ? 'Recalculando ruta…' : 'Calculando ruta…'}
+            <View style={styles.maneuverIcon}>
+              <Ionicons name="sync" size={30} color="#ffffff" />
+            </View>
+            <AppText variant="h2" color="#ffffff" style={styles.flex}>
+              {offRoute ? 'Recalculando…' : 'Calculando ruta…'}
             </AppText>
           </View>
         ) : (
           <View style={styles.maneuverRow}>
             <View style={styles.maneuverIcon}>
-              <Ionicons
-                name={upcoming ? instructionIcons[upcoming.icon] : 'arrow-up'}
-                size={38}
-                color={ROUTE_BLUE}
-              />
+              <Ionicons name={upcoming ? instructionIcons[upcoming.icon] : 'arrow-up'} size={40} color="#ffffff" />
             </View>
-            <View style={styles.maneuverFlex}>
+            <View style={styles.flex}>
               <AppText variant="display" color="#ffffff" style={styles.maneuverDistance}>
                 {upcoming ? formatInstructionDistance(upcoming.remainingM) : 'Sigue recto'}
               </AppText>
-              <AppText variant="bodyStrong" color="#ffffff" numberOfLines={2}>
+              <AppText variant="bodyStrong" color="#d1fae5" numberOfLines={2} style={styles.road}>
                 {upcoming
                   ? upcoming.icon !== 'arrive' && upcoming.road
                     ? upcoming.road
@@ -112,40 +117,43 @@ export function NavigationHud({
             </View>
           </View>
         )}
+        {following && !recalculating ? (
+          <View style={styles.thenRow}>
+            <AppText variant="caption" color="#a7f3d0">
+              Luego
+            </AppText>
+            <Ionicons name={instructionIcons[following.icon]} size={16} color="#ffffff" />
+          </View>
+        ) : null}
       </View>
-      {following && !offRoute ? (
-        <View style={styles.thenPill}>
-          <AppText variant="caption" color="#ffffff">
-            Luego
-          </AppText>
-          <Ionicons name={instructionIcons[following.icon]} size={16} color="#ffffff" />
-        </View>
-      ) : null}
 
       {curve ? (
         <View style={[styles.curveBadge, curveUrgent && styles.curveBadgeUrgent]}>
-          <Ionicons name="warning" size={14} color={curveUrgent ? '#ffffff' : '#1f1300'} />
-          <AppText variant="label" color={curveUrgent ? '#ffffff' : '#1f1300'} style={styles.curveText}>
-            Curva {curve.distanceM < 1000 ? `${Math.round(curve.distanceM / 10) * 10} m` : '1 km'} · {curve.speedKmh} km/h
+          <Ionicons name="warning" size={14} color={curveUrgent ? '#ffffff' : '#422006'} />
+          <AppText variant="bodyStrong" color={curveUrgent ? '#ffffff' : '#422006'} style={styles.curveText}>
+            Curva en {curve.distanceM < 1000 ? `${Math.round(curve.distanceM / 10) * 10} m` : '1 km'} ·{' '}
+            {curve.speedKmh} km/h
           </AppText>
         </View>
       ) : null}
 
-      <View style={[styles.speedBubble, overLimit && styles.speedBubbleOver]}>
-        <AppText variant="h1" color={overLimit ? '#ffffff' : INK} style={styles.speedValue}>
-          {speedLabel}
-        </AppText>
-        <AppText variant="label" color={overLimit ? '#ffffff' : '#5b6675'} style={styles.speedUnit}>
-          km/h
-        </AppText>
-      </View>
-      {limitKmh != null ? (
-        <View style={styles.speedLimit}>
-          <AppText variant="label" style={styles.speedLimitText}>
-            {limitKmh}
+      <View style={styles.leftColumn}>
+        {limitKmh != null ? (
+          <View style={styles.speedLimit}>
+            <AppText variant="bodyStrong" style={styles.speedLimitText}>
+              {limitKmh}
+            </AppText>
+          </View>
+        ) : null}
+        <View style={[styles.speedBubble, overLimit && styles.speedBubbleOver]}>
+          <AppText variant="display" color={overLimit ? '#ffffff' : INK} style={styles.speedValue}>
+            {speedLabel}
+          </AppText>
+          <AppText variant="caption" color={overLimit ? '#ffe4e6' : SOFT} style={styles.speedUnit}>
+            km/h
           </AppText>
         </View>
-      ) : null}
+      </View>
 
       <View style={styles.sideButtons}>
         {!mapFollowing ? (
@@ -155,7 +163,7 @@ export function NavigationHud({
             accessibilityRole="button"
             accessibilityLabel="Recentrar en tu posición"
           >
-            <Ionicons name="navigate" size={18} color={ROUTE_BLUE} />
+            <Ionicons name="navigate" size={18} color={MANEUVER} />
             <AppText variant="bodyStrong" color={INK} style={styles.recenterText}>
               Centrar
             </AppText>
@@ -167,12 +175,10 @@ export function NavigationHud({
           accessibilityRole="button"
           accessibilityLabel="Orientar el mapa al norte"
         >
-          <AppText variant="label" color={northUp ? '#ffffff' : INK} style={styles.northText}>
-            N
-          </AppText>
+          <Ionicons name="compass-outline" size={22} color={northUp ? '#ffffff' : INK} />
         </Pressable>
         <Pressable
-          style={[styles.roundButton, muted && styles.roundButtonMuted]}
+          style={[styles.roundButton, muted && styles.roundButtonActive]}
           onPress={onToggleMute}
           accessibilityRole="button"
           accessibilityLabel={muted ? 'Activar la voz' : 'Silenciar la voz'}
@@ -181,183 +187,178 @@ export function NavigationHud({
         </Pressable>
       </View>
 
-      <View style={[styles.bottomCard, { paddingBottom: bottomInset + spacing.md }]}>
-        <Pressable
-          style={styles.closeButton}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Terminar la navegación"
-        >
-          <Ionicons name="close" size={22} color="#ffffff" />
-        </Pressable>
-        <View style={styles.etaBlock}>
-          <AppText variant="h1" color={INK} style={styles.etaTime}>
-            {arrivalLabel ?? '--:--'}
-          </AppText>
-          <AppText variant="caption" color="#5b6675" numberOfLines={1}>
-            {remainingTimeLabel} · {remainingDistanceLabel} · {destinationLabel}
-          </AppText>
+      <View style={[styles.bottomCard, { paddingBottom: bottomInset + spacing.lg }]}>
+        <View style={styles.handle} />
+        <View style={styles.bottomRow}>
+          <Pressable
+            style={styles.closeButton}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Terminar la navegación"
+          >
+            <Ionicons name="close" size={22} color={INK} />
+          </Pressable>
+          <View style={styles.etaBlock}>
+            <AppText variant="display" color={FAST} style={styles.etaTime}>
+              {remainingTimeLabel}
+            </AppText>
+            <AppText variant="body" color={SOFT} numberOfLines={1}>
+              {remainingDistanceLabel}
+              {arrivalLabel ? ` · ${arrivalLabel}` : ''}
+            </AppText>
+            <AppText variant="caption" color={SOFT} numberOfLines={1} style={styles.destination}>
+              {destinationLabel}
+            </AppText>
+          </View>
+          <Pressable
+            style={styles.closeButton}
+            onPress={onChangeRoute}
+            accessibilityRole="button"
+            accessibilityLabel="Cambiar destino"
+          >
+            <Ionicons name="search" size={20} color={INK} />
+          </Pressable>
         </View>
-        <Pressable
-          style={styles.routesButton}
-          onPress={onChangeRoute}
-          accessibilityRole="button"
-          accessibilityLabel="Cambiar destino"
-        >
-          <Ionicons name="swap-vertical" size={20} color={INK} />
-        </Pressable>
       </View>
     </View>
   );
 }
 
+const SHADOW = {
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 6,
+};
+
 const styles = StyleSheet.create({
   navLayer: { flex: 1 },
+  flex: { flex: 1 },
   maneuverCard: {
-    backgroundColor: ROUTE_BLUE,
+    backgroundColor: MANEUVER,
     borderRadius: radius['2xl'],
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+    ...SHADOW,
   },
-  maneuverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
+  maneuverRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   maneuverIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: MANEUVER_DARK,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  maneuverFlex: { flex: 1 },
-  maneuverDistance: { fontSize: 34, lineHeight: 38 },
-  thenPill: {
+  maneuverDistance: { fontSize: 38, lineHeight: 42 },
+  road: { fontSize: 17, lineHeight: 22 },
+  thenRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 6,
-    marginLeft: spacing.md,
-    backgroundColor: '#1b5fbf',
+    alignSelf: 'flex-start',
+    backgroundColor: MANEUVER_DARK,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
-  speedBubble: {
-    position: 'absolute',
-    left: 0,
-    bottom: 128,
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#d7dee7',
-    elevation: 5,
-  },
-  speedBubbleOver: { backgroundColor: '#e5394a', borderColor: '#e5394a' },
   curveBadge: {
-    position: 'absolute',
-    left: 0,
-    bottom: 228,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#facc15',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    elevation: 5,
+    gap: 6,
+    backgroundColor: '#fde047',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    ...SHADOW,
   },
-  curveBadgeUrgent: { backgroundColor: '#e5394a' },
-  curveText: { fontSize: 11 },
-  speedValue: { fontSize: 26, lineHeight: 28 },
-  speedUnit: { fontSize: 8 },
-  speedLimit: {
-    position: 'absolute',
-    left: 56,
-    bottom: 186,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 3,
-    borderColor: '#e5394a',
+  curveBadgeUrgent: { backgroundColor: ALERT },
+  curveText: { fontSize: 13 },
+  leftColumn: { position: 'absolute', left: 0, bottom: 168, alignItems: 'center', gap: spacing.sm },
+  speedBubble: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOW,
   },
-  speedLimitText: { fontSize: 11, color: INK },
-  sideButtons: {
-    position: 'absolute',
-    right: 0,
-    bottom: 128,
-    gap: spacing.sm,
-    alignItems: 'flex-end',
+  speedBubbleOver: { backgroundColor: ALERT },
+  speedValue: { fontSize: 26, lineHeight: 28 },
+  speedUnit: { fontSize: 10, marginTop: -2 },
+  speedLimit: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: ALERT,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOW,
   },
+  speedLimitText: { fontSize: 15, color: INK },
+  sideButtons: { position: 'absolute', right: 0, bottom: 168, gap: spacing.sm, alignItems: 'flex-end' },
   recenterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 44,
-    borderRadius: 22,
-    paddingHorizontal: 14,
+    height: 46,
+    borderRadius: 23,
+    paddingHorizontal: 16,
     backgroundColor: '#ffffff',
-    elevation: 5,
+    ...SHADOW,
   },
-  recenterText: { fontSize: 14 },
+  recenterText: { fontSize: 15 },
   roundButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    elevation: 5,
+    ...SHADOW,
   },
-  roundButtonActive: { backgroundColor: ROUTE_BLUE },
-  roundButtonMuted: { backgroundColor: '#5b6675' },
-  northText: { fontSize: 13 },
+  roundButtonActive: { backgroundColor: INK },
   bottomCard: {
     position: 'absolute',
     left: -spacing.lg,
     right: -spacing.lg,
     bottom: -spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     backgroundColor: '#ffffff',
     borderTopLeftRadius: radius['2xl'],
     borderTopRightRadius: radius['2xl'],
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    elevation: 10,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 12,
   },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#e2e8f0',
+    marginBottom: spacing.sm,
+  },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   closeButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#e5394a',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   etaBlock: { flex: 1, alignItems: 'center' },
-  etaTime: { fontSize: 28, lineHeight: 32 },
-  routesButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#eef2f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  etaTime: { fontSize: 30, lineHeight: 34 },
+  destination: { marginTop: 1 },
 });

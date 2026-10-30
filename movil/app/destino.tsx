@@ -1,23 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppText, Button, IconButton, Input } from '@/src/components/ui';
+import { AppText, Button, IconButton } from '@/src/components/ui';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import {
   formatSearchDistance,
   searchPlaces,
   type SearchPlace,
 } from '@/src/lib/place-search';
-import { useChosenDestination } from '@/src/store/destination';
-import { colors, radius, spacing } from '@/src/theme';
+import { useChosenDestination, type ChosenDestination } from '@/src/store/destination';
+import { colors, fonts, radius, spacing } from '@/src/theme';
 
 export default function DestinationScreen() {
   const live = useLiveLocation();
   const setDestination = useChosenDestination((state) => state.setDestination);
   const startNavigation = useChosenDestination((state) => state.startNavigation);
+  const recents = useChosenDestination((state) => state.recents);
   const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string }>();
 
   const [query, setQuery] = useState('');
@@ -93,6 +94,11 @@ export default function DestinationScreen() {
     };
   }, [query]);
 
+  const selectRecent = (place: ChosenDestination) => {
+    setDestination(place);
+    router.replace('/');
+  };
+
   const selectPlace = (place: SearchPlace) => {
     setDestination({
       latitude: place.latitude,
@@ -141,124 +147,160 @@ export default function DestinationScreen() {
     );
   }
 
+  const showRecents = !hasQuery && recents.length > 0;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
-        <AppText variant="label" color={colors.accent}>
-          ¿A DÓNDE VAMOS?
-        </AppText>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.searchWrap}>
-        <Input
+      <View style={styles.searchBar}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Volver">
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
+        </Pressable>
+        <TextInput
           value={query}
           onChangeText={handleQueryChange}
-          placeholder="Calle, ciudad o sitio… ej. Pico Duarte"
+          placeholder="¿A dónde vamos?"
+          placeholderTextColor={colors.muted}
           autoCorrect={false}
           autoFocus
           returnKeyType="search"
-          rightSlot={
-            searchingNow ? (
-              <AppText variant="caption" color={colors.dim} style={{ paddingHorizontal: 10 }}>
-                …
-              </AppText>
-            ) : (
-              <Ionicons name="search" size={18} color={colors.dim} style={{ paddingHorizontal: 12 }} />
-            )
-          }
+          selectionColor={colors.accent}
+          style={styles.searchInput}
         />
-      </View>
-
-      <FlatList
-        keyboardShouldPersistTaps="handled"
-        data={visibleResults}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons
-              name={searchError ? 'alert-circle-outline' : 'compass-outline'}
-              size={30}
-              color={colors.dim}
-            />
-            <AppText variant="body" color={colors.muted} style={styles.emptyTitle}>
-              {searchError ??
-                (hasQuery
-                  ? searchingNow
-                    ? 'Buscando lugares…'
-                    : 'Escribe más letras o prueba otra palabra.'
-                  : 'Busca una calle, ciudad o sitio. La ruta se traza por calles reales.')}
-            </AppText>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => selectPlace(item)}
-            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Ir a ${item.name}`}
-          >
-            <View style={styles.rowIcon}>
-              <Ionicons name="location-outline" size={16} color={colors.accent} />
-            </View>
-            <View style={styles.rowText}>
-              <AppText variant="bodyStrong" numberOfLines={1}>
-                {item.name}
-              </AppText>
-              {item.detail ? (
-                <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-                  {item.detail}
-                </AppText>
-              ) : null}
-            </View>
-            <AppText variant="caption" color={colors.muted}>
-              {formatSearchDistance(item.distanceM)}
-            </AppText>
+        {searchingNow ? (
+          <ActivityIndicator size="small" color={colors.muted} />
+        ) : query.length > 0 ? (
+          <Pressable onPress={() => handleQueryChange('')} hitSlop={10} accessibilityLabel="Borrar">
+            <Ionicons name="close-circle" size={20} color={colors.dim} />
           </Pressable>
-        )}
-      />
-
-      <View style={styles.footer}>
-        <AppText variant="caption" color={colors.dim}>
-          Búsqueda: Photon/Komoot · Datos © OpenStreetMap
-        </AppText>
+        ) : null}
       </View>
+
+      {showRecents ? (
+        <FlatList
+          keyboardShouldPersistTaps="handled"
+          data={recents}
+          keyExtractor={(item, index) => `${item.label}-${index}`}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <AppText variant="label" color={colors.muted} style={styles.sectionTitle}>
+              RECIENTES
+            </AppText>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => selectRecent(item)}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`Ir a ${item.label}`}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons name="time-outline" size={18} color={colors.textSoft} />
+              </View>
+              <AppText variant="bodyStrong" numberOfLines={1} style={styles.rowText}>
+                {item.label}
+              </AppText>
+              <Ionicons name="arrow-up-outline" size={18} color={colors.dim} style={styles.rowArrow} />
+            </Pressable>
+          )}
+        />
+      ) : (
+        <FlatList
+          keyboardShouldPersistTaps="handled"
+          data={visibleResults}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons
+                name={searchError ? 'alert-circle-outline' : 'search-outline'}
+                size={28}
+                color={colors.dim}
+              />
+              <AppText variant="body" color={colors.muted} style={styles.emptyTitle}>
+                {searchError ??
+                  (hasQuery
+                    ? searchingNow
+                      ? 'Buscando…'
+                      : 'Escribe un poco más.'
+                    : 'Busca una calle, un lugar o una ciudad.')}
+              </AppText>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => selectPlace(item)}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`Ir a ${item.name}`}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons name="location-outline" size={18} color={colors.textSoft} />
+              </View>
+              <View style={styles.rowText}>
+                <AppText variant="bodyStrong" numberOfLines={1}>
+                  {item.name}
+                </AppText>
+                {item.detail ? (
+                  <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                    {item.detail}
+                  </AppText>
+                ) : null}
+              </View>
+              <AppText variant="caption" color={colors.muted}>
+                {formatSearchDistance(item.distanceM)}
+              </AppText>
+            </Pressable>
+          )}
+        />
+      )}
+
+      <AppText variant="caption" color={colors.dim} style={styles.footer}>
+        © OpenStreetMap
+      </AppText>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    height: 56,
+    borderRadius: 28,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  searchWrap: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.md,
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 17,
+    paddingVertical: 0,
   },
+  sectionTitle: { marginTop: spacing.md, marginBottom: spacing.xs },
+  pressed: { opacity: 0.6 },
+  rowArrow: { transform: [{ rotate: '-45deg' }] },
   list: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 14,
   },
   rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,10 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   emptyTitle: { textAlign: 'center' },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
+  footer: { textAlign: 'center', paddingVertical: spacing.sm },
   sharedWrap: {
     flex: 1,
     paddingHorizontal: spacing.xl,

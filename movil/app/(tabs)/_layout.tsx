@@ -14,11 +14,11 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.dim,
         tabBarStyle: isNavigating
           ? { display: 'none' }
-          : [styles.tabBar, { height: 64 + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }],
+          : [styles.tabBar, { height: 62 + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }],
         tabBarLabelStyle: styles.tabLabel,
         tabBarItemStyle: styles.tabItem,
         tabBarHideOnKeyboard: true,
@@ -88,10 +88,11 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.bgElevated,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    paddingTop: 9,
+    backgroundColor: colors.bg,
+    borderTopColor: colors.borderSoft,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    elevation: 0,
   },
   tabItem: {
     paddingVertical: 4,
@@ -99,20 +100,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabLabel: {
-    fontFamily: fonts.bodySemi,
-    fontSize: 10,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
     letterSpacing: 0,
+    marginTop: 2,
   },
   partyIcon: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceHigh,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
   },
   partyIconActive: {
     backgroundColor: colors.accent,
