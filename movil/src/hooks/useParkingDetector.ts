@@ -12,7 +12,7 @@ import {
   type Stop,
   type StopSample,
 } from '@/src/lib/parking-logic';
-import { isSimulating, simMotionEvents } from '@/src/lib/simulator';
+import { isSimulating, simMotionEvents, useSimulator } from '@/src/lib/simulator';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { useTrips } from '@/src/store/trips';
 
@@ -23,6 +23,10 @@ const TRIP_PARKING_MAX_AGE_MS = 24 * 3_600_000;
 // reevalúa igualmente cada poco.
 const EVALUATE_EVERY_MS = 10_000;
 const MAX_SAMPLES = 400;
+// Sin muestras del GPS en este tiempo (app en segundo plano, GPS apagado) la
+// parada pendiente ya no dice nada: de ese hueco se encargan el final del
+// viaje grabado y los avisos del sensor.
+const STALE_STOP_MS = 15 * 60_000;
 // El simulador comprime los tiempos de espera para no esperar minutos.
 const SIM_TIME_SCALE = 0.15;
 // Sensor: eventos de las últimas 48 h.
@@ -48,9 +52,20 @@ type DetectorState = {
 };
 
 // Evalúa la parada en curso; si es un aparcamiento lo guarda.
+function resetDetector(state: DetectorState) {
+  state.stop = null;
+  state.lastMoving = null;
+  state.samples = [];
+}
+
 function evaluatePending(state: DetectorState, now: number) {
   const stop = state.stop;
   if (!stop) return;
+  const lastSampleAt = state.samples[state.samples.length - 1]?.at ?? stop.at;
+  if (now - lastSampleAt > (isSimulating() ? 60_000 : STALE_STOP_MS)) {
+    resetDetector(state);
+    return;
+  }
   const decision = evaluateStop({
     stop,
     samples: state.samples,
@@ -140,6 +155,14 @@ export function useParkingDetector(
     detector.current.destination = destination ?? null;
   }, [destination]);
 
+  // Empezar o parar una simulación no debe heredar paradas de antes.
+  useEffect(() => {
+    const state = detector.current;
+    return useSimulator.subscribe((next, previous) => {
+      if (next.active !== previous.active) resetDetector(state);
+    });
+  }, []);
+
   useEffect(() => {
     const state = detector.current;
     const timer = setInterval(() => evaluatePending(state, Date.now()), EVALUATE_EVERY_MS);
@@ -167,6 +190,12 @@ export function useParkingDetector(
     }
 
     if (!state.lastMoving) return;
+    // Hueco largo sin GPS: lo anterior ya no vale para esta parada.
+    const previousAt = state.samples[state.samples.length - 1]?.at ?? state.lastMoving.at;
+    if (now - previousAt > STALE_STOP_MS) {
+      resetDetector(state);
+      return;
+    }
     if (!state.stop) state.stop = state.lastMoving;
     state.samples.push({ latitude, longitude, speedKmh: speed, at: now });
     if (state.samples.length > MAX_SAMPLES) state.samples.shift();

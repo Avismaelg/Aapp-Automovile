@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { partyMembers } from '@/src/data/mock';
 import { recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
 import type { MotionHint } from '@/src/lib/parking-logic';
+import { useParking, type ParkingSpot } from '@/src/store/parking';
 
 // Simulador de pruebas: mueve tu posición por una ruta real (con frenadas en
 // las curvas), simula aparcar, caminar y volver al coche, y amigos de una
@@ -156,6 +157,9 @@ let trail: LatLng[] = [];
 // Prueba de desvío: tras unos metros de ruta se sale por una calle lateral
 // para comprobar que la app recalcula.
 let detourPending = false;
+// Aparcamiento real antes de simular: las pruebas lo cambian y al parar se
+// devuelve tal cual.
+let realSpot: ParkingSpot | null | undefined;
 // Avisos simulados del sensor de actividad (en coche / a pie).
 let motion: MotionHint[] = [];
 
@@ -307,6 +311,7 @@ function convoy(previous: SimMember[]): SimMember[] {
 // --- API ---------------------------------------------------------------
 
 export function startSimulation(origin: { latitude: number; longitude: number }) {
+  if (realSpot === undefined) realSpot = useParking.getState().spot;
   trail = [[origin.latitude, origin.longitude]];
   useSimulator.setState({
     active: true,
@@ -435,6 +440,11 @@ export function stopSimulation() {
   script = null;
   trail = [];
   motion = [];
+  if (realSpot !== undefined) {
+    if (realSpot) useParking.getState().setSpot(realSpot);
+    else useParking.getState().clearSpot();
+    realSpot = undefined;
+  }
   useSimulator.setState({ active: false, phase: 'idle', label: '', fix: null, party: false, members: [] });
 }
 
