@@ -428,4 +428,17 @@ describe('registro automático de rutas', () => {
       }
     });
   });
+
+  it('borrar una ruta la quita del historial y de los totales', async () => {
+    drive(0, 10, Date.now());
+    await useTrips.getState().stopTrip();
+    const [trip] = useTrips.getState().trips;
+    const before = useTrips.getState().totals;
+    expect(before.drives).toBe(1);
+
+    await useTrips.getState().removeTrip(trip.id);
+
+    expect(useTrips.getState().trips).toHaveLength(0);
+    expect(useTrips.getState().totals).toEqual({ drives: 0, distanceM: 0, durationMs: 0 });
+  });
 });

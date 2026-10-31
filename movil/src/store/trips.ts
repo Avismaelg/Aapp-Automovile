@@ -52,6 +52,7 @@ type TripsState = {
   }) => void;
   stopTrip: () => Promise<void>;
   removeTestTrips: () => Promise<void>;
+  removeTrip: (tripId: string) => Promise<void>;
   markRecordsSubmitted: (tripId: string) => void;
 };
 
@@ -449,6 +450,27 @@ export const useTrips = create<TripsState>((set, get) => ({
     // Termina en el último punto en coche: caminar después no suma tiempo.
     set({ active: null, ...archiveTrip(get(), active, lastPointAt(active)) });
     await persistAll();
+  },
+
+  // Borra un viaje guardado y lo resta de los totales.
+  removeTrip: async (tripId) => {
+    const trip = get().trips.find((item) => item.id === tripId);
+    if (!trip) return;
+    const { totals } = get();
+    set({
+      trips: get().trips.filter((item) => item.id !== tripId),
+      totals: trip.test
+        ? totals
+        : {
+            drives: Math.max(0, totals.drives - 1),
+            distanceM: Math.max(0, totals.distanceM - trip.distanceM),
+            durationMs: Math.max(
+              0,
+              totals.durationMs - ((trip.endedAt ?? trip.startedAt) - trip.startedAt),
+            ),
+          },
+    });
+    await persistArchive();
   },
 
   removeTestTrips: async () => {

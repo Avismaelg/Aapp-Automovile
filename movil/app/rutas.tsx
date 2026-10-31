@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   AppText,
@@ -12,7 +12,7 @@ import {
   ScreenHeader,
   Stat,
 } from '@/src/components/ui';
-import { useTrips } from '@/src/store/trips';
+import { useTrips, type Trip } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -45,6 +45,18 @@ export default function TripsScreen() {
   const trips = useTrips((state) => state.trips);
   const active = useTrips((state) => state.active);
   const stopTrip = useTrips((state) => state.stopTrip);
+  const removeTrip = useTrips((state) => state.removeTrip);
+
+  const confirmRemove = (trip: Trip) => {
+    Alert.alert(
+      'Borrar ruta',
+      `${formatDate(trip.startedAt)} · ${formatKm(trip.distanceM)}. Se quita de tu historial y de tus totales.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Borrar', style: 'destructive', onPress: () => void removeTrip(trip.id) },
+      ],
+    );
+  };
 
   // Los viajes de prueba del simulador se ven en la lista pero no suman.
   const totals = useMemo(() => {
@@ -73,7 +85,10 @@ export default function TripsScreen() {
           accessibilityLabel="Récords"
         />
       </View>
-      <ScreenHeader title="Mis rutas" subtitle="Se graban solas al conducir" />
+      <ScreenHeader
+        title="Mis rutas"
+        subtitle="Se graban solas al conducir. Mantén pulsada una para borrarla."
+      />
 
       <View style={styles.summary}>
         <Stat value={String(totals.count)} label="rutas" align="center" />
@@ -117,7 +132,18 @@ export default function TripsScreen() {
       {trips.length > 0 ? (
         <View style={styles.group}>
           {trips.map((trip, index) => (
-            <View key={trip.id} style={[styles.trip, index > 0 && styles.rowDivider]}>
+            <Pressable
+              key={trip.id}
+              onLongPress={() => confirmRemove(trip)}
+              accessibilityRole="button"
+              accessibilityLabel={`Ruta del ${formatDate(trip.startedAt)}`}
+              accessibilityHint="Mantén pulsado para borrarla"
+              style={({ pressed }) => [
+                styles.trip,
+                index > 0 && styles.rowDivider,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
               <View style={{ flex: 1 }}>
                 <View style={styles.tripTitleRow}>
                   <AppText variant="bodyStrong">{formatDate(trip.startedAt)}</AppText>
@@ -132,7 +158,7 @@ export default function TripsScreen() {
                 </AppText>
               </View>
               <AppText variant="title">{formatKm(trip.distanceM)}</AppText>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : null}
