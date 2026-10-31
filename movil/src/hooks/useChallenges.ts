@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 
 import { friends as mockFriends } from '@/src/data/mock';
 import type { ChallengeCategory, VehicleKind } from '@/src/types/models';
@@ -37,6 +37,8 @@ type ChallengeRow = {
   finished_at: string | null;
   rules: string | null;
   created_at: string;
+  end_lat?: number | null;
+  end_lng?: number | null;
 };
 
 type ParticipantRow = {
@@ -229,6 +231,8 @@ export function useChallenges() {
           finishedAt: challenge.finished_at,
           rules: challenge.rules,
           createdAt: challenge.created_at,
+          endLat: challenge.end_lat ?? null,
+          endLng: challenge.end_lng ?? null,
           isHost,
           myStatus: mine?.status ?? (isHost ? 'accepted' : 'invited'),
           participants: challengeParticipants.map((participant) => {
@@ -258,40 +262,70 @@ export function useChallenges() {
     },
   });
 
+  const channelId = useId().replace(/:/g, '');
+  const challengeIds = (query.data ?? [])
+    .filter((challenge) => challenge.status !== 'finished')
+    .map((challenge) => challenge.id)
+    .slice(0, 5)
+    .join(',');
+
+  // Antes llegaban los cambios de TODOS los retos del sistema y el nombre del
+  // canal se repetía entre pantallas. Ahora: tus invitaciones y los retos
+  // abiertos en los que estás (la clasificación en vivo).
   useEffect(() => {
     if (demo || !supabase || !account) return;
-    const channel = supabase
-      .channel(`challenges-live-${account.id}`)
+    const client = supabase;
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+    let channel = client
+      .channel(`challenges-live-${account.id}-${channelId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'challenges' },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+        {
+          event: '*',
+          schema: 'public',
+          table: 'challenge_participants',
+          filter: `user_id=eq.${account.id}`,
         },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'challenge_participants' },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ['challenges'] });
-        },
-      )
-      .subscribe();
+        refresh,
+      );
+    for (const id of challengeIds ? challengeIds.split(',') : []) {
+      channel = channel
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'challenge_participants', filter: `challenge_id=eq.${id}` },
+          refresh,
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'challenges', filter: `id=eq.${id}` },
+          refresh,
+        );
+    }
+    channel.subscribe();
 
     return () => {
-      void supabase?.removeChannel(channel);
+      void client.removeChannel(channel);
     };
-  }, [account, demo, queryClient]);
+  }, [account, demo, queryClient, channelId, challengeIds]);
 
   const challenges = demo ? [] : query.data ?? [];
   const visible = challenges.filter((challenge) => challenge.myStatus !== 'declined');
-  const live = visible.find((challenge) => challenge.status === 'live') ?? null;
+  // Las invitaciones pendientes van primero: un reto por llegada se crea ya
+  // «en vivo», y antes al invitado nunca le salía para aceptarlo.
   const incomingInvites = visible.filter(
     (challenge) =>
-      challenge.status === 'pending' &&
+      (challenge.status === 'pending' || challenge.status === 'live') &&
       !challenge.isHost &&
       challenge.myStatus === 'invited',
   );
+  const racing =
+    visible.find(
+      (challenge) => challenge.status === 'live' && challenge.myStatus === 'accepted',
+    ) ?? null;
+  const live =
+    racing ??
+    visible.find((challenge) => challenge.status === 'live' && challenge.myStatus !== 'invited') ??
+    null;
   const pending = visible.filter(
     (challenge) => challenge.status === 'pending' && challenge.myStatus !== 'declined',
   );
@@ -302,6 +336,8 @@ export function useChallenges() {
     challenges,
     active,
     activeAsChallenge: active ? realChallengeToChallenge(active) : null,
+    // Reto en el que estás corriendo ahora (aceptado y en vivo).
+    racing,
     invitations: incomingInvites,
     history,
     isLoading: demo ? false : query.isLoading,
@@ -322,6 +358,9 @@ export type CreateChallengeInput = {
   rules: string;
   hostVehicleId?: string;
   hostVehicleKind: VehicleKind;
+  // Meta del reto por llegada.
+  endLat?: number;
+  endLng?: number;
   invitees: {
     userId: string;
     vehicleId?: string;
@@ -359,6 +398,8 @@ export function useCreateChallenge() {
           distance_m: Math.round(input.distanceKm * 1000),
           starts_at: input.mode === 'instant' ? new Date().toISOString() : null,
           rules: input.rules,
+          end_lat: input.endLat ?? null,
+          end_lng: input.endLng ?? null,
         })
         .select('id, code')
         .single();
@@ -485,4 +526,20 @@ export function useFinishChallenge() {
       void queryClient.invalidateQueries({ queryKey: ['challenges'] });
     },
   });
+}
+
+// Avance en un reto por llegada. Devuelve tu puesto al llegar.
+export async function reportChallengeProgress(
+  challengeId: string,
+  progressPct: number,
+  arrived: boolean,
+): Promise<number | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('report_challenge_progress', {
+    p_challenge_id: challengeId,
+    p_progress: progressPct,
+    p_arrived: arrived,
+  });
+  if (error) throw new Error(error.message);
+  return typeof data === 'number' ? data : null;
 }

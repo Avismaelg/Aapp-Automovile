@@ -22,6 +22,7 @@ import {
   setCruiseKmh,
   setSimParty,
   simulateIncomingInvite,
+  startRally,
   startSimulation,
   stopSimulation,
   useSimulator,
@@ -86,6 +87,14 @@ export default function SimulatorScreen() {
     useParking.getState().clearSpot();
     runRecordedTripScenario();
     toMap();
+  };
+
+  // Convoy de 5 con reto: tú conduces por calles hasta la meta y 4 amigos
+  // llegan desde otros puntos. La barra muestra la clasificación en vivo.
+  const rallyTest = () => {
+    ensureStarted();
+    const goal = startRally();
+    if (goal) routeTo({ ...goal, label: TEST_LABEL });
   };
 
   const invite = () => {
@@ -191,6 +200,12 @@ export default function SimulatorScreen() {
           title="Atasco (solo GPS)"
           detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
           onPress={() => traffic(false)}
+        />
+        <Test
+          icon="trophy-outline"
+          title="Convoy de 5 con reto"
+          detail="4 amigos salen de sitios distintos hacia tu meta (a 2,6 km). Tú vas por calles. Arriba ves la clasificación en vivo y en la pestaña Party su velocidad."
+          onPress={rallyTest}
         />
         <Test
           icon="mail-unread-outline"

@@ -15,6 +15,8 @@ import {
 import { errorMessage } from '@/src/lib/alerts';
 import { profileColor } from '@/src/lib/profile-db';
 import { answerSimInvite, useSimulator } from '@/src/lib/simulator';
+import { useChallenges, useRespondChallenge } from '@/src/hooks/useChallenges';
+import { useChosenDestination } from '@/src/store/destination';
 import { colors, radius, spacing } from '@/src/theme';
 
 // Aviso en cualquier pantalla cuando un amigo te invita: «Unirme» te mete en
@@ -56,7 +58,7 @@ export function PartyInviteBanner() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   }, [invite]);
 
-  if (!invite) return null;
+  if (!invite) return <ChallengeInviteBanner />;
   const inviterName = invite.inviter?.displayName ?? invite.inviterName ?? 'Un amigo';
   const simulated = invite.partyId === 'sim';
 
@@ -153,3 +155,83 @@ const styles = StyleSheet.create({
   secondary: { backgroundColor: colors.surfaceHigh },
   primary: { backgroundColor: colors.text },
 });
+
+// Un amigo te reta (también desde la party). Aceptar te pone la ruta a la meta.
+function ChallengeInviteBanner() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { invitations } = useChallenges();
+  const respond = useRespondChallenge();
+  const [hidden, setHidden] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const challenge = invitations.find((item) => item.id !== hidden);
+  if (!challenge) return null;
+  const host = challenge.participants.find((participant) => participant.isHost);
+  const hostName = host?.profile.displayName ?? 'Un piloto';
+
+  const answer = async (accept: boolean) => {
+    setError(null);
+    try {
+      await respond.mutateAsync({ challengeId: challenge.id, accept });
+      setHidden(challenge.id);
+      if (accept && challenge.endLat != null && challenge.endLng != null) {
+        const store = useChosenDestination.getState();
+        store.setDestination({
+          latitude: challenge.endLat,
+          longitude: challenge.endLng,
+          label: challenge.toLabel,
+        });
+        store.startNavigation();
+        router.navigate('/(tabs)');
+      }
+    } catch (respondError) {
+      setError(errorMessage(respondError, 'No pudimos responder.'));
+    }
+  };
+
+  return (
+    <View style={[styles.wrap, { top: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <Avatar
+            name={hostName}
+            color={profileColor(host?.profile.username ?? hostName)}
+            size={40}
+            uri={host?.profile.avatarUrl ?? undefined}
+          />
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyStrong" numberOfLines={1}>
+              {hostName.split(' ')[0]} te reta
+            </AppText>
+            <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+              Llegar primero a {challenge.toLabel}
+            </AppText>
+          </View>
+        </View>
+        {error ? <AppText variant="caption" color={colors.danger}>{error}</AppText> : null}
+        <View style={styles.actions}>
+          <Pressable
+            style={[styles.button, styles.secondary]}
+            onPress={() => void answer(false)}
+            accessibilityRole="button"
+          >
+            <AppText variant="bodyStrong" color={colors.textSoft} style={{ fontSize: 14 }}>
+              Rechazar
+            </AppText>
+          </Pressable>
+          <Pressable
+            style={[styles.button, styles.primary]}
+            onPress={() => void answer(true)}
+            disabled={respond.isPending}
+            accessibilityRole="button"
+          >
+            <Ionicons name="flag" size={16} color={colors.bg} />
+            <AppText variant="bodyStrong" color={colors.bg} style={{ fontSize: 14 }}>
+              {respond.isPending ? 'Aceptando…' : 'Aceptar e ir'}
+            </AppText>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}

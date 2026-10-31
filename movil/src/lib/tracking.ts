@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
+import { pushLivePosition } from '@/src/lib/live-share';
 
 const TASK_NAME = 'caravana-background-location';
 // Un fix con más error que esto ensucia la ruta más de lo que aporta.
@@ -25,6 +26,40 @@ const UPDATE_OPTIONS: Location.LocationTaskOptions = {
     killServiceOnDestroy: false,
   },
 };
+
+// En una party la posición se comparte en vivo: puntos cada 3 s y sin
+// agruparlos (los lotes de 30 s dejaban a los demás viéndote a saltos).
+const CONVOY_OPTIONS: Location.LocationTaskOptions = {
+  ...UPDATE_OPTIONS,
+  accuracy: Location.Accuracy.BestForNavigation,
+  timeInterval: 3_000,
+  distanceInterval: 8,
+  deferredUpdatesInterval: 0,
+  foregroundService: {
+    ...UPDATE_OPTIONS.foregroundService!,
+    notificationTitle: 'Caravana · convoy en vivo',
+    notificationBody: 'Tu party ve tu posición. Toca para abrir.',
+  },
+};
+
+let convoyMode = false;
+const currentOptions = () => (convoyMode ? CONVOY_OPTIONS : UPDATE_OPTIONS);
+
+// Entrar o salir de una party cambia el ritmo del servicio. Debe llamarse con
+// la app en primer plano (Android no deja arrancar el servicio desde fondo).
+export async function setConvoyMode(enabled: boolean) {
+  if (Platform.OS === 'web' || enabled === convoyMode) return;
+  convoyMode = enabled;
+  try {
+    if (!(await hasTrackingPermissions())) return;
+    if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
+      await Location.stopLocationUpdatesAsync(TASK_NAME);
+      await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
+    }
+  } catch {
+    // Se reintenta en el próximo resumeTracking.
+  }
+}
 
 function toBackgroundPoint(location: Location.LocationObject): BackgroundPoint | null {
   const { latitude, longitude, speed, accuracy } = location.coords;
@@ -49,6 +84,19 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(TASK_NAME)) {
       const points = data.locations
         .map(toBackgroundPoint)
         .filter((point): point is BackgroundPoint => point !== null);
+      // La más reciente va a la party y a los amigos (con la pantalla
+      // bloqueada también).
+      const latest = data.locations[data.locations.length - 1];
+      if (latest && (latest.coords.accuracy ?? 0) <= MAX_ACCURACY_M) {
+        const { latitude, longitude, speed, heading } = latest.coords;
+        void pushLivePosition({
+          latitude,
+          longitude,
+          at: latest.timestamp,
+          speedKmh: speed != null && speed >= 0 ? speed * 3.6 : null,
+          heading: heading != null && heading >= 0 ? heading : null,
+        });
+      }
       try {
         await saveBackgroundBatch(points);
       } catch {
@@ -76,7 +124,7 @@ export async function requestTrackingPermissions() {
 
 async function ensureUpdatesRunning() {
   if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) return;
-  await Location.startLocationUpdatesAsync(TASK_NAME, UPDATE_OPTIONS);
+  await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
 }
 
 export async function startTracking() {
@@ -115,7 +163,7 @@ export async function resumeTracking(): Promise<ResumeResult> {
     if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
       await Location.stopLocationUpdatesAsync(TASK_NAME);
     }
-    await Location.startLocationUpdatesAsync(TASK_NAME, UPDATE_OPTIONS);
+    await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
     return 'running';
   } catch {
     return 'error';

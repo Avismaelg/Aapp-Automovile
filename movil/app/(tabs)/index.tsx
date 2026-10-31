@@ -25,10 +25,9 @@ import { NavigationHud } from "@/src/components/navigation/NavigationHud";
 import { SpeedHud } from "@/src/components/navigation/SpeedHud";
 import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
-import {
-  useFriendsOnMap,
-  useShareLocationWithFriends,
-} from "@/src/hooks/useFriendsOnMap";
+import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
+import { useLiveShare } from "@/src/hooks/useLiveShare";
+import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
 import { lastSeenLabel } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
@@ -44,7 +43,9 @@ import {
   distanceToSpotMeters,
 } from "@/src/hooks/useParkingDetector";
 import { useRoadInfo } from "@/src/hooks/useRoadInfo";
-import { useActiveParty, usePartyLocation } from "@/src/hooks/useParty";
+import { useActiveParty, useSetPartyDestination } from "@/src/hooks/useParty";
+import { ConvoyDestinationCard } from "@/src/components/navigation/ConvoyDestinationCard";
+import { sameDestination, shouldOfferConvoyDestination } from "@/src/lib/convoy";
 import { useCreateChallenge } from "@/src/hooks/useChallenges";
 import { useTripRecorder } from "@/src/hooks/useTripRecorder";
 import { useVoiceGuidance } from "@/src/hooks/useVoiceGuidance";
@@ -99,11 +100,36 @@ export default function NavigationScreen() {
   const setShareWithFriends = useSharing((state) => state.setShareWithFriends);
   // En simulación de party, los amigos simulados se suman a los reales.
   const simMembers = useSimulator((state) => state.members);
-  const mapFriends = useMemo(
+  // Los de tu party llegan en tiempo real (cada ~3 s); los demás amigos, por
+  // la posición que comparten. Si alguien está en ambos, gana la party.
+  const partyOnMap = useMemo(
     () =>
-      simMembers.length > 0 ? [...realFriends, ...simMembers] : realFriends,
-    [realFriends, simMembers],
+      party && !isDemo
+        ? party.members
+            .filter(
+              (member) =>
+                !member.isMe && member.lastLat != null && member.lastLng != null,
+            )
+            .map((member) => ({
+              id: member.userId,
+              name: member.profile.displayName,
+              color: member.color,
+              latitude: member.lastLat as number,
+              longitude: member.lastLng as number,
+              isTalking: false,
+            }))
+        : [],
+    [party, isDemo],
   );
+  const liveMembers = useMemo(() => {
+    const inParty = new Set(partyOnMap.map((member) => member.id));
+    return [
+      ...partyOnMap,
+      ...realFriends.filter((friend) => !inParty.has(friend.id)),
+      ...simMembers,
+    ];
+  }, [partyOnMap, realFriends, simMembers]);
+  const mapFriends = liveMembers;
   const createChallenge = useCreateChallenge();
 
   const [voiceMuted, setVoiceMuted] = useState(false);
@@ -130,6 +156,19 @@ export default function NavigationScreen() {
   );
 
   const destination = chosenDestination;
+  const partyDestination = useMemo(
+    () =>
+      party?.destinationLat != null && party.destinationLng != null
+        ? {
+            latitude: party.destinationLat,
+            longitude: party.destinationLng,
+            label: party.destinationLabel ?? "Destino del convoy",
+            setBy: party.destinationSetBy,
+            setAt: party.destinationSetAt,
+          }
+        : null,
+    [party],
+  );
 
   const route = useGraphHopperRoute({
     origin: live.location,
@@ -154,16 +193,18 @@ export default function NavigationScreen() {
   const sim = useSimulator();
   const simulating = sim.active;
   // Tu posición en la party (solo GPS real: nunca la de demo ni la simulada).
-  usePartyLocation(
-    party?.id,
-    live.location,
-    Boolean(party) && !isDemo && live.isLive && live.location.source === "gps",
-  );
-  // Tus amigos te ven en su mapa (si lo permites; se pregunta una vez).
-  useShareLocationWithFriends(
+  // Tu posición en vivo para la party y tus amigos (solo GPS real: nunca la
+  // de demo ni la simulada).
+  // Reto por llegada en curso: avance y puesto automáticos.
+  useChallengeRace(
     live.location,
     !isDemo && live.isLive && live.location.source === "gps",
   );
+  useLiveShare(live.location, {
+    partyId: party && !isDemo ? party.id : null,
+    enabled: !isDemo && live.isLive && live.location.source === "gps",
+  });
+  // Tus amigos te ven en su mapa (si lo permites; se pregunta una vez).
   useEffect(() => {
     if (isDemo || friendCount === 0 || shareWithFriends !== null) return;
     Alert.alert(
@@ -433,6 +474,15 @@ export default function NavigationScreen() {
       Alert.alert("Retos", "Los retos reales requieren una cuenta conectada.");
       return;
     }
+    // El reto es llegar primero a una meta: sin destino no hay meta.
+    const goal = destination ?? partyDestination;
+    if (!goal) {
+      Alert.alert(
+        "Elige la meta",
+        "Busca un destino en el mapa y vuelve a retar: gana quien llegue primero ahí.",
+      );
+      return;
+    }
     Alert.alert(
       `Reto a ${friend.name.split(" ")[0]}`,
       "Reto por llegada: gana quien llegue primero al destino, respetando las leyes.",
@@ -448,7 +498,9 @@ export default function NavigationScreen() {
                 category: "mixed",
                 mode: "instant",
                 fromLabel: "Mi ubicación",
-                toLabel: destination?.label ?? "Meta libre",
+                toLabel: goal.label,
+                endLat: goal.latitude,
+                endLng: goal.longitude,
                 distanceKm: (route.route?.distanceM ?? 0) / 1000,
                 rules:
                   "Por llegada: gana quien llegue primero respetando las leyes.",
@@ -561,11 +613,58 @@ export default function NavigationScreen() {
     driveRoute(route.route.coordinates);
   }, [sim.phase, navigating, route.route, retryRoute]);
 
+  // En una party, el destino que eliges se comparte con el convoy (salvo ir
+  // a por tu coche, que es solo tuyo).
+  const setPartyDestination = useSetPartyDestination();
+  const shareDestinationWithConvoy = setPartyDestination.mutate;
   const beginNavigation = useCallback(() => {
     setFollowing(true);
     setRecenterToken((value) => value + 1);
     startNavigation();
-  }, [startNavigation]);
+    const target = useChosenDestination.getState().destination;
+    if (
+      party &&
+      !isDemo &&
+      target &&
+      target.label !== "Mi coche" &&
+      !sameDestination(target, partyDestination)
+    ) {
+      shareDestinationWithConvoy({
+        partyId: party.id,
+        label: target.label,
+        lat: target.latitude,
+        lng: target.longitude,
+      });
+    }
+  }, [startNavigation, party, isDemo, partyDestination, shareDestinationWithConvoy]);
+
+  // Otro piloto fijó o cambió el destino: «Ir con el convoy» con un toque.
+  const [dismissedConvoyAt, setDismissedConvoyAt] = useState<string | null>(null);
+  const offerConvoyDestination =
+    partyDestination != null &&
+    !isDemo &&
+    shouldOfferConvoyDestination({
+      me: me.id,
+      party: partyDestination,
+      mine: destination,
+      navigating: isNavigating,
+      dismissedAt: dismissedConvoyAt,
+    });
+  const convoyDestinationSetter = party?.members.find(
+    (member) => member.userId === partyDestination?.setBy,
+  );
+  const followConvoyDestination = () => {
+    if (!partyDestination) return;
+    useChosenDestination.getState().setDestination({
+      latitude: partyDestination.latitude,
+      longitude: partyDestination.longitude,
+      label: partyDestination.label,
+    });
+    setDismissedConvoyAt(partyDestination.setAt);
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
+    startNavigation();
+  };
 
   useEffect(() => {
     if (!navigating || !offRoute || route.isLoading) return;
@@ -640,6 +739,7 @@ export default function NavigationScreen() {
           ]}
         >
           {navigating && destination ? (
+            <>
             <NavigationHud
               upcoming={upcoming ?? null}
               following={thenInstruction}
@@ -666,6 +766,23 @@ export default function NavigationScreen() {
               onChangeRoute={() => router.push("/destino" as Href)}
               onClose={clearDestination}
             />
+            {offerConvoyDestination && partyDestination ? (
+              <View
+                pointerEvents="box-none"
+                style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
+              >
+                <ConvoyDestinationCard
+                  setterName={
+                    convoyDestinationSetter?.profile.displayName ?? "Un piloto"
+                  }
+                  label={partyDestination.label}
+                  changed
+                  onFollow={followConvoyDestination}
+                  onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
+                />
+              </View>
+            ) : null}
+            </>
           ) : (
             <>
               {/* Inicio minimalista: un solo buscador con tu avatar. El vehículo se
@@ -985,6 +1102,18 @@ export default function NavigationScreen() {
                   />
                 ) : null}
 
+                {offerConvoyDestination && partyDestination ? (
+                  <ConvoyDestinationCard
+                    setterName={
+                      convoyDestinationSetter?.profile.displayName ?? "Un piloto"
+                    }
+                    label={partyDestination.label}
+                    changed={isNavigating}
+                    onFollow={followConvoyDestination}
+                    onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
+                  />
+                ) : null}
+
                 {selectedFriend ? (
                   <FriendSheet
                     friend={selectedFriend}
@@ -1017,6 +1146,7 @@ export default function NavigationScreen() {
 }
 
 const styles = StyleSheet.create({
+  convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg },
   root: { flex: 1, backgroundColor: colors.bg },
   overlay: {
     position: "absolute",

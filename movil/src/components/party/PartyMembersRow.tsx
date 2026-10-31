@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar } from '@/src/components/ui';
+import { memberLiveLabel } from '@/src/lib/convoy';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -14,6 +16,7 @@ export type DisplayMember = {
   isTalking: boolean;
   isMe?: boolean;
   lastSeenAt?: string | null;
+  speedKmh?: number | null;
   voiceChannelSlug?: PartyVoiceChannelSlug;
 };
 
@@ -26,11 +29,19 @@ export function PartyMembersRow({
   onChallenge: (member: DisplayMember) => void;
   onInvite: () => void;
 }) {
+  // Reloj para que «HACE 2 MIN» avance aunque no llegue nada nuevo.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Lista virtualizada: en parties grandes solo se pintan los visibles.
   return (
     <FlatList
       horizontal
       data={members}
+      extraData={now}
       keyExtractor={(member) => member.id}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.memberRow}
@@ -62,7 +73,16 @@ export function PartyMembersRow({
                 ? 'HABLANDO'
                 : member.battery != null
                   ? `${member.battery}%`
-                  : 'EN VIVO'}
+                  : member.lastSeenAt !== undefined
+                    ? memberLiveLabel(
+                        {
+                          lastSeenAt: member.lastSeenAt ?? null,
+                          speedKmh: member.speedKmh ?? null,
+                          isMe: member.isMe,
+                        },
+                        now,
+                      )
+                    : 'EN VIVO'}
             </AppText>
           </View>
         </Pressable>

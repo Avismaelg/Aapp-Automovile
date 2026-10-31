@@ -1,21 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriends } from '@/src/hooks/useFriends';
-import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import {
   latestFriendPositions,
-  shouldPushFriendLocation,
   type FriendLocationRow,
   type PositionedFriend,
 } from '@/src/lib/party-invites';
 import { profileColor } from '@/src/lib/profile-db';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
-import { useSharing } from '@/src/store/sharing';
 
 export type MapFriend = WorldMapMember & { username: string; updatedAt?: number };
 
@@ -119,40 +116,4 @@ export function useFriendsOnMap() {
     isLoading: !isDemo && positionsQuery.isLoading,
     refetch: positionsQuery.refetch,
   };
-}
-
-// Sube tu posición para que tus amigos te vean (si lo has permitido). Al
-// desactivarlo se borra tu última posición del servidor.
-export function useShareLocationWithFriends(location: LiveLocation, enabled: boolean) {
-  const accountId = useAuth((state) => state.account?.id);
-  const share = useSharing((state) => state.shareWithFriends);
-  const lastRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
-  const active = Boolean(enabled && share && accountId && supabase);
-
-  useEffect(() => {
-    if (!active || !accountId || !supabase) return;
-    const next = { lat: location.latitude, lng: location.longitude, at: Date.now() };
-    if (!shouldPushFriendLocation(lastRef.current, next)) return;
-    lastRef.current = next;
-    void supabase
-      .from('friend_locations')
-      .upsert({
-        user_id: accountId,
-        lat: next.lat,
-        lng: next.lng,
-        heading: location.heading ?? null,
-        speed_kmh: location.speedKmh ?? null,
-        updated_at: new Date(next.at).toISOString(),
-      })
-      .then(({ error }) => {
-        // Reintenta en el siguiente punto.
-        if (error) lastRef.current = null;
-      });
-  }, [active, accountId, location]);
-
-  useEffect(() => {
-    if (share !== false || !accountId || !supabase) return;
-    lastRef.current = null;
-    void supabase.from('friend_locations').delete().eq('user_id', accountId);
-  }, [share, accountId]);
 }

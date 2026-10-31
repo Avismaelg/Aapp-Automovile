@@ -30,6 +30,7 @@ import { addModel, resetPuck, setModelPuck } from "@/modules/car-puck";
 
 import { useCarModel } from "@/src/hooks/useCarModel";
 import { useMapTheme } from "@/src/hooks/useMapTheme";
+import { useSmoothMembers } from "@/src/hooks/useSmoothMembers";
 import { useSimulator } from "@/src/lib/simulator";
 import { navCamera } from "@/src/lib/nav-camera";
 import {
@@ -541,28 +542,6 @@ export const WorldMap = memo(function WorldMap({
     [],
   );
 
-  const hasMembers = members.length > 0;
-  const membersData = useMemo<GeoJSON.FeatureCollection>(() => {
-    if (!hasMembers) return EMPTY;
-    return {
-      type: "FeatureCollection",
-      features: members.map((member) => ({
-        type: "Feature",
-        id: member.id,
-        properties: {
-          id: member.id,
-          color: member.color,
-          initials: initials(member.name),
-          name: member.name.split(" ")[0],
-          talking: Boolean(member.isTalking),
-        },
-        geometry: {
-          type: "Point",
-          coordinates: [member.longitude, member.latitude],
-        },
-      })),
-    };
-  }, [hasMembers, members]);
 
   // Tocar un amigo abre su ficha; tocar un grupo acerca el mapa.
   const handleMembersPress = useCallback(
@@ -871,98 +850,11 @@ export const WorldMap = memo(function WorldMap({
 
         {/* Siempre montada (vacía sin amigos): montar y desmontar fuentes
             cambia su orden en el estilo. */}
-        <ShapeSource
-          id="caravana-members"
-          shape={membersData}
-          cluster
-          clusterRadius={44}
-          clusterMaxZoomLevel={15}
+        <MembersSource
+          members={members}
+          night={night}
           onPress={handleMembersPress}
-        >
-          <CircleLayer
-            id="caravana-member-groups"
-            filter={["has", "point_count"]}
-            style={{
-              circleColor: "#0b1422",
-              circleOpacity: 0.92,
-              circleRadius: [
-                "step",
-                ["to-number", ["get", "point_count"]],
-                16,
-                10,
-                19,
-                50,
-                23,
-                200,
-                28,
-              ],
-              circleStrokeColor: "#ffffff",
-              circleStrokeWidth: 2,
-            }}
-          />
-          <SymbolLayer
-            id="caravana-member-group-count"
-            filter={["has", "point_count"]}
-            style={{
-              textField: [
-                "concat",
-                "+",
-                ["to-string", ["get", "point_count_abbreviated"]],
-              ],
-              textFont: MEMBER_FONT,
-              textSize: 13,
-              textColor: "#ffffff",
-              textAllowOverlap: true,
-            }}
-          />
-          <CircleLayer
-            id="caravana-member-dots"
-            filter={["!", ["has", "point_count"]]}
-            style={{
-              circleColor: ["to-color", ["get", "color"]],
-              circleRadius: 14,
-              circleStrokeColor: [
-                "case",
-                ["==", ["get", "talking"], true],
-                "#ff5a1f",
-                "#ffffff",
-              ],
-              circleStrokeWidth: [
-                "case",
-                ["==", ["get", "talking"], true],
-                4,
-                2,
-              ],
-            }}
-          />
-          <SymbolLayer
-            id="caravana-member-names"
-            filter={["!", ["has", "point_count"]]}
-            minZoomLevel={13}
-            style={{
-              textField: ["to-string", ["get", "name"]],
-              textFont: MEMBER_FONT,
-              textSize: 12,
-              textOffset: [0, 1.9],
-              textAnchor: "top",
-              textColor: night ? "#f3f6fa" : "#0b1422",
-              textHaloColor: night ? "#0b1422" : "#ffffff",
-              textHaloWidth: 1.5,
-              textAllowOverlap: false,
-            }}
-          />
-          <SymbolLayer
-            id="caravana-member-labels"
-            filter={["!", ["has", "point_count"]]}
-            style={{
-              textField: ["to-string", ["get", "initials"]],
-              textFont: MEMBER_FONT,
-              textSize: 11,
-              textColor: "#0B0F14",
-              textAllowOverlap: true,
-            }}
-          />
-        </ShapeSource>
+        />
 
         {destination ? (
           <MarkerView
@@ -1064,4 +956,135 @@ const styles = StyleSheet.create({
     borderColor: "rgba(77,225,255,0.5)",
     overflow: "hidden",
   },
+});
+
+// Puntos de los amigos y de la party. Componente aparte: al animar el
+// deslizamiento entre posiciones solo se repinta esta fuente, no el mapa.
+const MembersSource = memo(function MembersSource({
+  members: incoming,
+  night,
+  onPress,
+}: {
+  members: WorldMapMember[];
+  night: boolean;
+  onPress: (event: { features: GeoJSON.Feature[] }) => void;
+}) {
+  const members = useSmoothMembers(incoming);
+  const hasMembers = members.length > 0;
+  const membersData = useMemo<GeoJSON.FeatureCollection>(() => {
+    if (!hasMembers) return EMPTY;
+    return {
+      type: "FeatureCollection",
+      features: members.map((member) => ({
+        type: "Feature",
+        id: member.id,
+        properties: {
+          id: member.id,
+          color: member.color,
+          initials: initials(member.name),
+          name: member.name.split(" ")[0],
+          talking: Boolean(member.isTalking),
+        },
+        geometry: {
+          type: "Point",
+          coordinates: [member.longitude, member.latitude],
+        },
+      })),
+    };
+  }, [hasMembers, members]);
+
+  return (
+    <ShapeSource
+      id="caravana-members"
+      shape={membersData}
+      cluster
+      clusterRadius={44}
+      clusterMaxZoomLevel={15}
+      onPress={onPress}
+    >
+      <CircleLayer
+        id="caravana-member-groups"
+        filter={["has", "point_count"]}
+        style={{
+          circleColor: "#0b1422",
+          circleOpacity: 0.92,
+          circleRadius: [
+            "step",
+            ["to-number", ["get", "point_count"]],
+            16,
+            10,
+            19,
+            50,
+            23,
+            200,
+            28,
+          ],
+          circleStrokeColor: "#ffffff",
+          circleStrokeWidth: 2,
+        }}
+      />
+      <SymbolLayer
+        id="caravana-member-group-count"
+        filter={["has", "point_count"]}
+        style={{
+          textField: [
+            "concat",
+            "+",
+            ["to-string", ["get", "point_count_abbreviated"]],
+          ],
+          textFont: MEMBER_FONT,
+          textSize: 13,
+          textColor: "#ffffff",
+          textAllowOverlap: true,
+        }}
+      />
+      <CircleLayer
+        id="caravana-member-dots"
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          circleColor: ["to-color", ["get", "color"]],
+          circleRadius: 14,
+          circleStrokeColor: [
+            "case",
+            ["==", ["get", "talking"], true],
+            "#ff5a1f",
+            "#ffffff",
+          ],
+          circleStrokeWidth: [
+            "case",
+            ["==", ["get", "talking"], true],
+            4,
+            2,
+          ],
+        }}
+      />
+      <SymbolLayer
+        id="caravana-member-names"
+        filter={["!", ["has", "point_count"]]}
+        minZoomLevel={13}
+        style={{
+          textField: ["to-string", ["get", "name"]],
+          textFont: MEMBER_FONT,
+          textSize: 12,
+          textOffset: [0, 1.9],
+          textAnchor: "top",
+          textColor: night ? "#f3f6fa" : "#0b1422",
+          textHaloColor: night ? "#0b1422" : "#ffffff",
+          textHaloWidth: 1.5,
+          textAllowOverlap: false,
+        }}
+      />
+      <SymbolLayer
+        id="caravana-member-labels"
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          textField: ["to-string", ["get", "initials"]],
+          textFont: MEMBER_FONT,
+          textSize: 11,
+          textColor: "#0B0F14",
+          textAllowOverlap: true,
+        }}
+      />
+    </ShapeSource>
+  );
 });

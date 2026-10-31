@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId } from 'react';
 
-import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import {
   applyMemberPatches,
   changesMembership,
@@ -34,6 +33,8 @@ export type PartyMemberView = {
   lastLat: number | null;
   lastLng: number | null;
   lastSeenAt: string | null;
+  speedKmh: number | null;
+  heading: number | null;
   isMuted: boolean;
   isMe: boolean;
   voiceChannelSlug: PartyVoiceChannelSlug;
@@ -49,6 +50,8 @@ export type PartyView = {
   destinationLabel: string | null;
   destinationLat: number | null;
   destinationLng: number | null;
+  destinationSetBy: string | null;
+  destinationSetAt: string | null;
   startsAt: string | null;
   createdAt: string;
   maxMembers: number;
@@ -67,6 +70,8 @@ type PartyRow = {
   destination_label: string | null;
   destination_lat: number | null;
   destination_lng: number | null;
+  destination_set_by?: string | null;
+  destination_set_at?: string | null;
   starts_at: string | null;
   created_at: string;
   max_members: number;
@@ -80,6 +85,8 @@ type PartyMemberRow = {
   last_lat: number | null;
   last_lng: number | null;
   last_seen_at: string | null;
+  last_speed_kmh?: number | string | null;
+  last_heading?: number | string | null;
   is_muted: boolean;
   voice_channel_slug: PartyVoiceChannelSlug;
   left_at?: string | null;
@@ -105,7 +112,7 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
 
   const { data: memberRows, error } = await supabase
     .from('party_members')
-    .select('party_id, user_id, role, last_lat, last_lng, last_seen_at, is_muted, voice_channel_slug')
+    .select('party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, voice_channel_slug')
     .eq('party_id', party.id)
     .is('left_at', null);
 
@@ -132,6 +139,8 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
     destinationLabel: party.destination_label,
     destinationLat: party.destination_lat,
     destinationLng: party.destination_lng,
+    destinationSetBy: party.destination_set_by ?? null,
+    destinationSetAt: party.destination_set_at ?? null,
     startsAt: party.starts_at,
     createdAt: party.created_at,
     maxMembers: party.max_members,
@@ -147,6 +156,8 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
         lastLat: member.last_lat,
         lastLng: member.last_lng,
         lastSeenAt: member.last_seen_at,
+        speedKmh: member.last_speed_kmh != null ? Number(member.last_speed_kmh) : null,
+        heading: member.last_heading != null ? Number(member.last_heading) : null,
         isMuted: member.is_muted,
         isMe: member.user_id === accountId,
         voiceChannelSlug: member.voice_channel_slug,
@@ -241,6 +252,10 @@ export function useActiveParty() {
             row.destination_lat !== undefined ? row.destination_lat : current.destinationLat,
           destinationLng:
             row.destination_lng !== undefined ? row.destination_lng : current.destinationLng,
+          destinationSetBy:
+            row.destination_set_by !== undefined ? row.destination_set_by : current.destinationSetBy,
+          destinationSetAt:
+            row.destination_set_at !== undefined ? row.destination_set_at : current.destinationSetAt,
         };
       });
     };
@@ -487,62 +502,6 @@ export function useSetPartyDestination() {
       void queryClient.invalidateQueries({ queryKey: ['party'] });
     },
   });
-}
-
-export function usePartyLocation(
-  partyId: string | undefined,
-  location: LiveLocation,
-  enabled: boolean,
-) {
-  const accountId = useAuth((state) => state.account?.id);
-  const latestRef = useRef(location);
-
-  useEffect(() => {
-    latestRef.current = location;
-  }, [location]);
-
-  useEffect(() => {
-    const client = supabase;
-    if (!partyId || !enabled || !accountId || !client) return;
-
-    // Evita escrituras redundantes: si el coche no se movió 5 m y la última
-    // actualización fue hace menos de 30 s, no hace falta tocar Supabase.
-    let lastPushAt = 0;
-    let lastLat: number | null = null;
-    let lastLng: number | null = null;
-
-    const pushLocation = async (force: boolean) => {
-      const { latitude, longitude } = latestRef.current;
-      const now = Date.now();
-      if (!force && lastLat != null && lastLng != null) {
-        const meters = Math.hypot(
-          (latitude - lastLat) * 111320,
-          (longitude - lastLng) * 111320 * Math.cos((latitude * Math.PI) / 180),
-        );
-        if (meters < 5 && now - lastPushAt < 30_000) return;
-      }
-      lastPushAt = now;
-      lastLat = latitude;
-      lastLng = longitude;
-      try {
-        await client
-          .from('party_members')
-          .update({
-            last_lat: latitude,
-            last_lng: longitude,
-            last_seen_at: new Date().toISOString(),
-          })
-          .eq('party_id', partyId)
-          .eq('user_id', accountId);
-      } catch {
-        // La siguiente actualización reintenta; no bloqueamos el mapa.
-      }
-    };
-
-    void pushLocation(true);
-    const timer = setInterval(() => void pushLocation(false), 5_000);
-    return () => clearInterval(timer);
-  }, [partyId, enabled, accountId]);
 }
 
 export type PartyMessageView = {

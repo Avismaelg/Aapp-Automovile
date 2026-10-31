@@ -8,6 +8,8 @@ export type MemberPatch = {
   last_lat?: number | null;
   last_lng?: number | null;
   last_seen_at?: string | null;
+  last_speed_kmh?: number | string | null;
+  last_heading?: number | string | null;
   is_muted?: boolean;
   voice_channel_slug?: string;
 };
@@ -17,6 +19,8 @@ type PatchableMember = {
   lastLat: number | null;
   lastLng: number | null;
   lastSeenAt: string | null;
+  speedKmh?: number | null;
+  heading?: number | null;
   isMuted: boolean;
   voiceChannelSlug: string;
 };
@@ -57,6 +61,14 @@ export function applyMemberPatches<T extends PatchableMember>(
       lastLat: row.last_lat !== undefined ? row.last_lat : member.lastLat,
       lastLng: row.last_lng !== undefined ? row.last_lng : member.lastLng,
       lastSeenAt: row.last_seen_at !== undefined ? row.last_seen_at : member.lastSeenAt,
+      speedKmh:
+        row.last_speed_kmh !== undefined
+          ? row.last_speed_kmh == null ? null : Number(row.last_speed_kmh)
+          : member.speedKmh,
+      heading:
+        row.last_heading !== undefined
+          ? row.last_heading == null ? null : Number(row.last_heading)
+          : member.heading,
       isMuted: row.is_muted !== undefined ? row.is_muted : member.isMuted,
       voiceChannelSlug:
         row.voice_channel_slug !== undefined ? row.voice_channel_slug : member.voiceChannelSlug,

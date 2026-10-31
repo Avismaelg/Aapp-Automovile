@@ -188,7 +188,13 @@ function setFix(fix: SimFix, phase?: SimPhase) {
   useSimulator.setState((state) => ({
     fix,
     phase: phase ?? state.phase,
-    members: state.party ? (crowd.length ? moveCrowd() : convoy(state.members)) : [],
+    members: rally
+      ? state.members
+      : state.party
+        ? crowd.length
+          ? moveCrowd()
+          : convoy(state.members)
+        : [],
   }));
 }
 
@@ -409,6 +415,116 @@ function convoy(previous: SimMember[]): SimMember[] {
   });
 }
 
+// Convoy de 5 con reto: 4 amigos salen de sitios distintos (1,5–3 km) y van
+// a la misma meta a su ritmo, con semáforos. Sus posiciones cambian cada 3 s,
+// como llegan de verdad por el tiempo real, para ver el deslizamiento y la
+// clasificación en vivo.
+type Racer = {
+  id: string;
+  name: string;
+  color: string;
+  pos: LatLng;
+  kmh: number;
+  stopEvery: number;
+  arrivedAt: number | null;
+};
+let rally: { goal: LatLng; label: string; racers: Racer[]; startedAt: number; myArrivedAt: number | null } | null = null;
+let rallyTimer: ReturnType<typeof setInterval> | null = null;
+const RALLY_STEP_S = 3;
+
+function rallyTick() {
+  const current = rally;
+  if (!current) return;
+  const now = Date.now();
+  const elapsed = Math.round((now - current.startedAt) / 1000);
+  for (const racer of current.racers) {
+    if (racer.arrivedAt) continue;
+    if (elapsed % racer.stopEvery < 12) continue; // semáforo
+    const left = metersBetween(racer.pos, current.goal);
+    const step = (racer.kmh / 3.6) * RALLY_STEP_S;
+    if (left <= step + 30) {
+      racer.pos = current.goal;
+      racer.arrivedAt = now;
+    } else {
+      racer.pos = offsetPoint(racer.pos, bearingDeg(racer.pos, current.goal), step);
+    }
+  }
+  const me = currentPoint();
+  if (me && !current.myArrivedAt && metersBetween(me, current.goal) <= 60) current.myArrivedAt = now;
+
+  // Clasificación: primero los que llegaron (por orden), luego por distancia.
+  const rows = [
+    ...current.racers.map((racer) => ({
+      name: racer.name.split(' ')[0],
+      arrivedAt: racer.arrivedAt,
+      left: metersBetween(racer.pos, current.goal),
+    })),
+    { name: 'Tú', arrivedAt: current.myArrivedAt, left: me ? metersBetween(me, current.goal) : Infinity },
+  ].sort((a, b) =>
+    a.arrivedAt && b.arrivedAt
+      ? a.arrivedAt - b.arrivedAt
+      : a.arrivedAt
+        ? -1
+        : b.arrivedAt
+          ? 1
+          : a.left - b.left,
+  );
+  const stats =
+    `Reto a ${current.label}: ` +
+    rows
+      .slice(0, 5)
+      .map((row, i) => `${i + 1}º ${row.name}${row.arrivedAt ? ' 🏁' : ` ${(row.left / 1000).toFixed(1)} km`}`)
+      .join(' · ');
+  useSimulator.setState({
+    stats,
+    members: current.racers.map((racer) => ({
+      id: racer.id,
+      name: racer.name,
+      color: racer.color,
+      latitude: racer.pos[0],
+      longitude: racer.pos[1],
+      isTalking: false,
+    })),
+  });
+}
+
+// Empieza el convoy con reto. Devuelve la meta para que la pantalla te
+// ponga la ruta (tú conduces por calles reales con el simulador).
+export function startRally(goal?: { latitude: number; longitude: number; label: string }) {
+  const origin = currentPoint();
+  if (!origin) return null;
+  crowd = [];
+  const target: LatLng = goal ? [goal.latitude, goal.longitude] : offsetPoint(origin, 40, 2_600);
+  const label = goal?.label ?? 'la meta';
+  const people = partyMembers.slice(0, 4);
+  rally = {
+    goal: target,
+    label,
+    startedAt: Date.now(),
+    myArrivedAt: null,
+    racers: people.map((person, i) => ({
+      id: `rally-${person.id}`,
+      name: person.name,
+      color: person.color,
+      pos: offsetPoint(target, 60 + i * 95, 1_500 + i * 450),
+      kmh: [48, 62, 40, 55][i],
+      stopEvery: [70, 95, 60, 120][i],
+      arrivedAt: null,
+    })),
+  };
+  useSimulator.setState({ party: true });
+  if (rallyTimer) clearInterval(rallyTimer);
+  rallyTimer = setInterval(rallyTick, RALLY_STEP_S * 1000);
+  rallyTick();
+  return { latitude: target[0], longitude: target[1], label };
+}
+
+function stopRally() {
+  if (rallyTimer) clearInterval(rallyTimer);
+  rallyTimer = null;
+  rally = null;
+}
+
 // --- API ---------------------------------------------------------------
 
 export function startSimulation(origin: { latitude: number; longitude: number }) {
@@ -428,6 +544,7 @@ export function setCruiseKmh(kmh: number) {
 }
 
 export function setSimParty(enabled: boolean, size = 0) {
+  stopRally();
   const origin = currentPoint();
   if (enabled && size > 0 && origin) makeCity(origin, size);
   else crowd = [];
@@ -605,6 +722,7 @@ export function stopSimulation() {
   trail = [];
   motion = [];
   crowd = [];
+  stopRally();
   if (inviteTimer) clearTimeout(inviteTimer);
   inviteTimer = null;
   void useTrips.getState().removeTestTrips();

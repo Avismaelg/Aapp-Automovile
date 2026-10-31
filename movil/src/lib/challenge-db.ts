@@ -49,6 +49,8 @@ export type RealChallenge = {
   finishedAt: string | null;
   rules: string | null;
   createdAt: string;
+  endLat: number | null;
+  endLng: number | null;
   participants: RealChallengeParticipant[];
   myStatus: ParticipantStatus;
   isHost: boolean;

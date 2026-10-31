@@ -97,6 +97,7 @@ export default function PartyScreen() {
         : voice.activeSpeakerIds.includes(member.userId),
       isMe: member.isMe,
       lastSeenAt: member.lastSeenAt,
+      speedKmh: member.speedKmh,
       voiceChannelSlug: member.voiceChannelSlug,
     }));
   }, [
@@ -253,6 +254,13 @@ export default function PartyScreen() {
       Alert.alert('Retos', 'Todavía no hay pilotos a quienes retar.');
       return;
     }
+    if (!destination) {
+      Alert.alert(
+        'Elige la meta',
+        'Fija primero el destino del convoy (búscalo en el mapa y pulsa Ir): gana quien llegue primero ahí.',
+      );
+      return;
+    }
     Alert.alert(
       title,
       'Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.',
@@ -268,7 +276,9 @@ export default function PartyScreen() {
                 category: 'mixed',
                 mode: 'instant',
                 fromLabel: 'Salida del convoy',
-                toLabel: partyDestination,
+                toLabel: destination.label,
+                endLat: destination.latitude,
+                endLng: destination.longitude,
                 distanceKm: (graphHopper.route?.distanceM ?? 0) / 1000,
                 rules: 'Por llegada: gana quien llegue primero respetando las leyes.',
                 hostVehicleId: primaryVehicle?.id,
