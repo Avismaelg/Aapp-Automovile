@@ -1,32 +1,26 @@
-import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 
-import { getMotionEvents } from '@/modules/motion';
-import { haversineMeters } from '@/src/lib/geo';
-import { whenHydrated } from '@/src/lib/hydration';
+import { getMotionEvents } from "@/modules/motion";
+import { haversineMeters } from "@/src/lib/geo";
+import { whenHydrated } from "@/src/lib/hydration";
 import {
-  evaluateStop,
+  ParkingDetector,
   reconcileSpotWithMotion,
-  type GeoPoint,
-  type MotionHint,
-  type Stop,
-  type StopSample,
-} from '@/src/lib/parking-logic';
-import { isSimulating, simMotionEvents, useSimulator } from '@/src/lib/simulator';
-import { useParking, type ParkingSpot } from '@/src/store/parking';
-import { useTrips } from '@/src/store/trips';
+  spotFromTripEnd,
+} from "@/src/lib/parking-detector";
+import type { GeoPoint } from "@/src/lib/parking-logic";
+import {
+  isSimulating,
+  simMotionEvents,
+  useSimulator,
+} from "@/src/lib/simulator";
+import { useParking, type ParkingSpot } from "@/src/store/parking";
+import { useTrips } from "@/src/store/trips";
 
-const MOVE_KMH = 10;
-// Un viaje terminado hace más de esto ya no indica dónde está el coche.
-const TRIP_PARKING_MAX_AGE_MS = 24 * 3_600_000;
 // Parado sin señales nuevas del GPS (quieto, el GPS deja de emitir): se
 // reevalúa igualmente cada poco.
 const EVALUATE_EVERY_MS = 10_000;
-const MAX_SAMPLES = 400;
-// Sin muestras del GPS en este tiempo (app en segundo plano, GPS apagado) la
-// parada pendiente ya no dice nada: de ese hueco se encargan el final del
-// viaje grabado y los avisos del sensor.
-const STALE_STOP_MS = 15 * 60_000;
 // El simulador comprime los tiempos de espera para no esperar minutos.
 const SIM_TIME_SCALE = 0.15;
 // Sensor: eventos de las últimas 48 h.
@@ -40,93 +34,59 @@ export function distanceToSpotMeters(
   return haversineMeters(location, spot);
 }
 
-function motionSince(sinceMs: number): MotionHint[] {
-  return isSimulating() ? simMotionEvents(sinceMs) : getMotionEvents(sinceMs);
-}
-
-type DetectorState = {
-  stop: Stop | null;
-  lastMoving: Stop | null;
-  samples: StopSample[];
-  destination: GeoPoint | null;
-};
-
-// Evalúa la parada en curso; si es un aparcamiento lo guarda.
-function resetDetector(state: DetectorState) {
-  state.stop = null;
-  state.lastMoving = null;
-  state.samples = [];
-}
-
-function evaluatePending(state: DetectorState, now: number) {
-  const stop = state.stop;
-  if (!stop) return;
-  const lastSampleAt = state.samples[state.samples.length - 1]?.at ?? stop.at;
-  if (now - lastSampleAt > (isSimulating() ? 60_000 : STALE_STOP_MS)) {
-    resetDetector(state);
-    return;
-  }
-  const decision = evaluateStop({
-    stop,
-    samples: state.samples,
-    motion: motionSince(stop.at - 120_000),
-    now,
-    destination: state.destination,
-    timeScale: isSimulating() ? SIM_TIME_SCALE : 1,
+function createDetector() {
+  return new ParkingDetector({
+    getSpot: () => useParking.getState().spot,
+    setSpot: (spot) => useParking.getState().setSpot(spot),
+    clearSpot: () => useParking.getState().clearSpot(),
+    motionSince: (since) =>
+      isSimulating() ? simMotionEvents(since) : getMotionEvents(since),
+    timeScale: () => (isSimulating() ? SIM_TIME_SCALE : 1),
   });
-  if (decision.kind === 'pending') return;
-  if (decision.kind === 'parked') {
-    const existing = useParking.getState().spot;
-    if (!existing || haversineMeters(existing, stop) >= 25) {
-      useParking.getState().setSpot({ latitude: stop.latitude, longitude: stop.longitude, at: stop.at });
-    }
-    state.lastMoving = null;
-  }
-  state.stop = null;
-  state.samples = [];
 }
 
 // Guarda dónde quedó aparcado el coche. Una parada solo cuenta como
 // aparcamiento con pruebas de que bajaste del coche (sensor de actividad,
 // llegar al destino, alejarte andando o mucho rato quieto): en un tapón el
-// GPS da lo mismo que aparcado. Ver src/lib/parking-logic.ts.
+// GPS da lo mismo que aparcado. Ver src/lib/parking-detector.ts.
 //
 // Al abrir la app también se usa el final del último viaje grabado y los
 // avisos del sensor guardados con la app cerrada.
 export function useParkingDetector(
-  location: { latitude: number; longitude: number; speedKmh?: number | null },
+  location: {
+    latitude: number;
+    longitude: number;
+    speedKmh?: number | null;
+    accuracy?: number | null;
+  },
   destination?: GeoPoint | null,
 ) {
-  const setSpot = useParking((state) => state.setSpot);
-  const detector = useRef<DetectorState>({
-    stop: null,
-    lastMoving: null,
-    samples: [],
-    destination: null,
-  });
+  const [detector] = useState(createDetector);
   const lastTrip = useTrips((state) => state.trips[0]);
 
-  const { latitude, longitude, speedKmh } = location;
+  const { latitude, longitude, speedKmh = null, accuracy = null } = location;
 
   useEffect(() => {
-    const end = lastTrip?.points[lastTrip.points.length - 1];
-    const endedAt = lastTrip?.endedAt;
-    if (!lastTrip || !end || !endedAt) return;
-    if (Date.now() - endedAt > TRIP_PARKING_MAX_AGE_MS) return;
-
+    if (!lastTrip) return;
     let cancelled = false;
     void whenHydrated(useParking).then(() => {
       if (cancelled) return;
-      const { spot, seenTripId, markTripSeen } = useParking.getState();
-      if (seenTripId === lastTrip.id) return;
-      markTripSeen(lastTrip.id);
-      if (spot && spot.at >= endedAt) return;
-      setSpot({ latitude: end.latitude, longitude: end.longitude, at: endedAt });
+      const { spot, seenTripId, markTripSeen, setSpot } = useParking.getState();
+      const now = Date.now();
+      const result = spotFromTripEnd(
+        lastTrip,
+        spot,
+        seenTripId,
+        now,
+        getMotionEvents(now - MOTION_WINDOW_MS),
+      );
+      if (result.seen) markTripSeen(result.seen);
+      if (result.spot) setSpot(result.spot);
     });
     return () => {
       cancelled = true;
     };
-  }, [lastTrip, setSpot]);
+  }, [lastTrip]);
 
   // Con la app cerrada: corrige el aparcamiento con los avisos del sensor.
   useEffect(() => {
@@ -134,71 +94,45 @@ export function useParkingDetector(
       if (isSimulating()) return;
       void whenHydrated(useParking).then(() => {
         const now = Date.now();
-        const { spot, clearSpot } = useParking.getState();
+        const { spot, setSpot, clearSpot } = useParking.getState();
         const decision = reconcileSpotWithMotion(
           spot,
           getMotionEvents(now - MOTION_WINDOW_MS),
           now,
         );
-        if (decision.kind === 'move') setSpot(decision.spot);
-        else if (decision.kind === 'clear' && !detector.current.stop) clearSpot();
+        if (decision.kind === "move") setSpot(decision.spot);
+        else if (decision.kind === "clear" && !detector.pending) clearSpot();
       });
     };
     reconcile();
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') reconcile();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") reconcile();
     });
     return () => subscription.remove();
-  }, [setSpot]);
+  }, [detector]);
 
   useEffect(() => {
-    detector.current.destination = destination ?? null;
-  }, [destination]);
+    detector.setDestination(destination ?? null);
+  }, [detector, destination]);
 
   // Empezar o parar una simulación no debe heredar paradas de antes.
-  useEffect(() => {
-    const state = detector.current;
-    return useSimulator.subscribe((next, previous) => {
-      if (next.active !== previous.active) resetDetector(state);
-    });
-  }, []);
+  useEffect(
+    () =>
+      useSimulator.subscribe((next, previous) => {
+        if (next.active !== previous.active) detector.reset();
+      }),
+    [detector],
+  );
 
   useEffect(() => {
-    const state = detector.current;
-    const timer = setInterval(() => evaluatePending(state, Date.now()), EVALUATE_EVERY_MS);
+    const timer = setInterval(
+      () => detector.evaluate(Date.now()),
+      EVALUATE_EVERY_MS,
+    );
     return () => clearInterval(timer);
-  }, []);
+  }, [detector]);
 
   useEffect(() => {
-    const state = detector.current;
-    const speed = speedKmh ?? 0;
-    const now = Date.now();
-
-    if (speed >= MOVE_KMH) {
-      state.lastMoving = { latitude, longitude, at: now };
-      // Vuelves a ir en coche: la parada era tráfico.
-      state.stop = null;
-      state.samples = [];
-
-      // Si ya estás conduciendo y te alejas del punto aparcado, vas en el
-      // coche: se olvida el aparcamiento viejo.
-      const spot = useParking.getState().spot;
-      if (spot && haversineMeters(spot, { latitude, longitude }) > 60) {
-        useParking.getState().clearSpot();
-      }
-      return;
-    }
-
-    if (!state.lastMoving) return;
-    // Hueco largo sin GPS: lo anterior ya no vale para esta parada.
-    const previousAt = state.samples[state.samples.length - 1]?.at ?? state.lastMoving.at;
-    if (now - previousAt > STALE_STOP_MS) {
-      resetDetector(state);
-      return;
-    }
-    if (!state.stop) state.stop = state.lastMoving;
-    state.samples.push({ latitude, longitude, speedKmh: speed, at: now });
-    if (state.samples.length > MAX_SAMPLES) state.samples.shift();
-    evaluatePending(state, now);
-  }, [latitude, longitude, speedKmh]);
+    detector.onFix({ latitude, longitude, speedKmh, accuracy, at: Date.now() });
+  }, [detector, latitude, longitude, speedKmh, accuracy]);
 }

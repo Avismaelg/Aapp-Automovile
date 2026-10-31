@@ -441,4 +441,52 @@ describe('registro automático de rutas', () => {
     expect(useTrips.getState().trips).toHaveLength(0);
     expect(useTrips.getState().totals).toEqual({ drives: 0, distanceM: 0, durationMs: 0 });
   });
+
+  it('con GPS a 1 Hz la distancia no se cuenta de más', async () => {
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    // 2 km a 45 km/h (12,5 m/s), una muestra por segundo.
+    for (let s = 0; s <= 160; s += 1) {
+      record({
+        latitude: LAT + s * 12.5 * 0.000009,
+        longitude: LNG,
+        speedKmh: 45,
+        at: start + s * 1_000,
+      });
+    }
+    await useTrips.getState().stopTrip();
+    const [trip] = useTrips.getState().trips;
+    expect(trip.distanceM).toBeGreaterThan(1_900);
+    expect(trip.distanceM).toBeLessThan(2_100);
+  });
+
+  it('al abrir, las rutas antiguas con distancia inflada se vuelven a medir', async () => {
+    const points = Array.from({ length: 11 }, (_, index) => ({
+      latitude: north(index),
+      longitude: LNG,
+      speedKmh: 40,
+      at: Date.now() - 600_000 + index * 60_000,
+    }));
+    const old = {
+      id: 'old',
+      startedAt: points[0].at,
+      endedAt: points[10].at,
+      distanceM: 1_650, // contado de más: los puntos suman ~1,1 km
+      maxSpeedKmh: 40,
+      avgSpeedKmh: 9.9,
+      points,
+    };
+    await AsyncStorage.setItem(
+      'caravana.trips.v1',
+      JSON.stringify({ trips: [old], totals: { drives: 1, distanceM: 1_650, durationMs: 600_000 } }),
+    );
+    useTrips.setState({ hydrated: false, trips: [], active: null });
+    await useTrips.getState().hydrate();
+
+    const [trip] = useTrips.getState().trips;
+    expect(trip.distanceM).toBeGreaterThan(1_100);
+    expect(trip.distanceM).toBeLessThan(1_120);
+    expect(trip.avgSpeedKmh).toBeCloseTo(6.7, 0);
+    expect(useTrips.getState().totals.distanceM).toBeCloseTo(trip.distanceM, 0);
+  });
 });
