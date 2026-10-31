@@ -58,7 +58,10 @@ const MAX_POINTS = 700;
 const MOVE_START_KMH = 15;
 const START_CONFIRM_SAMPLES = 3;
 const MIN_RECORD_KMH = 8;
-const STOP_AFTER_MS = 90_000;
+// Parado este tiempo, el viaje se da por terminado. Es largo a propósito: en
+// un tapón se puede estar varios minutos quieto sin haber aparcado (al bajar
+// del coche el viaje se cierra antes, por el detector de aparcamiento).
+const STOP_AFTER_MS = 10 * 60_000;
 const MIN_TRIP_DISTANCE_M = 200;
 // Sin ninguna muestra durante este tiempo (app cerrada, túnel, GPS apagado)
 // el viaje se da por terminado donde se perdió la señal.
@@ -322,7 +325,8 @@ export const useTrips = create<TripsState>((set, get) => ({
 
     if (!driving && now - lastMovingAt > STOP_AFTER_MS) {
       const ending = { ...active, points, distanceM, maxSpeedKmh };
-      set({ active: null, ...archiveTrip(get(), ending, now) });
+      // Termina cuando dejó de moverse, no cuando nos damos cuenta.
+      set({ active: null, ...archiveTrip(get(), ending, lastMovingAt) });
       void persistAll();
       return;
     }

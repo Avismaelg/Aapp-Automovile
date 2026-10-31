@@ -104,7 +104,7 @@ export default function NavigationScreen() {
         : null,
     [parkingSpot],
   );
-  useParkingDetector(live.location);
+  useParkingDetector(live.location, isNavigating ? destination : null);
   const sim = useSimulator();
   const simulating = sim.active;
   // Tu posición en la party (solo GPS real: nunca la de demo ni la simulada).

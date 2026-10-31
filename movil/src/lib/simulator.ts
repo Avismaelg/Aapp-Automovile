@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { partyMembers } from '@/src/data/mock';
 import { recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
+import type { MotionHint } from '@/src/lib/parking-logic';
 
 // Simulador de pruebas: mueve tu posición por una ruta real (con frenadas en
 // las curvas), simula aparcar, caminar y volver al coche, y amigos de una
@@ -20,7 +21,8 @@ export type SimPhase =
   | 'away'
   | 'walking-back'
   | 'driving-off'
-  | 'detour';
+  | 'detour'
+  | 'traffic';
 
 export type SimFix = {
   latitude: number;
@@ -69,6 +71,7 @@ export const PHASE_LABELS: Record<SimPhase, string> = {
   'walking-back': 'Volviendo al coche',
   'driving-off': 'Arrancando',
   detour: 'Saliéndote de la ruta',
+  traffic: 'En un tapón',
 };
 
 const TICK_MS = 1_000;
@@ -153,6 +156,16 @@ let trail: LatLng[] = [];
 // Prueba de desvío: tras unos metros de ruta se sale por una calle lateral
 // para comprobar que la app recalcula.
 let detourPending = false;
+// Avisos simulados del sensor de actividad (en coche / a pie).
+let motion: MotionHint[] = [];
+
+function emitMotion(type: MotionHint['type'], transition: MotionHint['transition']) {
+  motion.push({ type, transition, at: Date.now() });
+}
+
+export function simMotionEvents(sinceMs: number) {
+  return motion.filter((event) => event.at >= sinceMs);
+}
 
 function setFix(fix: SimFix, phase?: SimPhase) {
   trail.push([fix.latitude, fix.longitude]);
@@ -222,6 +235,31 @@ function walk(to: LatLng, phase: SimPhase, onDone: () => void) {
     const done = walker.length - distance < 0.5;
     setFix({ latitude: point[0], longitude: point[1], speedKmh: done ? 0 : WALK_KMH, heading }, phase);
     if (done) onDone();
+  });
+}
+
+// Tapón: avanza por la calle alternando parado y a paso de tortuga, sin
+// pasar nunca de 10 km/h.
+function crawl(
+  points: LatLng[],
+  pattern: [kmh: number, seconds: number][],
+  phase: SimPhase,
+  onDone: () => void,
+) {
+  const walker = new PathWalker(points);
+  let distance = 0;
+  let step = 0;
+  let left = pattern[0]?.[1] ?? 0;
+  runEvery(() => {
+    const [kmh] = pattern[step] ?? [0];
+    distance = Math.min(walker.length, distance + kmh / 3.6);
+    const { point, heading } = walker.at(distance);
+    setFix({ latitude: point[0], longitude: point[1], speedKmh: kmh, heading }, phase);
+    left -= 1;
+    if (left > 0) return;
+    step += 1;
+    if (step >= pattern.length) onDone();
+    else left = pattern[step][1];
   });
 }
 
@@ -334,13 +372,18 @@ export function runParkingScenario() {
   useSimulator.setState({ label: 'Aparcar, caminar y volver' });
   // Primero llega conduciendo 120 m para que haya «movimiento» previo.
   const arrival = offsetPoint(origin, heading, 120);
+  emitMotion('vehicle', 'enter');
   drive([origin, arrival], 'driving', () => {
     wait(14, 'parking', () => {
+      // El sensor tarda unos segundos en notar que has bajado del coche.
+      emitMotion('vehicle', 'exit');
+      emitMotion('foot', 'enter');
       const away = offsetPoint(arrival, heading + 90, 150);
       walk(away, 'walking-away', () => {
         wait(10, 'away', () => {
           walk(arrival, 'walking-back', () => {
             wait(4, 'parking', () => {
+              emitMotion('vehicle', 'enter');
               drive([arrival, offsetPoint(arrival, heading, 250)], 'driving-off');
             });
           });
@@ -350,11 +393,48 @@ export function runParkingScenario() {
   });
 }
 
+// Atasco: conduce, se queda parado y avanza a trompicones varios minutos
+// (comprimidos) y luego sale del tapón. Nunca debe detectarse aparcamiento.
+// Con sensor = el teléfono dice «en vehículo»; sin sensor = solo GPS.
+export function runTrafficScenario(withSensor: boolean) {
+  const origin = currentPoint();
+  if (!origin) return;
+  const heading = useSimulator.getState().fix?.heading ?? 0;
+  useSimulator.setState({
+    label: withSensor ? 'Atasco (con sensor)' : 'Atasco (solo GPS)',
+  });
+  if (withSensor) emitMotion('vehicle', 'enter');
+  const jamStart = offsetPoint(origin, heading, 150);
+  const jamEnd = offsetPoint(jamStart, heading, 400);
+  drive([origin, jamStart], 'driving', () => {
+    crawl(
+      [jamStart, jamEnd],
+      [
+        [0, 70],
+        [6, 15],
+        [0, 45],
+        [4, 20],
+        [0, 60],
+        [7, 12],
+        [3, 25],
+        [0, 30],
+      ],
+      'traffic',
+      () => {
+        const fix = useSimulator.getState().fix;
+        const from: LatLng = fix ? [fix.latitude, fix.longitude] : jamEnd;
+        drive([from, offsetPoint(from, heading, 300)], 'driving');
+      },
+    );
+  });
+}
+
 export function stopSimulation() {
   if (timer) clearInterval(timer);
   timer = null;
   script = null;
   trail = [];
+  motion = [];
   useSimulator.setState({ active: false, phase: 'idle', label: '', fix: null, party: false, members: [] });
 }
 

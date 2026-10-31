@@ -103,11 +103,18 @@ export type ResumeResult = 'running' | 'no-permission' | 'error';
 // actualización de la app, ahorro de batería). Lo relanza sin pedir permisos:
 // debe llamarse con la app en primer plano, Android no deja arrancar un
 // servicio de ubicación desde segundo plano.
+//
+// Ojo: si Android mata la app, el registro de la tarea sigue («started») pero
+// el servicio en primer plano ha muerto y solo llegan ubicaciones sueltas un
+// par de veces por hora. Por eso se reinicia siempre.
 export async function resumeTracking(): Promise<ResumeResult> {
   if (Platform.OS === 'web') return 'error';
   try {
     if (!(await hasTrackingPermissions())) return 'no-permission';
-    await ensureUpdatesRunning();
+    if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
+      await Location.stopLocationUpdatesAsync(TASK_NAME);
+    }
+    await Location.startLocationUpdatesAsync(TASK_NAME, UPDATE_OPTIONS);
     return 'running';
   } catch {
     return 'error';

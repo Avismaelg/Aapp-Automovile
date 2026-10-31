@@ -9,6 +9,7 @@ import {
   offsetPoint,
   PHASE_LABELS,
   runParkingScenario,
+  runTrafficScenario,
   setCruiseKmh,
   setSimParty,
   startSimulation,
@@ -67,6 +68,13 @@ export default function SimulatorScreen() {
     ensureStarted();
     useParking.getState().clearSpot();
     runParkingScenario();
+    toMap();
+  };
+
+  const traffic = (withSensor: boolean) => {
+    ensureStarted();
+    useParking.getState().clearSpot();
+    runTrafficScenario(withSensor);
     toMap();
   };
 
@@ -135,8 +143,20 @@ export default function SimulatorScreen() {
         <Test
           icon="car"
           title="Aparcar, caminar y volver"
-          detail="Llega, aparca (se detecta en 10 s), camina 150 m (punto azul y coche aparcado), vuelve y arranca."
+          detail="Llega, aparca (el sensor detecta que bajas del coche), camina 150 m (punto azul y coche aparcado), vuelve y arranca."
           onPress={parking}
+        />
+        <Test
+          icon="hourglass"
+          title="Atasco (con sensor)"
+          detail="Varios minutos parado y a trompicones con el teléfono diciendo «en vehículo». No debe marcar aparcamiento."
+          onPress={() => traffic(true)}
+        />
+        <Test
+          icon="hourglass-outline"
+          title="Atasco (solo GPS)"
+          detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
+          onPress={() => traffic(false)}
         />
         <View style={styles.partyRow}>
           <Ionicons name="people" size={20} color={colors.accent} />

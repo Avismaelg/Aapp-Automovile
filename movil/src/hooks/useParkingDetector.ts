@@ -1,15 +1,32 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 
+import { getMotionEvents } from '@/modules/motion';
 import { haversineMeters } from '@/src/lib/geo';
 import { whenHydrated } from '@/src/lib/hydration';
-import { isSimulating } from '@/src/lib/simulator';
+import {
+  evaluateStop,
+  reconcileSpotWithMotion,
+  type GeoPoint,
+  type MotionHint,
+  type Stop,
+  type StopSample,
+} from '@/src/lib/parking-logic';
+import { isSimulating, simMotionEvents } from '@/src/lib/simulator';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { useTrips } from '@/src/store/trips';
 
 const MOVE_KMH = 10;
-const PARK_AFTER_MS = 90_000;
 // Un viaje terminado hace más de esto ya no indica dónde está el coche.
 const TRIP_PARKING_MAX_AGE_MS = 24 * 3_600_000;
+// Parado sin señales nuevas del GPS (quieto, el GPS deja de emitir): se
+// reevalúa igualmente cada poco.
+const EVALUATE_EVERY_MS = 10_000;
+const MAX_SAMPLES = 400;
+// El simulador comprime los tiempos de espera para no esperar minutos.
+const SIM_TIME_SCALE = 0.15;
+// Sensor: eventos de las últimas 48 h.
+const MOTION_WINDOW_MS = 48 * 3_600_000;
 
 export function distanceToSpotMeters(
   location: { latitude: number; longitude: number },
@@ -19,17 +36,59 @@ export function distanceToSpotMeters(
   return haversineMeters(location, spot);
 }
 
-// Guarda el punto donde el coche quedó aparcado: el último punto en movimiento
-// cuando pasan 90 s por debajo de 10 km/h, o el final del último viaje grabado
-// (también los grabados en segundo plano con la app cerrada).
-export function useParkingDetector(location: {
-  latitude: number;
-  longitude: number;
-  speedKmh?: number | null;
-}) {
+function motionSince(sinceMs: number): MotionHint[] {
+  return isSimulating() ? simMotionEvents(sinceMs) : getMotionEvents(sinceMs);
+}
+
+type DetectorState = {
+  stop: Stop | null;
+  lastMoving: Stop | null;
+  samples: StopSample[];
+  destination: GeoPoint | null;
+};
+
+// Evalúa la parada en curso; si es un aparcamiento lo guarda.
+function evaluatePending(state: DetectorState, now: number) {
+  const stop = state.stop;
+  if (!stop) return;
+  const decision = evaluateStop({
+    stop,
+    samples: state.samples,
+    motion: motionSince(stop.at - 120_000),
+    now,
+    destination: state.destination,
+    timeScale: isSimulating() ? SIM_TIME_SCALE : 1,
+  });
+  if (decision.kind === 'pending') return;
+  if (decision.kind === 'parked') {
+    const existing = useParking.getState().spot;
+    if (!existing || haversineMeters(existing, stop) >= 25) {
+      useParking.getState().setSpot({ latitude: stop.latitude, longitude: stop.longitude, at: stop.at });
+    }
+    state.lastMoving = null;
+  }
+  state.stop = null;
+  state.samples = [];
+}
+
+// Guarda dónde quedó aparcado el coche. Una parada solo cuenta como
+// aparcamiento con pruebas de que bajaste del coche (sensor de actividad,
+// llegar al destino, alejarte andando o mucho rato quieto): en un tapón el
+// GPS da lo mismo que aparcado. Ver src/lib/parking-logic.ts.
+//
+// Al abrir la app también se usa el final del último viaje grabado y los
+// avisos del sensor guardados con la app cerrada.
+export function useParkingDetector(
+  location: { latitude: number; longitude: number; speedKmh?: number | null },
+  destination?: GeoPoint | null,
+) {
   const setSpot = useParking((state) => state.setSpot);
-  const lastMovingRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  const lastMovingAtRef = useRef(0);
+  const detector = useRef<DetectorState>({
+    stop: null,
+    lastMoving: null,
+    samples: [],
+    destination: null,
+  });
   const lastTrip = useTrips((state) => state.trips[0]);
 
   const { latitude, longitude, speedKmh } = location;
@@ -54,13 +113,49 @@ export function useParkingDetector(location: {
     };
   }, [lastTrip, setSpot]);
 
+  // Con la app cerrada: corrige el aparcamiento con los avisos del sensor.
   useEffect(() => {
+    const reconcile = () => {
+      if (isSimulating()) return;
+      void whenHydrated(useParking).then(() => {
+        const now = Date.now();
+        const { spot, clearSpot } = useParking.getState();
+        const decision = reconcileSpotWithMotion(
+          spot,
+          getMotionEvents(now - MOTION_WINDOW_MS),
+          now,
+        );
+        if (decision.kind === 'move') setSpot(decision.spot);
+        else if (decision.kind === 'clear' && !detector.current.stop) clearSpot();
+      });
+    };
+    reconcile();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') reconcile();
+    });
+    return () => subscription.remove();
+  }, [setSpot]);
+
+  useEffect(() => {
+    detector.current.destination = destination ?? null;
+  }, [destination]);
+
+  useEffect(() => {
+    const state = detector.current;
+    const timer = setInterval(() => evaluatePending(state, Date.now()), EVALUATE_EVERY_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const state = detector.current;
     const speed = speedKmh ?? 0;
     const now = Date.now();
 
     if (speed >= MOVE_KMH) {
-      lastMovingRef.current = { latitude, longitude };
-      lastMovingAtRef.current = now;
+      state.lastMoving = { latitude, longitude, at: now };
+      // Vuelves a ir en coche: la parada era tráfico.
+      state.stop = null;
+      state.samples = [];
 
       // Si ya estás conduciendo y te alejas del punto aparcado, vas en el
       // coche: se olvida el aparcamiento viejo.
@@ -71,18 +166,10 @@ export function useParkingDetector(location: {
       return;
     }
 
-    if (!lastMovingRef.current || !lastMovingAtRef.current) return;
-    if (now - lastMovingAtRef.current < (isSimulating() ? 10_000 : PARK_AFTER_MS)) return;
-
-    const parked = lastMovingRef.current;
-    const existing = useParking.getState().spot;
-    const unchanged = existing
-      ? haversineMeters(existing, parked) < 25
-      : false;
-    if (!unchanged) {
-      setSpot({ latitude: parked.latitude, longitude: parked.longitude, at: now });
-    }
-    lastMovingRef.current = null;
-    lastMovingAtRef.current = 0;
-  }, [latitude, longitude, speedKmh, setSpot]);
+    if (!state.lastMoving) return;
+    if (!state.stop) state.stop = state.lastMoving;
+    state.samples.push({ latitude, longitude, speedKmh: speed, at: now });
+    if (state.samples.length > MAX_SAMPLES) state.samples.shift();
+    evaluatePending(state, now);
+  }, [latitude, longitude, speedKmh]);
 }

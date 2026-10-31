@@ -41,7 +41,7 @@ describe('registro automático de rutas', () => {
     jest.useRealTimers();
   });
 
-  it('descarta el viaje breve al llevar 90 s parado aunque no cambie el promedio', () => {
+  it('descarta el viaje breve al llevar 10 min parado aunque no cambie el promedio', () => {
     const start = Date.now();
     const record = useTrips.getState().recordPoint;
     for (let index = 0; index < 3; index += 1) {
@@ -51,8 +51,35 @@ describe('registro automático de rutas', () => {
 
     record({ latitude: LAT, longitude: LNG, speedKmh: 0, at: start + 10_000 });
     record({ latitude: LAT, longitude: LNG, speedKmh: 0, at: start + 105_000 });
+    // 90 s parado ya no corta el viaje: puede ser un tapón.
+    expect(useTrips.getState().active).not.toBeNull();
 
+    record({ latitude: LAT, longitude: LNG, speedKmh: 0, at: start + 11 * 60_000 });
     expect(useTrips.getState().active).toBeNull();
+    expect(useTrips.getState().trips).toHaveLength(0);
+  });
+
+  it('un tapón de varios minutos no parte el viaje en dos', () => {
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    let at = start;
+    let lat = LAT;
+    const step = (speedKmh: number, seconds: number) => {
+      for (let s = 0; s < seconds; s += 5) {
+        at += 5_000;
+        lat += (speedKmh / 3.6) * 5 * 0.000009;
+        record({ latitude: lat, longitude: LNG, speedKmh, at });
+      }
+    };
+    step(40, 120);
+    const tripId = useTrips.getState().active?.id;
+    expect(tripId).toBeDefined();
+    step(0, 240);
+    step(5, 30);
+    step(0, 180);
+    step(40, 120);
+
+    expect(useTrips.getState().active?.id).toBe(tripId);
     expect(useTrips.getState().trips).toHaveLength(0);
   });
 

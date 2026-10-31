@@ -13,13 +13,14 @@ import Mapbox, {
 } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { AppState, findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { addModel, resetPuck, setModelPuck } from '@/modules/car-puck';
 
 import { useCarModel } from '@/src/hooks/useCarModel';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
 import { useSimulator } from '@/src/lib/simulator';
+import { navCamera } from '@/src/lib/nav-camera';
 import {
   MAP_FALLBACK_STYLES,
   MAPBOX_ACCESS_TOKEN,
@@ -46,13 +47,10 @@ Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN || null);
 
 const NO_ALTERNATIVES: WorldMapAlternative[] = [];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
-const MANEUVER_ZOOM_M = 250;
 const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_other' };
 // Halo del punto azul (a pie o sin coche 3D).
 const PUCK_PULSING = { isEnabled: true, color: '#3d9bff', radius: 'accuracy' } as const;
 const NO_PADDING = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
-// En navegación la flecha va abajo, para ver más calle por delante.
-const NAV_PADDING = { paddingTop: 260, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
 // Capas de tráfico del estilo de navegación de Mapbox. Por defecto pintan de
 // verde las calles sin atasco; aquí solo se colorean las retenciones, como
 // en Google Maps.
@@ -138,16 +136,6 @@ type WorldMapProps = {
 
 // Zoom según la velocidad: cerca en ciudad, más abierto en autopista y más
 // cerca aún al acercarse a una maniobra.
-function zoomForSpeed(speedKmh: number, walking: boolean, nearManeuver: boolean) {
-  if (walking) return 17.5;
-  let zoom = 15.3;
-  if (speedKmh < 25) zoom = 17;
-  else if (speedKmh < 50) zoom = 16.5;
-  else if (speedKmh < 80) zoom = 16;
-  if (nearManeuver && speedKmh < 80) zoom = Math.max(zoom, 17);
-  return zoom;
-}
-
 function toLngLat(point: [number, number]): [number, number] {
   return [point[1], point[0]];
 }
@@ -363,11 +351,28 @@ export const WorldMap = memo(function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parkingKey]);
 
+  const { height: windowHeight } = useWindowDimensions();
   const speedKmh = location.speedKmh ?? 0;
-  const nearManeuver = upcoming != null && upcoming.remainingM < MANEUVER_ZOOM_M;
-  const zoom = zoomForSpeed(speedKmh, walking, nearManeuver);
-  const navigating = Boolean(route) && !walking;
   const headingUp = !northUp && !walking;
+  const camera = navCamera({
+    speedKmh,
+    walking,
+    driving: headingUp,
+    maneuverM: upcoming?.remainingM,
+  });
+  // En vista inclinada el coche va abajo, para ver más calle por delante.
+  const followPadding = useMemo(
+    () =>
+      camera.topPaddingRatio > 0
+        ? {
+            paddingTop: Math.round(windowHeight * camera.topPaddingRatio),
+            paddingRight: 0,
+            paddingBottom: 0,
+            paddingLeft: 0,
+          }
+        : NO_PADDING,
+    [camera.topPaddingRatio, windowHeight],
+  );
   const tracking = following && hasPermission;
 
   // Cambia el punto azul por el coche 3D. Mapbox recrea su indicador al
@@ -457,10 +462,10 @@ export const WorldMap = memo(function WorldMap({
           defaultSettings={{ centerCoordinate: [location.longitude, location.latitude], zoomLevel: 15 }}
           followUserLocation={tracking}
           followUserMode={headingUp ? UserTrackingMode.FollowWithCourse : UserTrackingMode.Follow}
-          followZoomLevel={zoom}
-          followPitch={0}
+          followZoomLevel={camera.zoom}
+          followPitch={camera.pitch}
           followHeading={headingUp ? undefined : 0}
-          followPadding={navigating && headingUp ? NAV_PADDING : NO_PADDING}
+          followPadding={followPadding}
           onUserTrackingModeChange={handleTrackingChange}
         />
 
