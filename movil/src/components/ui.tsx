@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, fonts, radius, shadows, spacing } from '@/src/theme';
+import { colors, fonts, radius, spacing } from '@/src/theme';
 import { initials } from '@/src/lib/format';
 
 type TextVariant =
@@ -129,7 +129,7 @@ export function Card({
       style={[
         styles.card,
         tone === 'elevated' && { backgroundColor: colors.surfaceAlt },
-        tone === 'accent' && { backgroundColor: colors.accent },
+        tone === 'accent' && { backgroundColor: colors.accent, borderColor: colors.accent },
         tone === 'transparent' && {
           backgroundColor: 'transparent',
           borderColor: colors.border,
@@ -168,15 +168,15 @@ export function Button({
   accessibilityHint?: string;
 }) {
   const palette = {
-    primary: { bg: colors.accent, fg: '#120802', border: colors.accent },
-    lime: { bg: colors.lime, fg: '#101603', border: colors.lime },
+    primary: { bg: colors.text, fg: colors.bg, border: colors.text },
+    lime: { bg: colors.surfaceHigh, fg: colors.text, border: colors.surfaceHigh },
     secondary: {
       bg: colors.surfaceHigh,
       fg: colors.text,
-      border: colors.border,
+      border: colors.surfaceHigh,
     },
-    ghost: { bg: 'transparent', fg: colors.text, border: colors.border },
-    danger: { bg: colors.danger, fg: '#1A0306', border: colors.danger },
+    ghost: { bg: 'transparent', fg: colors.textSoft, border: colors.border },
+    danger: { bg: 'rgba(255,77,94,0.12)', fg: colors.danger, border: 'rgba(255,77,94,0.12)' },
   }[variant];
 
   return (
@@ -201,7 +201,6 @@ export function Button({
           borderColor: palette.border,
           opacity: disabled || !onPress ? 0.45 : pressed ? 0.82 : 1,
         },
-        variant === 'primary' && shadows.accent,
         style,
       ]}
     >
@@ -217,9 +216,9 @@ export function Button({
             />
           ) : null}
           <AppText
-            variant={size === 'sm' ? 'label' : 'bodyStrong'}
+            variant="bodyStrong"
             color={palette.fg}
-            style={{ letterSpacing: 0.2 }}
+            style={size === 'sm' ? { fontSize: 13 } : size === 'lg' ? { fontSize: 16 } : null}
           >
             {label}
           </AppText>
@@ -251,14 +250,14 @@ export function IconButton({
   accessibilityHint?: string;
 }) {
   const toneStyle = {
-    surface: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
-    accent: { backgroundColor: colors.accent, borderColor: colors.accent },
-    ghost: { backgroundColor: 'transparent', borderColor: colors.border },
+    surface: { backgroundColor: colors.surfaceHigh, borderColor: colors.surfaceHigh },
+    accent: { backgroundColor: colors.text, borderColor: colors.text },
+    ghost: { backgroundColor: 'transparent', borderColor: 'transparent' },
   }[tone];
 
   const content = (
     <>
-      <Ionicons name={icon} size={size * 0.46} color={color} />
+      <Ionicons name={icon} size={size * 0.46} color={tone === 'accent' ? colors.bg : color} />
       {badge ? <View style={styles.badge} /> : null}
     </>
   );
@@ -356,7 +355,7 @@ export function Pill({
   style?: StyleProp<ViewStyle>;
 }) {
   const palette = {
-    neutral: { bg: colors.surfaceHigh, fg: colors.textSoft, border: colors.border },
+    neutral: { bg: colors.surfaceHigh, fg: colors.textSoft, border: colors.surfaceHigh },
     accent: { bg: colors.accentSoft, fg: colors.accent, border: 'rgba(255,90,31,0.3)' },
     lime: { bg: colors.limeSoft, fg: colors.lime, border: 'rgba(201,255,77,0.28)' },
     danger: { bg: 'rgba(255,77,94,0.14)', fg: colors.danger, border: 'rgba(255,77,94,0.3)' },
@@ -421,11 +420,39 @@ export function SectionHeader({
           accessibilityRole="button"
           accessibilityLabel={action}
         >
-          <AppText variant="label" color={colors.accent}>
+          <AppText variant="bodyStrong" color={colors.muted} style={{ fontSize: 13 }}>
             {action}
           </AppText>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+export function ScreenHeader({
+  title,
+  subtitle,
+  right,
+  style,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.screenHeader, style]}>
+      <View style={{ flex: 1 }}>
+        <AppText variant="h1">
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="body" color={colors.muted} style={{ marginTop: 4 }}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+      {right ? <View style={styles.screenHeaderRight}>{right}</View> : null}
     </View>
   );
 }
@@ -459,7 +486,7 @@ export function Input({
         <TextInput
           {...props}
           placeholderTextColor={colors.dim}
-          selectionColor={colors.accent}
+          selectionColor={colors.textSoft}
           accessibilityLabel={props.accessibilityLabel ?? label}
           style={[styles.input, inputStyle]}
         />
@@ -486,7 +513,7 @@ export function EmptyState({
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={24} color={colors.accent} />
+        <Ionicons name={icon} size={24} color={colors.textSoft} />
       </View>
       <AppText variant="title" align="center">
         {title}
@@ -571,14 +598,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSoft,
     padding: spacing.lg,
-    ...shadows.card,
   },
   button: {
-    minHeight: 50,
-    borderRadius: radius.lg,
+    minHeight: 52,
+    borderRadius: radius.pill,
     borderWidth: 1,
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
@@ -588,12 +614,10 @@ const styles = StyleSheet.create({
   },
   buttonSm: {
     minHeight: 38,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   buttonLg: {
     minHeight: 58,
-    borderRadius: radius.xl,
   },
   iconButton: {
     borderRadius: radius.pill,
@@ -634,11 +658,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
   },
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  screenHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing['2xl'],
+    marginTop: spacing['3xl'],
     marginBottom: spacing.md,
   },
   divider: {
@@ -648,10 +680,10 @@ const styles = StyleSheet.create({
   },
   inputWrap: {
     minHeight: 50,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgElevated,
+    borderColor: colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
     paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -682,7 +714,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,

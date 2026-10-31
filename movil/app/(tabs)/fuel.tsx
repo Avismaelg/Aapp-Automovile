@@ -22,6 +22,7 @@ import {
   IconButton,
   Input,
   Screen,
+  ScreenHeader,
   SectionHeader,
 } from '@/src/components/ui';
 import type { Vehicle } from '@/src/types/models';
@@ -223,13 +224,11 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <View>
-          <AppText variant="label" color={colors.accent}>ENERGÍA Y RUTAS</AppText>
-          <AppText variant="h1" style={{ marginTop: 4 }}>Tu rendimiento</AppText>
-        </View>
-        <IconButton icon="download-outline" onPress={exportPdf} />
-      </View>
+      <ScreenHeader
+        title="Consumo"
+        subtitle="Gasto, rendimiento y repostajes"
+        right={<IconButton icon="download-outline" onPress={exportPdf} />}
+      />
 
       <ScrollView
         horizontal
@@ -421,12 +420,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: spacing['4xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
   },
   vehicleScroll: { marginTop: spacing.lg, marginHorizontal: -spacing.xl },
   vehicleRow: { gap: 8, paddingHorizontal: spacing.xl },

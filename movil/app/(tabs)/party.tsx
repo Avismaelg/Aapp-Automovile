@@ -307,7 +307,7 @@ export default function PartyScreen() {
     return (
       <Screen>
         <View style={styles.state}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.textSoft} />
           <AppText variant="caption" color={colors.muted}>Cargando party…</AppText>
         </View>
       </Screen>
@@ -409,9 +409,7 @@ export default function PartyScreen() {
 
         <View style={styles.sheetHeader}>
           <View style={{ flex: 1 }}>
-            <AppText variant="label" color={colors.muted}>
-              Caravana en curso
-            </AppText>
+            <AppText variant="title">Caravana en curso</AppText>
             <View style={styles.metaRow}>
               <ElapsedClock since={elapsedSince} />
               <View style={styles.metaDot} />
@@ -428,8 +426,8 @@ export default function PartyScreen() {
             style={styles.inviteButton}
             onPress={() => void shareParty()}
           >
-            <Ionicons name="person-add" size={15} color={colors.accent} />
-            <AppText variant="label" color={colors.accent}>Invitar</AppText>
+            <Ionicons name="person-add-outline" size={15} color={colors.text} />
+            <AppText variant="bodyStrong" style={{ fontSize: 13 }}>Invitar</AppText>
           </Pressable>
         </View>
 
@@ -439,42 +437,13 @@ export default function PartyScreen() {
           onInvite={() => void shareParty()}
         />
 
-        <View style={styles.convoyActions}>
-          <Button
-            label="Mapa del convoy"
-            variant="lime"
-            size="sm"
-            icon="navigate"
-            onPress={openConvoyMap}
-            style={{ flex: 1 }}
-          />
-          <Button
-            label="Retar al convoy"
-            variant="secondary"
-            size="sm"
-            icon="flag"
-            onPress={() => challengePilots(`Reto al convoy: ${partyName}`, displayMembers)}
-            style={{ flex: 1 }}
-          />
-        </View>
-
-        <View style={styles.routeCard}>
-          <View style={styles.routePoint}>
-            <View style={[styles.routeDot, { backgroundColor: colors.lime }]} />
-            <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.muted}>Salida</AppText>
-              <AppText variant="bodyStrong" numberOfLines={1}>Tu ubicación en vivo</AppText>
-            </View>
-          </View>
-          <Ionicons name="arrow-forward" size={14} color={colors.dim} />
-          <View style={styles.routePoint}>
-            <View style={[styles.routeDot, { backgroundColor: colors.accent }]} />
-            <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.muted}>Destino</AppText>
-              <AppText variant="bodyStrong" numberOfLines={1}>{partyDestination}</AppText>
-            </View>
-          </View>
-        </View>
+        <Button
+          label="Ver el convoy en el mapa"
+          variant="secondary"
+          size="sm"
+          icon="navigate-outline"
+          onPress={openConvoyMap}
+        />
 
         <PartyVoicePanel
           isDemo={isDemo}
@@ -502,9 +471,12 @@ export default function PartyScreen() {
             <Ionicons name="share-social-outline" size={20} color={colors.text} />
             <AppText variant="caption" color={colors.textSoft}>Compartir</AppText>
           </Pressable>
-          <Pressable style={styles.bottomAction} onPress={() => router.push('/(tabs)/challenges')}>
-            <Ionicons name="flag-outline" size={19} color={colors.lime} />
-            <AppText variant="caption" color={colors.lime}>Retar</AppText>
+          <Pressable
+            style={styles.bottomAction}
+            onPress={() => challengePilots(`Reto al convoy: ${partyName}`, displayMembers)}
+          >
+            <Ionicons name="flag-outline" size={19} color={colors.text} />
+            <AppText variant="caption" color={colors.textSoft}>Retar</AppText>
           </Pressable>
           <Pressable style={styles.leaveAction} onPress={() => void leave()}>
             <Ionicons name="exit-outline" size={18} color={colors.danger} />
@@ -562,8 +534,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: radius['2xl'],
     borderTopRightRadius: radius['2xl'],
-    borderTopWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
   },
@@ -571,7 +541,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.border,
+    backgroundColor: colors.surfaceHigh,
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
@@ -586,26 +556,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.28)',
+    backgroundColor: colors.surfaceHigh,
     borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  convoyActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  routeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  routePoint: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  routeDot: { width: 8, height: 8, borderRadius: 4 },
   bottomActions: {
     flexDirection: 'row',
     alignItems: 'center',

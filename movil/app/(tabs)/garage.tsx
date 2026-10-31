@@ -1,19 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { QRCard } from '@/src/components/QRCard';
 import {
   AppText,
   Button,
-  Card,
   EmptyState,
   IconButton,
-  Pill,
   Screen,
+  ScreenHeader,
   SectionHeader,
   Stat,
 } from '@/src/components/ui';
@@ -22,11 +19,7 @@ import type { Vehicle } from '@/src/types/models';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useGarageVehicles, pickVehiclePhoto, useSetVehiclePhoto } from '@/src/hooks/useGarage';
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
-import {
-  isElectric,
-  vehicleFuelLabel,
-  vehicleKindMeta,
-} from '@/src/lib/vehicles';
+import { isElectric, vehicleFuelLabel, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
 
 function CarSilhouette() {
@@ -88,13 +81,17 @@ export default function GarageScreen() {
   const openNewVehicle = () => router.push('/vehicle/new');
 
   const header = (
-    <View style={styles.header}>
-      <View>
-        <AppText variant="label" color={colors.accent}>GARAJE</AppText>
-        <AppText variant="h1" style={{ marginTop: 4 }}>Mis vehículos</AppText>
-      </View>
-      <IconButton icon="add" tone="accent" color="#120802" onPress={openNewVehicle} />
-    </View>
+    <ScreenHeader
+      title="Garaje"
+      right={
+        <IconButton
+          icon="add"
+          tone="accent"
+          onPress={openNewVehicle}
+          accessibilityLabel="Añadir vehículo"
+        />
+      }
+    />
   );
 
   if (isLoading) {
@@ -102,7 +99,7 @@ export default function GarageScreen() {
       <Screen>
         {header}
         <View style={styles.loadingState}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.textSoft} />
           <AppText variant="caption" color={colors.muted}>
             Cargando tu garaje…
           </AppText>
@@ -130,227 +127,171 @@ export default function GarageScreen() {
       {header}
 
       {vehicle && meta ? (
-        <LinearGradient
-        colors={
-          electric
-            ? ['#0A1D21', '#131A20', '#10151B']
-            : ['#3A1512', '#1A1517', '#10151B']
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.carCard, electric && styles.carCardElectric]}
-      >
-        <View style={styles.carTop}>
-          <Pill
-            label={vehicle.isPrimary ? 'Vehículo principal' : meta.label}
-            tone={electric ? 'lime' : 'accent'}
-            icon={vehicle.isPrimary ? 'star' : meta.icon}
-          />
-          <Pill label={String(vehicle.year)} tone="neutral" />
-        </View>
-        <Pressable
-          onPress={changePhoto}
-          disabled={setPhoto.isPending}
-          style={({ pressed }) => [styles.carArt, pressed && { opacity: 0.85 }]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            vehicle.photoUrl ? 'Cambiar foto del vehículo' : 'Añadir foto del vehículo'
-          }
-        >
-          {vehicle.photoUrl ? (
-            <>
+        <View style={styles.hero}>
+          <Pressable
+            onPress={changePhoto}
+            disabled={setPhoto.isPending}
+            style={({ pressed }) => [styles.carArt, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              vehicle.photoUrl ? 'Cambiar foto del vehículo' : 'Añadir foto del vehículo'
+            }
+          >
+            {vehicle.photoUrl ? (
               <Image
                 source={{ uri: vehicle.photoUrl }}
                 style={styles.vehiclePhoto}
                 resizeMode="cover"
               />
-              <View style={styles.photoBadge}>
-                <Ionicons name="camera" size={14} color="#120802" />
-                <AppText variant="label" style={styles.photoBadgeText}>
-                  {setPhoto.isPending ? 'Subiendo…' : 'Cambiar foto'}
-                </AppText>
-              </View>
-            </>
-          ) : setPhoto.isPending ? (
-            <ActivityIndicator color={meta.color} />
-          ) : (
-            <>
-              {vehicle.kind === 'car' ? (
-                <CarSilhouette />
-              ) : (
-                <View style={[styles.vehicleArt, { backgroundColor: `${meta.color}12` }]}>
-                  <Ionicons name={meta.icon} size={74} color={`${meta.color}CC`} />
-                  <View style={[styles.vehicleArtLine, { backgroundColor: `${meta.color}55` }]} />
-                </View>
-              )}
-              <View style={[styles.photoBadge, styles.photoBadgeEmpty]}>
-                <Ionicons name="camera-outline" size={14} color={colors.accent} />
-                <AppText variant="label" color={colors.accent} style={styles.photoBadgeText}>
-                  Añadir foto
-                </AppText>
-              </View>
-            </>
-          )}
-        </Pressable>
-        <View style={styles.carInfo}>
-          <AppText variant="label" color={colors.textSoft}>
-            {vehicle.make.toUpperCase()} · {vehicleFuelLabel(vehicle).toUpperCase()}
-          </AppText>
-          <AppText variant="h1" style={{ marginTop: 2 }}>{vehicle.model}</AppText>
-          <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-            “{vehicle.nickname}” · {vehicle.odometerKm.toLocaleString('es-DO')} km
-          </AppText>
-        </View>
-        <View style={styles.carStats}>
-          <Stat
-            value={`${vehicle.efficiency.toFixed(1).replace('.', ',')}`}
-            label={electric ? 'kWh/100' : 'km/L'}
-          />
-          <View style={styles.carDivider} />
-          <Stat value={vehicle.odometerKm.toLocaleString('es-DO')} label="km" />
-          <View style={styles.carDivider} />
-          <Stat value="Activo" label="QR público" accent={meta.color} />
-        </View>
-        <View style={styles.carActions}>
-          <Button
-            label="Editar"
-            variant="secondary"
-            icon="create-outline"
-            size="sm"
-            onPress={() =>
-              router.push({ pathname: '/vehicle/new', params: { vehicleId: vehicle.id } })
-            }
-          />
-          <Button
-            label={electric ? 'Ver cargas' : 'Ver consumo'}
-            variant="ghost"
-            icon={electric ? 'flash-outline' : 'speedometer-outline'}
-            size="sm"
-            onPress={() => router.push('/(tabs)/fuel')}
-          />
-        </View>
-      </LinearGradient>
-      ) : (
-        <Card style={styles.emptyGarage}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="car-sport-outline" size={30} color={colors.accent} />
-          </View>
-          <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-            Tu garaje está vacío
-          </AppText>
-          <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Añade tu primer coche, moto, EV o camión para empezar a registrar
-            rutas, consumo y su QR.
-          </AppText>
-          <Button
-            label="Añadir mi primer vehículo"
-            icon="add"
-            onPress={openNewVehicle}
-            style={{ marginTop: spacing.lg }}
-          />
-        </Card>
-      )}
-
-      <SectionHeader title="Mi identidad Caravana" action="Compartir" onAction={shareQr} />
-      <View style={styles.qrRow}>
-        <QRCard
-          value={profileUrl(me.username)}
-          label="PERFIL"
-          caption={`@${me.username}`}
-          size={132}
-        />
-        <View style={styles.qrSide}>
-          <Card style={styles.qrInfo}>
-            <View style={styles.qrIcon}>
-              <Ionicons name="qr-code" size={22} color={colors.lime} />
+            ) : setPhoto.isPending ? (
+              <ActivityIndicator color={colors.textSoft} />
+            ) : vehicle.kind === 'car' ? (
+              <CarSilhouette />
+            ) : (
+              <Ionicons name={meta.icon} size={72} color={colors.textSoft} />
+            )}
+            <View style={styles.photoBadge}>
+              <Ionicons name="camera-outline" size={14} color={colors.text} />
+              <AppText variant="caption" color={colors.text}>
+                {setPhoto.isPending
+                  ? 'Subiendo…'
+                  : vehicle.photoUrl
+                    ? 'Cambiar foto'
+                    : 'Añadir foto'}
+              </AppText>
             </View>
-            <AppText variant="title" style={{ marginTop: 10 }}>Tu QR, en el vehículo</AppText>
-            <AppText variant="caption" color={colors.muted} style={{ marginTop: 4 }}>
-              Coche, moto, EV o camión: cada uno tiene su QR para llevar pegado.
+          </Pressable>
+
+          <View style={styles.carInfo}>
+            <AppText variant="caption" color={colors.muted}>
+              {vehicle.make} · {vehicle.year} · {vehicleFuelLabel(vehicle)}
+              {vehicle.isPrimary ? ' · Principal' : ''}
             </AppText>
-            <Button
-              label="Compartir QR"
-              variant="lime"
-              size="sm"
-              icon="share-outline"
-              onPress={shareQr}
-              style={{ marginTop: spacing.md }}
-            />
-          </Card>
-          <PressableRow
-            icon="scan-outline"
-            label="Escanear un QR"
-            onPress={() => router.push('/scan')}
-          />
-        </View>
-      </View>
+            <AppText variant="h1" style={{ marginTop: 2 }}>
+              {vehicle.model}
+            </AppText>
+            {vehicle.nickname ? (
+              <AppText variant="body" color={colors.textSoft} style={{ marginTop: 2 }}>
+                “{vehicle.nickname}”
+              </AppText>
+            ) : null}
+          </View>
 
-      <SectionHeader title="Vehículos" action="Añadir" onAction={openNewVehicle} />
-      {garageVehicles.map((item) => {
-        const itemMeta = vehicleKindMeta[item.kind];
-        const active = item.id === vehicle?.id;
-        return (
-          <Pressable
-            key={item.id}
-            onPress={() => setSelectedId(item.id)}
-            style={({ pressed }) => [
-              styles.vehicleRow,
-              active && styles.vehicleRowActive,
-              pressed && { opacity: 0.8 },
-            ]}
-          >
-            <View style={[styles.vehicleThumb, { backgroundColor: `${itemMeta.color}1A` }]}>
-              {item.photoUrl ? (
-                <Image
-                  source={{ uri: item.photoUrl }}
-                  style={styles.vehicleThumbImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Ionicons name={itemMeta.icon} size={24} color={itemMeta.color} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.vehicleNameRow}>
-                <AppText variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {item.make} {item.model}
-                </AppText>
-                {item.isPrimary ? <Pill label="Principal" tone="accent" /> : null}
-              </View>
-              <AppText variant="caption" color={colors.muted}>
-                {itemMeta.shortLabel} · {item.year} · {item.nickname} · {item.efficiency}
-                {item.kind === 'ev' ? ' kWh/100' : ' km/L'}
-              </AppText>
-              <AppText variant="label" color={colors.dim} style={{ fontSize: 8, marginTop: 4 }}>
-                {vehicleUrl(item.qrSlug)}
-              </AppText>
-            </View>
+          <View style={styles.carStats}>
+            <Stat
+              value={`${vehicle.efficiency.toFixed(1).replace('.', ',')}`}
+              label={electric ? 'kWh/100 km' : 'km/L'}
+            />
+            <Stat value={vehicle.odometerKm.toLocaleString('es-DO')} label="km recorridos" />
+            <Stat value={meta.shortLabel} label="tipo" />
+          </View>
+
+          <View style={styles.carActions}>
+            <Button
+              label="Editar"
+              variant="secondary"
+              size="sm"
+              full={false}
+              style={{ flex: 1 }}
+              onPress={() =>
+                router.push({ pathname: '/vehicle/new', params: { vehicleId: vehicle.id } })
+              }
+            />
+            <Button
+              label={electric ? 'Cargas' : 'Consumo'}
+              variant="secondary"
+              size="sm"
+              full={false}
+              style={{ flex: 1 }}
+              onPress={() => router.push('/(tabs)/fuel')}
+            />
             <IconButton
               icon="qr-code-outline"
-              size={34}
-              tone="ghost"
-              onPress={() => shareVehicle(item)}
+              size={38}
+              onPress={() => shareVehicle(vehicle)}
+              accessibilityLabel="Compartir QR del vehículo"
             />
-          </Pressable>
-        );
-      })}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.emptyGarage}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="car-sport-outline" size={30} color={colors.textSoft} />
+          </View>
+          <AppText variant="h2" align="center" style={{ marginTop: spacing.lg }}>
+            Tu garaje está vacío
+          </AppText>
+          <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 6 }}>
+            Añade tu coche, moto, EV o camión para registrar rutas, consumo y su QR.
+          </AppText>
+          <Button
+            label="Añadir vehículo"
+            onPress={openNewVehicle}
+            style={{ marginTop: spacing.xl }}
+          />
+        </View>
+      )}
 
-      {garageVehicles.length > 0 ? (
-        <Pressable onPress={openNewVehicle} style={({ pressed }) => [{ opacity: pressed ? 0.82 : 1 }]}>
-          <Card style={styles.addVehicle}>
-            <View style={styles.addIcon}>
-              <Ionicons name="add" size={22} color={colors.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppText variant="bodyStrong">Añadir coche, moto, EV o camión</AppText>
-              <AppText variant="caption" color={colors.muted}>
-                Cada vehículo tiene su propio historial, consumo y QR.
-              </AppText>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.dim} />
-          </Card>
-        </Pressable>
+      {garageVehicles.length > 1 ? (
+        <>
+          <SectionHeader title="Mis vehículos" />
+          <View style={styles.group}>
+            {garageVehicles.map((item, index) => {
+              const itemMeta = vehicleKindMeta[item.kind];
+              const active = item.id === vehicle?.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setSelectedId(item.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={({ pressed }) => [
+                    styles.vehicleRow,
+                    index > 0 && styles.rowDivider,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <View style={styles.vehicleThumb}>
+                    {item.photoUrl ? (
+                      <Image
+                        source={{ uri: item.photoUrl }}
+                        style={styles.vehicleThumbImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name={itemMeta.icon} size={20} color={colors.textSoft} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {item.make} {item.model}
+                    </AppText>
+                    <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+                      {item.year} · {item.nickname}
+                      {item.isPrimary ? ' · Principal' : ''}
+                    </AppText>
+                  </View>
+                  {active ? <Ionicons name="checkmark" size={20} color={colors.text} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
       ) : null}
+
+      <SectionHeader title="QR" />
+      <View style={styles.group}>
+        <PressableRow icon="share-outline" label="Compartir mi QR" onPress={shareQr} />
+        <PressableRow
+          icon="scan-outline"
+          label="Escanear un QR"
+          onPress={() => router.push('/scan')}
+          divider
+        />
+        {garageVehicles.length > 0 ? (
+          <PressableRow icon="add" label="Añadir otro vehículo" onPress={openNewVehicle} divider />
+        ) : null}
+      </View>
 
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={colors.dim} />
@@ -366,34 +307,34 @@ function PressableRow({
   icon,
   label,
   onPress,
+  divider,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  divider?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.scanRow, pressed && { opacity: 0.72 }]}
+      style={({ pressed }) => [
+        styles.linkRow,
+        divider && styles.rowDivider,
+        pressed && { opacity: 0.7 },
+      ]}
     >
-      <Ionicons name={icon} size={18} color={colors.accent} />
-      <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
+      <Ionicons name={icon} size={19} color={colors.textSoft} />
+      <AppText variant="bodyStrong" style={{ flex: 1 }}>
         {label}
       </AppText>
-      <Ionicons name="chevron-forward" size={14} color={colors.dim} />
+      <Ionicons name="chevron-forward" size={16} color={colors.dim} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-  },
   loadingState: {
     alignItems: 'center',
     gap: 10,
@@ -401,153 +342,89 @@ const styles = StyleSheet.create({
   },
   emptyGarage: {
     alignItems: 'center',
-    marginTop: spacing.xl,
-    paddingVertical: spacing['3xl'],
+    marginTop: spacing['3xl'],
+    paddingHorizontal: spacing.lg,
   },
   emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.24)',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  carCard: {
+  hero: {
     marginTop: spacing.lg,
     borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.18)',
+    backgroundColor: colors.surface,
     padding: spacing.lg,
-    overflow: 'hidden',
   },
-  carCardElectric: { borderColor: 'rgba(77,225,255,0.22)' },
-  carTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   carArt: {
     alignItems: 'center',
-    marginTop: spacing.sm,
-    minHeight: 92,
     justifyContent: 'center',
+    minHeight: 150,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
   },
   vehiclePhoto: {
-    width: '100%',
-    height: 150,
-    borderRadius: radius.lg,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   photoBadge: {
     position: 'absolute',
-    right: 8,
-    bottom: 8,
+    right: 10,
+    bottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: colors.lime,
+    backgroundColor: 'rgba(6,8,11,0.72)',
     borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  photoBadgeEmpty: {
-    position: 'relative',
-    right: undefined,
-    bottom: undefined,
-    alignSelf: 'center',
-    marginTop: spacing.sm,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.3)',
-  },
-  photoBadgeText: { fontSize: 9 },
   carSilhouette: { opacity: 0.9 },
-  vehicleArt: {
-    width: 190,
-    height: 92,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  vehicleArtLine: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 14,
-    height: 1,
-  },
-  carInfo: { marginTop: spacing.sm },
+  carInfo: { marginTop: spacing.lg },
   carStats: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  carDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: spacing.lg },
-  carActions: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
-  qrRow: { flexDirection: 'row', gap: 10 },
-  qrSide: { flex: 1, gap: 10 },
-  qrInfo: { flex: 1, padding: spacing.md },
-  qrIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.limeSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+  carActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
   },
-  scanRow: {
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSoft,
+  },
+  linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    gap: spacing.md,
+    minHeight: 56,
   },
   vehicleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: 8,
-  },
-  vehicleRowActive: {
-    borderColor: 'rgba(255,90,31,0.55)',
-    backgroundColor: colors.surfaceAlt,
+    paddingVertical: spacing.md,
   },
   vehicleThumb: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  vehicleThumbImage: { width: 52, height: 52 },
-  vehicleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  addVehicle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderStyle: 'dashed',
-    backgroundColor: 'transparent',
-    marginTop: 4,
-  },
-  addIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  vehicleThumbImage: { width: 44, height: 44 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

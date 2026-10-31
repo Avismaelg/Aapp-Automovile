@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText, Avatar, Button, Card, IconButton, Pill, Screen, SectionHeader } from '@/src/components/ui';
+import { AppText, Avatar, Button, Card, IconButton, Pill, Screen, ScreenHeader, SectionHeader } from '@/src/components/ui';
 import { challengeRoutes } from '@/src/data/mock';
 import { ActiveChallengeCard } from '@/src/components/challenges/ActiveChallengeCard';
 import { CategoryPicker } from '@/src/components/challenges/CategoryPicker';
@@ -76,17 +76,11 @@ export default function ChallengesScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <View>
-          <AppText variant="label" color={colors.accent}>RETOS</AppText>
-          <AppText variant="h1" style={{ marginTop: 4 }}>Desafía a tus amigos</AppText>
-        </View>
-        <IconButton icon="trophy-outline" tone="surface" />
-      </View>
+      <ScreenHeader title="Retos" subtitle="Desafía a tus amigos en la carretera" />
 
       {challengesLoading ? (
         <View style={styles.syncRow}>
-          <ActivityIndicator size="small" color={colors.accent} />
+          <ActivityIndicator size="small" color={colors.textSoft} />
           <AppText variant="caption" color={colors.muted}>Cargando tus retos…</AppText>
         </View>
       ) : null}
@@ -390,12 +384,6 @@ export default function ChallengesScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-  },
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',

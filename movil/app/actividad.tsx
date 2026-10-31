@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
 import {
   ActivityIndicator,
@@ -10,7 +9,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 
 import { FeedCard } from '@/src/components/FeedCard';
 import { PostCard } from '@/src/components/PostCard';
@@ -20,12 +18,11 @@ import {
   Button,
   Card,
   IconButton,
-  Pill,
   Screen,
   SectionHeader,
-  Stat,
 } from '@/src/components/ui';
 import { activeChallenge, feed, friends as demoFriends } from '@/src/data/mock';
+import { tripStats } from '@/src/lib/achievements';
 import type { Friend } from '@/src/types/models';
 import { useChallenges } from '@/src/hooks/useChallenges';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
@@ -35,51 +32,22 @@ import { showError } from '@/src/lib/alerts';
 import { realChallengeToChallenge } from '@/src/lib/challenge-db';
 import { profileColor } from '@/src/lib/profile-db';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
+import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
+import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 
 const quickActions = [
-  { label: 'Party', icon: 'radio' as const, color: colors.accent, href: '/party' },
-  { label: 'Eventos', icon: 'calendar' as const, color: '#FF8AD4', href: '/events' },
-  { label: 'Retos', icon: 'flag' as const, color: colors.lime, href: '/challenges' },
-  { label: 'Rutas', icon: 'map' as const, color: '#2EE6A8', href: '/rutas' },
-  { label: 'Récords', icon: 'trophy' as const, color: '#FFD24D', href: '/records' },
-  { label: 'Repostaje', icon: 'water' as const, color: colors.cyan, href: '/fuel' },
-  { label: 'Mi QR', icon: 'qr-code' as const, color: '#B98CFF', href: '/scan' },
-  { label: 'Garaje', icon: 'car-sport' as const, color: '#FFB84D', href: '/garage' },
-  { label: 'Conducir', icon: 'navigate' as const, color: colors.cyan, href: '/drive' },
+  { label: 'Party', icon: 'radio-outline' as const, href: '/party' },
+  { label: 'Eventos', icon: 'calendar-outline' as const, href: '/events' },
+  { label: 'Retos', icon: 'flag-outline' as const, href: '/challenges' },
+  { label: 'Rutas', icon: 'map-outline' as const, href: '/rutas' },
+  { label: 'Récords', icon: 'trophy-outline' as const, href: '/records' },
+  { label: 'Repostaje', icon: 'water-outline' as const, href: '/fuel' },
+  { label: 'Mi QR', icon: 'qr-code-outline' as const, href: '/scan' },
+  { label: 'Garaje', icon: 'car-sport-outline' as const, href: '/garage' },
+  { label: 'Conducir', icon: 'navigate-outline' as const, href: '/drive' },
 ];
-
-function HeroRoute() {
-  return (
-    <Svg
-      width={160}
-      height={130}
-      viewBox="0 0 210 170"
-      style={styles.heroRoute}
-      pointerEvents="none"
-    >
-      <Path
-        d="M8 150 C 40 120, 52 132, 74 100 S 92 52, 122 48 S 160 70, 178 34 S 196 18, 208 8"
-        stroke={colors.accent}
-        strokeWidth={2}
-        fill="none"
-        opacity={0.35}
-        strokeDasharray="4 5"
-      />
-      <Path
-        d="M8 150 C 40 120, 52 132, 74 100 S 92 52, 122 48 S 160 70, 178 34 S 196 18, 208 8"
-        stroke={colors.accent}
-        strokeWidth={8}
-        fill="none"
-        opacity={0.07}
-      />
-      <Path d="M0 88 C 40 80, 66 96, 104 86 S 160 66, 210 74" stroke="#1C2631" strokeWidth={1} fill="none" />
-      <Path d="M34 0 C 42 54, 28 104, 44 170" stroke="#1C2631" strokeWidth={1} fill="none" />
-      <Path d="M140 0 C 132 56, 150 120, 136 170" stroke="#1C2631" strokeWidth={1} fill="none" />
-    </Svg>
-  );
-}
 
 function greeting() {
   const hour = new Date().getHours();
@@ -96,6 +64,9 @@ export default function ActividadScreen() {
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const firstName = me.name.split(' ')[0];
+  const isDemo = useAuth((state) => state.account?.mode === 'demo');
+  const tripTotals = useTrips((state) => state.totals);
+  const stats = isDemo ? me.stats : tripStats(tripTotals);
   // Fuera del modo demo, el banner y los amigos salen de la cuenta real.
   const { active: realActive, isDemo: challengesDemo } = useChallenges();
   const bannerChallenge = challengesDemo
@@ -167,87 +138,59 @@ export default function ActividadScreen() {
     <Screen contentStyle={{ paddingTop: spacing.sm }}>
       <View style={styles.backRow}>
         <IconButton icon="chevron-back" size={40} onPress={goBack} />
-        <AppText variant="label" color={colors.muted}>Actividad</AppText>
+        <IconButton icon="notifications-outline" size={40} badge />
       </View>
       <View style={styles.header}>
-        <View>
-          <View style={styles.brandRow}>
-            <View style={styles.brandDot} />
-            <AppText variant="label" color={colors.accent} style={{ letterSpacing: 2 }}>
-              CARAVANA
-            </AppText>
-          </View>
-          <AppText variant="h1" style={{ marginTop: 6 }}>
-            {greeting()},{'\n'}{firstName}.
+        <View style={{ flex: 1 }}>
+          <AppText variant="body" color={colors.muted}>
+            {greeting()}
+          </AppText>
+          <AppText variant="h1" style={{ marginTop: 2 }}>
+            {firstName}
           </AppText>
         </View>
-        <View style={styles.headerActions}>
-          <IconButton icon="notifications-outline" badge />
-          <Avatar
-            name={me.name}
-            color={me.color}
-            size={44}
-            uri={me.avatarUrl}
-            ring={colors.border}
-            online
-          />
-        </View>
+        <Avatar name={me.name} color={me.color} size={48} uri={me.avatarUrl} />
       </View>
 
-      <Pressable style={styles.trackingBar} onPress={openTrackingOptions}>
-        <View style={[styles.liveDot, !trackingEnabled && styles.liveDotPaused]} />
-        <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-          {trackingEnabled ? 'Tracking automático activo' : 'Tracking automático en pausa'}
-        </AppText>
-        <Pill
-          label={trackingEnabled ? 'Listo' : 'Pausa'}
-          tone={trackingEnabled ? 'lime' : 'neutral'}
-          icon={trackingEnabled ? 'flash' : 'pause'}
-        />
-      </Pressable>
-
-      <LinearGradient
-        colors={['#2A170F', '#151A21', '#10151B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <HeroRoute />
-        <View style={styles.heroTop}>
-          <Pill label="Tu mes en la carretera" tone="accent" icon="flag" />
-          <Pill label="+12 %" tone="lime" icon="trending-up" />
-        </View>
+      <View style={styles.hero}>
         <View style={styles.heroValueRow}>
-          <AppText variant="display" style={{ fontSize: 42 }}>
-            1.284
+          <AppText variant="display" style={{ fontSize: 44, lineHeight: 48 }}>
+            {Math.round(stats.km).toLocaleString('es-DO')}
           </AppText>
-          <AppText variant="h3" color={colors.textSoft} style={{ marginBottom: 8, marginLeft: 6 }}>
+          <AppText variant="h3" color={colors.muted} style={{ marginBottom: 6, marginLeft: 6 }}>
             km
           </AppText>
         </View>
-        <AppText variant="caption" color={colors.muted}>
-          128 rutas · 214 horas al volante
+        <AppText variant="body" color={colors.muted}>
+          {stats.drives} {stats.drives === 1 ? 'ruta' : 'rutas'} · {stats.hours} h al volante
         </AppText>
 
-        <View style={styles.heroStats}>
-          <Stat value="128" label="rutas" />
-          <View style={styles.heroDivider} />
-          <Stat value="214 h" label="conduciendo" />
-          <View style={styles.heroDivider} />
-          <Stat value="42" label="amigos" />
-        </View>
+        <Pressable style={styles.trackingRow} onPress={openTrackingOptions}>
+          <View style={[styles.liveDot, !trackingEnabled && styles.liveDotPaused]} />
+          <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
+            {trackingEnabled ? 'Tracking automático activo' : 'Tracking automático en pausa'}
+          </AppText>
+          <Ionicons name="chevron-forward" size={14} color={colors.dim} />
+        </Pressable>
 
         <View style={styles.heroActions}>
-          <Pressable style={styles.heroPrimary} onPress={() => router.push('/(tabs)/party')}>
-            <Ionicons name="radio" size={18} color="#120802" />
-            <AppText variant="bodyStrong" color="#120802">Salir en party</AppText>
-          </Pressable>
-          <Pressable style={styles.heroSecondary} onPress={() => router.push('/(tabs)/fuel')}>
-            <Ionicons name="water-outline" size={18} color={colors.text} />
-            <AppText variant="bodyStrong">Repostar</AppText>
-          </Pressable>
+          <Button
+            label="Salir en party"
+            size="sm"
+            full={false}
+            style={{ flex: 1 }}
+            onPress={() => router.push('/(tabs)/party')}
+          />
+          <Button
+            label="Repostar"
+            variant="secondary"
+            size="sm"
+            full={false}
+            style={{ flex: 1 }}
+            onPress={() => router.push('/(tabs)/fuel')}
+          />
         </View>
-      </LinearGradient>
+      </View>
 
       <View style={styles.quickGrid}>
         {quickActions.map((action) => (
@@ -256,8 +199,8 @@ export default function ActividadScreen() {
             style={({ pressed }) => [styles.quickItem, pressed && { opacity: 0.7 }]}
             onPress={() => router.push(action.href as never)}
           >
-            <View style={[styles.quickIcon, { backgroundColor: `${action.color}1F`, borderColor: `${action.color}40` }]}>
-              <Ionicons name={action.icon} size={21} color={action.color} />
+            <View style={styles.quickIcon}>
+              <Ionicons name={action.icon} size={21} color={colors.text} />
             </View>
             <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
               {action.label}
@@ -272,11 +215,12 @@ export default function ActividadScreen() {
           onPress={() => router.push('/(tabs)/challenges')}
         >
           <View style={styles.challengeIcon}>
-            <Ionicons name="flag" size={20} color={colors.lime} />
+            <Ionicons name="flag-outline" size={20} color={colors.text} />
           </View>
           <View style={{ flex: 1 }}>
-            <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>
-              {bannerChallenge.status === 'live' ? 'RETO EN CURSO' : 'RETO PENDIENTE'} · {bannerChallenge.participants.length} PARTICIPANTES
+            <AppText variant="caption" color={colors.muted}>
+              {bannerChallenge.status === 'live' ? 'Reto en curso' : 'Reto pendiente'} ·{' '}
+              {bannerChallenge.participants.length} participantes
             </AppText>
             <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
               {bannerChallenge.title}
@@ -286,10 +230,7 @@ export default function ActividadScreen() {
               {bannerLeader ? `${bannerLeader.isMe ? 'Tú' : bannerLeader.name.split(' ')[0]} lidera` : ''}
             </AppText>
           </View>
-          <View style={styles.challengeCta}>
-            <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>VER</AppText>
-            <Ionicons name="chevron-forward" size={13} color={colors.textSoft} />
-          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.dim} />
         </Pressable>
       ) : null}
 
@@ -301,7 +242,7 @@ export default function ActividadScreen() {
       >
         {roadFriends.length === 0 ? (
           <Pressable onPress={() => router.push('/friends')} style={styles.friendCard}>
-            <Ionicons name="person-add-outline" size={22} color={colors.accent} />
+            <Ionicons name="person-add-outline" size={22} color={colors.textSoft} />
             <AppText variant="bodyStrong" style={{ marginTop: 10 }}>Añade amigos</AppText>
             <AppText variant="caption" color={colors.muted}>Verás aquí a tu gente.</AppText>
           </Pressable>
@@ -330,8 +271,8 @@ export default function ActividadScreen() {
               {friend.car}
             </AppText>
             <View style={styles.friendBottom}>
-              <Ionicons name="navigate" size={11} color={colors.accent} />
-              <AppText variant="caption" color={colors.accent}>
+              <Ionicons name="navigate-outline" size={11} color={colors.muted} />
+              <AppText variant="caption" color={colors.muted}>
                 {friend.distanceKm ? `${friend.distanceKm} km` : friend.status}
               </AppText>
             </View>
@@ -348,7 +289,7 @@ export default function ActividadScreen() {
         feed.map((item) => <FeedCard key={item.id} item={item} />)
       ) : feedLoading ? (
         <View style={styles.feedState}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.textSoft} />
           <AppText variant="caption" color={colors.muted}>Cargando actividad…</AppText>
         </View>
       ) : feedError ? (
@@ -367,7 +308,7 @@ export default function ActividadScreen() {
       ) : posts.length === 0 ? (
         <Card style={styles.feedEmpty}>
           <View style={styles.feedEmptyIcon}>
-            <Ionicons name="sparkles-outline" size={24} color={colors.accent} />
+            <Ionicons name="sparkles-outline" size={24} color={colors.textSoft} />
           </View>
           <AppText variant="title" align="center">Sé el primero en compartir</AppText>
           <AppText variant="caption" color={colors.muted} align="center">
@@ -375,7 +316,6 @@ export default function ActividadScreen() {
           </AppText>
           <Button
             label="Crear publicación"
-            icon="create-outline"
             onPress={() => router.push('/post/new')}
             style={{ marginTop: spacing.md }}
           />
@@ -411,83 +351,38 @@ const styles = StyleSheet.create({
   backRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-  },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brandDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  trackingBar: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    marginTop: spacing.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.green,
-    shadowColor: colors.green,
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
   },
-  liveDotPaused: { backgroundColor: colors.dim, shadowOpacity: 0 },
+  liveDotPaused: { backgroundColor: colors.dim },
   hero: {
-    marginTop: spacing.lg,
-    borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,31,0.25)',
-    padding: spacing.xl,
-    overflow: 'hidden',
-  },
-  // Decoración arriba a la derecha: termina antes de las cifras para no cruzarlas.
-  heroRoute: { position: 'absolute', right: -6, top: 8, opacity: 0.8 },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroValueRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing.lg },
-  heroStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius['2xl'],
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
   },
-  heroDivider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: spacing.lg },
-  heroActions: { flexDirection: 'row', gap: 10, marginTop: spacing.xl },
-  heroPrimary: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
+  heroValueRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  trackingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 9,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSoft,
   },
-  heroSecondary: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
+  heroActions: { flexDirection: 'row', gap: 10, marginTop: spacing.lg },
   // Cinco accesos por fila: nueve en una sola fila se montaban en móvil.
   quickGrid: {
     flexDirection: 'row',
@@ -501,35 +396,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginTop: spacing.lg,
-    backgroundColor: 'rgba(201,255,77,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(201,255,77,0.2)',
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
   },
   challengeIcon: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: colors.limeSoft,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  challengeCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   quickIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   friendCard: {
     width: 132,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.md,
   },
   friendTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
@@ -558,7 +448,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
