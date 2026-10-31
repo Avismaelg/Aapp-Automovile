@@ -25,7 +25,13 @@ import { NavigationHud } from "@/src/components/navigation/NavigationHud";
 import { SpeedHud } from "@/src/components/navigation/SpeedHud";
 import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
-import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
+import {
+  useFriendsOnMap,
+  useShareLocationWithFriends,
+} from "@/src/hooks/useFriendsOnMap";
+import { useInviteToParty } from "@/src/hooks/usePartyInvites";
+import { lastSeenLabel } from "@/src/lib/party-invites";
+import { useSharing } from "@/src/store/sharing";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
 import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
 import {
@@ -52,7 +58,6 @@ import {
 } from "@/src/lib/simulator";
 import { haversineMeters } from "@/src/lib/geo";
 import { formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
-import { partyUrl } from "@/src/lib/qr";
 import type { WorldMapAlternative, WorldMapMember } from "@/src/lib/map-html";
 import {
   cumulativeDistances,
@@ -84,7 +89,14 @@ export default function NavigationScreen() {
   const live = useLiveLocation();
   const { party, isDemo } = useActiveParty();
   const { vehicles } = useGarageVehicles();
-  const { members: realFriends } = useFriendsOnMap();
+  const {
+    members: realFriends,
+    friendCount,
+    now: friendsNow,
+  } = useFriendsOnMap();
+  const inviteToParty = useInviteToParty();
+  const shareWithFriends = useSharing((state) => state.shareWithFriends);
+  const setShareWithFriends = useSharing((state) => state.setShareWithFriends);
   // En simulación de party, los amigos simulados se suman a los reales.
   const simMembers = useSimulator((state) => state.members);
   const mapFriends = useMemo(
@@ -147,6 +159,22 @@ export default function NavigationScreen() {
     live.location,
     Boolean(party) && !isDemo && live.isLive && live.location.source === "gps",
   );
+  // Tus amigos te ven en su mapa (si lo permites; se pregunta una vez).
+  useShareLocationWithFriends(
+    live.location,
+    !isDemo && live.isLive && live.location.source === "gps",
+  );
+  useEffect(() => {
+    if (isDemo || friendCount === 0 || shareWithFriends !== null) return;
+    Alert.alert(
+      "¿Que tus amigos te vean en el mapa?",
+      "Tus amigos verán tu última posición en su mapa, y tú la suya si también lo activan. Puedes cambiarlo en Perfil.",
+      [
+        { text: "Ahora no", style: "cancel", onPress: () => setShareWithFriends(false) },
+        { text: "Compartir", onPress: () => setShareWithFriends(true) },
+      ],
+    );
+  }, [isDemo, friendCount, shareWithFriends, setShareWithFriends]);
   const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
   const showParking =
     Boolean(parkingSpot) && parkingDistance != null && parkingDistance > 40;
@@ -371,21 +399,33 @@ export default function NavigationScreen() {
     beginNavigation();
   };
 
-  // Acciones sobre un amigo visto en el mapa.
-  const inviteToConvoy = async () => {
-    if (isDemo || !party?.code) {
+  // Acciones sobre un amigo visto en el mapa. Invitar es un toque: si aún
+  // no tienes party, se crea y le llega la invitación al momento.
+  const inviteToConvoy = async (friend: WorldMapMember) => {
+    if (isDemo) {
       Alert.alert(
         "Convoy",
-        isDemo
-          ? "Los convoys reales requieren una cuenta conectada. Crea una party en la pestaña Party."
-          : "Primero crea o únete a una party en la pestaña Party.",
+        "Los convoys reales requieren una cuenta conectada.",
       );
       return;
     }
-    await Share.share({
-      message: `Únete a mi convoy en Caravana: ${partyUrl(party.code)}`,
-      url: partyUrl(party.code),
-    });
+    if (party?.members.some((member) => member.userId === friend.id)) {
+      Alert.alert("Convoy", `${friend.name.split(" ")[0]} ya está en tu party.`);
+      return;
+    }
+    try {
+      await inviteToParty.mutateAsync({
+        partyId: party?.id ?? null,
+        userIds: [friend.id],
+        myName: me.name,
+      });
+      Alert.alert(
+        "Invitación enviada",
+        `${friend.name.split(" ")[0]} la verá al momento. Cuando acepte, aparecerá en tu party.`,
+      );
+    } catch (error) {
+      showError("Convoy", error, "No pudimos invitar.");
+    }
   };
 
   const challengeFriend = (friend: WorldMapMember) => {
@@ -948,7 +988,19 @@ export default function NavigationScreen() {
                 {selectedFriend ? (
                   <FriendSheet
                     friend={selectedFriend}
-                    onInvite={() => void inviteToConvoy()}
+                    status={lastSeenLabel(
+                      (selectedFriend as { updatedAt?: number }).updatedAt,
+                      friendsNow,
+                    )}
+                    inviting={inviteToParty.isPending}
+                    inviteLabel={
+                      party?.members.some((member) => member.userId === selectedFriend.id)
+                        ? "En tu party"
+                        : party
+                          ? "Invitar a mi party"
+                          : "Crear party e invitar"
+                    }
+                    onInvite={() => void inviteToConvoy(selectedFriend)}
                     onChallenge={() => challengeFriend(selectedFriend)}
                     onClose={() => setSelectedFriend(null)}
                   />

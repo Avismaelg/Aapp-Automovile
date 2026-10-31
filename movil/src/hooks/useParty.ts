@@ -155,6 +155,17 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
   };
 }
 
+async function leaveOtherParties(accountId: string, keepPartyId: string | null) {
+  if (!supabase) return;
+  let query = supabase
+    .from('party_members')
+    .update({ left_at: new Date().toISOString(), last_lat: null, last_lng: null })
+    .eq('user_id', accountId)
+    .is('left_at', null);
+  if (keepPartyId) query = query.neq('party_id', keepPartyId);
+  await query;
+}
+
 export function useActiveParty() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
@@ -297,6 +308,9 @@ export function useCreateParty() {
       if (demo) throw new Error('Las parties reales requieren una cuenta conectada.');
       if (!supabase || !account) throw new Error('Inicia sesión para crear una party.');
 
+      // Solo una party activa a la vez: crear una nueva te saca de la anterior.
+      await leaveOtherParties(account.id, null);
+
       const { data, error } = await supabase
         .from('parties')
         .insert({
@@ -304,10 +318,10 @@ export function useCreateParty() {
           name: input.name.trim(),
           status: 'live',
           starts_at: new Date().toISOString(),
-          destination_label: input.destinationLabel,
+          destination_label: input.destinationLabel || null,
           destination_lat: input.destinationLat ?? null,
           destination_lng: input.destinationLng ?? null,
-          max_members: 10,
+          max_members: 50,
           is_private: true,
         })
         .select('id, invite_code')
@@ -360,6 +374,7 @@ export function useJoinParty() {
       }
 
       const party = Array.isArray(data) ? data[0] : data;
+      if (party?.id) await leaveOtherParties(account.id, party.id as string);
       return { id: party?.id as string, code: party?.invite_code as string };
     },
     onSuccess: () => {

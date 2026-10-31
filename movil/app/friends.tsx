@@ -28,6 +28,9 @@ import {
   useSearchProfiles,
   useSendFriendRequest,
 } from '@/src/hooks/useFriends';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useActiveParty } from '@/src/hooks/useParty';
+import { useInviteToParty } from '@/src/hooks/usePartyInvites';
 import { relationForTarget, type FriendEntry } from '@/src/lib/friends';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
 import { colors, spacing } from '@/src/theme';
@@ -50,6 +53,11 @@ export default function FriendsScreen() {
   const respondRequest = useRespondFriendRequest();
   const removeFriend = useRemoveFriend();
   const [actionError, setActionError] = useState<string | null>(null);
+  const me = useCurrentUser();
+  const { party } = useActiveParty();
+  const inviteToParty = useInviteToParty();
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -87,6 +95,22 @@ export default function FriendsScreen() {
       ],
     );
   };
+
+  // Invitar a tu party con un toque (si no tienes, se crea).
+  const inviteFriend = (profile: UserProfile) =>
+    run(async () => {
+      setInvitingId(profile.id);
+      try {
+        await inviteToParty.mutateAsync({
+          partyId: party?.id ?? null,
+          userIds: [profile.id],
+          myName: me.name,
+        });
+        setInvitedIds((list) => [...list, profile.id]);
+      } finally {
+        setInvitingId(null);
+      }
+    });
 
   const relationFor = (profileId: string) => relationForTarget(entries, profileId);
 
@@ -139,6 +163,20 @@ export default function FriendsScreen() {
           {profile.city || 'Caravana'}
         </AppText>
       </View>
+      {entry?.status === 'accepted' && !isDemo ? (
+        <Button
+          label={invitedIds.includes(profile.id) ? 'Invitado' : 'Party'}
+          size="sm"
+          full={false}
+          variant={invitedIds.includes(profile.id) ? 'ghost' : 'primary'}
+          icon={invitedIds.includes(profile.id) ? 'checkmark' : 'radio-outline'}
+          loading={inviteToParty.isPending && invitingId === profile.id}
+          onPress={
+            invitedIds.includes(profile.id) ? undefined : () => void inviteFriend(profile)
+          }
+          style={{ paddingHorizontal: 12 }}
+        />
+      ) : null}
       {entry ? (
         <IconButton
           icon="person-remove-outline"
@@ -280,6 +318,9 @@ export default function FriendsScreen() {
       {outgoing.length > 0 ? (
         <>
           <SectionHeader title="Solicitudes enviadas" action={`${outgoing.length}`} />
+          <AppText variant="caption" color={colors.muted} style={{ marginBottom: spacing.sm }}>
+            Aparecerán en tu mapa y podrás invitarlos a tu party cuando acepten.
+          </AppText>
           <Card style={styles.listCard}>
             {outgoing.map((entry) => (
               <View key={entry.id} style={styles.personRow}>

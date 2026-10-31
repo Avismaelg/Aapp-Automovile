@@ -21,6 +21,7 @@ import {
   runTrafficScenario,
   setCruiseKmh,
   setSimParty,
+  simulateIncomingInvite,
   startSimulation,
   stopSimulation,
   useSimulator,
@@ -84,6 +85,13 @@ export default function SimulatorScreen() {
     ensureStarted();
     useParking.getState().clearSpot();
     runRecordedTripScenario();
+    toMap();
+  };
+
+  const invite = () => {
+    ensureStarted();
+    setSimParty(false);
+    simulateIncomingInvite();
     toMap();
   };
 
@@ -183,6 +191,12 @@ export default function SimulatorScreen() {
           title="Atasco (solo GPS)"
           detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
           onPress={() => traffic(false)}
+        />
+        <Test
+          icon="mail-unread-outline"
+          title="Un amigo te invita a su party"
+          detail="A los 3 s llega el aviso «Laura te invita a su convoy». Con «Unirme» entras y la ves en el mapa."
+          onPress={invite}
         />
         <Test
           icon="people-circle-outline"

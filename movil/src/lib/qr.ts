@@ -24,6 +24,9 @@ export type CaravanaLink =
 
 export function parseCaravanaUrl(raw: string): CaravanaLink | null {
   let path = raw.trim();
+  // Enlace de invitación de la página web: …/p/?c=ABC123
+  const code = path.match(/\/p\/?\?(?:.*&)?c=([A-Za-z0-9]{4,8})/);
+  if (code) return { kind: 'party', id: code[1].toUpperCase() };
   try {
     const url = new URL(path);
     path = url.pathname;

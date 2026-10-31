@@ -8,7 +8,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  Share,
   StyleSheet,
   View,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapAttribution } from '@/src/components/MapAttribution';
 import { PartyLobby } from '@/src/components/PartyLobby';
+import { InviteSheet } from '@/src/components/party/InviteSheet';
 import { PTTButton } from '@/src/components/PTTButton';
 import { ElapsedClock } from '@/src/components/party/ElapsedClock';
 import { PartyMembersRow, type DisplayMember } from '@/src/components/party/PartyMembersRow';
@@ -39,7 +39,6 @@ import {
   partyVoiceChannels,
   type PartyVoiceChannelSlug,
 } from '@/src/lib/party';
-import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
 
 export default function PartyScreen() {
@@ -67,6 +66,7 @@ export default function PartyScreen() {
   // En demo el convoy "empezó" hace activeParty.elapsedSeconds.
   const [demoStartedAt] = useState(() => Date.now() - activeParty.elapsedSeconds * 1000);
   const [recenterToken, setRecenterToken] = useState(0);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const displayMembers = useMemo<DisplayMember[]>(() => {
     // Prueba de carga del simulador: la party enorme.
@@ -214,11 +214,13 @@ export default function PartyScreen() {
     }
   };
 
-  const shareParty = () =>
-    Share.share({
-      message: `Únete a mi party en Caravana: ${partyUrl(partyCode)}`,
-      url: partyUrl(partyCode),
-    });
+  const openInvite = () => {
+    if (isDemo && !simParty) {
+      Alert.alert('Invitar', 'Las invitaciones reales requieren una cuenta conectada.');
+      return;
+    }
+    setInviteOpen(true);
+  };
 
   const startNavigation = useChosenDestination((state) => state.startNavigation);
   const setChosenDestination = useChosenDestination((state) => state.setDestination);
@@ -400,7 +402,7 @@ export default function PartyScreen() {
             <IconButton
               icon="ellipsis-horizontal"
               size={40}
-              onPress={() => void shareParty()}
+              onPress={openInvite}
             />
           </View>
         </View>
@@ -432,11 +434,21 @@ export default function PartyScreen() {
               <AppText variant="caption" color={colors.textSoft}>
                 {memberCount} {memberCount === 1 ? 'piloto' : 'pilotos'}
               </AppText>
+              {partyCode ? (
+                <>
+                  <View style={styles.metaDot} />
+                  <Pressable onPress={openInvite} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Código ${partyCode}`}>
+                    <AppText variant="caption" color={colors.text} style={styles.codeText}>
+                      {partyCode}
+                    </AppText>
+                  </Pressable>
+                </>
+              ) : null}
             </View>
           </View>
           <Pressable
             style={styles.inviteButton}
-            onPress={() => void shareParty()}
+            onPress={openInvite}
           >
             <Ionicons name="person-add-outline" size={15} color={colors.text} />
             <AppText variant="bodyStrong" style={{ fontSize: 13 }}>Invitar</AppText>
@@ -446,7 +458,7 @@ export default function PartyScreen() {
         <PartyMembersRow
           members={displayMembers}
           onChallenge={(member) => challengePilots(`Reto a ${member.name.split(' ')[0]}`, [member])}
-          onInvite={() => void shareParty()}
+          onInvite={openInvite}
         />
 
         <Button
@@ -478,10 +490,10 @@ export default function PartyScreen() {
           </Pressable>
           <Pressable
             style={styles.bottomAction}
-            onPress={() => void shareParty()}
+            onPress={openInvite}
           >
-            <Ionicons name="share-social-outline" size={20} color={colors.text} />
-            <AppText variant="caption" color={colors.textSoft}>Compartir</AppText>
+            <Ionicons name="qr-code-outline" size={19} color={colors.text} />
+            <AppText variant="caption" color={colors.textSoft}>Código</AppText>
           </Pressable>
           <Pressable
             style={styles.bottomAction}
@@ -498,6 +510,38 @@ export default function PartyScreen() {
 
         <MapAttribution style={styles.attribution} />
       </View>
+
+      <InviteSheet
+        visible={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        simulated={simParty}
+        extraFriends={
+          simParty
+            ? [
+                { id: 'sim-ana', name: 'Ana Ruiz', username: 'ana.ruiz' },
+                { id: 'sim-pedro', name: 'Pedro Gil', username: 'pedrogil' },
+                { id: 'sim-marta', name: 'Marta Sanz', username: 'martasanz' },
+              ]
+            : []
+        }
+        party={
+          simParty
+            ? {
+                id: 'sim',
+                code: partyCode,
+                name: partyName,
+                memberIds: displayMembers.map((member) => member.id),
+              }
+            : party
+            ? {
+                id: party.id,
+                code: party.code,
+                name: party.name,
+                memberIds: party.members.map((member) => member.userId),
+              }
+            : null
+        }
+      />
 
       <LinearGradient
         colors={['rgba(6,8,11,0.7)', 'transparent']}
@@ -563,6 +607,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
+  codeText: { fontWeight: '700', letterSpacing: 1.5 },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.dim },
   inviteButton: {
     flexDirection: 'row',

@@ -7,11 +7,17 @@ import { colors, radius, spacing } from '@/src/theme';
 
 export function FriendSheet({
   friend,
+  status = 'En el mapa',
+  inviteLabel = 'Invitar al convoy',
+  inviting = false,
   onInvite,
   onChallenge,
   onClose,
 }: {
   friend: WorldMapMember;
+  status?: string;
+  inviteLabel?: string;
+  inviting?: boolean;
   onInvite: () => void;
   onChallenge: () => void;
   onClose: () => void;
@@ -32,7 +38,7 @@ export function FriendSheet({
             {friend.name}
           </AppText>
           <AppText variant="caption" color={chrome.muted}>
-            En el mapa ahora
+            {status}
           </AppText>
         </View>
         <IconButton
@@ -45,11 +51,12 @@ export function FriendSheet({
       </View>
       <View style={styles.destinationActions}>
         <Button
-          label="Invitar al convoy"
-          variant="lime"
+          label={inviteLabel}
+          variant="primary"
           size="sm"
           icon="person-add"
-          onPress={onInvite}
+          loading={inviting}
+          onPress={inviteLabel === 'En tu party' ? undefined : onInvite}
           style={styles.destinationAction}
         />
         <Button

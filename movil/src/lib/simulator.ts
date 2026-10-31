@@ -55,6 +55,8 @@ type SimState = {
   recordTrips: boolean;
   // Prueba de carga de la ciudad: resumen del tráfico.
   stats: string;
+  // Prueba de invitación: un amigo simulado te invita a su party.
+  invite: { id: string; inviterName: string; partyName: string } | null;
 };
 
 export const useSimulator = create<SimState>(() => ({
@@ -67,6 +69,7 @@ export const useSimulator = create<SimState>(() => ({
   members: [],
   recordTrips: false,
   stats: '',
+  invite: null,
 }));
 
 export const PHASE_LABELS: Record<SimPhase, string> = {
@@ -435,6 +438,25 @@ export function setSimParty(enabled: boolean, size = 0) {
   }));
 }
 
+// Un amigo simulado te invita a los pocos segundos (como llegaría por tiempo
+// real). Aceptarla te mete en su convoy simulado.
+let inviteTimer: ReturnType<typeof setTimeout> | null = null;
+export function simulateIncomingInvite(delayMs = 3_000) {
+  if (inviteTimer) clearTimeout(inviteTimer);
+  useSimulator.setState({ invite: null });
+  inviteTimer = setTimeout(() => {
+    inviteTimer = null;
+    useSimulator.setState({
+      invite: { id: `sim-${Date.now()}`, inviterName: 'Laura Méndez', partyName: 'Convoy de Laura' },
+    });
+  }, delayMs);
+}
+
+export function answerSimInvite(accept: boolean) {
+  useSimulator.setState({ invite: null });
+  if (accept) setSimParty(true);
+}
+
 // La pantalla del mapa llama a esto cuando llega una ruta nueva. Si empieza
 // lejos (p. ej. a pie, la ruta sale del coche aparcado) se salta a su inicio.
 export function driveRoute(points: LatLng[]) {
@@ -583,6 +605,8 @@ export function stopSimulation() {
   trail = [];
   motion = [];
   crowd = [];
+  if (inviteTimer) clearTimeout(inviteTimer);
+  inviteTimer = null;
   void useTrips.getState().removeTestTrips();
   if (realSpot !== undefined) {
     if (realSpot) useParking.getState().setSpot(realSpot);
@@ -598,6 +622,7 @@ export function stopSimulation() {
     members: [],
     recordTrips: false,
     stats: '',
+    invite: null,
   });
 }
 

@@ -24,6 +24,7 @@ import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
 import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
+import { useSharing } from '@/src/store/sharing';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -46,6 +47,8 @@ export default function ProfileScreen() {
   const trackingEnabled = useSession((state) => state.trackingEnabled);
   const setTrackingEnabled = useSession((state) => state.setTrackingEnabled);
   const [showQr, setShowQr] = useState(false);
+  const shareWithFriends = useSharing((state) => state.shareWithFriends);
+  const setShareWithFriends = useSharing((state) => state.setShareWithFriends);
   const isDemo = account?.mode === 'demo';
   const trips = useTrips((state) => state.trips);
   const tripTotals = useTrips((state) => state.totals);
@@ -258,6 +261,20 @@ export default function ProfileScreen() {
             <Switch
               value={trackingEnabled}
               onValueChange={changeTracking}
+              trackColor={{ false: colors.surfaceHigh, true: colors.green }}
+              thumbColor={colors.white}
+            />
+          }
+        />
+        <Row
+          icon="people-outline"
+          label="Mi ubicación para amigos"
+          detail="Tus amigos te ven en su mapa"
+          divider
+          right={
+            <Switch
+              value={shareWithFriends === true}
+              onValueChange={setShareWithFriends}
               trackColor={{ false: colors.surfaceHigh, true: colors.green }}
               thumbColor={colors.white}
             />

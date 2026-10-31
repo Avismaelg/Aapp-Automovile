@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
+import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { installWebAlert } from '@/src/lib/web-alert';
 import { useAuth } from '@/src/store/auth';
@@ -138,6 +139,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
             </Stack>
+            {isAuthenticated ? <PartyInviteBanner /> : null}
           </AppErrorBoundary>
       </SafeAreaProvider>
     </QueryClientProvider>
