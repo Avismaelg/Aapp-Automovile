@@ -1,18 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { getMotionEvents } from '@/modules/motion';
 import { submitTripSpeedRecords } from '@/src/lib/highway-records';
-import { useTrips } from '@/src/store/trips';
+import { motionActivityAt } from '@/src/lib/parking-logic';
+import { setMotionGates, useTrips } from '@/src/store/trips';
 import { useSession } from '@/src/store/session';
 
 // Con la app abierta el GPS en primer plano ya graba; los lotes de fondo se
 // recogen igualmente para que no se acumulen en el almacenamiento.
 const INGEST_EVERY_MS = 2 * 60_000;
+// Ventana de avisos del sensor para saber qué haces ahora.
+const MOTION_LOOKBACK_MS = 12 * 3_600_000;
+
+// Quieto o a pie según el sensor: no se empieza un viaje (el GPS de dentro de
+// casa da velocidades falsas). Sin sensor no bloquea nada.
+setMotionGates({
+  blocksStart: (at) => {
+    const state = motionActivityAt(getMotionEvents(at - MOTION_LOOKBACK_MS), at);
+    return state === 'still' || state === 'foot';
+  },
+  // Solo opina si el sensor tiene historial antes del viaje; si no, no sabe.
+  hadVehicle: (from, to) => {
+    const events = getMotionEvents(from - MOTION_LOOKBACK_MS);
+    if (!events.some((event) => event.at < from)) return null;
+    if (motionActivityAt(events, from) === 'vehicle') return true;
+    return events.some(
+      (event) =>
+        event.type === 'vehicle' && event.transition === 'enter' && event.at >= from && event.at <= to,
+    );
+  },
+});
 
 // Conecta el GPS con la grabación de rutas: fusiona los puntos grabados en
 // segundo plano y publica los récords de cada viaje terminado.
 export function useTripRecorder(
-  location: { latitude: number; longitude: number; speedKmh?: number | null },
+  location: {
+    latitude: number;
+    longitude: number;
+    speedKmh?: number | null;
+    accuracy?: number | null;
+  },
   vehicleName?: string,
   // test: viaje del simulador (no cuenta en totales ni récords).
   options?: { walking?: boolean; test?: boolean },
@@ -49,12 +77,12 @@ export function useTripRecorder(
     };
   }, [hydrated, ingestBackground]);
 
-  const { latitude, longitude, speedKmh = null } = location;
+  const { latitude, longitude, speedKmh = null, accuracy = null } = location;
   useEffect(() => {
     // Caminando o con tracking automático desactivado no se graba ruta de coche.
     if (walking || !trackingEnabled) return;
-    recordPoint({ latitude, longitude, speedKmh, test });
-  }, [latitude, longitude, speedKmh, recordPoint, trackingEnabled, walking, test]);
+    recordPoint({ latitude, longitude, speedKmh, test, accuracy });
+  }, [latitude, longitude, speedKmh, accuracy, recordPoint, trackingEnabled, walking, test]);
 
   // Al empezar a caminar (coche aparcado) se cierra el viaje de coche.
   useEffect(() => {

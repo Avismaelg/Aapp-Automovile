@@ -48,6 +48,7 @@ type TripsState = {
     at?: number;
     source?: 'live' | 'background';
     test?: boolean;
+    accuracy?: number | null;
   }) => void;
   stopTrip: () => Promise<void>;
   removeTestTrips: () => Promise<void>;
@@ -62,6 +63,17 @@ const MAX_POINTS = 700;
 // caminata (o un pico de ruido del GPS) nunca abre una ruta.
 const MOVE_START_KMH = 15;
 const START_CONFIRM_SAMPLES = 3;
+// Además de la velocidad, la posición tiene que avanzar de verdad: dentro de
+// casa el GPS «salta» decenas de metros y da velocidades falsas.
+const START_MIN_DISPLACEMENT_M = 60;
+// Si el sensor dice que estás quieto o a pie, solo se empieza con un
+// desplazamiento indiscutible (por si el sensor se equivoca).
+const START_OVERRIDE_DISPLACEMENT_M = 1_000;
+// Fixes con más error que esto no sirven para grabar (dentro de casa el GPS
+// llega a 100-300 m de error).
+const MAX_RECORD_ACCURACY_M = 50;
+// Un «viaje» que nunca se aleja más que esto de la salida es ruido del GPS.
+const MIN_TRIP_REACH_M = 150;
 const MIN_RECORD_KMH = 8;
 // Parado este tiempo, el viaje se da por terminado. Es largo a propósito: en
 // un tapón se puede estar varios minutos quieto sin haber aparcado (al bajar
@@ -80,6 +92,31 @@ let lastPersistAt = 0;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let fastSamples = 0;
 let pendingStart: TripPoint | null = null;
+// Sensor de actividad (lo conecta useTripRecorder; en tests no hay sensor):
+// - blocksStart: ¿quieto o a pie en este instante? No se empieza un viaje.
+// - hadVehicle: ¿detectó ir en vehículo en ese intervalo? null = no sabe.
+type MotionGates = {
+  blocksStart: (at: number) => boolean;
+  hadVehicle: (from: number, to: number) => boolean | null;
+};
+const NO_MOTION: MotionGates = { blocksStart: () => false, hadVehicle: () => null };
+let motion: MotionGates = NO_MOTION;
+
+export function setMotionGates(gates: MotionGates | null) {
+  motion = gates ?? NO_MOTION;
+}
+
+// Margen antes del viaje para el aviso «en vehículo» (llega con retraso o
+// justo antes de arrancar).
+const VEHICLE_LOOKBACK_MS = 15 * 60_000;
+// Tiempo que se le da a un viaje para alejarse de la salida.
+const REACH_GRACE_MS = 5 * 60_000;
+
+function tripReach(trip: Trip) {
+  const origin = trip.points[0];
+  if (!origin) return 0;
+  return Math.max(...trip.points.map((point) => haversineMeters(origin, point)));
+}
 // Mientras hay puntos de segundo plano sin recoger (al arrancar o al volver de
 // segundo plano) se ignora el GPS en vivo: un fix nuevo haría que los puntos
 // pendientes, más antiguos, se descartaran como repetidos.
@@ -148,6 +185,11 @@ function archiveTrip(
   endedAt: number,
 ): { trips: Trip[]; totals: TripTotals } {
   if (trip.distanceM < MIN_TRIP_DISTANCE_M) return { trips: state.trips, totals: state.totals };
+  if (tripReach(trip) < MIN_TRIP_REACH_M) return { trips: state.trips, totals: state.totals };
+  // El sensor estuvo todo el rato sin detectar un vehículo: era ruido del GPS.
+  if (!trip.test && motion.hadVehicle(trip.startedAt - VEHICLE_LOOKBACK_MS, endedAt) === false) {
+    return { trips: state.trips, totals: state.totals };
+  }
   const finished = finishTrip(trip, endedAt);
   const sorted = [finished, ...state.trips].sort((a, b) => b.startedAt - a.startedAt);
   // Los viajes de prueba no ocupan sitio: nunca desplazan uno real.
@@ -251,8 +293,18 @@ export const useTrips = create<TripsState>((set, get) => ({
     liveBlocked = true;
   },
 
-  recordPoint: ({ latitude, longitude, speedKmh, at, source = 'live', test = false }) => {
+  recordPoint: ({
+    latitude,
+    longitude,
+    speedKmh,
+    at,
+    source = 'live',
+    test = false,
+    accuracy = null,
+  }) => {
     if (source === 'live' && liveBlocked) return;
+    // Un fix impreciso no dice nada fiable ni de la posición ni de la velocidad.
+    if (accuracy != null && accuracy > MAX_RECORD_ACCURACY_M) return;
     const current = get().active;
     // Durante una simulación el servicio de fondo sigue mandando el GPS real:
     // esos puntos no deben cortar ni ensuciar el viaje de prueba.
@@ -300,6 +352,13 @@ export const useTrips = create<TripsState>((set, get) => ({
       }
       fastSamples += 1;
       if (fastSamples < START_CONFIRM_SAMPLES) return;
+      const displacement = haversineMeters(pendingStart, { latitude, longitude });
+      if (displacement < START_MIN_DISPLACEMENT_M) return;
+      // El desplazamiento tiene que cuadrar con la velocidad: el ruido del GPS
+      // da velocidades altas sin avanzar.
+      const elapsedS = (now - pendingStart.at) / 1_000;
+      if (elapsedS > 0 && displacement / elapsedS < (MOVE_START_KMH / 3.6) * 0.5) return;
+      if (!test && motion.blocksStart(now) && displacement < START_OVERRIDE_DISPLACEMENT_M) return;
 
       const startPoint = pendingStart;
       fastSamples = 0;
@@ -318,6 +377,16 @@ export const useTrips = create<TripsState>((set, get) => ({
       lastMovingAt = now;
       set({ active: trip });
       schedulePersist();
+      return;
+    }
+
+    // Pasados unos minutos sin alejarse de la salida no es un viaje: se
+    // descarta sin guardar (GPS de interior).
+    if (!active.test && now - active.startedAt > REACH_GRACE_MS && tripReach(active) < MIN_TRIP_REACH_M) {
+      fastSamples = 0;
+      pendingStart = null;
+      set({ active: null });
+      void persistActive();
       return;
     }
 

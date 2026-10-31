@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { saveBackgroundBatch } from '@/src/lib/background-points';
-import { resetTripDetection, useTrips } from '@/src/store/trips';
+import { resetTripDetection, setMotionGates, useTrips } from '@/src/store/trips';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // jest.mock se eleva antes de los imports: aquí solo funciona require.
@@ -45,7 +45,7 @@ describe('registro automático de rutas', () => {
     const start = Date.now();
     const record = useTrips.getState().recordPoint;
     for (let index = 0; index < 3; index += 1) {
-      record({ latitude: LAT, longitude: LNG, speedKmh: 20, at: start + index * 2_500 });
+      record({ latitude: north(index * 0.4), longitude: LNG, speedKmh: 20, at: start + index * 5_000 });
     }
     expect(useTrips.getState().active).not.toBeNull();
 
@@ -313,5 +313,119 @@ describe('registro automático de rutas', () => {
 
     expect(useTrips.getState().active?.id).toBe(testId);
     expect(useTrips.getState().trips).toHaveLength(0);
+  });
+
+  describe('parado en casa con el GPS «bailando»', () => {
+    it('saltos de decenas de metros con velocidad falsa no abren ruta', () => {
+      const start = Date.now();
+      const record = useTrips.getState().recordPoint;
+      // Ruido típico de interior: salta alrededor de casa a 15-25 km/h.
+      const offsets = [0, 35, -20, 40, -35, 10, 45, -40, 25, -15, 30, -30];
+      offsets.forEach((offset, index) => {
+        record({
+          latitude: LAT + offset * 0.000009,
+          longitude: LNG + (index % 2 ? 1 : -1) * 15 * 0.00001,
+          speedKmh: 15 + (index % 3) * 5,
+          at: start + index * 5_000,
+          accuracy: 30,
+        });
+      });
+      expect(useTrips.getState().active).toBeNull();
+    });
+
+    it('los fixes con mucho error se ignoran', () => {
+      const start = Date.now();
+      const record = useTrips.getState().recordPoint;
+      for (let index = 0; index < 10; index += 1) {
+        record({
+          latitude: north(index),
+          longitude: LNG,
+          speedKmh: 40,
+          at: start + index * 5_000,
+          accuracy: 260,
+        });
+      }
+      expect(useTrips.getState().active).toBeNull();
+    });
+
+    it('con el sensor diciendo «quieto», el GPS solo no abre ruta; un trayecto largo sí', () => {
+      setMotionGates({ blocksStart: () => true, hadVehicle: () => null });
+      try {
+        const start = Date.now();
+        const record = useTrips.getState().recordPoint;
+        for (let index = 0; index < 5; index += 1) {
+          record({ latitude: north(index * 0.5), longitude: LNG, speedKmh: 40, at: start + index * 5_000 });
+        }
+        expect(useTrips.getState().active).toBeNull();
+        // Más de 1 km recorrido: aunque el sensor no se entere, es un viaje.
+        for (let index = 5; index < 20; index += 1) {
+          record({ latitude: north(index * 0.5), longitude: LNG, speedKmh: 40, at: start + index * 5_000 });
+        }
+        expect(useTrips.getState().active).not.toBeNull();
+      } finally {
+        setMotionGates(null);
+      }
+    });
+
+    it('un «viaje» que nunca se aleja 150 m de la salida se descarta', async () => {
+      const start = Date.now();
+      const record = useTrips.getState().recordPoint;
+      // Vueltas en un aparcamiento: suma >200 m sin salir de 100 m.
+      const ring = [0, 0.7, 0.9, 0.3, -0.4, -0.8, -0.2, 0.6, 0.9, 0.1, -0.6, -0.9, 0];
+      ring.forEach((step, index) => {
+        record({
+          latitude: north(step * 0.9),
+          longitude: LNG + (index % 2 ? 0.0004 : -0.0004),
+          speedKmh: 20,
+          at: start + index * 5_000,
+        });
+      });
+      expect(useTrips.getState().active?.distanceM ?? 0).toBeGreaterThan(200);
+      await useTrips.getState().stopTrip();
+      expect(useTrips.getState().trips).toHaveLength(0);
+    });
+
+    it('una ruta ya abierta que no se aleja de casa se descarta a los 5 min', () => {
+      const start = Date.now();
+      const record = useTrips.getState().recordPoint;
+      for (let index = 0; index < 3; index += 1) {
+        record({ latitude: north(index * 0.4), longitude: LNG, speedKmh: 20, at: start + index * 5_000 });
+      }
+      expect(useTrips.getState().active).not.toBeNull();
+      // Sigue «bailando» cerca de la salida.
+      for (let index = 3; index < 80; index += 1) {
+        record({
+          latitude: north((index % 4) * 0.3),
+          longitude: LNG,
+          speedKmh: 12,
+          at: start + index * 5_000,
+        });
+      }
+      expect(useTrips.getState().active).toBeNull();
+      expect(useTrips.getState().trips).toHaveLength(0);
+    });
+
+    it('si el sensor nunca detectó vehículo, la ruta no se guarda', async () => {
+      setMotionGates({ blocksStart: () => false, hadVehicle: () => false });
+      try {
+        drive(0, 10, Date.now());
+        expect(useTrips.getState().active).not.toBeNull();
+        await useTrips.getState().stopTrip();
+        expect(useTrips.getState().trips).toHaveLength(0);
+      } finally {
+        setMotionGates(null);
+      }
+    });
+
+    it('si el sensor no sabe (sin historial), la ruta se guarda', async () => {
+      setMotionGates({ blocksStart: () => false, hadVehicle: () => null });
+      try {
+        drive(0, 10, Date.now());
+        await useTrips.getState().stopTrip();
+        expect(useTrips.getState().trips).toHaveLength(1);
+      } finally {
+        setMotionGates(null);
+      }
+    });
   });
 });

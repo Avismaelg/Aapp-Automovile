@@ -59,6 +59,22 @@ export function motionStateAt(events: MotionHint[], at: number): 'vehicle' | 'fo
   return state;
 }
 
+// Actividad más reciente según el sensor, incluido «quieto». Ojo: en un
+// semáforo el sensor también puede decir «quieto» yendo en coche, así que
+// solo sirve para no EMPEZAR viajes, no para darlos por terminados.
+export function motionActivityAt(
+  events: MotionHint[],
+  at: number,
+): 'vehicle' | 'foot' | 'still' | 'unknown' {
+  let state: 'vehicle' | 'foot' | 'still' | 'unknown' = 'unknown';
+  for (const event of [...events].sort((a, b) => a.at - b.at)) {
+    if (event.at > at) break;
+    if (event.type === 'vehicle') state = event.transition === 'enter' ? 'vehicle' : 'foot';
+    else if (event.transition === 'enter') state = event.type;
+  }
+  return state;
+}
+
 export function evaluateStop({
   stop,
   samples,

@@ -6,7 +6,8 @@ import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-
 
 const TASK_NAME = 'caravana-background-location';
 // Un fix con más error que esto ensucia la ruta más de lo que aporta.
-const MAX_ACCURACY_M = 100;
+// Dentro de casa el GPS llega a 100-300 m de error y fabrica rutas falsas.
+const MAX_ACCURACY_M = 50;
 
 const UPDATE_OPTIONS: Location.LocationTaskOptions = {
   accuracy: Location.Accuracy.High,
