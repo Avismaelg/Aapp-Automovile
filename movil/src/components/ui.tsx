@@ -457,10 +457,6 @@ export function ScreenHeader({
   );
 }
 
-export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.divider, style]} />;
-}
-
 export function Input({
   label,
   rightSlot,
@@ -672,11 +668,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing['3xl'],
     marginBottom: spacing.md,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.borderSoft,
-    marginVertical: spacing.md,
   },
   inputWrap: {
     minHeight: 50,

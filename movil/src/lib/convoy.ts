@@ -185,3 +185,33 @@ export function shouldReportProgress(
 export function placeLabel(rank: number) {
   return rank === 1 ? '¡Has ganado!' : `Has llegado ${rank}º`;
 }
+
+// ---------------------------------------------------------------------------
+// Seguir a un piloto
+// ---------------------------------------------------------------------------
+
+// Cada cuánto mover el destino tras el piloto que sigues: si se alejó más de
+// esto del punto al que vas. Menos recalcularía la ruta sin parar.
+export const FOLLOW_MOVE_M = 150;
+// A esta distancia ya lo has alcanzado.
+export const FOLLOW_CAUGHT_M = 80;
+
+// Nuevo destino al seguir a alguien, o null si no hace falta recalcular.
+export function followDestination(
+  current: (Point & { followId?: string }) | null,
+  target: { id: string; position: Point | null },
+) {
+  if (!target.position) return null;
+  if (current?.followId === target.id && metersBetween(current, target.position) < FOLLOW_MOVE_M) {
+    return null;
+  }
+  return target.position;
+}
+
+export function followStatus(me: Point, target: Point | null, lastSeenAt: string | null, now: number) {
+  if (!target) return 'sin posición';
+  if (lastSeenAt && now - Date.parse(lastSeenAt) > MEMBER_STALE_MS) return 'sin señal';
+  const meters = metersBetween(me, target);
+  if (meters <= FOLLOW_CAUGHT_M) return 'a tu lado';
+  return meters < 1000 ? `a ${Math.round(meters / 10) * 10} m` : `a ${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+}

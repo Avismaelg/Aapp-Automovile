@@ -106,10 +106,3 @@ export async function pushLivePosition(fix: LiveFix) {
   }
 }
 
-// Solo para las pruebas.
-export function resetLiveShareForTests() {
-  config = null;
-  lastParty = null;
-  lastFriends = null;
-  busy = false;
-}

@@ -18,6 +18,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
+import { acquireSubscription } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
@@ -275,37 +276,41 @@ export function useChallenges() {
   useEffect(() => {
     if (demo || !supabase || !account) return;
     const client = supabase;
-    const refresh = () => void queryClient.invalidateQueries({ queryKey: ['challenges'] });
-    let channel = client
-      .channel(`challenges-live-${account.id}-${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenge_participants',
-          filter: `user_id=eq.${account.id}`,
-        },
-        refresh,
-      );
-    for (const id of challengeIds ? challengeIds.split(',') : []) {
-      channel = channel
+    const accountId = account.id;
+    // Un solo canal para todas las pantallas que usan los retos.
+    return acquireSubscription(`challenges:${accountId}:${challengeIds}`, () => {
+      const refresh = () => void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      let channel = client
+        .channel(`challenges-live-${accountId}-${channelId}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'challenge_participants', filter: `challenge_id=eq.${id}` },
-          refresh,
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'challenges', filter: `id=eq.${id}` },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'challenge_participants',
+            filter: `user_id=eq.${accountId}`,
+          },
           refresh,
         );
-    }
-    channel.subscribe();
+      for (const id of challengeIds ? challengeIds.split(',') : []) {
+        channel = channel
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'challenge_participants', filter: `challenge_id=eq.${id}` },
+            refresh,
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'challenges', filter: `id=eq.${id}` },
+            refresh,
+          );
+      }
+      channel.subscribe();
 
-    return () => {
-      void client.removeChannel(channel);
-    };
+      return () => {
+        void client.removeChannel(channel);
+      };
+    });
   }, [account, demo, queryClient, channelId, challengeIds]);
 
   const challenges = demo ? [] : query.data ?? [];

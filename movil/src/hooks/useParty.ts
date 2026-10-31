@@ -18,6 +18,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { filterString, partySubscriptions } from '@/src/lib/realtime-routing';
+import { acquireSubscription } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
@@ -178,7 +179,9 @@ async function leaveOtherParties(accountId: string, keepPartyId: string | null) 
   await query;
 }
 
-export function useActiveParty() {
+// `poll`: solo la pantalla siempre montada (Inicio) relee cada 15 s; si lo
+// hicieran todas, la party se pediría varias veces por intervalo.
+export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
@@ -189,7 +192,7 @@ export function useActiveParty() {
     enabled: Boolean(account) && !demo,
     // Respaldo del tiempo real: si se corta (cobertura, segundo plano), el
     // destino y las posiciones llegan igual como mucho en 15 s.
-    refetchInterval: (current) => (current.state.data ? 15_000 : false),
+    refetchInterval: (current) => (poll && current.state.data ? 15_000 : false),
     queryFn: async (): Promise<PartyView | null> => {
       if (!account || !supabase) return null;
 
@@ -224,92 +227,96 @@ export function useActiveParty() {
   // Al volver a la app se pone al día al momento (el canal pudo cortarse).
   const refetchParty = query.refetch;
   useEffect(() => {
-    if (demo) return;
+    if (demo || !poll) return;
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refetchParty();
     });
     return () => subscription.remove();
-  }, [demo, refetchParty]);
+  }, [demo, poll, refetchParty]);
 
   useEffect(() => {
     if (demo || !supabase || !account) return;
     const client = supabase;
-    const cacheKey = ['party', account.id, 'supabase'];
+    const accountId = account.id;
+    // Un solo canal para todas las pantallas que usan la party.
+    return acquireSubscription(`party:${accountId}:${partyId ?? 'none'}`, () => {
+      const cacheKey = ['party', accountId, 'supabase'];
 
-    // Los UPDATE parchean la caché y solo se recarga si cambia la estructura
-    // (altas, bajas o cambio de party). Con parties grandes llegan decenas de
-    // posiciones por segundo: se acumulan y se aplican juntas cada segundo,
-    // con un solo repintado.
-    const queue = new Map<string, MemberPatch>();
-    const flush = () => {
-      if (queue.size === 0) return;
-      const pending = new Map(queue);
-      queue.clear();
-      queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
-        if (!current) return current;
-        const members = applyMemberPatches(current.members, pending);
-        return members === current.members ? current : { ...current, members };
-      });
-    };
-    const timer = setInterval(flush, MEMBER_FLUSH_MS);
+      // Los UPDATE parchean la caché y solo se recarga si cambia la estructura
+      // (altas, bajas o cambio de party). Con parties grandes llegan decenas de
+      // posiciones por segundo: se acumulan y se aplican juntas cada segundo,
+      // con un solo repintado.
+      const queue = new Map<string, MemberPatch>();
+      const flush = () => {
+        if (queue.size === 0) return;
+        const pending = new Map(queue);
+        queue.clear();
+        queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
+          if (!current) return current;
+          const members = applyMemberPatches(current.members, pending);
+          return members === current.members ? current : { ...current, members };
+        });
+      };
+      const timer = setInterval(flush, MEMBER_FLUSH_MS);
 
-    const patchParty = (row: Partial<PartyRow>) => {
-      queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          name: row.name ?? current.name,
-          status: row.status ?? current.status,
-          destinationLabel:
-            row.destination_label !== undefined ? row.destination_label : current.destinationLabel,
-          destinationLat:
-            row.destination_lat !== undefined ? row.destination_lat : current.destinationLat,
-          destinationLng:
-            row.destination_lng !== undefined ? row.destination_lng : current.destinationLng,
-          destinationSetBy:
-            row.destination_set_by !== undefined ? row.destination_set_by : current.destinationSetBy,
-          destinationSetAt:
-            row.destination_set_at !== undefined ? row.destination_set_at : current.destinationSetAt,
-        };
-      });
-    };
+      const patchParty = (row: Partial<PartyRow>) => {
+        queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            name: row.name ?? current.name,
+            status: row.status ?? current.status,
+            destinationLabel:
+              row.destination_label !== undefined ? row.destination_label : current.destinationLabel,
+            destinationLat:
+              row.destination_lat !== undefined ? row.destination_lat : current.destinationLat,
+            destinationLng:
+              row.destination_lng !== undefined ? row.destination_lng : current.destinationLng,
+            destinationSetBy:
+              row.destination_set_by !== undefined ? row.destination_set_by : current.destinationSetBy,
+            destinationSetAt:
+              row.destination_set_at !== undefined ? row.destination_set_at : current.destinationSetAt,
+          };
+        });
+      };
 
-    const refetch = () => void queryClient.invalidateQueries({ queryKey: ['party'] });
-    // Solo los cambios de TU party (antes llegaban los de todas las parties
-    // del sistema a cada teléfono). Sin party, solo tus propias altas.
-    // Reglas en src/lib/realtime-routing.ts (las mismas que la prueba de carga).
-    const channel = client.channel(`party-live-${account.id}-${channelId}`);
-    for (const subscription of partySubscriptions(account.id, partyId)) {
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: subscription.table,
-          filter: filterString(subscription),
-        },
-        (payload) => {
-          if (payload.eventType !== 'UPDATE' || !partyId) {
-            refetch();
-          } else if (subscription.table === 'parties') {
-            patchParty(payload.new as Partial<PartyRow>);
-          } else {
-            const row = payload.new as Partial<PartyMemberRow>;
-            if (!row.user_id) return;
-            const current = queryClient.getQueryData<PartyView | null>(cacheKey);
-            if (!current || changesMembership(row as MemberPatch, current.members)) refetch();
-            else queueMemberPatch(queue, row as MemberPatch);
-          }
-        },
-      );
-    }
-    channel.subscribe();
+      const refetch = () => void queryClient.invalidateQueries({ queryKey: ['party'] });
+      // Solo los cambios de TU party (antes llegaban los de todas las parties
+      // del sistema a cada teléfono). Sin party, solo tus propias altas.
+      // Reglas en src/lib/realtime-routing.ts (las mismas que la prueba de carga).
+      const channel = client.channel(`party-live-${accountId}-${channelId}`);
+      for (const subscription of partySubscriptions(accountId, partyId)) {
+        channel.on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: subscription.table,
+            filter: filterString(subscription),
+          },
+          (payload) => {
+            if (payload.eventType !== 'UPDATE' || !partyId) {
+              refetch();
+            } else if (subscription.table === 'parties') {
+              patchParty(payload.new as Partial<PartyRow>);
+            } else {
+              const row = payload.new as Partial<PartyMemberRow>;
+              if (!row.user_id) return;
+              const current = queryClient.getQueryData<PartyView | null>(cacheKey);
+              if (!current || changesMembership(row as MemberPatch, current.members)) refetch();
+              else queueMemberPatch(queue, row as MemberPatch);
+            }
+          },
+        );
+      }
+      channel.subscribe();
 
-    return () => {
-      clearInterval(timer);
-      flush();
-      void supabase?.removeChannel(channel);
-    };
+      return () => {
+        clearInterval(timer);
+        flush();
+        void client.removeChannel(channel);
+      };
+    });
   }, [account, demo, queryClient, channelId, partyId]);
 
   return {

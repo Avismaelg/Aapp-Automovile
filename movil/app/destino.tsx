@@ -8,6 +8,8 @@ import { AppText, Button, IconButton } from '@/src/components/ui';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import {
   formatSearchDistance,
+  rankPlaces,
+  searchKnownPlaces,
   searchPlaces,
   type SearchPlace,
 } from '@/src/lib/place-search';
@@ -32,9 +34,13 @@ export default function DestinationScreen() {
   const visibleResults = hasQuery ? results : [];
   const searchingNow = hasQuery && isSearching;
 
+  // Los destinos conocidos de RD salen al instante (y sin conexión); los de
+  // internet se suman al llegar.
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    setResults([]);
+    setResults(
+      value.trim().length >= 3 ? rankPlaces(searchKnownPlaces(value, liveLocationRef.current)) : [],
+    );
     setSearchError(null);
     setIsSearching(false);
   };
@@ -80,6 +86,7 @@ export default function DestinationScreen() {
           setSearchError(found.length === 0 ? 'Sin resultados. Prueba con otra palabra.' : null);
         } catch {
           if (controller.signal.aborted || searchToken.current !== token) return;
+          // Solo falla si no hay internet y tampoco hay destinos conocidos.
           setResults([]);
           setSearchError('No pudimos buscar ahora. Revisa tu conexión.');
         } finally {

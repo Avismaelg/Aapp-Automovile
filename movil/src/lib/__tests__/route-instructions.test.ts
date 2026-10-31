@@ -64,3 +64,24 @@ describe('route instructions', () => {
     expect(spokenInstruction('Gira a la derecha', 40)).toBe('Gira a la derecha');
   });
 });
+
+describe('avance sobre carreteras largas', () => {
+  // Autopista recta de 10 km con solo 2 puntos (como salen muchas rutas).
+  const highway: [number, number][] = [
+    [18.5, -69.5],
+    [18.5, -69.4052],
+  ];
+  const cumulative = cumulativeDistances(highway);
+
+  it('el avance es continuo, no a saltos de punto en punto', () => {
+    const quarter = routeProgress(highway, cumulative, { latitude: 18.5, longitude: -69.4763 });
+    expect(quarter!.progressM).toBeGreaterThan(cumulative[1] * 0.2);
+    expect(quarter!.progressM).toBeLessThan(cumulative[1] * 0.3);
+  });
+
+  it('en mitad de la recta no te da por fuera de ruta', () => {
+    // A 5 km de cada punto pero encima de la carretera.
+    const middle = routeProgress(highway, cumulative, { latitude: 18.5001, longitude: -69.4526 });
+    expect(middle!.distanceM).toBeLessThan(20);
+  });
+});

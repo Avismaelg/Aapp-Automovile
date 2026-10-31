@@ -34,6 +34,7 @@ import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { useSimulator } from '@/src/lib/simulator';
+import { useFollow } from '@/src/store/follow';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import {
   partyVoiceChannels,
@@ -295,6 +296,23 @@ export default function PartyScreen() {
     );
   };
 
+  // Tocar a un piloto: seguirle (la ruta va a donde está y se mueve con él)
+  // o retarle.
+  const memberActions = (member: DisplayMember) => {
+    const first = member.name.split(' ')[0];
+    Alert.alert(member.name, undefined, [
+      {
+        text: `Seguir a ${first}`,
+        onPress: () => {
+          useFollow.getState().follow({ id: member.id, name: member.name });
+          router.replace('/');
+        },
+      },
+      { text: `Retar a ${first}`, onPress: () => challengePilots(`Reto a ${first}`, [member]) },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
+
   const leave = async () => {
     if (isDemo) {
       router.replace('/');
@@ -467,7 +485,7 @@ export default function PartyScreen() {
 
         <PartyMembersRow
           members={displayMembers}
-          onChallenge={(member) => challengePilots(`Reto a ${member.name.split(' ')[0]}`, [member])}
+          onChallenge={memberActions}
           onInvite={openInvite}
         />
 

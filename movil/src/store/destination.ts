@@ -9,6 +9,8 @@ export type ChosenDestination = {
   // Solo tuyo (ir a por tu coche, un reto, una prueba): no se comparte con
   // el convoy.
   personal?: boolean;
+  // Siguiendo a un piloto del convoy: el destino se mueve con él.
+  followId?: string;
 };
 
 type DestinationState = {
@@ -32,7 +34,10 @@ export const useChosenDestination = create<DestinationState>()(
       setDestination: (destination) =>
         set((state) => ({
           destination,
-          recents: [
+          // Tu coche, un reto o seguir a alguien no van a «recientes».
+          recents: destination.personal
+            ? state.recents
+            : [
             { latitude: destination.latitude, longitude: destination.longitude, label: destination.label },
             ...state.recents.filter(
               (item) =>
@@ -51,7 +56,11 @@ export const useChosenDestination = create<DestinationState>()(
     {
       name: 'caravana.destination.v1',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ destination: state.destination, recents: state.recents }),
+      // Seguir a alguien no se guarda: al reabrir, su posición ya sería vieja.
+      partialize: (state) => ({
+        destination: state.destination?.followId ? null : state.destination,
+        recents: state.recents,
+      }),
     },
   ),
 );

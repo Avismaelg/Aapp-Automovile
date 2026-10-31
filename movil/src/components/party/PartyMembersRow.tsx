@@ -55,7 +55,7 @@ export function PartyMembersRow({
           disabled={member.isMe}
           style={({ pressed }) => [styles.member, pressed && { opacity: 0.75 }]}
           accessibilityRole="button"
-          accessibilityLabel={`Retar a ${member.name}`}
+          accessibilityLabel={`Seguir o retar a ${member.name}`}
         >
           <Avatar
             name={member.name}

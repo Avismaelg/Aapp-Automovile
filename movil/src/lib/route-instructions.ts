@@ -35,24 +35,47 @@ export function cumulativeDistances(points: LatLng[]) {
   return cumulative;
 }
 
-// Avance del vehículo sobre la ruta midiendo el punto más cercano.
+// Avance del vehículo sobre la ruta: se proyecta tu posición sobre el tramo
+// más cercano (no sobre el punto más cercano). En carreteras rectas con pocos
+// puntos el avance antes iba a saltos de cientos de metros y la distancia a
+// la ruta salía inflada (falsos «fuera de ruta»).
 export function routeProgress(
   points: LatLng[],
   cumulative: number[],
   position: { latitude: number; longitude: number } | null,
 ): RouteProgress | null {
   if (!position || points.length < 2) return null;
-  let nearestIndex = 0;
+  // Plano local (metros) alrededor de tu posición: suficiente para tramos de
+  // calle y mucho más barato que la trigonometría completa.
+  const kx = 111_320 * Math.cos((position.latitude * Math.PI) / 180);
+  const ky = 110_540;
   let best = Infinity;
-  const target: LatLng = [position.latitude, position.longitude];
-  for (let index = 0; index < points.length; index += 1) {
-    const distance = haversineMeters(points[index], target);
-    if (distance < best) {
-      best = distance;
+  let nearestIndex = 0;
+  let along = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const ax = (points[index][1] - position.longitude) * kx;
+    const ay = (points[index][0] - position.latitude) * ky;
+    const bx = (points[index + 1][1] - position.longitude) * kx;
+    const by = (points[index + 1][0] - position.latitude) * ky;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const length2 = dx * dx + dy * dy;
+    const t = length2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length2)) : 0;
+    const px = ax + t * dx;
+    const py = ay + t * dy;
+    const distance2 = px * px + py * py;
+    if (distance2 < best) {
+      best = distance2;
       nearestIndex = index;
+      along = t;
     }
   }
-  return { progressM: cumulative[nearestIndex] ?? 0, nearestIndex, distanceM: best };
+  const segment = (cumulative[nearestIndex + 1] ?? 0) - (cumulative[nearestIndex] ?? 0);
+  return {
+    progressM: (cumulative[nearestIndex] ?? 0) + along * segment,
+    nearestIndex,
+    distanceM: Math.sqrt(best),
+  };
 }
 
 function iconFromModifier(type: string, modifier: string | undefined): RouteInstructionIcon {

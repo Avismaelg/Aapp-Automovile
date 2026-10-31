@@ -3,9 +3,6 @@ import type { ViewStyle } from 'react-native';
 
 import { colors } from '@/src/theme';
 
-// Fondo translúcido de los controles que flotan sobre el mapa.
-export const GLASS = 'rgba(6,8,11,0.74)';
-
 // Colores de los controles sobre el mapa: tarjetas blancas con sombra sobre
 // el mapa de día (como Google Maps) y oscuras sobre el de noche.
 export type MapChrome = {

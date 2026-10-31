@@ -58,6 +58,8 @@ export type WorldMapRoute = {
 export type WorldMapAlternative = {
   index: number;
   coordinates: [number, number][];
+  // Lo que se escribe sobre ella («+4 min»).
+  label?: string;
 };
 
 export type WorldMapVehicleKind = 'car' | 'motorcycle' | 'ev' | 'truck';

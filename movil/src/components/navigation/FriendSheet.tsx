@@ -12,6 +12,7 @@ export function FriendSheet({
   inviting = false,
   onInvite,
   onChallenge,
+  onFollow,
   onClose,
 }: {
   friend: WorldMapMember;
@@ -20,6 +21,8 @@ export function FriendSheet({
   inviting?: boolean;
   onInvite: () => void;
   onChallenge: () => void;
+  // Solo si es del convoy (con posición en vivo).
+  onFollow?: () => void;
   onClose: () => void;
 }) {
   const chrome = useMapChrome();
@@ -59,6 +62,16 @@ export function FriendSheet({
           onPress={inviteLabel === 'En tu party' ? undefined : onInvite}
           style={styles.destinationAction}
         />
+        {onFollow ? (
+          <Button
+            label="Seguir"
+            variant="secondary"
+            size="sm"
+            icon="navigate"
+            onPress={onFollow}
+            style={styles.destinationAction}
+          />
+        ) : null}
         <Button
           label="Retar"
           variant="secondary"

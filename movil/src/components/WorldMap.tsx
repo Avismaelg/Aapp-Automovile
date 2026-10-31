@@ -67,6 +67,11 @@ const NO_ALTERNATIVES: WorldMapAlternative[] = [];
 // trabas y quedan por debajo de los textos y botones de la pantalla (los
 // marcadores nativos se pintaban encima). Juntos se agrupan en «+N».
 const MEMBER_FONT = ["DIN Pro Medium", "Arial Unicode MS Regular"];
+// Grosor de la ruta según el zoom (más fina de lejos, ancha al conducir).
+const ROUTE_WIDTH: unknown = ["interpolate", ["linear"], ["zoom"], 10, 4, 13, 7, 16, 12, 18, 18];
+const ROUTE_WIDTH_GLOW: unknown = ["interpolate", ["linear"], ["zoom"], 10, 10, 13, 16, 16, 26, 18, 36];
+const ROUTE_WIDTH_ALT: unknown = ["interpolate", ["linear"], ["zoom"], 10, 3, 13, 5, 16, 8, 18, 12];
+
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [],
@@ -375,27 +380,43 @@ export const WorldMap = memo(function WorldMap({
         : null,
     [route, cumulative, location],
   );
-  const nearestIndex = progress?.nearestIndex ?? 0;
+  // La ruta se sube una vez; lo recorrido se oculta con un recorte que
+  // avanza de forma continua (antes la ruta entera se rehacía en cada punto).
+  const routeData = useMemo<GeoJSON.FeatureCollection>(
+    () =>
+      route && route.coordinates.length >= 2
+        ? { type: "FeatureCollection", features: [line(route.coordinates)] }
+        : EMPTY,
+    [route],
+  );
+  const routeLength = cumulative ? cumulative[cumulative.length - 1] : 0;
+  // En pasos de 0,1 % para no tocar el estilo con cada metro.
+  const traveled =
+    progress && routeLength > 0
+      ? Math.min(0.999, Math.round((progress.progressM / routeLength) * 1000) / 1000)
+      : 0;
 
-  // Lo recorrido en gris y lo que falta en azul; solo cambia al avanzar de punto.
-  const routeData = useMemo<GeoJSON.FeatureCollection>(() => {
-    if (!route || route.coordinates.length < 2) return EMPTY;
-    const features: GeoJSON.Feature[] = [];
-    if (nearestIndex > 0)
-      features.push(
-        line(route.coordinates.slice(0, nearestIndex + 1), { segment: "past" }),
-      );
-    const ahead = route.coordinates.slice(nearestIndex);
-    if (ahead.length >= 2) features.push(line(ahead, { segment: "ahead" }));
-    return { type: "FeatureCollection", features };
-  }, [route, nearestIndex]);
+  // Tramo final a pie: si la calle no llega justo al destino, una línea de
+  // puntos une el final de la ruta con el sitio exacto.
+  const lastMileData = useMemo<GeoJSON.FeatureCollection>(() => {
+    if (!route || !destination || route.coordinates.length < 2) return EMPTY;
+    const end = route.coordinates[route.coordinates.length - 1];
+    const target: [number, number] = [destination.latitude, destination.longitude];
+    const gap = Math.hypot(
+      (end[0] - target[0]) * 110_540,
+      (end[1] - target[1]) * 111_320 * Math.cos((end[0] * Math.PI) / 180),
+    );
+    return gap > 25 ? { type: "FeatureCollection", features: [line([end, target])] } : EMPTY;
+  }, [route, destination]);
 
   const alternativesData = useMemo<GeoJSON.FeatureCollection>(
     () => ({
       type: "FeatureCollection",
       features: alternatives
         .filter((item) => item.coordinates.length >= 2)
-        .map((item) => line(item.coordinates, { index: item.index })),
+        .map((item) =>
+          line(item.coordinates, { index: item.index, label: item.label ?? "" }),
+        ),
     }),
     [alternatives],
   );
@@ -408,25 +429,28 @@ export const WorldMap = memo(function WorldMap({
         : null,
     [route, progress],
   );
+  // Flecha de la próxima maniobra: 35 m antes y 20 m después del giro, en
+  // blanco sobre la ruta (como los navegadores de coche).
   const maneuverData = useMemo<GeoJSON.FeatureCollection>(() => {
     if (!route || !cumulative || !upcoming) return EMPTY;
-    if (upcoming.icon === "depart" || upcoming.icon === "straight")
+    if (upcoming.icon === "depart" || upcoming.icon === "straight" || upcoming.icon === "arrive")
       return EMPTY;
-    const index = cumulative.findIndex(
-      (value) => value >= upcoming.atDistanceM,
+    const from = upcoming.atDistanceM - 35;
+    const to = upcoming.atDistanceM + 20;
+    const points = route.coordinates.filter(
+      (_, index) => cumulative[index] >= from && cumulative[index] <= to,
     );
-    const point =
-      route.coordinates[index < 0 ? route.coordinates.length - 1 : index];
-    return {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Point", coordinates: toLngLat(point) },
-        },
-      ],
-    };
+    const at = cumulative.findIndex((value) => value >= upcoming.atDistanceM);
+    const center = route.coordinates[at < 0 ? route.coordinates.length - 1 : at];
+    const features: GeoJSON.Feature[] = [
+      {
+        type: "Feature",
+        properties: { kind: "point" },
+        geometry: { type: "Point", coordinates: toLngLat(center) },
+      },
+    ];
+    if (points.length >= 2) features.push(line(points, { kind: "arrow" }));
+    return { type: "FeatureCollection", features };
   }, [route, cumulative, upcoming]);
 
   const parkingDistance = parking
@@ -633,78 +657,47 @@ export const WorldMap = memo(function WorldMap({
           onPress={handleAlternativePress}
         >
           <LineLayer
-            id="caravana-alt-casing"
-            belowLayerID={belowLayerID}
-            style={{
-              lineCap: "round",
-              lineJoin: "round",
-              lineColor: "#6f7f93",
-              lineWidth: [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                11,
-                6,
-                14,
-                9,
-                16,
-                13,
-                18,
-                19,
-              ],
-            }}
-          />
-          <LineLayer
             id="caravana-alt-line"
             belowLayerID={belowLayerID}
             style={{
               lineCap: "round",
               lineJoin: "round",
-              lineColor: "#b4c2d3",
-              lineWidth: [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                11,
-                4,
-                14,
-                6,
-                16,
-                9,
-                18,
-                14,
-              ],
+              lineColor: night ? "#5d6b7d" : "#a9b6c6",
+              lineBorderColor: night ? "#2a3442" : "#7b8899",
+              lineBorderWidth: 1.5,
+              lineEmissiveStrength: 1,
+              lineWidth: ROUTE_WIDTH_ALT as number,
+            }}
+          />
+          <SymbolLayer
+            id="caravana-alt-label"
+            style={{
+              symbolPlacement: "line-center",
+              textField: ["to-string", ["get", "label"]],
+              textFont: MEMBER_FONT,
+              textSize: 13,
+              textColor: night ? "#e6ebf1" : "#1f2a37",
+              textHaloColor: night ? "#1b2330" : "#ffffff",
+              textHaloWidth: 2,
+              textAllowOverlap: false,
             }}
           />
         </ShapeSource>
 
-        <ShapeSource id="caravana-route" shape={routeData}>
+        <ShapeSource id="caravana-route" shape={routeData} lineMetrics>
+          {/* Halo suave bajo la ruta: se ve sobre cualquier fondo. */}
           <LineLayer
-            id="caravana-route-casing"
+            id="caravana-route-glow"
             belowLayerID={belowLayerID}
             style={{
               lineCap: "round",
               lineJoin: "round",
-              lineColor: [
-                "case",
-                ["==", ["get", "segment"], "past"],
-                "#8a96a4",
-                "#1458b8",
-              ],
-              lineWidth: [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                11,
-                8,
-                14,
-                12,
-                16,
-                17,
-                18,
-                24,
-              ],
-              lineOpacity: ["case", ["==", ["get", "segment"], "past"], 0.6, 1],
+              lineColor: "#3d9bff",
+              lineOpacity: night ? 0.35 : 0.22,
+              lineBlur: 6,
+              lineEmissiveStrength: 1,
+              lineWidth: ROUTE_WIDTH_GLOW as number,
+              lineTrimOffset: [0, traveled],
             }}
           />
           <LineLayer
@@ -713,25 +706,46 @@ export const WorldMap = memo(function WorldMap({
             style={{
               lineCap: "round",
               lineJoin: "round",
-              lineColor: [
-                "case",
-                ["==", ["get", "segment"], "past"],
-                "#c3cbd4",
-                "#3d9bff",
-              ],
-              lineWidth: [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                11,
-                5.5,
-                14,
-                8.5,
-                16,
-                12.5,
-                18,
-                18,
-              ],
+              lineColor: "#3d9bff",
+              lineBorderColor: "#1458b8",
+              lineBorderWidth: 2.5,
+              // Que la luz de noche del mapa no la apague.
+              lineEmissiveStrength: 1,
+              lineWidth: ROUTE_WIDTH as number,
+              lineTrimOffset: [0, traveled],
+            }}
+          />
+          {/* Flechas de sentido a lo largo de la ruta. */}
+          <SymbolLayer
+            id="caravana-route-chevrons"
+            minZoomLevel={13}
+            style={{
+              symbolPlacement: "line",
+              symbolSpacing: 90,
+              textField: "›",
+              textFont: MEMBER_FONT,
+              textSize: ["interpolate", ["linear"], ["zoom"], 13, 14, 17, 22],
+              textColor: "#ffffff",
+              textOpacity: 0.85,
+              textKeepUpright: false,
+              textRotationAlignment: "map",
+              textPitchAlignment: "map",
+              textAllowOverlap: true,
+              textIgnorePlacement: true,
+            }}
+          />
+        </ShapeSource>
+
+        <ShapeSource id="caravana-last-mile" shape={lastMileData}>
+          <LineLayer
+            id="caravana-last-mile"
+            belowLayerID={belowLayerID}
+            style={{
+              lineCap: "round",
+              lineColor: "#3d9bff",
+              lineWidth: 4,
+              lineDasharray: [0.1, 2],
+              lineEmissiveStrength: 1,
             }}
           />
         </ShapeSource>
@@ -771,13 +785,28 @@ export const WorldMap = memo(function WorldMap({
         </ShapeSource>
 
         <ShapeSource id="caravana-maneuver" shape={maneuverData}>
+          <LineLayer
+            id="caravana-maneuver-arrow"
+            filter={["==", ["get", "kind"], "arrow"]}
+            style={{
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: "#ffffff",
+              lineBorderColor: "#0b3b80",
+              lineBorderWidth: 2,
+              lineEmissiveStrength: 1,
+              lineWidth: ["interpolate", ["linear"], ["zoom"], 13, 4, 16, 8, 18, 12],
+            }}
+          />
           <CircleLayer
             id="caravana-maneuver"
+            filter={["==", ["get", "kind"], "point"]}
             style={{
-              circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 8],
+              circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 7],
               circleColor: "#ffffff",
-              circleStrokeColor: "#1458b8",
+              circleStrokeColor: "#0b3b80",
               circleStrokeWidth: 3,
+              circleEmissiveStrength: 1,
             }}
           />
         </ShapeSource>

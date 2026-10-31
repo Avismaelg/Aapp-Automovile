@@ -22,7 +22,6 @@ export type FuelResult = {
 };
 
 const LITERS_PER_US_GALLON = 3.785411784;
-const KM_PER_MILE = 1.609344;
 const MPG_TO_KM_PER_L = 0.425143707;
 
 export function toKmPerL(value: number, unit: EfficiencyUnit): number {
@@ -101,32 +100,6 @@ export function logUnit(log: FuelLog) {
 
 export function logPriceUnit(log: FuelLog) {
   return log.kind === 'electric' ? '/kWh' : '/L';
-}
-
-export function distanceToMiles(km: number) {
-  return km / KM_PER_MILE;
-}
-
-export function gallonsToLiters(gallons: number) {
-  return gallons * LITERS_PER_US_GALLON;
-}
-
-/** Consumo real entre dos repostajes de tanque lleno. */
-export function consumptionBetweenFillups(
-  previousOdometerKm: number,
-  currentOdometerKm: number,
-  liters: number,
-): { kmPerL: number; lPer100km: number; mpg: number } {
-  const distance = currentOdometerKm - previousOdometerKm;
-  if (distance <= 0 || liters <= 0) {
-    return { kmPerL: 0, lPer100km: 0, mpg: 0 };
-  }
-  const kmPerL = distance / liters;
-  return {
-    kmPerL,
-    lPer100km: 100 / kmPerL,
-    mpg: kmPerL / MPG_TO_KM_PER_L,
-  };
 }
 
 /**

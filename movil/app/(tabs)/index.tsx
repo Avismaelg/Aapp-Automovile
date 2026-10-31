@@ -31,6 +31,7 @@ import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
 import { lastSeenLabel } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
+import { useFollow } from "@/src/store/follow";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
 import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
 import {
@@ -47,6 +48,8 @@ import { useActiveParty, useSetPartyDestination } from "@/src/hooks/useParty";
 import { ConvoyDestinationCard } from "@/src/components/navigation/ConvoyDestinationCard";
 import {
   convoyDestinationAction,
+  followDestination,
+  followStatus,
   destinationKey as convoyDestinationKey,
   sameDestination,
   shouldShareMyDestination,
@@ -93,7 +96,7 @@ export default function NavigationScreen() {
   const insets = useSafeAreaInsets();
   const me = useCurrentUser();
   const live = useLiveLocation();
-  const { party, isDemo } = useActiveParty();
+  const { party, isDemo } = useActiveParty({ poll: true });
   const { vehicles } = useGarageVehicles();
   const {
     members: realFriends,
@@ -135,6 +138,53 @@ export default function NavigationScreen() {
     ];
   }, [partyOnMap, realFriends, simMembers]);
   const mapFriends = liveMembers;
+
+  // «Seguir a»: el destino es la posición en vivo de un piloto del convoy y
+  // se mueve con él (cada 150 m, para no recalcular la ruta sin parar).
+  const followTarget = useFollow((state) => state.target);
+  const stopFollowing = useFollow((state) => state.stop);
+  const followedMember = followTarget
+    ? liveMembers.find((member) => member.id === followTarget.id) ?? null
+    : null;
+  const followedSeenAt =
+    party?.members.find((member) => member.userId === followTarget?.id)?.lastSeenAt ?? null;
+  const followAppliedRef = useRef(false);
+  const followLat = followedMember?.latitude;
+  const followLng = followedMember?.longitude;
+  useEffect(() => {
+    if (!followTarget) {
+      followAppliedRef.current = false;
+      return;
+    }
+    const store = useChosenDestination.getState();
+    const next = followDestination(store.destination, {
+      id: followTarget.id,
+      position:
+        followLat != null && followLng != null
+          ? { latitude: followLat, longitude: followLng }
+          : null,
+    });
+    if (!next) return;
+    followAppliedRef.current = true;
+    store.setDestination({
+      ...next,
+      label: followTarget.name,
+      personal: true,
+      followId: followTarget.id,
+    });
+    if (!store.isNavigating) store.startNavigation();
+  }, [followTarget, followLat, followLng]);
+  // Si eliges otro destino o terminas la ruta, dejas de seguir.
+  const currentFollowId = useChosenDestination((state) => state.destination?.followId ?? null);
+  useEffect(() => {
+    if (!followTarget || !followAppliedRef.current) return;
+    // Se lee del store (no del render): el efecto de arriba acaba de cambiarlo.
+    const latest = useChosenDestination.getState().destination?.followId ?? null;
+    if (latest !== followTarget.id) {
+      followAppliedRef.current = false;
+      stopFollowing();
+    }
+  }, [followTarget, currentFollowId, stopFollowing]);
   const createChallenge = useCreateChallenge();
 
   const [voiceMuted, setVoiceMuted] = useState(false);
@@ -546,12 +596,16 @@ export default function NavigationScreen() {
       navigating
         ? []
         : route.routes
-            .map((option, index) => ({
-              index,
-              coordinates: option.coordinates,
-            }))
+            .map((option, index) => {
+              const extra = Math.round((option.timeMs - fastestTimeMs) / 60_000);
+              return {
+                index,
+                coordinates: option.coordinates,
+                label: extra > 0 ? `+${extra} min` : "Igual de rápida",
+              };
+            })
             .filter((option) => option.index !== route.selected),
-    [navigating, route.routes, route.selected],
+    [navigating, route.routes, route.selected, fastestTimeMs],
   );
   const selectRoute = route.select;
 
@@ -834,24 +888,52 @@ export default function NavigationScreen() {
               onChangeRoute={() => router.push("/destino" as Href)}
               onClose={clearDestination}
             />
-            {convoyNotice ? (
-              <View
-                pointerEvents="none"
-                style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
-              >
+            <View
+              pointerEvents="box-none"
+              style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
+            >
+              {followTarget ? (
                 <View style={[styles.convoyNotice, chrome.surface]}>
+                  <Ionicons name="navigate-circle" size={20} color={chrome.text} />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
+                      Siguiendo a {followTarget.name.split(" ")[0]}
+                    </AppText>
+                    <AppText variant="caption" color={chrome.muted}>
+                      {followStatus(
+                        live.location,
+                        followedMember
+                          ? { latitude: followedMember.latitude, longitude: followedMember.longitude }
+                          : null,
+                        followedSeenAt,
+                        clockNow,
+                      )}
+                    </AppText>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      stopFollowing();
+                      clearDestination();
+                    }}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Dejar de seguir"
+                  >
+                    <AppText variant="bodyStrong" color={chrome.muted} style={{ fontSize: 13 }}>
+                      Dejar
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
+              {convoyNotice ? (
+                <View style={[styles.convoyNotice, chrome.surface]} pointerEvents="none">
                   <Ionicons name="flag" size={16} color={chrome.text} />
                   <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={{ flex: 1 }}>
                     {convoyNotice.name} cambió el destino: {convoyNotice.label}
                   </AppText>
                 </View>
-              </View>
-            ) : null}
-            {offerConvoyDestination && partyDestination ? (
-              <View
-                pointerEvents="box-none"
-                style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
-              >
+              ) : null}
+              {offerConvoyDestination && partyDestination && !followTarget ? (
                 <ConvoyDestinationCard
                   setterName={setterName}
                   label={partyDestination.label}
@@ -859,8 +941,8 @@ export default function NavigationScreen() {
                   onFollow={followConvoyDestination}
                   onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
                 />
-              </View>
-            ) : null}
+              ) : null}
+            </View>
             </>
           ) : (
             <>
@@ -1208,6 +1290,17 @@ export default function NavigationScreen() {
                     }
                     onInvite={() => void inviteToConvoy(selectedFriend)}
                     onChallenge={() => challengeFriend(selectedFriend)}
+                    onFollow={
+                      party?.members.some((member) => member.userId === selectedFriend.id) ||
+                      simMembers.some((member) => member.id === selectedFriend.id)
+                        ? () => {
+                            useFollow
+                              .getState()
+                              .follow({ id: selectedFriend.id, name: selectedFriend.name });
+                            setSelectedFriend(null);
+                          }
+                        : undefined
+                    }
                     onClose={() => setSelectedFriend(null)}
                   />
                 ) : null}
@@ -1223,7 +1316,7 @@ export default function NavigationScreen() {
 }
 
 const styles = StyleSheet.create({
-  convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg },
+  convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm },
   convoyNotice: {
     flexDirection: "row",
     alignItems: "center",

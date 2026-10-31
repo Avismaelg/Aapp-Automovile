@@ -393,33 +393,6 @@ export const feed: FeedItem[] = [
   },
 ];
 
-export const recentDrives = [
-  {
-    id: 'd1',
-    title: 'Santo Domingo → Boca Chica',
-    date: 'Hoy, 7:12 a. m.',
-    km: 32.4,
-    minutes: 38,
-    avgSpeed: 51,
-  },
-  {
-    id: 'd2',
-    title: 'Casa → Trabajo',
-    date: 'Ayer, 6:54 a. m.',
-    km: 14.8,
-    minutes: 27,
-    avgSpeed: 32,
-  },
-  {
-    id: 'd3',
-    title: 'Ruta a Constanza',
-    date: 'Dom, 8:05 a. m.',
-    km: 86.2,
-    minutes: 94,
-    avgSpeed: 55,
-  },
-];
-
 export const fuelLogs: FuelLog[] = [
   {
     id: 'fl1',
