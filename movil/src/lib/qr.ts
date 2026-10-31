@@ -8,8 +8,12 @@ export function vehicleUrl(slug: string) {
   return `${WEB_BASE}/v/${encodeURIComponent(slug)}`;
 }
 
+// Página de invitación (GitHub Pages): muestra el código y abre la app.
+export const INVITE_BASE =
+  process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://avismaelg.github.io/Aapp-Automovile';
+
 export function partyUrl(code: string) {
-  return `${WEB_BASE}/p/${encodeURIComponent(code.toUpperCase())}`;
+  return `${INVITE_BASE}/p/?c=${encodeURIComponent(code.toUpperCase())}`;
 }
 
 export function challengeUrl(code: string) {
