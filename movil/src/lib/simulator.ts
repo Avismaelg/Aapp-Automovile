@@ -181,7 +181,7 @@ function setFix(fix: SimFix, phase?: SimPhase) {
   useSimulator.setState((state) => ({
     fix,
     phase: phase ?? state.phase,
-    members: state.party ? convoy(state.members) : [],
+    members: state.party ? (crowd.length ? moveCrowd() : convoy(state.members)) : [],
   }));
 }
 
@@ -293,6 +293,39 @@ const CONVOY = partyMembers.slice(0, 3).map((member, index) => ({
   side: index % 2 === 0 ? 4 : -4,
 }));
 
+// Prueba de carga: una party enorme repartida por la ciudad, cada uno
+// conduciendo a su velocidad y cambiando de rumbo de vez en cuando.
+const CROWD_NAMES = ['Ana', 'Luis', 'Carla', 'José', 'Mía', 'Pedro', 'Sara', 'Leo', 'Eva', 'Raúl', 'Nora', 'Iván'];
+const CROWD_COLORS = ['#FF5A1F', '#C9FF4D', '#4DE1FF', '#2EE6A8', '#FFD24D', '#B98CFF', '#FF8AD4', '#FFB84D'];
+type CrowdDriver = { point: LatLng; heading: number; speed: number; talking: boolean };
+let crowd: CrowdDriver[] = [];
+
+function makeCrowd(center: LatLng, size: number) {
+  crowd = Array.from({ length: size }, (_, index) => ({
+    point: offsetPoint(center, Math.random() * 360, Math.sqrt(Math.random()) * 4_000),
+    heading: Math.random() * 360,
+    // Mezcla de parados, tráfico lento y avenida (m/s).
+    speed: [0, 3, 8, 14, 18][index % 5],
+    talking: false,
+  }));
+}
+
+function moveCrowd(): SimMember[] {
+  return crowd.map((driver, index) => {
+    if (Math.random() < 0.02) driver.heading = (driver.heading + (Math.random() < 0.5 ? 90 : -90)) % 360;
+    driver.point = offsetPoint(driver.point, driver.heading, driver.speed);
+    if (Math.random() < 0.01) driver.talking = !driver.talking;
+    return {
+      id: `crowd-${index}`,
+      name: `${CROWD_NAMES[index % CROWD_NAMES.length]} ${index + 1}`,
+      color: CROWD_COLORS[index % CROWD_COLORS.length],
+      latitude: driver.point[0],
+      longitude: driver.point[1],
+      isTalking: driver.talking,
+    };
+  });
+}
+
 function convoy(previous: SimMember[]): SimMember[] {
   return CONVOY.map((member, index) => {
     const position = trail[Math.max(0, trail.length - 1 - member.delay)] ?? trail[0];
@@ -330,8 +363,14 @@ export function setCruiseKmh(kmh: number) {
   useSimulator.setState({ cruiseKmh: kmh });
 }
 
-export function setSimParty(enabled: boolean) {
-  useSimulator.setState((state) => ({ party: enabled, members: enabled ? convoy(state.members) : [] }));
+export function setSimParty(enabled: boolean, size = 0) {
+  const origin = currentPoint();
+  if (enabled && size > 0 && origin) makeCrowd(origin, size);
+  else crowd = [];
+  useSimulator.setState((state) => ({
+    party: enabled,
+    members: enabled ? (crowd.length ? moveCrowd() : convoy(state.members)) : [],
+  }));
 }
 
 // La pantalla del mapa llama a esto cuando llega una ruta nueva. Si empieza
@@ -481,6 +520,7 @@ export function stopSimulation() {
   script = null;
   trail = [];
   motion = [];
+  crowd = [];
   void useTrips.getState().removeTestTrips();
   if (realSpot !== undefined) {
     if (realSpot) useParking.getState().setSpot(realSpot);

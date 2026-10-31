@@ -9,6 +9,7 @@ import Mapbox, {
   MarkerView,
   ModelLayer,
   ShapeSource,
+  SymbolLayer,
   UserTrackingMode,
 } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
@@ -46,6 +47,10 @@ import { colors } from '@/src/theme';
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN || null);
 
 const NO_ALTERNATIVES: WorldMapAlternative[] = [];
+// Hasta aquí cada amigo es un marcador nativo (bonito, pero una vista por
+// persona). Con más, se dibujan todos en una capa de la GPU y se agrupan.
+const MEMBER_MARKER_LIMIT = 25;
+const MEMBER_FONT = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_other' };
 // Halo del punto azul (a pie o sin coche 3D).
@@ -431,6 +436,51 @@ export const WorldMap = memo(function WorldMap({
     if (typeof index === 'number') callbacksRef.current.onAlternativePress?.(index);
   }, []);
 
+  const crowd = members.length > MEMBER_MARKER_LIMIT;
+  const membersData = useMemo<GeoJSON.FeatureCollection>(() => {
+    if (!crowd) return EMPTY;
+    return {
+      type: 'FeatureCollection',
+      features: members.map((member) => ({
+        type: 'Feature',
+        id: member.id,
+        properties: {
+          id: member.id,
+          color: member.color,
+          initials: initials(member.name),
+          name: member.name.split(' ')[0],
+        },
+        geometry: { type: 'Point', coordinates: [member.longitude, member.latitude] },
+      })),
+    };
+  }, [crowd, members]);
+
+  // Tocar un amigo abre su ficha; tocar un grupo acerca el mapa.
+  const handleMembersPress = useCallback(
+    (event: { features: GeoJSON.Feature[] }) => {
+      const feature = event.features[0];
+      if (!feature) return;
+      const id = feature.properties?.id;
+      if (typeof id === 'string') {
+        callbacksRef.current.onMemberPress?.(id);
+        return;
+      }
+      if (feature.geometry.type !== 'Point') return;
+      const center = feature.geometry.coordinates as [number, number];
+      changeFollowing(false);
+      void (async () => {
+        const zoom = (await mapRef.current?.getZoom().catch(() => null)) ?? 13;
+        cameraRef.current?.setCamera({
+          centerCoordinate: center,
+          zoomLevel: Math.min(18, zoom + 2),
+          animationMode: 'easeTo',
+          animationDuration: 500,
+        });
+      })();
+    },
+    [changeFollowing],
+  );
+
   const handleStyleError = useCallback(() => {
     setStyleFailed((failed) => {
       if (!failed) callbacksRef.current.onError?.('No pudimos cargar el mapa. Probamos con el mapa de respaldo.');
@@ -603,7 +653,62 @@ export const WorldMap = memo(function WorldMap({
           <LocationPuck puckBearingEnabled puckBearing={headingUp ? 'course' : 'heading'} pulsing={PUCK_PULSING} />
         ) : null}
 
-        {members.map((member) => (
+        {crowd ? (
+          <ShapeSource
+            id="caravana-members"
+            shape={membersData}
+            cluster
+            clusterRadius={44}
+            clusterMaxZoomLevel={15}
+            onPress={handleMembersPress}
+          >
+            <CircleLayer
+              id="caravana-member-groups"
+              filter={['has', 'point_count']}
+              style={{
+                circleColor: '#0b1422',
+                circleOpacity: 0.92,
+                circleRadius: ['step', ['get', 'point_count'], 16, 10, 19, 50, 23, 200, 28],
+                circleStrokeColor: '#ffffff',
+                circleStrokeWidth: 2,
+              }}
+            />
+            <SymbolLayer
+              id="caravana-member-group-count"
+              filter={['has', 'point_count']}
+              style={{
+                textField: ['concat', '+', ['get', 'point_count_abbreviated']],
+                textFont: MEMBER_FONT,
+                textSize: 13,
+                textColor: '#ffffff',
+                textAllowOverlap: true,
+              }}
+            />
+            <CircleLayer
+              id="caravana-member-dots"
+              filter={['!', ['has', 'point_count']]}
+              style={{
+                circleColor: ['get', 'color'],
+                circleRadius: 13,
+                circleStrokeColor: '#ffffff',
+                circleStrokeWidth: 2,
+              }}
+            />
+            <SymbolLayer
+              id="caravana-member-labels"
+              filter={['!', ['has', 'point_count']]}
+              style={{
+                textField: ['get', 'initials'],
+                textFont: MEMBER_FONT,
+                textSize: 11,
+                textColor: '#0B0F14',
+                textAllowOverlap: true,
+              }}
+            />
+          </ShapeSource>
+        ) : null}
+
+        {crowd ? null : members.map((member) => (
           <MarkerView
             key={member.id}
             coordinate={[member.longitude, member.latitude]}

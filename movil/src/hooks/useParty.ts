@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
+import { applyMemberPatches, queueMemberPatch, type MemberPatch } from '@/src/lib/party-patch';
 import { isDemoMode } from '@/src/lib/demo';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
@@ -15,6 +16,9 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
 export type PartyRole = 'host' | 'member' | 'sweeper';
+
+// Cada cuánto se aplican las posiciones acumuladas de la party.
+const MEMBER_FLUSH_MS = 1_000;
 
 export type PartyMemberView = {
   userId: string;
@@ -182,35 +186,29 @@ export function useActiveParty() {
     },
   });
 
+  const partyId = query.data?.id ?? null;
+
   useEffect(() => {
     if (demo || !supabase || !account) return;
     const client = supabase;
     const cacheKey = ['party', account.id, 'supabase'];
 
-    // Refrescar toda la party en cada latido (cada 5 s por miembro) era caro.
-    // Ahora los UPDATE parchean la caché y solo se recarga si cambia la
-    // estructura (altas, bajas o cambio de party).
-    const patchMembers = (row: Partial<PartyMemberRow>) => {
-      if (!row.user_id) return;
+    // Los UPDATE parchean la caché y solo se recarga si cambia la estructura
+    // (altas, bajas o cambio de party). Con parties grandes llegan decenas de
+    // posiciones por segundo: se acumulan y se aplican juntas cada segundo,
+    // con un solo repintado.
+    const queue = new Map<string, MemberPatch>();
+    const flush = () => {
+      if (queue.size === 0) return;
+      const pending = new Map(queue);
+      queue.clear();
       queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
         if (!current) return current;
-        let found = false;
-        const members = current.members.map((member) => {
-          if (member.userId !== row.user_id) return member;
-          found = true;
-          return {
-            ...member,
-            lastLat: row.last_lat !== undefined ? row.last_lat : member.lastLat,
-            lastLng: row.last_lng !== undefined ? row.last_lng : member.lastLng,
-            lastSeenAt: row.last_seen_at !== undefined ? row.last_seen_at : member.lastSeenAt,
-            isMuted: row.is_muted !== undefined ? row.is_muted : member.isMuted,
-            voiceChannelSlug:
-              row.voice_channel_slug !== undefined ? row.voice_channel_slug : member.voiceChannelSlug,
-          };
-        });
-        return found ? { ...current, members } : current;
+        const members = applyMemberPatches(current.members, pending);
+        return members === current.members ? current : { ...current, members };
       });
     };
+    const timer = setInterval(flush, MEMBER_FLUSH_MS);
 
     const patchParty = (row: Partial<PartyRow>) => {
       queryClient.setQueryData<PartyView | null>(cacheKey, (current) => {
@@ -229,36 +227,47 @@ export function useActiveParty() {
       });
     };
 
-    const channel = client
-      .channel(`party-live-${account.id}-${channelId}`)
-      .on(
+    const refetch = () => void queryClient.invalidateQueries({ queryKey: ['party'] });
+    // Solo los cambios de TU party (antes llegaban los de todas las parties
+    // del sistema a cada teléfono). Sin party, solo tus propias altas.
+    const channel = client.channel(`party-live-${account.id}-${channelId}`);
+    if (partyId) {
+      channel
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'parties', filter: `id=eq.${partyId}` },
+          (payload) => {
+            if (payload.eventType === 'UPDATE') patchParty(payload.new as Partial<PartyRow>);
+            else refetch();
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'party_members', filter: `party_id=eq.${partyId}` },
+          (payload) => {
+            if (payload.eventType === 'UPDATE') {
+              const row = payload.new as Partial<PartyMemberRow>;
+              if (row.user_id) queueMemberPatch(queue, row as MemberPatch);
+            } else {
+              refetch();
+            }
+          },
+        );
+    } else {
+      channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'parties' },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            patchParty(payload.new as Partial<PartyRow>);
-          } else {
-            void queryClient.invalidateQueries({ queryKey: ['party'] });
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'party_members' },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            patchMembers(payload.new as Partial<PartyMemberRow>);
-          } else {
-            void queryClient.invalidateQueries({ queryKey: ['party'] });
-          }
-        },
-      )
-      .subscribe();
+        { event: '*', schema: 'public', table: 'party_members', filter: `user_id=eq.${account.id}` },
+        refetch,
+      );
+    }
+    channel.subscribe();
 
     return () => {
+      clearInterval(timer);
+      flush();
       void supabase?.removeChannel(channel);
     };
-  }, [account, demo, queryClient, channelId]);
+  }, [account, demo, queryClient, channelId, partyId]);
 
   return {
     party: demo ? null : query.data ?? null,

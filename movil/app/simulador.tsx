@@ -87,6 +87,12 @@ export default function SimulatorScreen() {
     toMap();
   };
 
+  const bigParty = () => {
+    ensureStarted();
+    setSimParty(true, 1000);
+    router.replace('/party');
+  };
+
   const traffic = (withSensor: boolean) => {
     ensureStarted();
     useParking.getState().clearSpot();
@@ -177,6 +183,12 @@ export default function SimulatorScreen() {
           title="Atasco (solo GPS)"
           detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
           onPress={() => traffic(false)}
+        />
+        <Test
+          icon="people-circle-outline"
+          title="Party de 1.000 personas"
+          detail="Prueba de carga: 1.000 conductores moviéndose a tu alrededor en el mapa y en la lista de la party."
+          onPress={bigParty}
         />
         <View style={styles.partyRow}>
           <View style={styles.testIcon}>

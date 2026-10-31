@@ -1,0 +1,57 @@
+// Cambios de miembros de la party que llegan por tiempo real (posición,
+// silencio, canal de voz). Con parties grandes llegan decenas por segundo:
+// se acumulan y se aplican juntos una vez por segundo, en una sola pasada.
+
+export type MemberPatch = {
+  user_id: string;
+  last_lat?: number | null;
+  last_lng?: number | null;
+  last_seen_at?: string | null;
+  is_muted?: boolean;
+  voice_channel_slug?: string;
+};
+
+type PatchableMember = {
+  userId: string;
+  lastLat: number | null;
+  lastLng: number | null;
+  lastSeenAt: string | null;
+  isMuted: boolean;
+  voiceChannelSlug: string;
+};
+
+// Junta un cambio nuevo con los pendientes del mismo usuario (gana el último
+// valor de cada campo).
+export function queueMemberPatch(queue: Map<string, MemberPatch>, row: MemberPatch) {
+  const previous = queue.get(row.user_id);
+  const merged: MemberPatch = { ...previous, user_id: row.user_id };
+  for (const key of Object.keys(row) as (keyof MemberPatch)[]) {
+    if (row[key] !== undefined) (merged as Record<string, unknown>)[key] = row[key];
+  }
+  queue.set(row.user_id, merged);
+}
+
+// Aplica todos los cambios pendientes. Devuelve la misma lista si ninguno
+// corresponde a un miembro (no hay que repintar).
+export function applyMemberPatches<T extends PatchableMember>(
+  members: T[],
+  queue: Map<string, MemberPatch>,
+): T[] {
+  if (queue.size === 0) return members;
+  let changed = false;
+  const next = members.map((member) => {
+    const row = queue.get(member.userId);
+    if (!row) return member;
+    changed = true;
+    return {
+      ...member,
+      lastLat: row.last_lat !== undefined ? row.last_lat : member.lastLat,
+      lastLng: row.last_lng !== undefined ? row.last_lng : member.lastLng,
+      lastSeenAt: row.last_seen_at !== undefined ? row.last_seen_at : member.lastSeenAt,
+      isMuted: row.is_muted !== undefined ? row.is_muted : member.isMuted,
+      voiceChannelSlug:
+        row.voice_channel_slug !== undefined ? row.voice_channel_slug : member.voiceChannelSlug,
+    };
+  });
+  return changed ? next : members;
+}

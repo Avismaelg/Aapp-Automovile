@@ -69,6 +69,16 @@ export default function PartyScreen() {
   const [recenterToken, setRecenterToken] = useState(0);
 
   const displayMembers = useMemo<DisplayMember[]>(() => {
+    // Prueba de carga del simulador: la party enorme.
+    if (simParty && simMembers.length > partyMembers.length) {
+      return simMembers.map((member) => ({
+        id: member.id,
+        name: member.name,
+        username: member.id,
+        color: member.color,
+        isTalking: member.isTalking,
+      }));
+    }
     if (isDemo) {
       return partyMembers.map((member, index) => ({
         ...member,
@@ -92,6 +102,8 @@ export default function PartyScreen() {
   }, [
     currentUser.username,
     isDemo,
+    simParty,
+    simMembers,
     party,
     voice.activeSpeakerIds,
     voice.talking,

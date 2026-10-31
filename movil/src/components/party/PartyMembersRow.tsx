@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar } from '@/src/components/ui';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
@@ -26,15 +26,20 @@ export function PartyMembersRow({
   onChallenge: (member: DisplayMember) => void;
   onInvite: () => void;
 }) {
+  // Lista virtualizada: en parties grandes solo se pintan los visibles.
   return (
-    <ScrollView
+    <FlatList
       horizontal
+      data={members}
+      keyExtractor={(member) => member.id}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.memberRow}
-    >
-      {members.map((member) => (
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={5}
+      ItemSeparatorComponent={Separator}
+      renderItem={({ item: member }) => (
         <Pressable
-          key={member.id}
           onPress={() => onChallenge(member)}
           disabled={member.isMe}
           style={({ pressed }) => [styles.member, pressed && { opacity: 0.75 }]}
@@ -61,16 +66,28 @@ export function PartyMembersRow({
             </AppText>
           </View>
         </Pressable>
-      ))}
-      <Pressable style={styles.addMember} onPress={onInvite}>
-        <Ionicons name="add" size={20} color={colors.muted} />
-      </Pressable>
-    </ScrollView>
+      )}
+      ListFooterComponent={
+        <Pressable
+          style={styles.addMember}
+          onPress={onInvite}
+          accessibilityRole="button"
+          accessibilityLabel="Invitar"
+        >
+          <Ionicons name="add" size={20} color={colors.muted} />
+        </Pressable>
+      }
+    />
   );
 }
 
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
 const styles = StyleSheet.create({
-  memberRow: { gap: 8, paddingVertical: spacing.md, paddingRight: spacing.lg },
+  memberRow: { paddingVertical: spacing.md, paddingRight: spacing.lg },
+  separator: { width: 8 },
   member: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,6 +101,7 @@ const styles = StyleSheet.create({
     minWidth: 118,
   },
   addMember: {
+    marginLeft: 8,
     width: 40,
     height: 40,
     borderRadius: 20,
