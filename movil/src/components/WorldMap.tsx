@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
   Camera,
   CircleLayer,
@@ -11,23 +11,33 @@ import Mapbox, {
   ShapeSource,
   SymbolLayer,
   UserTrackingMode,
-} from '@rnmapbox/maps';
-import * as Location from 'expo-location';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, findNodeHandle, Platform, Pressable, type StyleProp, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from 'react-native';
+} from "@rnmapbox/maps";
+import * as Location from "expo-location";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AppState,
+  findNodeHandle,
+  Platform,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from "react-native";
 
-import { addModel, resetPuck, setModelPuck } from '@/modules/car-puck';
+import { addModel, resetPuck, setModelPuck } from "@/modules/car-puck";
 
-import { useCarModel } from '@/src/hooks/useCarModel';
-import { useMapTheme } from '@/src/hooks/useMapTheme';
-import { useSimulator } from '@/src/lib/simulator';
-import { navCamera } from '@/src/lib/nav-camera';
+import { useCarModel } from "@/src/hooks/useCarModel";
+import { useMapTheme } from "@/src/hooks/useMapTheme";
+import { useSimulator } from "@/src/lib/simulator";
+import { navCamera } from "@/src/lib/nav-camera";
 import {
   MAP_FALLBACK_STYLES,
   MAPBOX_ACCESS_TOKEN,
   NATIVE_LABEL_LAYER,
   NATIVE_MAP_STYLES,
-} from '@/src/lib/map/config';
+} from "@/src/lib/map/config";
 import type {
   WorldMapAlternative,
   WorldMapDestination,
@@ -37,9 +47,14 @@ import type {
   WorldMapRoute,
   WorldMapTravelMode,
   WorldMapVehicleKind,
-} from '@/src/lib/map-html';
-import { cumulativeDistances, metersBetween, nextInstruction, routeProgress } from '@/src/lib/route-instructions';
-import { colors } from '@/src/theme';
+} from "@/src/lib/map-html";
+import {
+  cumulativeDistances,
+  metersBetween,
+  nextInstruction,
+  routeProgress,
+} from "@/src/lib/route-instructions";
+import { colors } from "@/src/theme";
 
 // Mapa nativo (Mapbox Maps SDK v11 vía @rnmapbox/maps): la cámara de
 // seguimiento y el indicador de posición los anima el motor nativo a 60 fps.
@@ -47,40 +62,59 @@ import { colors } from '@/src/theme';
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN || null);
 
 const NO_ALTERNATIVES: WorldMapAlternative[] = [];
-// Hasta aquí cada amigo es un marcador nativo (bonito, pero una vista por
-// persona). Con más, se dibujan todos en una capa de la GPU y se agrupan.
-const MEMBER_MARKER_LIMIT = 25;
-const MEMBER_FONT = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
-const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
-const OPENFREEMAP_LABEL_LAYER = { day: 'waterway_line_label', night: 'place_other' };
+// Los amigos se dibujan en capas del propio mapa (GPU): aguantan cientos sin
+// trabas y quedan por debajo de los textos y botones de la pantalla (los
+// marcadores nativos se pintaban encima). Juntos se agrupan en «+N».
+const MEMBER_FONT = ["DIN Pro Medium", "Arial Unicode MS Regular"];
+const EMPTY: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
+const OPENFREEMAP_LABEL_LAYER = {
+  day: "waterway_line_label",
+  night: "place_other",
+};
 // Halo del punto azul (a pie o sin coche 3D).
-const PUCK_PULSING = { isEnabled: true, color: '#3d9bff', radius: 'accuracy' } as const;
-const NO_PADDING = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 };
+const PUCK_PULSING = {
+  isEnabled: true,
+  color: "#3d9bff",
+  radius: "accuracy",
+} as const;
+const NO_PADDING = {
+  paddingTop: 0,
+  paddingRight: 0,
+  paddingBottom: 0,
+  paddingLeft: 0,
+};
 // Capas de tráfico del estilo de navegación de Mapbox. Por defecto pintan de
 // verde las calles sin atasco; aquí solo se colorean las retenciones, como
 // en Google Maps.
 const TRAFFIC_LAYERS = [
-  'traffic-tunnel-link-navigation',
-  'traffic-tunnel-minor-navigation',
-  'traffic-tunnel-street-navigation',
-  'traffic-tunnel-secondary-tertiary-navigation',
-  'traffic-tunnel-primary-navigation',
-  'traffic-tunnel-major-link-navigation',
-  'traffic-tunnel-motorway-trunk-navigation',
-  'traffic-bridge-road-link-navigation',
-  'traffic-bridge-road-minor-navigation',
-  'traffic-bridge-road-street-navigation',
-  'traffic-bridge-road-secondary-tertiary-navigation',
-  'traffic-bridge-road-primary-navigation',
-  'traffic-bridge-road-major-link-navigation',
-  'traffic-bridge-road-motorway-trunk-navigation',
+  "traffic-tunnel-link-navigation",
+  "traffic-tunnel-minor-navigation",
+  "traffic-tunnel-street-navigation",
+  "traffic-tunnel-secondary-tertiary-navigation",
+  "traffic-tunnel-primary-navigation",
+  "traffic-tunnel-major-link-navigation",
+  "traffic-tunnel-motorway-trunk-navigation",
+  "traffic-bridge-road-link-navigation",
+  "traffic-bridge-road-minor-navigation",
+  "traffic-bridge-road-street-navigation",
+  "traffic-bridge-road-secondary-tertiary-navigation",
+  "traffic-bridge-road-primary-navigation",
+  "traffic-bridge-road-major-link-navigation",
+  "traffic-bridge-road-motorway-trunk-navigation",
 ];
 const TRAFFIC_COLOR: unknown = [
-  'match', ['get', 'congestion'],
-  'moderate', '#f59e0b',
-  'heavy', '#ef4444',
-  'severe', '#991b1b',
-  'rgba(0,0,0,0)',
+  "match",
+  ["get", "congestion"],
+  "moderate",
+  "#f59e0b",
+  "heavy",
+  "#ef4444",
+  "severe",
+  "#991b1b",
+  "rgba(0,0,0,0)",
 ];
 
 // Coche 3D como indicador de posición (Android): tamaño fijo en pantalla
@@ -91,24 +125,41 @@ const PUCK_ROTATION = 270;
 // cualquier zoom, la escala se duplica por cada nivel que te alejas. Va por
 // escalones de medio nivel porque Mapbox no interpola listas.
 const PARKED_SCALE: unknown = [
-  'step', ['zoom'],
-  ['literal', [184.0, 184.0, 184.0]],
-  12.5, ['literal', [130.11, 130.11, 130.11]],
-  13, ['literal', [92.0, 92.0, 92.0]],
-  13.5, ['literal', [65.05, 65.05, 65.05]],
-  14, ['literal', [46.0, 46.0, 46.0]],
-  14.5, ['literal', [32.53, 32.53, 32.53]],
-  15, ['literal', [23.0, 23.0, 23.0]],
-  15.5, ['literal', [16.26, 16.26, 16.26]],
-  16, ['literal', [11.5, 11.5, 11.5]],
-  16.5, ['literal', [8.13, 8.13, 8.13]],
-  17, ['literal', [5.75, 5.75, 5.75]],
-  17.5, ['literal', [4.07, 4.07, 4.07]],
-  18, ['literal', [2.88, 2.88, 2.88]],
-  18.5, ['literal', [2.03, 2.03, 2.03]],
-  19, ['literal', [1.44, 1.44, 1.44]],
-  19.5, ['literal', [1.02, 1.02, 1.02]],
-  20, ['literal', [0.72, 0.72, 0.72]],
+  "step",
+  ["zoom"],
+  ["literal", [184.0, 184.0, 184.0]],
+  12.5,
+  ["literal", [130.11, 130.11, 130.11]],
+  13,
+  ["literal", [92.0, 92.0, 92.0]],
+  13.5,
+  ["literal", [65.05, 65.05, 65.05]],
+  14,
+  ["literal", [46.0, 46.0, 46.0]],
+  14.5,
+  ["literal", [32.53, 32.53, 32.53]],
+  15,
+  ["literal", [23.0, 23.0, 23.0]],
+  15.5,
+  ["literal", [16.26, 16.26, 16.26]],
+  16,
+  ["literal", [11.5, 11.5, 11.5]],
+  16.5,
+  ["literal", [8.13, 8.13, 8.13]],
+  17,
+  ["literal", [5.75, 5.75, 5.75]],
+  17.5,
+  ["literal", [4.07, 4.07, 4.07]],
+  18,
+  ["literal", [2.88, 2.88, 2.88]],
+  18.5,
+  ["literal", [2.03, 2.03, 2.03]],
+  19,
+  ["literal", [1.44, 1.44, 1.44]],
+  19.5,
+  ["literal", [1.02, 1.02, 1.02]],
+  20,
+  ["literal", [0.72, 0.72, 0.72]],
 ];
 
 type WorldMapProps = {
@@ -145,21 +196,24 @@ function toLngLat(point: [number, number]): [number, number] {
   return [point[1], point[0]];
 }
 
-function line(coordinates: [number, number][], properties: GeoJSON.GeoJsonProperties = {}): GeoJSON.Feature {
+function line(
+  coordinates: [number, number][],
+  properties: GeoJSON.GeoJsonProperties = {},
+): GeoJSON.Feature {
   return {
-    type: 'Feature',
+    type: "Feature",
     properties,
-    geometry: { type: 'LineString', coordinates: coordinates.map(toLngLat) },
+    geometry: { type: "LineString", coordinates: coordinates.map(toLngLat) },
   };
 }
 
 function initials(name: string) {
   return name
-    .split(' ')
+    .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.charAt(0))
-    .join('')
+    .join("")
     .toUpperCase();
 }
 
@@ -207,13 +261,13 @@ export const WorldMap = memo(function WorldMap({
   destination = null,
   location,
   parking = null,
-  travelMode = 'car',
+  travelMode = "car",
   northUp = false,
   fitRoute = null,
   autoFollow = true,
   route = null,
   alternatives = NO_ALTERNATIVES,
-  vehicleColor = '#ff5a1f',
+  vehicleColor = "#ff5a1f",
   recenterToken = 0,
   ornamentBottom = 4,
   drivingLine = null,
@@ -230,18 +284,28 @@ export const WorldMap = memo(function WorldMap({
   // Un id por color: Mapbox no recarga un modelo ya registrado con el mismo id.
   // Sale del archivo (que lleva el color), no del color pedido: el archivo
   // nuevo llega un momento después.
-  const carModelId = `caravana-${(carModel ?? 'car').split('/').pop()}`;
+  const carModelId = `caravana-${(carModel ?? "car").split("/").pop()}`;
   const simulating = useSimulator((state) => state.active);
   const theme = useMapTheme(location);
   const hasPermission = useLocationPermission();
   const [styleFailed, setStyleFailed] = useState(false);
   const [userFollowing, setFollowing] = useState(autoFollow);
-  const callbacksRef = useRef({ onFollowChange, onMemberPress, onAlternativePress, onError });
-  const walking = travelMode === 'walking';
+  const callbacksRef = useRef({
+    onFollowChange,
+    onMemberPress,
+    onAlternativePress,
+    onError,
+  });
+  const walking = travelMode === "walking";
   const following = autoFollow && userFollowing;
 
   useEffect(() => {
-    callbacksRef.current = { onFollowChange, onMemberPress, onAlternativePress, onError };
+    callbacksRef.current = {
+      onFollowChange,
+      onMemberPress,
+      onAlternativePress,
+      onError,
+    };
   }, [onFollowChange, onMemberPress, onAlternativePress, onError]);
 
   const followingRef = useRef(autoFollow);
@@ -275,7 +339,7 @@ export const WorldMap = memo(function WorldMap({
       centerCoordinate: [focus.longitude, focus.latitude],
       zoomLevel: 17.5,
       heading: 0,
-      animationMode: 'flyTo',
+      animationMode: "flyTo",
       animationDuration: 1200,
     });
     // Solo al pedirlo (token), no cuando cambian las coordenadas.
@@ -283,7 +347,7 @@ export const WorldMap = memo(function WorldMap({
   }, [focus?.token, changeFollowing]);
 
   // Sin permiso de GPS (o en la demo) se centra en la posición que da la app.
-  const lastCenteredRef = useRef('');
+  const lastCenteredRef = useRef("");
   useEffect(() => {
     if (!following || hasPermission) return;
     const key = `${location.latitude.toFixed(5)}|${location.longitude.toFixed(5)}`;
@@ -291,17 +355,23 @@ export const WorldMap = memo(function WorldMap({
     lastCenteredRef.current = key;
     cameraRef.current?.setCamera({
       centerCoordinate: [location.longitude, location.latitude],
-      animationMode: 'easeTo',
+      animationMode: "easeTo",
       animationDuration: 600,
     });
   }, [following, hasPermission, location.latitude, location.longitude]);
 
   const cumulative = useMemo(
-    () => (route && route.coordinates.length >= 2 ? cumulativeDistances(route.coordinates) : null),
+    () =>
+      route && route.coordinates.length >= 2
+        ? cumulativeDistances(route.coordinates)
+        : null,
     [route],
   );
   const progress = useMemo(
-    () => (route && cumulative ? routeProgress(route.coordinates, cumulative, location) : null),
+    () =>
+      route && cumulative
+        ? routeProgress(route.coordinates, cumulative, location)
+        : null,
     [route, cumulative, location],
   );
   const nearestIndex = progress?.nearestIndex ?? 0;
@@ -310,15 +380,18 @@ export const WorldMap = memo(function WorldMap({
   const routeData = useMemo<GeoJSON.FeatureCollection>(() => {
     if (!route || route.coordinates.length < 2) return EMPTY;
     const features: GeoJSON.Feature[] = [];
-    if (nearestIndex > 0) features.push(line(route.coordinates.slice(0, nearestIndex + 1), { segment: 'past' }));
+    if (nearestIndex > 0)
+      features.push(
+        line(route.coordinates.slice(0, nearestIndex + 1), { segment: "past" }),
+      );
     const ahead = route.coordinates.slice(nearestIndex);
-    if (ahead.length >= 2) features.push(line(ahead, { segment: 'ahead' }));
-    return { type: 'FeatureCollection', features };
+    if (ahead.length >= 2) features.push(line(ahead, { segment: "ahead" }));
+    return { type: "FeatureCollection", features };
   }, [route, nearestIndex]);
 
   const alternativesData = useMemo<GeoJSON.FeatureCollection>(
     () => ({
-      type: 'FeatureCollection',
+      type: "FeatureCollection",
       features: alternatives
         .filter((item) => item.coordinates.length >= 2)
         .map((item) => line(item.coordinates, { index: item.index })),
@@ -328,29 +401,50 @@ export const WorldMap = memo(function WorldMap({
 
   // Punto de la próxima maniobra (un círculo blanco sobre la ruta).
   const upcoming = useMemo(
-    () => (route && progress ? nextInstruction(route.instructions, progress.progressM) : null),
+    () =>
+      route && progress
+        ? nextInstruction(route.instructions, progress.progressM)
+        : null,
     [route, progress],
   );
   const maneuverData = useMemo<GeoJSON.FeatureCollection>(() => {
     if (!route || !cumulative || !upcoming) return EMPTY;
-    if (upcoming.icon === 'depart' || upcoming.icon === 'straight') return EMPTY;
-    const index = cumulative.findIndex((value) => value >= upcoming.atDistanceM);
-    const point = route.coordinates[index < 0 ? route.coordinates.length - 1 : index];
+    if (upcoming.icon === "depart" || upcoming.icon === "straight")
+      return EMPTY;
+    const index = cumulative.findIndex(
+      (value) => value >= upcoming.atDistanceM,
+    );
+    const point =
+      route.coordinates[index < 0 ? route.coordinates.length - 1 : index];
     return {
-      type: 'FeatureCollection',
-      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: toLngLat(point) } }],
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: toLngLat(point) },
+        },
+      ],
     };
   }, [route, cumulative, upcoming]);
 
-  const parkingDistance = parking ? Math.round(metersBetween(location, parking)) : null;
-  const parkingKey = parking && parkingDistance != null && parkingDistance > 40
-    ? `${parking.latitude}|${parking.longitude}|${Math.round(location.latitude * 5000)}|${Math.round(location.longitude * 5000)}`
-    : '';
+  const parkingDistance = parking
+    ? Math.round(metersBetween(location, parking))
+    : null;
+  const parkingKey =
+    parking && parkingDistance != null && parkingDistance > 40
+      ? `${parking.latitude}|${parking.longitude}|${Math.round(location.latitude * 5000)}|${Math.round(location.longitude * 5000)}`
+      : "";
   const parkingLineData = useMemo<GeoJSON.FeatureCollection>(() => {
     if (!parkingKey || !parking) return EMPTY;
     return {
-      type: 'FeatureCollection',
-      features: [line([[location.latitude, location.longitude], [parking.latitude, parking.longitude]])],
+      type: "FeatureCollection",
+      features: [
+        line([
+          [location.latitude, location.longitude],
+          [parking.latitude, parking.longitude],
+        ]),
+      ],
     };
     // La línea se rehace al moverse ~20 m (parkingKey), no con cada señal.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -383,7 +477,8 @@ export const WorldMap = memo(function WorldMap({
   // Cambia el punto azul por el coche 3D. Mapbox recrea su indicador al
   // cargar un estilo, así que se vuelve a aplicar en cada carga.
   const [styleLoads, setStyleLoads] = useState(0);
-  const useCarPuck = Platform.OS === 'android' && !walking && hasPermission && carModel != null;
+  const useCarPuck =
+    Platform.OS === "android" && !walking && hasPermission && carModel != null;
   // Si el coche 3D no se pudo poner se reintenta cada 3 s y al volver la app
   // a primer plano (en segundo plano el mapa no está en pantalla y falla).
   // No se monta el punto de rnmapbox como respaldo: al desmontarse apaga el
@@ -391,13 +486,13 @@ export const WorldMap = memo(function WorldMap({
   const [retryTick, setRetryTick] = useState(0);
   const puckIsModelRef = useRef(false);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setRetryTick((tick) => tick + 1);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") setRetryTick((tick) => tick + 1);
     });
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-    if (Platform.OS !== 'android' || !carModel || styleLoads === 0) return;
+    if (Platform.OS !== "android" || !carModel || styleLoads === 0) return;
     let retry: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
       const tag = findNodeHandle(mapRef.current);
@@ -405,10 +500,13 @@ export const WorldMap = memo(function WorldMap({
       // El modelo del coche aparcado se registra en cada estilo cargado.
       void addModel(tag, carModelId, carModel);
       if (useCarPuck) {
-        void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then((applied) => {
-          puckIsModelRef.current = applied;
-          if (!applied) retry = setTimeout(() => setRetryTick((tick) => tick + 1), 3_000);
-        });
+        void setModelPuck(tag, carModel, PUCK_SCALE, PUCK_ROTATION).then(
+          (applied) => {
+            puckIsModelRef.current = applied;
+            if (!applied)
+              retry = setTimeout(() => setRetryTick((tick) => tick + 1), 3_000);
+          },
+        );
       } else if (puckIsModelRef.current) {
         // A pie: el coche se queda aparcado y tú vuelves a ser el punto azul.
         void resetPuck(tag).then((reset) => {
@@ -421,7 +519,10 @@ export const WorldMap = memo(function WorldMap({
       if (retry) clearTimeout(retry);
     };
   }, [useCarPuck, carModel, carModelId, styleLoads, retryTick]);
-  const handleStyleLoaded = useCallback(() => setStyleLoads((count) => count + 1), []);
+  const handleStyleLoaded = useCallback(
+    () => setStyleLoads((count) => count + 1),
+    [],
+  );
 
   const handleTrackingChange = useCallback(
     (event: { nativeEvent: { payload: { followUserLocation: boolean } } }) => {
@@ -431,29 +532,37 @@ export const WorldMap = memo(function WorldMap({
     [changeFollowing],
   );
 
-  const handleAlternativePress = useCallback((event: { features: GeoJSON.Feature[] }) => {
-    const index = event.features[0]?.properties?.index;
-    if (typeof index === 'number') callbacksRef.current.onAlternativePress?.(index);
-  }, []);
+  const handleAlternativePress = useCallback(
+    (event: { features: GeoJSON.Feature[] }) => {
+      const index = event.features[0]?.properties?.index;
+      if (typeof index === "number")
+        callbacksRef.current.onAlternativePress?.(index);
+    },
+    [],
+  );
 
-  const crowd = members.length > MEMBER_MARKER_LIMIT;
+  const hasMembers = members.length > 0;
   const membersData = useMemo<GeoJSON.FeatureCollection>(() => {
-    if (!crowd) return EMPTY;
+    if (!hasMembers) return EMPTY;
     return {
-      type: 'FeatureCollection',
+      type: "FeatureCollection",
       features: members.map((member) => ({
-        type: 'Feature',
+        type: "Feature",
         id: member.id,
         properties: {
           id: member.id,
           color: member.color,
           initials: initials(member.name),
-          name: member.name.split(' ')[0],
+          name: member.name.split(" ")[0],
+          talking: Boolean(member.isTalking),
         },
-        geometry: { type: 'Point', coordinates: [member.longitude, member.latitude] },
+        geometry: {
+          type: "Point",
+          coordinates: [member.longitude, member.latitude],
+        },
       })),
     };
-  }, [crowd, members]);
+  }, [hasMembers, members]);
 
   // Tocar un amigo abre su ficha; tocar un grupo acerca el mapa.
   const handleMembersPress = useCallback(
@@ -461,11 +570,11 @@ export const WorldMap = memo(function WorldMap({
       const feature = event.features[0];
       if (!feature) return;
       const id = feature.properties?.id;
-      if (typeof id === 'string') {
+      if (typeof id === "string") {
         callbacksRef.current.onMemberPress?.(id);
         return;
       }
-      if (feature.geometry.type !== 'Point') return;
+      if (feature.geometry.type !== "Point") return;
       const center = feature.geometry.coordinates as [number, number];
       changeFollowing(false);
       void (async () => {
@@ -473,7 +582,7 @@ export const WorldMap = memo(function WorldMap({
         cameraRef.current?.setCamera({
           centerCoordinate: center,
           zoomLevel: Math.min(18, zoom + 2),
-          animationMode: 'easeTo',
+          animationMode: "easeTo",
           animationDuration: 500,
         });
       })();
@@ -483,18 +592,31 @@ export const WorldMap = memo(function WorldMap({
 
   const handleStyleError = useCallback(() => {
     setStyleFailed((failed) => {
-      if (!failed) callbacksRef.current.onError?.('No pudimos cargar el mapa. Probamos con el mapa de respaldo.');
+      if (!failed)
+        callbacksRef.current.onError?.(
+          "No pudimos cargar el mapa. Probamos con el mapa de respaldo.",
+        );
       return true;
     });
   }, []);
 
   const usingMapbox = Boolean(MAPBOX_ACCESS_TOKEN) && !styleFailed;
-  const styleURL = (styleFailed ? MAP_FALLBACK_STYLES : NATIVE_MAP_STYLES)[theme];
-  const belowLayerID = (styleFailed ? OPENFREEMAP_LABEL_LAYER : NATIVE_LABEL_LAYER)[theme];
-  const night = theme === 'night';
+  const styleURL = (styleFailed ? MAP_FALLBACK_STYLES : NATIVE_MAP_STYLES)[
+    theme
+  ];
+  const belowLayerID = (
+    styleFailed ? OPENFREEMAP_LABEL_LAYER : NATIVE_LABEL_LAYER
+  )[theme];
+  const night = theme === "night";
 
   return (
-    <View style={[styles.root, { backgroundColor: night ? '#0b0f14' : '#e9edf1' }, style]}>
+    <View
+      style={[
+        styles.root,
+        { backgroundColor: night ? "#0b0f14" : "#e9edf1" },
+        style,
+      ]}
+    >
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -509,9 +631,16 @@ export const WorldMap = memo(function WorldMap({
       >
         <Camera
           ref={cameraRef}
-          defaultSettings={{ centerCoordinate: [location.longitude, location.latitude], zoomLevel: 15 }}
+          defaultSettings={{
+            centerCoordinate: [location.longitude, location.latitude],
+            zoomLevel: 15,
+          }}
           followUserLocation={tracking}
-          followUserMode={headingUp ? UserTrackingMode.FollowWithCourse : UserTrackingMode.Follow}
+          followUserMode={
+            headingUp
+              ? UserTrackingMode.FollowWithCourse
+              : UserTrackingMode.Follow
+          }
           followZoomLevel={camera.zoom}
           followPitch={camera.pitch}
           followHeading={headingUp ? undefined : 0}
@@ -519,25 +648,53 @@ export const WorldMap = memo(function WorldMap({
           onUserTrackingModeChange={handleTrackingChange}
         />
 
-        <ShapeSource id="caravana-alternatives" shape={alternativesData} onPress={handleAlternativePress}>
+        <ShapeSource
+          id="caravana-alternatives"
+          shape={alternativesData}
+          onPress={handleAlternativePress}
+        >
           <LineLayer
             id="caravana-alt-casing"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'round',
-              lineJoin: 'round',
-              lineColor: '#6f7f93',
-              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 6, 14, 9, 16, 13, 18, 19],
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: "#6f7f93",
+              lineWidth: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                11,
+                6,
+                14,
+                9,
+                16,
+                13,
+                18,
+                19,
+              ],
             }}
           />
           <LineLayer
             id="caravana-alt-line"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'round',
-              lineJoin: 'round',
-              lineColor: '#b4c2d3',
-              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 6, 16, 9, 18, 14],
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: "#b4c2d3",
+              lineWidth: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                11,
+                4,
+                14,
+                6,
+                16,
+                9,
+                18,
+                14,
+              ],
             }}
           />
         </ShapeSource>
@@ -547,21 +704,55 @@ export const WorldMap = memo(function WorldMap({
             id="caravana-route-casing"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'round',
-              lineJoin: 'round',
-              lineColor: ['case', ['==', ['get', 'segment'], 'past'], '#8a96a4', '#1458b8'],
-              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 8, 14, 12, 16, 17, 18, 24],
-              lineOpacity: ['case', ['==', ['get', 'segment'], 'past'], 0.6, 1],
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: [
+                "case",
+                ["==", ["get", "segment"], "past"],
+                "#8a96a4",
+                "#1458b8",
+              ],
+              lineWidth: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                11,
+                8,
+                14,
+                12,
+                16,
+                17,
+                18,
+                24,
+              ],
+              lineOpacity: ["case", ["==", ["get", "segment"], "past"], 0.6, 1],
             }}
           />
           <LineLayer
             id="caravana-route-line"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'round',
-              lineJoin: 'round',
-              lineColor: ['case', ['==', ['get', 'segment'], 'past'], '#c3cbd4', '#3d9bff'],
-              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 5.5, 14, 8.5, 16, 12.5, 18, 18],
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: [
+                "case",
+                ["==", ["get", "segment"], "past"],
+                "#c3cbd4",
+                "#3d9bff",
+              ],
+              lineWidth: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                11,
+                5.5,
+                14,
+                8.5,
+                16,
+                12.5,
+                18,
+                18,
+              ],
             }}
           />
         </ShapeSource>
@@ -572,10 +763,28 @@ export const WorldMap = memo(function WorldMap({
             id="caravana-driving-line"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'butt',
-              lineJoin: 'round',
-              lineColor: ['match', ['get', 'level'], 'brake', '#ef4444', 'ease', '#facc15', '#38bdf8'],
-              lineWidth: ['interpolate', ['linear'], ['zoom'], 13, 4, 16, 9, 18, 14],
+              lineCap: "butt",
+              lineJoin: "round",
+              lineColor: [
+                "match",
+                ["get", "level"],
+                "brake",
+                "#ef4444",
+                "ease",
+                "#facc15",
+                "#38bdf8",
+              ],
+              lineWidth: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                13,
+                4,
+                16,
+                9,
+                18,
+                14,
+              ],
               lineDasharray: [1.4, 0.9],
               lineOpacity: 0.95,
             }}
@@ -586,9 +795,9 @@ export const WorldMap = memo(function WorldMap({
           <CircleLayer
             id="caravana-maneuver"
             style={{
-              circleRadius: ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 8],
-              circleColor: '#ffffff',
-              circleStrokeColor: '#1458b8',
+              circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 8],
+              circleColor: "#ffffff",
+              circleStrokeColor: "#1458b8",
               circleStrokeWidth: 3,
             }}
           />
@@ -599,9 +808,9 @@ export const WorldMap = memo(function WorldMap({
             id="caravana-parking-line"
             belowLayerID={belowLayerID}
             style={{
-              lineCap: 'round',
-              lineJoin: 'round',
-              lineColor: '#4de1ff',
+              lineCap: "round",
+              lineJoin: "round",
+              lineColor: "#4de1ff",
               lineWidth: 4,
               lineDasharray: [2, 2],
               lineOpacity: 0.9,
@@ -624,9 +833,12 @@ export const WorldMap = memo(function WorldMap({
           <ShapeSource
             id="caravana-parked-car"
             shape={{
-              type: 'Feature',
+              type: "Feature",
               properties: {},
-              geometry: { type: 'Point', coordinates: [parking.longitude, parking.latitude] },
+              geometry: {
+                type: "Point",
+                coordinates: [parking.longitude, parking.latitude],
+              },
             }}
           >
             <ModelLayer
@@ -650,87 +862,107 @@ export const WorldMap = memo(function WorldMap({
         ) : null}
 
         {hasPermission && !useCarPuck ? (
-          <LocationPuck puckBearingEnabled puckBearing={headingUp ? 'course' : 'heading'} pulsing={PUCK_PULSING} />
+          <LocationPuck
+            puckBearingEnabled
+            puckBearing={headingUp ? "course" : "heading"}
+            pulsing={PUCK_PULSING}
+          />
         ) : null}
 
-        {crowd ? (
-          <ShapeSource
-            id="caravana-members"
-            shape={membersData}
-            cluster
-            clusterRadius={44}
-            clusterMaxZoomLevel={15}
-            onPress={handleMembersPress}
-          >
-            <CircleLayer
-              id="caravana-member-groups"
-              filter={['has', 'point_count']}
-              style={{
-                circleColor: '#0b1422',
-                circleOpacity: 0.92,
-                circleRadius: ['step', ['get', 'point_count'], 16, 10, 19, 50, 23, 200, 28],
-                circleStrokeColor: '#ffffff',
-                circleStrokeWidth: 2,
-              }}
-            />
-            <SymbolLayer
-              id="caravana-member-group-count"
-              filter={['has', 'point_count']}
-              style={{
-                textField: ['concat', '+', ['get', 'point_count_abbreviated']],
-                textFont: MEMBER_FONT,
-                textSize: 13,
-                textColor: '#ffffff',
-                textAllowOverlap: true,
-              }}
-            />
-            <CircleLayer
-              id="caravana-member-dots"
-              filter={['!', ['has', 'point_count']]}
-              style={{
-                circleColor: ['get', 'color'],
-                circleRadius: 13,
-                circleStrokeColor: '#ffffff',
-                circleStrokeWidth: 2,
-              }}
-            />
-            <SymbolLayer
-              id="caravana-member-labels"
-              filter={['!', ['has', 'point_count']]}
-              style={{
-                textField: ['get', 'initials'],
-                textFont: MEMBER_FONT,
-                textSize: 11,
-                textColor: '#0B0F14',
-                textAllowOverlap: true,
-              }}
-            />
-          </ShapeSource>
-        ) : null}
-
-        {crowd ? null : members.map((member) => (
-          <MarkerView
-            key={member.id}
-            coordinate={[member.longitude, member.latitude]}
-            anchor={{ x: 0.5, y: 0.25 }}
-            allowOverlap
-          >
-            <Pressable style={styles.member} onPress={() => callbacksRef.current.onMemberPress?.(member.id)}>
-              <View
-                style={[
-                  styles.memberDot,
-                  { backgroundColor: member.color },
-                  member.isTalking ? styles.memberTalking : null,
-                ]}
-              >
-                <Text style={styles.memberInitials}>{initials(member.name)}</Text>
-              </View>
-              <Text style={[styles.memberName, night ? styles.memberNameNight : null]} numberOfLines={1}>
-                {member.name.split(' ')[0]}
-              </Text>
-            </Pressable>
-          </MarkerView>
-        ))}
+        {/* Siempre montada (vacía sin amigos): montar y desmontar fuentes
+            cambia su orden en el estilo. */}
+        <ShapeSource
+          id="caravana-members"
+          shape={membersData}
+          cluster
+          clusterRadius={44}
+          clusterMaxZoomLevel={15}
+          onPress={handleMembersPress}
+        >
+          <CircleLayer
+            id="caravana-member-groups"
+            filter={["has", "point_count"]}
+            style={{
+              circleColor: "#0b1422",
+              circleOpacity: 0.92,
+              circleRadius: [
+                "step",
+                ["to-number", ["get", "point_count"]],
+                16,
+                10,
+                19,
+                50,
+                23,
+                200,
+                28,
+              ],
+              circleStrokeColor: "#ffffff",
+              circleStrokeWidth: 2,
+            }}
+          />
+          <SymbolLayer
+            id="caravana-member-group-count"
+            filter={["has", "point_count"]}
+            style={{
+              textField: [
+                "concat",
+                "+",
+                ["to-string", ["get", "point_count_abbreviated"]],
+              ],
+              textFont: MEMBER_FONT,
+              textSize: 13,
+              textColor: "#ffffff",
+              textAllowOverlap: true,
+            }}
+          />
+          <CircleLayer
+            id="caravana-member-dots"
+            filter={["!", ["has", "point_count"]]}
+            style={{
+              circleColor: ["to-color", ["get", "color"]],
+              circleRadius: 14,
+              circleStrokeColor: [
+                "case",
+                ["==", ["get", "talking"], true],
+                "#ff5a1f",
+                "#ffffff",
+              ],
+              circleStrokeWidth: [
+                "case",
+                ["==", ["get", "talking"], true],
+                4,
+                2,
+              ],
+            }}
+          />
+          <SymbolLayer
+            id="caravana-member-names"
+            filter={["!", ["has", "point_count"]]}
+            minZoomLevel={13}
+            style={{
+              textField: ["to-string", ["get", "name"]],
+              textFont: MEMBER_FONT,
+              textSize: 12,
+              textOffset: [0, 1.9],
+              textAnchor: "top",
+              textColor: night ? "#f3f6fa" : "#0b1422",
+              textHaloColor: night ? "#0b1422" : "#ffffff",
+              textHaloWidth: 1.5,
+              textAllowOverlap: false,
+            }}
+          />
+          <SymbolLayer
+            id="caravana-member-labels"
+            filter={["!", ["has", "point_count"]]}
+            style={{
+              textField: ["to-string", ["get", "initials"]],
+              textFont: MEMBER_FONT,
+              textSize: 11,
+              textColor: "#0B0F14",
+              textAllowOverlap: true,
+            }}
+          />
+        </ShapeSource>
 
         {destination ? (
           <MarkerView
@@ -757,7 +989,9 @@ export const WorldMap = memo(function WorldMap({
             anchor={carModel ? { x: 0.5, y: 1 } : { x: 0.5, y: 0.3 }}
             allowOverlap
           >
-            <View style={[styles.member, carModel ? styles.parkedLabelWrap : null]}>
+            <View
+              style={[styles.member, carModel ? styles.parkedLabelWrap : null]}
+            >
               {carModel ? null : (
                 <View style={styles.parkingBadge}>
                   <Ionicons name="car-sport" size={20} color="#06131a" />
@@ -765,10 +999,10 @@ export const WorldMap = memo(function WorldMap({
               )}
               <Text style={styles.parkingLabel}>
                 {parkingDistance == null || parkingDistance < 25
-                  ? 'Aparcado aquí'
+                  ? "Aparcado aquí"
                   : parkingDistance < 1000
                     ? `Tu coche · ${parkingDistance} m`
-                    : `Tu coche · ${(parkingDistance / 1000).toFixed(1).replace('.', ',')} km`}
+                    : `Tu coche · ${(parkingDistance / 1000).toFixed(1).replace(".", ",")} km`}
               </Text>
             </View>
           </MarkerView>
@@ -779,80 +1013,55 @@ export const WorldMap = memo(function WorldMap({
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, overflow: 'hidden' },
+  root: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   map: { flex: 1 },
-  member: { alignItems: 'center' },
-  memberDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(6,8,11,0.9)',
-    elevation: 4,
-  },
-  memberTalking: { borderColor: '#ff5a1f', borderWidth: 3 },
-  memberInitials: { color: '#071016', fontWeight: '800', fontSize: 12 },
-  memberName: {
-    marginTop: 3,
-    maxWidth: 120,
-    color: '#1b2430',
-    fontSize: 10,
-    fontWeight: '700',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  memberNameNight: { color: '#e8edf4', backgroundColor: 'rgba(6,8,11,0.85)' },
+  member: { alignItems: "center" },
   destIcon: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#c9ff4d',
+    backgroundColor: "#c9ff4d",
     borderWidth: 2,
-    borderColor: '#06080b',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#06080b",
+    alignItems: "center",
+    justifyContent: "center",
     elevation: 4,
   },
   destLabel: {
     marginTop: 3,
     maxWidth: 170,
-    color: '#101603',
-    backgroundColor: '#c9ff4d',
+    color: "#101603",
+    backgroundColor: "#c9ff4d",
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 5,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   parkingBadge: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#4de1ff',
+    backgroundColor: "#4de1ff",
     borderWidth: 2,
-    borderColor: '#06080b',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#06080b",
+    alignItems: "center",
+    justifyContent: "center",
     elevation: 4,
   },
   parkedLabelWrap: { paddingBottom: 30 },
   parkingLabel: {
     marginTop: 3,
-    color: '#4de1ff',
-    backgroundColor: '#06131a',
+    color: "#4de1ff",
+    backgroundColor: "#06131a",
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(77,225,255,0.5)',
-    overflow: 'hidden',
+    borderColor: "rgba(77,225,255,0.5)",
+    overflow: "hidden",
   },
 });

@@ -4,6 +4,7 @@
 
 export type MemberPatch = {
   user_id: string;
+  left_at?: string | null;
   last_lat?: number | null;
   last_lng?: number | null;
   last_seen_at?: string | null;
@@ -19,6 +20,14 @@ type PatchableMember = {
   isMuted: boolean;
   voiceChannelSlug: string;
 };
+
+// ¿Este cambio altera quién está en la party? Salir se guarda como UPDATE
+// con left_at (no es un DELETE): hay que recargar la lista, no parchearla.
+export function changesMembership(row: MemberPatch, members: { userId: string }[]) {
+  if (row.left_at) return true;
+  // Alguien que no estaba (vuelve a unirse reactivando su fila).
+  return !members.some((member) => member.userId === row.user_id);
+}
 
 // Junta un cambio nuevo con los pendientes del mismo usuario (gana el último
 // valor de cada campo).

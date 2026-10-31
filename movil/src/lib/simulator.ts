@@ -4,6 +4,7 @@ import { partyMembers } from '@/src/data/mock';
 import { recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
 import type { MotionHint } from '@/src/lib/parking-logic';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
+import { matchesSubscription, partySubscriptions } from '@/src/lib/realtime-routing';
 import { useTrips } from '@/src/store/trips';
 
 // Simulador de pruebas: mueve tu posición por una ruta real (con frenadas en
@@ -52,6 +53,8 @@ type SimState = {
   members: SimMember[];
   // Prueba de grabación: los viajes simulados se graban (marcados como prueba).
   recordTrips: boolean;
+  // Prueba de carga de la ciudad: resumen del tráfico.
+  stats: string;
 };
 
 export const useSimulator = create<SimState>(() => ({
@@ -63,6 +66,7 @@ export const useSimulator = create<SimState>(() => ({
   party: false,
   members: [],
   recordTrips: false,
+  stats: '',
 }));
 
 export const PHASE_LABELS: Record<SimPhase, string> = {
@@ -293,37 +297,94 @@ const CONVOY = partyMembers.slice(0, 3).map((member, index) => ({
   side: index % 2 === 0 ? 4 : -4,
 }));
 
-// Prueba de carga: una party enorme repartida por la ciudad, cada uno
-// conduciendo a su velocidad y cambiando de rumbo de vez en cuando.
+// Prueba de carga: una ciudad con 1.000 personas usando la app, repartidas
+// en parties de distintos tamaños y gente sola. Tú vas en una party de 12:
+// cada segundo se genera el tráfico de posiciones de toda la ciudad y se
+// reparte con las mismas reglas que useParty; en tu mapa solo aparece tu
+// party y el contador dice cuánto de ese tráfico llega a tu teléfono.
 const CROWD_NAMES = ['Ana', 'Luis', 'Carla', 'José', 'Mía', 'Pedro', 'Sara', 'Leo', 'Eva', 'Raúl', 'Nora', 'Iván'];
 const CROWD_COLORS = ['#FF5A1F', '#C9FF4D', '#4DE1FF', '#2EE6A8', '#FFD24D', '#B98CFF', '#FF8AD4', '#FFB84D'];
-type CrowdDriver = { point: LatLng; heading: number; speed: number; talking: boolean };
+const CITY_PARTY_SIZES = [12, 2, 2, 3, 3, 4, 4, 5, 6, 8, 10, 15, 20, 30, 45];
+const MY_ID = 'yo';
+type CrowdDriver = {
+  id: string;
+  partyId: string | null;
+  point: LatLng;
+  heading: number;
+  speed: number;
+  talking: boolean;
+};
 let crowd: CrowdDriver[] = [];
+let cityParties = 0;
+let cityTick = 0;
 
-function makeCrowd(center: LatLng, size: number) {
-  crowd = Array.from({ length: size }, (_, index) => ({
-    point: offsetPoint(center, Math.random() * 360, Math.sqrt(Math.random()) * 4_000),
-    heading: Math.random() * 360,
-    // Mezcla de parados, tráfico lento y avenida (m/s).
-    speed: [0, 3, 8, 14, 18][index % 5],
-    talking: false,
-  }));
+function makeCity(center: LatLng, size: number) {
+  crowd = [];
+  cityParties = 0;
+  let placed = 0;
+  // Tu party (p0) va contigo; las demás, repartidas por la ciudad.
+  while (placed < size * 0.82) {
+    const partySize = CITY_PARTY_SIZES[cityParties % CITY_PARTY_SIZES.length];
+    const others = cityParties === 0 ? partySize - 1 : partySize;
+    for (let k = 0; k < others && placed < size - 1; k += 1, placed += 1) {
+      crowd.push({
+        id: `u${placed}`,
+        partyId: `p${cityParties}`,
+        point: offsetPoint(
+          center,
+          Math.random() * 360,
+          cityParties === 0 ? 50 + Math.random() * 400 : Math.sqrt(Math.random()) * 5_000,
+        ),
+        heading: Math.random() * 360,
+        speed: [3, 8, 11, 14][placed % 4],
+        talking: false,
+      });
+    }
+    cityParties += 1;
+  }
+  for (; placed < size - 1; placed += 1) {
+    crowd.push({
+      id: `u${placed}`,
+      partyId: null,
+      point: offsetPoint(center, Math.random() * 360, Math.sqrt(Math.random()) * 5_000),
+      heading: Math.random() * 360,
+      speed: [0, 8, 14][placed % 3],
+      talking: false,
+    });
+  }
 }
 
 function moveCrowd(): SimMember[] {
-  return crowd.map((driver, index) => {
+  cityTick += 1;
+  const mySubscriptions = partySubscriptions(MY_ID, 'p0');
+  let sent = 0;
+  let received = 0;
+  const mine: SimMember[] = [];
+  crowd.forEach((driver, index) => {
     if (Math.random() < 0.02) driver.heading = (driver.heading + (Math.random() < 0.5 ? 90 : -90)) % 360;
     driver.point = offsetPoint(driver.point, driver.heading, driver.speed);
     if (Math.random() < 0.01) driver.talking = !driver.talking;
-    return {
-      id: `crowd-${index}`,
-      name: `${CROWD_NAMES[index % CROWD_NAMES.length]} ${index + 1}`,
-      color: CROWD_COLORS[index % CROWD_COLORS.length],
-      latitude: driver.point[0],
-      longitude: driver.point[1],
-      isTalking: driver.talking,
-    };
+    // Cada miembro de una party publica su posición cada 5 s.
+    if (driver.partyId && (cityTick + index) % 5 === 0) {
+      sent += 1;
+      const row = { party_id: driver.partyId, user_id: driver.id };
+      if (mySubscriptions.some((sub) => matchesSubscription(sub, 'party_members', row))) received += 1;
+    }
+    if (driver.partyId === 'p0') {
+      mine.push({
+        id: driver.id,
+        name: `${CROWD_NAMES[index % CROWD_NAMES.length]} ${index + 1}`,
+        color: CROWD_COLORS[index % CROWD_COLORS.length],
+        latitude: driver.point[0],
+        longitude: driver.point[1],
+        isTalking: driver.talking,
+      });
+    }
   });
+  useSimulator.setState({
+    stats: `${(crowd.length + 1).toLocaleString('es-DO')} usuarios en ${cityParties} parties · te llegan ${received} de ${sent} msg/s`,
+  });
+  return mine;
 }
 
 function convoy(previous: SimMember[]): SimMember[] {
@@ -365,8 +426,9 @@ export function setCruiseKmh(kmh: number) {
 
 export function setSimParty(enabled: boolean, size = 0) {
   const origin = currentPoint();
-  if (enabled && size > 0 && origin) makeCrowd(origin, size);
+  if (enabled && size > 0 && origin) makeCity(origin, size);
   else crowd = [];
+  if (!crowd.length) useSimulator.setState({ stats: '' });
   useSimulator.setState((state) => ({
     party: enabled,
     members: enabled ? (crowd.length ? moveCrowd() : convoy(state.members)) : [],
@@ -535,6 +597,7 @@ export function stopSimulation() {
     party: false,
     members: [],
     recordTrips: false,
+    stats: '',
   });
 }
 

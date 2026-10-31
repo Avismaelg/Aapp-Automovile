@@ -87,10 +87,10 @@ export default function SimulatorScreen() {
     toMap();
   };
 
-  const bigParty = () => {
+  const city = () => {
     ensureStarted();
     setSimParty(true, 1000);
-    router.replace('/party');
+    toMap();
   };
 
   const traffic = (withSensor: boolean) => {
@@ -186,9 +186,9 @@ export default function SimulatorScreen() {
         />
         <Test
           icon="people-circle-outline"
-          title="Party de 1.000 personas"
-          detail="Prueba de carga: 1.000 conductores moviéndose a tu alrededor en el mapa y en la lista de la party."
-          onPress={bigParty}
+          title="Ciudad con 1.000 usuarios"
+          detail="75 parties y gente sola usando la app a la vez. Vas en una party de 12: ves solo la tuya y un contador dice cuánto tráfico llega a tu teléfono."
+          onPress={city}
         />
         <View style={styles.partyRow}>
           <View style={styles.testIcon}>

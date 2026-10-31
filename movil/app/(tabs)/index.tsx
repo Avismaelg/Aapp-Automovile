@@ -1,52 +1,78 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import * as Speech from 'expo-speech';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
+import * as Speech from "expo-speech";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  AppState,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { MapAttribution } from '@/src/components/MapAttribution';
-import { WorldMap } from '@/src/components/WorldMap';
-import { DestinationCard, type RouteOption } from '@/src/components/navigation/DestinationCard';
-import { FriendSheet } from '@/src/components/navigation/FriendSheet';
-import { MapControls } from '@/src/components/navigation/MapControls';
-import { NavigationHud } from '@/src/components/navigation/NavigationHud';
-import { SpeedHud } from '@/src/components/navigation/SpeedHud';
-import { AppText, Avatar } from '@/src/components/ui';
-import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useFriendsOnMap } from '@/src/hooks/useFriendsOnMap';
-import { useGarageVehicles } from '@/src/hooks/useGarage';
-import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
-import { useLiveLocation, refreshStaleLocation } from '@/src/hooks/useLiveLocation';
-import { useMapTheme } from '@/src/hooks/useMapTheme';
-import { useParkingDetector, distanceToSpotMeters } from '@/src/hooks/useParkingDetector';
-import { useRoadInfo } from '@/src/hooks/useRoadInfo';
-import { useActiveParty, usePartyLocation } from '@/src/hooks/useParty';
-import { useCreateChallenge } from '@/src/hooks/useChallenges';
-import { useTripRecorder } from '@/src/hooks/useTripRecorder';
-import { useVoiceGuidance } from '@/src/hooks/useVoiceGuidance';
-import { showError } from '@/src/lib/alerts';
-import { buildDrivingLine } from '@/src/lib/driving-line';
-import { driveRoute, PHASE_LABELS, stopSimulation, useSimulator } from '@/src/lib/simulator';
-import { haversineMeters } from '@/src/lib/geo';
-import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
-import { partyUrl } from '@/src/lib/qr';
-import type { WorldMapAlternative, WorldMapMember } from '@/src/lib/map-html';
+import { MapAttribution } from "@/src/components/MapAttribution";
+import { WorldMap } from "@/src/components/WorldMap";
+import {
+  DestinationCard,
+  type RouteOption,
+} from "@/src/components/navigation/DestinationCard";
+import { FriendSheet } from "@/src/components/navigation/FriendSheet";
+import { MapControls } from "@/src/components/navigation/MapControls";
+import { NavigationHud } from "@/src/components/navigation/NavigationHud";
+import { SpeedHud } from "@/src/components/navigation/SpeedHud";
+import { AppText, Avatar } from "@/src/components/ui";
+import { useCurrentUser } from "@/src/hooks/useCurrentUser";
+import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
+import { useGarageVehicles } from "@/src/hooks/useGarage";
+import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
+import {
+  useLiveLocation,
+  refreshStaleLocation,
+} from "@/src/hooks/useLiveLocation";
+import { useMapTheme } from "@/src/hooks/useMapTheme";
+import {
+  useParkingDetector,
+  distanceToSpotMeters,
+} from "@/src/hooks/useParkingDetector";
+import { useRoadInfo } from "@/src/hooks/useRoadInfo";
+import { useActiveParty, usePartyLocation } from "@/src/hooks/useParty";
+import { useCreateChallenge } from "@/src/hooks/useChallenges";
+import { useTripRecorder } from "@/src/hooks/useTripRecorder";
+import { useVoiceGuidance } from "@/src/hooks/useVoiceGuidance";
+import { showError } from "@/src/lib/alerts";
+import { buildDrivingLine } from "@/src/lib/driving-line";
+import {
+  driveRoute,
+  PHASE_LABELS,
+  stopSimulation,
+  useSimulator,
+} from "@/src/lib/simulator";
+import { haversineMeters } from "@/src/lib/geo";
+import { formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
+import { partyUrl } from "@/src/lib/qr";
+import type { WorldMapAlternative, WorldMapMember } from "@/src/lib/map-html";
 import {
   cumulativeDistances,
   followingInstruction,
   nextInstruction,
   routeProgress,
-} from '@/src/lib/route-instructions';
-import { useChosenDestination } from '@/src/store/destination';
-import { useParking } from '@/src/store/parking';
-import { DAY_CHROME, MapChromeContext, NIGHT_CHROME } from '@/src/components/navigation/glass';
-import { colors, radius, spacing } from '@/src/theme';
+} from "@/src/lib/route-instructions";
+import { useChosenDestination } from "@/src/store/destination";
+import { useParking } from "@/src/store/parking";
+import {
+  DAY_CHROME,
+  MapChromeContext,
+  NIGHT_CHROME,
+} from "@/src/components/navigation/glass";
+import { colors, radius, spacing } from "@/src/theme";
 
 function formatParkingDistance(meters: number | null) {
-  if (meters == null) return 'aquí cerca';
+  if (meters == null) return "aquí cerca";
   if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+  return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
 // Pantalla inicial personal, estilo Waze: tu coche, tu destino y tus amigos
@@ -62,7 +88,8 @@ export default function NavigationScreen() {
   // En simulación de party, los amigos simulados se suman a los reales.
   const simMembers = useSimulator((state) => state.members);
   const mapFriends = useMemo(
-    () => (simMembers.length > 0 ? [...realFriends, ...simMembers] : realFriends),
+    () =>
+      simMembers.length > 0 ? [...realFriends, ...simMembers] : realFriends,
     [realFriends, simMembers],
   );
   const createChallenge = useCreateChallenge();
@@ -72,17 +99,23 @@ export default function NavigationScreen() {
   const [recenterToken, setRecenterToken] = useState(0);
   const [mapKey, setMapKey] = useState(0);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(
+    null,
+  );
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [northUp, setNorthUp] = useState(false);
   const lastRerouteAtRef = useRef(0);
 
   const chosenDestination = useChosenDestination((state) => state.destination);
-  const clearChosenDestination = useChosenDestination((state) => state.clearDestination);
+  const clearChosenDestination = useChosenDestination(
+    (state) => state.clearDestination,
+  );
   const recentDestinations = useChosenDestination((state) => state.recents);
   const isNavigating = useChosenDestination((state) => state.isNavigating);
-  const startNavigation = useChosenDestination((state) => state.startNavigation);
+  const startNavigation = useChosenDestination(
+    (state) => state.startNavigation,
+  );
 
   const destination = chosenDestination;
 
@@ -94,7 +127,8 @@ export default function NavigationScreen() {
   const retryRoute = route.retry;
   const roadInfo = useRoadInfo(live.location);
 
-  const primaryVehicle = vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
+  const primaryVehicle =
+    vehicles.find((vehicle) => vehicle.isPrimary) ?? vehicles[0];
   const parkingSpot = useParking((state) => state.spot);
   const clearParking = useParking((state) => state.clearSpot);
   const mapParking = useMemo(
@@ -111,7 +145,7 @@ export default function NavigationScreen() {
   usePartyLocation(
     party?.id,
     live.location,
-    Boolean(party) && !isDemo && live.isLive && live.location.source === 'gps',
+    Boolean(party) && !isDemo && live.isLive && live.location.source === "gps",
   );
   const parkingDistance = distanceToSpotMeters(live.location, parkingSpot);
   const showParking =
@@ -134,7 +168,9 @@ export default function NavigationScreen() {
     test: simulating,
   });
   const speedLabel =
-    live.location.speedKmh == null ? '--' : String(Math.round(live.location.speedKmh));
+    live.location.speedKmh == null
+      ? "--"
+      : String(Math.round(live.location.speedKmh));
   const routeLine = route.route
     ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
     : null;
@@ -144,7 +180,10 @@ export default function NavigationScreen() {
       route.routes.map((option) => ({
         timeLabel: formatRouteTime(option.timeMs),
         distanceLabel: formatRouteDistance(option.distanceM),
-        extraMinutes: Math.max(0, Math.round((option.timeMs - fastestTimeMs) / 60_000)),
+        extraMinutes: Math.max(
+          0,
+          Math.round((option.timeMs - fastestTimeMs) / 60_000),
+        ),
       })),
     [route.routes, fastestTimeMs],
   );
@@ -160,14 +199,19 @@ export default function NavigationScreen() {
   const progressState = useMemo(
     () =>
       route.route
-        ? routeProgress(route.route.coordinates, routeCumulative, { latitude, longitude })
+        ? routeProgress(route.route.coordinates, routeCumulative, {
+            latitude,
+            longitude,
+          })
         : null,
     [route.route, routeCumulative, latitude, longitude],
   );
   const progressM = progressState?.progressM ?? null;
   const routeDistanceFromPathM = progressState?.distanceM ?? null;
   const offRoute = Boolean(
-    route.route && routeDistanceFromPathM != null && routeDistanceFromPathM > 80,
+    route.route &&
+    routeDistanceFromPathM != null &&
+    routeDistanceFromPathM > 80,
   );
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),
@@ -178,7 +222,9 @@ export default function NavigationScreen() {
     [route.route, upcoming],
   );
   const remainingRouteM =
-    route.route && progressM != null ? Math.max(0, route.route.distanceM - progressM) : null;
+    route.route && progressM != null
+      ? Math.max(0, route.route.distanceM - progressM)
+      : null;
   const remainingTimeMs =
     route.route && remainingRouteM != null && route.route.distanceM > 0
       ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
@@ -196,8 +242,14 @@ export default function NavigationScreen() {
     return current?.road ?? roadInfo.roadName;
   }, [route.route, progressM, roadInfo.roadName]);
 
-  const handleFollowChange = useCallback((value: boolean) => setFollowing(value), []);
-  const handleMapError = useCallback((message: string) => setMapError(message), []);
+  const handleFollowChange = useCallback(
+    (value: boolean) => setFollowing(value),
+    [],
+  );
+  const handleMapError = useCallback(
+    (message: string) => setMapError(message),
+    [],
+  );
 
   // Al abrir la app, volver a ella o entrar a Inicio, el mapa siempre sigue tu
   // posición otra vez (aunque hayas arrastrado el mapa antes) y pide una
@@ -215,8 +267,8 @@ export default function NavigationScreen() {
   );
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') ensureFollowing();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") ensureFollowing();
     });
     return () => subscription.remove();
   }, [ensureFollowing]);
@@ -257,9 +309,9 @@ export default function NavigationScreen() {
 
   const arrivalLabel =
     route.route && remainingTimeMs != null
-      ? new Date(clockNow + remainingTimeMs).toLocaleTimeString('es-DO', {
-          hour: '2-digit',
-          minute: '2-digit',
+      ? new Date(clockNow + remainingTimeMs).toLocaleTimeString("es-DO", {
+          hour: "2-digit",
+          minute: "2-digit",
         })
       : null;
   const toggleNorthUp = () => setNorthUp((value) => !value);
@@ -295,10 +347,18 @@ export default function NavigationScreen() {
   };
 
   // Muestra el coche aparcado en el mapa (sin navegar).
-  const [parkingFocus, setParkingFocus] = useState<{ latitude: number; longitude: number; token: number } | null>(null);
+  const [parkingFocus, setParkingFocus] = useState<{
+    latitude: number;
+    longitude: number;
+    token: number;
+  } | null>(null);
   const showParkedCar = () => {
     if (!parkingSpot) return;
-    setParkingFocus({ latitude: parkingSpot.latitude, longitude: parkingSpot.longitude, token: Date.now() });
+    setParkingFocus({
+      latitude: parkingSpot.latitude,
+      longitude: parkingSpot.longitude,
+      token: Date.now(),
+    });
   };
 
   const goToParkedCar = () => {
@@ -306,7 +366,7 @@ export default function NavigationScreen() {
     useChosenDestination.getState().setDestination({
       latitude: parkingSpot.latitude,
       longitude: parkingSpot.longitude,
-      label: 'Mi coche',
+      label: "Mi coche",
     });
     beginNavigation();
   };
@@ -315,10 +375,10 @@ export default function NavigationScreen() {
   const inviteToConvoy = async () => {
     if (isDemo || !party?.code) {
       Alert.alert(
-        'Convoy',
+        "Convoy",
         isDemo
-          ? 'Los convoys reales requieren una cuenta conectada. Crea una party en la pestaña Party.'
-          : 'Primero crea o únete a una party en la pestaña Party.',
+          ? "Los convoys reales requieren una cuenta conectada. Crea una party en la pestaña Party."
+          : "Primero crea o únete a una party en la pestaña Party.",
       );
       return;
     }
@@ -330,34 +390,40 @@ export default function NavigationScreen() {
 
   const challengeFriend = (friend: WorldMapMember) => {
     if (isDemo) {
-      Alert.alert('Retos', 'Los retos reales requieren una cuenta conectada.');
+      Alert.alert("Retos", "Los retos reales requieren una cuenta conectada.");
       return;
     }
     Alert.alert(
-      `Reto a ${friend.name.split(' ')[0]}`,
-      'Reto por llegada: gana quien llegue primero al destino, respetando las leyes.',
+      `Reto a ${friend.name.split(" ")[0]}`,
+      "Reto por llegada: gana quien llegue primero al destino, respetando las leyes.",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Reto',
-          style: 'destructive',
+          text: "Reto",
+          style: "destructive",
           onPress: () => {
             void createChallenge
               .mutateAsync({
-                title: `Reto: ${friend.name.split(' ')[0]}`,
-                category: 'mixed',
-                mode: 'instant',
-                fromLabel: 'Mi ubicación',
-                toLabel: destination?.label ?? 'Meta libre',
+                title: `Reto: ${friend.name.split(" ")[0]}`,
+                category: "mixed",
+                mode: "instant",
+                fromLabel: "Mi ubicación",
+                toLabel: destination?.label ?? "Meta libre",
                 distanceKm: (route.route?.distanceM ?? 0) / 1000,
-                rules: 'Por llegada: gana quien llegue primero respetando las leyes.',
+                rules:
+                  "Por llegada: gana quien llegue primero respetando las leyes.",
                 hostVehicleId: primaryVehicle?.id,
-                hostVehicleKind: primaryVehicle?.kind ?? 'car',
-                invitees: [{ userId: friend.id, vehicleKind: 'car' }],
+                hostVehicleKind: primaryVehicle?.kind ?? "car",
+                invitees: [{ userId: friend.id, vehicleKind: "car" }],
               })
-              .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
+              .then(() =>
+                Alert.alert(
+                  "Reto enviado",
+                  "Verás la respuesta en la pestaña Retos.",
+                ),
+              )
               .catch((error: unknown) =>
-                showError('Reto', error, 'No pudimos crear el reto.'),
+                showError("Reto", error, "No pudimos crear el reto."),
               );
           },
         },
@@ -382,7 +448,10 @@ export default function NavigationScreen() {
       navigating
         ? []
         : route.routes
-            .map((option, index) => ({ index, coordinates: option.coordinates }))
+            .map((option, index) => ({
+              index,
+              coordinates: option.coordinates,
+            }))
             .filter((option) => option.index !== route.selected),
     [navigating, route.routes, route.selected],
   );
@@ -397,12 +466,16 @@ export default function NavigationScreen() {
   // Llegada: a menos de 40 m del destino (o al final de la ruta) se termina
   // la navegación sola y se avisa, como Waze.
   const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
-  const destinationDistanceM = destination ? haversineMeters(live.location, destination) : null;
+  const destinationDistanceM = destination
+    ? haversineMeters(live.location, destination)
+    : null;
   const arrived =
     navigating &&
     destination != null &&
     ((destinationDistanceM != null && destinationDistanceM < 40) ||
-      (remainingRouteM != null && remainingRouteM < 20 && (routeDistanceFromPathM ?? 999) < 40));
+      (remainingRouteM != null &&
+        remainingRouteM < 20 &&
+        (routeDistanceFromPathM ?? 999) < 40));
   useEffect(() => {
     if (!arrived || !destination) return;
     const label = destination.label;
@@ -413,7 +486,10 @@ export default function NavigationScreen() {
       clearChosenDestination();
       // La guía por voz se calla al terminar la ruta: el aviso va después.
       if (!voiceMuted) {
-        setTimeout(() => Speech.speak(`Has llegado a ${label}`, { language: 'es-ES' }), 600);
+        setTimeout(
+          () => Speech.speak(`Has llegado a ${label}`, { language: "es-ES" }),
+          600,
+        );
       }
     }, 0);
     return () => clearTimeout(timer);
@@ -429,7 +505,7 @@ export default function NavigationScreen() {
   // desvío) no vale.
   const staleRouteRef = useRef<typeof route.route | undefined>(undefined);
   useEffect(() => {
-    if (sim.phase !== 'waiting-route') {
+    if (sim.phase !== "waiting-route") {
       staleRouteRef.current = undefined;
       return;
     }
@@ -440,7 +516,8 @@ export default function NavigationScreen() {
       retryRoute();
       return;
     }
-    if (!navigating || !route.route || route.route === staleRouteRef.current) return;
+    if (!navigating || !route.route || route.route === staleRouteRef.current)
+      return;
     driveRoute(route.route.coordinates);
   }, [sim.phase, navigating, route.route, retryRoute]);
 
@@ -466,14 +543,28 @@ export default function NavigationScreen() {
   const drivingLine = useMemo(
     () =>
       navigating && !walking && route.route && progressState && !offRoute
-        ? buildDrivingLine(route.route.coordinates, progressState.nearestIndex, speedKmhNow, roadInfo.limitKmh ?? null)
+        ? buildDrivingLine(
+            route.route.coordinates,
+            progressState.nearestIndex,
+            speedKmhNow,
+            roadInfo.limitKmh ?? null,
+          )
         : null,
-    [navigating, walking, route.route, progressState, offRoute, speedKmhNow, roadInfo.limitKmh],
+    [
+      navigating,
+      walking,
+      route.route,
+      progressState,
+      offRoute,
+      speedKmhNow,
+      roadInfo.limitKmh,
+    ],
   );
 
   // Los controles se ven claros sobre el mapa de día y oscuros de noche.
-  const chrome = useMapTheme(live.location) === 'day' ? DAY_CHROME : NIGHT_CHROME;
-  const parkingTint = chrome.day ? '#0891b2' : colors.cyan;
+  const chrome =
+    useMapTheme(live.location) === "day" ? DAY_CHROME : NIGHT_CHROME;
+  const parkingTint = chrome.day ? "#0891b2" : colors.cyan;
 
   return (
     <View style={styles.root}>
@@ -483,7 +574,7 @@ export default function NavigationScreen() {
         destination={destination}
         location={live.location}
         parking={mapParking}
-        travelMode={walking ? 'walking' : 'car'}
+        travelMode={walking ? "walking" : "car"}
         northUp={northUp}
         route={route.route}
         alternatives={mapAlternatives}
@@ -501,271 +592,373 @@ export default function NavigationScreen() {
       />
 
       <MapChromeContext.Provider value={chrome}>
-      <View
-        pointerEvents="box-none"
-        style={[
-          styles.overlay,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
-        ]}
-      >
-        {navigating && destination ? (
-          <NavigationHud
-            upcoming={upcoming ?? null}
-            following={thenInstruction}
-            offRoute={offRoute}
-            hasRoute={Boolean(routeLine)}
-            arrivalLabel={arrivalLabel}
-            remainingTimeLabel={formatRouteTime(remainingTimeMs ?? route.route?.timeMs ?? 0)}
-            remainingDistanceLabel={formatRouteDistance(remainingRouteM ?? route.route?.distanceM ?? 0)}
-            destinationLabel={destination.label}
-            speedLabel={speedLabel}
-            limitKmh={roadInfo.limitKmh ?? null}
-            curve={drivingLine?.nextCurve ?? null}
-            northUp={northUp}
-            mapFollowing={following}
-            onRecenter={recenter}
-            muted={voiceMuted}
-            bottomInset={insets.bottom}
-            onToggleNorth={toggleNorthUp}
-            onToggleMute={() => setVoiceMuted((value) => !value)}
-            onChangeRoute={() => router.push('/destino' as Href)}
-            onClose={clearDestination}
-          />
-        ) : (
-          <>
-            {/* Inicio minimalista: un solo buscador con tu avatar. El vehículo se
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.overlay,
+            { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
+          ]}
+        >
+          {navigating && destination ? (
+            <NavigationHud
+              upcoming={upcoming ?? null}
+              following={thenInstruction}
+              offRoute={offRoute}
+              hasRoute={Boolean(routeLine)}
+              arrivalLabel={arrivalLabel}
+              remainingTimeLabel={formatRouteTime(
+                remainingTimeMs ?? route.route?.timeMs ?? 0,
+              )}
+              remainingDistanceLabel={formatRouteDistance(
+                remainingRouteM ?? route.route?.distanceM ?? 0,
+              )}
+              destinationLabel={destination.label}
+              speedLabel={speedLabel}
+              limitKmh={roadInfo.limitKmh ?? null}
+              curve={drivingLine?.nextCurve ?? null}
+              northUp={northUp}
+              mapFollowing={following}
+              onRecenter={recenter}
+              muted={voiceMuted}
+              bottomInset={insets.bottom}
+              onToggleNorth={toggleNorthUp}
+              onToggleMute={() => setVoiceMuted((value) => !value)}
+              onChangeRoute={() => router.push("/destino" as Href)}
+              onClose={clearDestination}
+            />
+          ) : (
+            <>
+              {/* Inicio minimalista: un solo buscador con tu avatar. El vehículo se
                 elige en Garaje y la actividad está en el icono del buscador. */}
-            {destination == null ? (
-              <View style={[styles.searchBar, chrome.surface]}>
-                <Pressable
-                  style={styles.searchTap}
-                  onPress={() => router.push('/destino' as Href)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Buscar destino"
-                >
-                  <Ionicons name="search" size={20} color="#1a73e8" />
-                  <AppText variant="bodyStrong" numberOfLines={1} color={chrome.muted} style={styles.searchText}>
-                    ¿A dónde vamos?
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  onPress={() => router.push('/actividad' as Href)}
-                  hitSlop={8}
-                  style={styles.searchIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Actividad"
-                >
-                  <Ionicons name="pulse" size={20} color={chrome.textSoft} />
-                </Pressable>
-                <Pressable
-                  onPress={() => router.push('/(tabs)/profile')}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityLabel="Tu perfil"
-                >
-                  <Avatar name={me.name} color={me.color} size={36} uri={me.avatarUrl} online={live.isLive} />
-                </Pressable>
-              </View>
-            ) : null}
-
-            {destination == null && recentDestinations.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.recentsScroll}
-                contentContainerStyle={styles.recentsRow}
-              >
-                {recentDestinations.slice(0, 5).map((recent) => (
+              {destination == null ? (
+                <View style={[styles.searchBar, chrome.surface]}>
                   <Pressable
-                    key={`${recent.label}-${recent.latitude.toFixed(5)}`}
-                    style={[styles.recentChip, chrome.surface]}
-                    onPress={() => {
-                      useChosenDestination.getState().setDestination(recent);
-                    }}
+                    style={styles.searchTap}
+                    onPress={() => router.push("/destino" as Href)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Ir a ${recent.label}`}
+                    accessibilityLabel="Buscar destino"
                   >
-                    <Ionicons name="time-outline" size={14} color={chrome.muted} />
+                    <Ionicons name="search" size={20} color="#1a73e8" />
                     <AppText
-                      variant="caption"
-                      color={chrome.textSoft}
+                      variant="bodyStrong"
                       numberOfLines={1}
-                      style={styles.recentChipText}
+                      color={chrome.muted}
+                      style={styles.searchText}
                     >
-                      {recent.label}
+                      ¿A dónde vamos?
                     </AppText>
                   </Pressable>
-                ))}
-              </ScrollView>
-            ) : null}
+                  <Pressable
+                    onPress={() => router.push("/actividad" as Href)}
+                    hitSlop={8}
+                    style={styles.searchIcon}
+                    accessibilityRole="button"
+                    accessibilityLabel="Actividad"
+                  >
+                    <Ionicons name="pulse" size={20} color={chrome.textSoft} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => router.push("/(tabs)/profile")}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Tu perfil"
+                  >
+                    <Avatar
+                      name={me.name}
+                      color={me.color}
+                      size={36}
+                      uri={me.avatarUrl}
+                      online={live.isLive}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
 
-            {simulating ? (
-              <View style={[styles.banner, chrome.surface, styles.simBanner]}>
-                <Ionicons name="flask" size={16} color="#7c3aed" />
-                <AppText variant="caption" color={chrome.textSoft} numberOfLines={1} style={styles.bannerText}>
-                  SIMULACIÓN · {PHASE_LABELS[sim.phase]} · {Math.round(sim.fix?.speedKmh ?? 0)} km/h
-                  {sim.party ? ' · party' : ''}
-                </AppText>
-                <Pressable onPress={() => router.push('/simulador' as Href)} hitSlop={8}>
-                  <AppText variant="label" color="#7c3aed" style={styles.retryText}>
-                    OPCIONES
-                  </AppText>
-                </Pressable>
-                <Pressable onPress={stopSimulation} hitSlop={8}>
-                  <AppText variant="label" color={colors.accent} style={styles.retryText}>
-                    PARAR
-                  </AppText>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {arrivedLabel ? (
-              <View style={[styles.banner, chrome.surface, styles.arrivedBanner]}>
-                <Ionicons name="flag" size={18} color="#16a34a" />
-                <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={styles.bannerText}>
-                  Has llegado a {arrivedLabel}
-                </AppText>
-                <Pressable onPress={() => setArrivedLabel(null)} hitSlop={8} accessibilityLabel="Cerrar aviso">
-                  <Ionicons name="close" size={18} color={chrome.muted} />
-                </Pressable>
-              </View>
-            ) : null}
-
-            {activeTrip ? (
-              <View style={[styles.recordingPill, chrome.surface]}>
-                <View style={styles.recordingDot} />
-                <AppText variant="caption" color={chrome.textSoft}>
-                  Grabando ruta ·{' '}
-                  {Math.max(1, Math.round((recordingNow - activeTrip.startedAt) / 60_000))} min ·{' '}
-                  {(activeTrip.distanceM / 1000).toFixed(1).replace('.', ',')} km
-                </AppText>
-              </View>
-            ) : null}
-
-            {showParking && parkingSpot ? (
-              <View style={[styles.parkingPill, chrome.surface, { borderColor: parkingTint }]}>
-                <Pressable
-                  style={styles.parkingShow}
-                  onPress={showParkedCar}
-                  onLongPress={() =>
-                    Alert.alert('Coche aparcado', '¿Olvidar la ubicación guardada?', [
-                      { text: 'Cancelar', style: 'cancel' },
-                      { text: 'Olvidar', style: 'destructive', onPress: clearParking },
-                    ])
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Ver mi coche aparcado en el mapa"
+              {destination == null && recentDestinations.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.recentsScroll}
+                  contentContainerStyle={styles.recentsRow}
                 >
-                  <Ionicons name="car" size={15} color={parkingTint} />
+                  {recentDestinations.slice(0, 5).map((recent) => (
+                    <Pressable
+                      key={`${recent.label}-${recent.latitude.toFixed(5)}`}
+                      style={[styles.recentChip, chrome.surface]}
+                      onPress={() => {
+                        useChosenDestination.getState().setDestination(recent);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ir a ${recent.label}`}
+                    >
+                      <Ionicons
+                        name="time-outline"
+                        size={14}
+                        color={chrome.muted}
+                      />
+                      <AppText
+                        variant="caption"
+                        color={chrome.textSoft}
+                        numberOfLines={1}
+                        style={styles.recentChipText}
+                      >
+                        {recent.label}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : null}
+
+              {simulating ? (
+                <View style={[styles.banner, chrome.surface, styles.simBanner]}>
+                  <Ionicons name="flask" size={16} color="#7c3aed" />
                   <AppText
                     variant="caption"
                     color={chrome.textSoft}
-                    style={styles.parkingText}
-                    numberOfLines={1}
+                    numberOfLines={sim.stats ? 2 : 1}
+                    style={styles.bannerText}
                   >
-                    Tu coche aparcado · {formatParkingDistance(parkingDistance)}
+                    {sim.stats
+                      ? sim.stats
+                      : `SIMULACIÓN · ${PHASE_LABELS[sim.phase]} · ${Math.round(sim.fix?.speedKmh ?? 0)} km/h${
+                          sim.party ? " · party" : ""
+                        }`}
                   </AppText>
-                </Pressable>
-                <Pressable
-                  onPress={goToParkedCar}
-                  hitSlop={8}
-                  style={styles.parkingGo}
-                  accessibilityRole="button"
-                  accessibilityLabel="Ir a mi coche aparcado"
-                >
-                  <Ionicons name="navigate" size={14} color={parkingTint} />
-                </Pressable>
-              </View>
-            ) : null}
+                  <Pressable
+                    onPress={() => router.push("/simulador" as Href)}
+                    hitSlop={8}
+                  >
+                    <AppText
+                      variant="label"
+                      color="#7c3aed"
+                      style={styles.retryText}
+                    >
+                      OPCIONES
+                    </AppText>
+                  </Pressable>
+                  <Pressable onPress={stopSimulation} hitSlop={8}>
+                    <AppText
+                      variant="label"
+                      color={colors.accent}
+                      style={styles.retryText}
+                    >
+                      PARAR
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
 
-            {!live.isLive ? (
-              <View style={[styles.banner, chrome.surface]}>
-                <View style={styles.bannerDot} />
-                <AppText variant="caption" color={chrome.textSoft} numberOfLines={2} style={styles.bannerText}>
-                  {live.message}
-                </AppText>
-                {live.status !== 'locating' ? (
-                  <Pressable onPress={live.retry} hitSlop={8}>
-                    <AppText variant="label" color={chrome.day ? '#2f8cff' : colors.lime} style={styles.retryText}>
+              {arrivedLabel ? (
+                <View
+                  style={[styles.banner, chrome.surface, styles.arrivedBanner]}
+                >
+                  <Ionicons name="flag" size={18} color="#16a34a" />
+                  <AppText
+                    variant="bodyStrong"
+                    color={chrome.text}
+                    numberOfLines={2}
+                    style={styles.bannerText}
+                  >
+                    Has llegado a {arrivedLabel}
+                  </AppText>
+                  <Pressable
+                    onPress={() => setArrivedLabel(null)}
+                    hitSlop={8}
+                    accessibilityLabel="Cerrar aviso"
+                  >
+                    <Ionicons name="close" size={18} color={chrome.muted} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {activeTrip ? (
+                <View style={[styles.recordingPill, chrome.surface]}>
+                  <View style={styles.recordingDot} />
+                  <AppText variant="caption" color={chrome.textSoft}>
+                    Grabando ruta ·{" "}
+                    {Math.max(
+                      1,
+                      Math.round(
+                        (recordingNow - activeTrip.startedAt) / 60_000,
+                      ),
+                    )}{" "}
+                    min ·{" "}
+                    {(activeTrip.distanceM / 1000).toFixed(1).replace(".", ",")}{" "}
+                    km
+                  </AppText>
+                </View>
+              ) : null}
+
+              {showParking && parkingSpot ? (
+                <View
+                  style={[
+                    styles.parkingPill,
+                    chrome.surface,
+                    { borderColor: parkingTint },
+                  ]}
+                >
+                  <Pressable
+                    style={styles.parkingShow}
+                    onPress={showParkedCar}
+                    onLongPress={() =>
+                      Alert.alert(
+                        "Coche aparcado",
+                        "¿Olvidar la ubicación guardada?",
+                        [
+                          { text: "Cancelar", style: "cancel" },
+                          {
+                            text: "Olvidar",
+                            style: "destructive",
+                            onPress: clearParking,
+                          },
+                        ],
+                      )
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver mi coche aparcado en el mapa"
+                  >
+                    <Ionicons name="car" size={15} color={parkingTint} />
+                    <AppText
+                      variant="caption"
+                      color={chrome.textSoft}
+                      style={styles.parkingText}
+                      numberOfLines={1}
+                    >
+                      Tu coche aparcado ·{" "}
+                      {formatParkingDistance(parkingDistance)}
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={goToParkedCar}
+                    hitSlop={8}
+                    style={styles.parkingGo}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ir a mi coche aparcado"
+                  >
+                    <Ionicons name="navigate" size={14} color={parkingTint} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {!live.isLive ? (
+                <View style={[styles.banner, chrome.surface]}>
+                  <View style={styles.bannerDot} />
+                  <AppText
+                    variant="caption"
+                    color={chrome.textSoft}
+                    numberOfLines={2}
+                    style={styles.bannerText}
+                  >
+                    {live.message}
+                  </AppText>
+                  {live.status !== "locating" ? (
+                    <Pressable onPress={live.retry} hitSlop={8}>
+                      <AppText
+                        variant="label"
+                        color={chrome.day ? "#2f8cff" : colors.lime}
+                        style={styles.retryText}
+                      >
+                        REINTENTAR
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {mapError ? (
+                <View
+                  style={[styles.banner, chrome.surface, styles.bannerError]}
+                >
+                  <Ionicons
+                    name="warning-outline"
+                    size={16}
+                    color={colors.accent}
+                  />
+                  <AppText
+                    variant="caption"
+                    color={chrome.textSoft}
+                    numberOfLines={2}
+                    style={styles.bannerText}
+                  >
+                    {mapError}
+                  </AppText>
+                  <Pressable onPress={retryMap} hitSlop={8}>
+                    <AppText
+                      variant="label"
+                      color={chrome.day ? "#2f8cff" : colors.lime}
+                      style={styles.retryText}
+                    >
                       REINTENTAR
                     </AppText>
                   </Pressable>
+                </View>
+              ) : null}
+
+              <View style={styles.spacer} pointerEvents="none" />
+
+              <View
+                pointerEvents="box-none"
+                style={styles.bottomCluster}
+                onLayout={(event) =>
+                  setBottomHeight(Math.round(event.nativeEvent.layout.height))
+                }
+              >
+                <View style={styles.sideRow}>
+                  <SpeedHud
+                    speedLabel={speedLabel}
+                    limitKmh={roadInfo.limitKmh ?? null}
+                    isLive={live.isLive}
+                    street={currentStreet ?? null}
+                  />
+
+                  <MapControls
+                    northUp={northUp}
+                    following={following}
+                    onToggleNorth={toggleNorthUp}
+                    onRecenter={recenter}
+                  />
+                </View>
+
+                {destination ? (
+                  <DestinationCard
+                    label={destination.label}
+                    timeLabel={
+                      route.route ? formatRouteTime(route.route.timeMs) : null
+                    }
+                    distanceLabel={
+                      route.route
+                        ? formatRouteDistance(route.route.distanceM)
+                        : null
+                    }
+                    arrivalLabel={arrivalLabel}
+                    loading={route.isLoading}
+                    error={route.error}
+                    options={routeOptions}
+                    selected={route.selected}
+                    canConfirm={!route.isLoading && Boolean(route.route)}
+                    bottomInset={0}
+                    onRetry={retryRoute}
+                    onSelect={selectRoute}
+                    onConfirm={beginNavigation}
+                    onShare={() => void shareRouteLink()}
+                    onClose={clearDestination}
+                  />
+                ) : null}
+
+                {selectedFriend ? (
+                  <FriendSheet
+                    friend={selectedFriend}
+                    onInvite={() => void inviteToConvoy()}
+                    onChallenge={() => challengeFriend(selectedFriend)}
+                    onClose={() => setSelectedFriend(null)}
+                  />
                 ) : null}
               </View>
-            ) : null}
 
-            {mapError ? (
-              <View style={[styles.banner, chrome.surface, styles.bannerError]}>
-                <Ionicons name="warning-outline" size={16} color={colors.accent} />
-                <AppText variant="caption" color={chrome.textSoft} numberOfLines={2} style={styles.bannerText}>
-                  {mapError}
-                </AppText>
-                <Pressable onPress={retryMap} hitSlop={8}>
-                  <AppText variant="label" color={chrome.day ? '#2f8cff' : colors.lime} style={styles.retryText}>
-                    REINTENTAR
-                  </AppText>
-                </Pressable>
-              </View>
-            ) : null}
-
-            <View style={styles.spacer} pointerEvents="none" />
-
-            <View
-              pointerEvents="box-none"
-              style={styles.bottomCluster}
-              onLayout={(event) => setBottomHeight(Math.round(event.nativeEvent.layout.height))}
-            >
-            <View style={styles.sideRow}>
-              <SpeedHud
-                speedLabel={speedLabel}
-                limitKmh={roadInfo.limitKmh ?? null}
-                isLive={live.isLive}
-                street={currentStreet ?? null}
-              />
-
-              <MapControls
-                northUp={northUp}
-                following={following}
-                onToggleNorth={toggleNorthUp}
-                onRecenter={recenter}
-              />
-            </View>
-
-            {destination ? (
-              <DestinationCard
-                label={destination.label}
-                timeLabel={route.route ? formatRouteTime(route.route.timeMs) : null}
-                distanceLabel={route.route ? formatRouteDistance(route.route.distanceM) : null}
-                arrivalLabel={arrivalLabel}
-                loading={route.isLoading}
-                error={route.error}
-                options={routeOptions}
-                selected={route.selected}
-                canConfirm={!route.isLoading && Boolean(route.route)}
-                bottomInset={0}
-                onRetry={retryRoute}
-                onSelect={selectRoute}
-                onConfirm={beginNavigation}
-                onShare={() => void shareRouteLink()}
-                onClose={clearDestination}
-              />
-            ) : null}
-
-            {selectedFriend ? (
-              <FriendSheet
-                friend={selectedFriend}
-                onInvite={() => void inviteToConvoy()}
-                onChallenge={() => challengeFriend(selectedFriend)}
-                onClose={() => setSelectedFriend(null)}
-              />
-            ) : null}
-
-            </View>
-
-            <MapAttribution style={styles.attribution} />
-          </>
-        )}
-      </View>
+              <MapAttribution style={styles.attribution} />
+            </>
+          )}
+        </View>
       </MapChromeContext.Provider>
     </View>
   );
@@ -774,7 +967,7 @@ export default function NavigationScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     right: 0,
     bottom: 0,
@@ -782,35 +975,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     minHeight: 56,
     borderRadius: 28,
     paddingLeft: spacing.lg,
     paddingRight: 10,
   },
-  searchTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 },
-  searchIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  searchTap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 56,
+  },
+  searchIcon: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   roundButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     marginTop: spacing.sm,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  simBanner: { borderColor: '#7c3aed', borderWidth: 1.5 },
-  arrivedBanner: { borderColor: '#16a34a', borderWidth: 1.5 },
-  bannerError: { borderColor: 'rgba(255,90,31,0.4)' },
+  simBanner: { borderColor: "#7c3aed", borderWidth: 1.5 },
+  arrivedBanner: { borderColor: "#16a34a", borderWidth: 1.5 },
+  bannerError: { borderColor: "rgba(255,90,31,0.4)" },
   bannerDot: {
     width: 7,
     height: 7,
@@ -821,21 +1025,25 @@ const styles = StyleSheet.create({
   retryText: { fontSize: 9 },
   searchText: { flex: 1 },
   recordingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginTop: spacing.sm,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
   recentChipText: { flexShrink: 1 },
-  recentsScroll: { marginTop: spacing.xs, marginHorizontal: -spacing.lg, flexGrow: 0 },
+  recentsScroll: {
+    marginTop: spacing.xs,
+    marginHorizontal: -spacing.lg,
+    flexGrow: 0,
+  },
   recentsRow: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 6 },
   recentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     maxWidth: 180,
     borderRadius: radius.pill,
@@ -849,36 +1057,42 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lime,
   },
   parkingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginTop: spacing.sm,
     borderRadius: radius.pill,
     paddingLeft: spacing.md,
     paddingRight: 4,
     paddingVertical: 4,
   },
-  parkingShow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, paddingVertical: 2 },
+  parkingShow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+    paddingVertical: 2,
+  },
   parkingText: { flexShrink: 1 },
   parkingGo: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(77,225,255,0.16)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(77,225,255,0.16)",
   },
   spacer: { flex: 1 },
   bottomCluster: { gap: 0 },
   sideRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
     marginBottom: spacing.md,
   },
   attribution: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: spacing.sm,
   },
 });
