@@ -180,6 +180,7 @@ function ChallengeInviteBanner() {
           latitude: challenge.endLat,
           longitude: challenge.endLng,
           label: challenge.toLabel,
+          personal: true,
         });
         store.startNavigation();
         router.navigate('/(tabs)');

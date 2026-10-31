@@ -98,6 +98,62 @@ export function shouldOfferConvoyDestination({
   return true;
 }
 
+export function destinationKey(point: Point | null) {
+  return point ? `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}` : null;
+}
+
+// ¿Compartir tu destino con el convoy? Cada vez que TÚ cambias de destino
+// navegando (desde el mapa, el buscador, un reciente o un evento), no solo
+// la primera vez. No se comparte si:
+// - es el mismo destino que ya tenías (p. ej. la party cambió y tú no),
+// - ya es el de la party (lo acabas de seguir: sin bucles),
+// - vas a por tu coche (es solo tuyo).
+export function shouldShareMyDestination({
+  previousKey,
+  mine,
+  party,
+  navigating,
+  personal,
+}: {
+  previousKey: string | null;
+  mine: Point | null;
+  party: Point | null;
+  navigating: boolean;
+  personal: boolean;
+}) {
+  const key = destinationKey(mine);
+  if (!navigating || !mine || key === previousKey) return { share: false, key: previousKey };
+  if (personal || sameDestination(mine, party)) return { share: false, key };
+  return { share: true, key };
+}
+
+// Cuando otro piloto cambia el destino del convoy:
+// - 'follow': ibas siguiendo el destino del convoy → cambias solo (no hace
+//   falta tocar nada conduciendo);
+// - 'offer': ibas a tu aire o no navegabas → «Ir con el convoy»;
+// - 'none': ya vas allí, lo fijaste tú o lo descartaste.
+export function convoyDestinationAction({
+  me,
+  party,
+  mine,
+  navigating,
+  handledAt,
+  followedKey,
+}: {
+  me: string;
+  party: PartyDestination | null;
+  mine: Point | null;
+  navigating: boolean;
+  handledAt: string | null;
+  followedKey: string | null;
+}): 'follow' | 'offer' | 'none' {
+  if (!party || !party.setBy || party.setBy === me) return 'none';
+  if (navigating && sameDestination(mine, party)) return 'none';
+  if (handledAt && party.setAt && handledAt === party.setAt) return 'none';
+  if (navigating && followedKey && destinationKey(mine) === followedKey) return 'follow';
+  return 'offer';
+}
+
 // ---------------------------------------------------------------------------
 // Retos por llegada
 // ---------------------------------------------------------------------------

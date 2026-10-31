@@ -6,6 +6,9 @@ export type ChosenDestination = {
   latitude: number;
   longitude: number;
   label: string;
+  // Solo tuyo (ir a por tu coche, un reto, una prueba): no se comparte con
+  // el convoy.
+  personal?: boolean;
 };
 
 type DestinationState = {
@@ -30,7 +33,7 @@ export const useChosenDestination = create<DestinationState>()(
         set((state) => ({
           destination,
           recents: [
-            destination,
+            { latitude: destination.latitude, longitude: destination.longitude, label: destination.label },
             ...state.recents.filter(
               (item) =>
                 !(

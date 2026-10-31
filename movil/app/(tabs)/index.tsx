@@ -45,7 +45,12 @@ import {
 import { useRoadInfo } from "@/src/hooks/useRoadInfo";
 import { useActiveParty, useSetPartyDestination } from "@/src/hooks/useParty";
 import { ConvoyDestinationCard } from "@/src/components/navigation/ConvoyDestinationCard";
-import { sameDestination, shouldOfferConvoyDestination } from "@/src/lib/convoy";
+import {
+  convoyDestinationAction,
+  destinationKey as convoyDestinationKey,
+  sameDestination,
+  shouldShareMyDestination,
+} from "@/src/lib/convoy";
 import { useCreateChallenge } from "@/src/hooks/useChallenges";
 import { useTripRecorder } from "@/src/hooks/useTripRecorder";
 import { useVoiceGuidance } from "@/src/hooks/useVoiceGuidance";
@@ -436,6 +441,7 @@ export default function NavigationScreen() {
       latitude: parkingSpot.latitude,
       longitude: parkingSpot.longitude,
       label: "Mi coche",
+      personal: true,
     });
     beginNavigation();
   };
@@ -621,38 +627,100 @@ export default function NavigationScreen() {
     setFollowing(true);
     setRecenterToken((value) => value + 1);
     startNavigation();
-    const target = useChosenDestination.getState().destination;
-    if (
-      party &&
-      !isDemo &&
-      target &&
-      target.label !== "Mi coche" &&
-      !sameDestination(target, partyDestination)
-    ) {
+  }, [startNavigation]);
+
+  // Cada destino nuevo que eliges navegando se comparte con el convoy, venga
+  // de donde venga (antes solo el primero, al pulsar Ir en el mapa). Al abrir
+  // la app se toma el destino actual como ya compartido: así un destino viejo
+  // no pisa el que haya puesto otro piloto mientras tanto.
+  const sharedKeyRef = useRef<string | null | undefined>(undefined);
+  const partyIdForShare = party && !isDemo ? party.id : null;
+  useEffect(() => {
+    if (!partyIdForShare) {
+      sharedKeyRef.current = undefined;
+      return;
+    }
+    if (sharedKeyRef.current === undefined) {
+      sharedKeyRef.current = isNavigating ? convoyDestinationKey(destination) : null;
+      return;
+    }
+    const decision = shouldShareMyDestination({
+      previousKey: sharedKeyRef.current,
+      mine: destination,
+      party: partyDestination,
+      navigating: isNavigating,
+      personal: Boolean(destination?.personal),
+    });
+    sharedKeyRef.current = decision.key;
+    if (decision.share && destination) {
       shareDestinationWithConvoy({
-        partyId: party.id,
-        label: target.label,
-        lat: target.latitude,
-        lng: target.longitude,
+        partyId: partyIdForShare,
+        label: destination.label,
+        lat: destination.latitude,
+        lng: destination.longitude,
       });
     }
-  }, [startNavigation, party, isDemo, partyDestination, shareDestinationWithConvoy]);
+  }, [partyIdForShare, isNavigating, destination, partyDestination, shareDestinationWithConvoy]);
 
-  // Otro piloto fijó o cambió el destino: «Ir con el convoy» con un toque.
+  // Otro piloto fijó o cambió el destino. Si ibas siguiendo el convoy,
+  // cambias solo (con un aviso); si no, «Ir con el convoy» con un toque.
   const [dismissedConvoyAt, setDismissedConvoyAt] = useState<string | null>(null);
-  const offerConvoyDestination =
-    partyDestination != null &&
-    !isDemo &&
-    shouldOfferConvoyDestination({
+  const [convoyNotice, setConvoyNotice] = useState<{ name: string; label: string } | null>(null);
+  const followedKeyRef = useRef<string | null>(null);
+  const handledAtRef = useRef<string | null>(null);
+  const convoyDestinationSetter = party?.members.find(
+    (member) => member.userId === partyDestination?.setBy,
+  );
+  const setterName = convoyDestinationSetter?.profile.displayName ?? "Un piloto";
+
+  // Recuerda el destino del convoy que vas siguiendo.
+  useEffect(() => {
+    if (isNavigating && partyDestination && sameDestination(destination, partyDestination)) {
+      followedKeyRef.current = convoyDestinationKey(destination);
+      handledAtRef.current = partyDestination.setAt;
+    }
+  }, [isNavigating, destination, partyDestination]);
+
+  // En pantalla: sin saber si lo ibas siguiendo, como mucho «ofrecer»; si lo
+  // seguías, el efecto de abajo te cambia al momento y la oferta desaparece.
+  const convoyAction = isDemo
+    ? "none"
+    : convoyDestinationAction({
+        me: me.id,
+        party: partyDestination,
+        mine: destination,
+        navigating: isNavigating,
+        handledAt: dismissedConvoyAt,
+        followedKey: null,
+      });
+
+  useEffect(() => {
+    if (isDemo || !partyDestination) return;
+    const action = convoyDestinationAction({
       me: me.id,
       party: partyDestination,
       mine: destination,
       navigating: isNavigating,
-      dismissedAt: dismissedConvoyAt,
+      handledAt: handledAtRef.current,
+      followedKey: followedKeyRef.current,
     });
-  const convoyDestinationSetter = party?.members.find(
-    (member) => member.userId === partyDestination?.setBy,
-  );
+    if (action !== "follow") return;
+    handledAtRef.current = partyDestination.setAt;
+    useChosenDestination.getState().setDestination({
+      latitude: partyDestination.latitude,
+      longitude: partyDestination.longitude,
+      label: partyDestination.label,
+    });
+    const notice = { name: setterName.split(" ")[0], label: partyDestination.label };
+    const show = setTimeout(() => setConvoyNotice(notice), 0);
+    const hide = setTimeout(() => setConvoyNotice(null), 7_000);
+    return () => {
+      clearTimeout(show);
+      clearTimeout(hide);
+    };
+  }, [isDemo, me.id, partyDestination, destination, isNavigating, setterName]);
+
+  const offerConvoyDestination = convoyAction === "offer" && partyDestination != null;
   const followConvoyDestination = () => {
     if (!partyDestination) return;
     useChosenDestination.getState().setDestination({
@@ -766,15 +834,26 @@ export default function NavigationScreen() {
               onChangeRoute={() => router.push("/destino" as Href)}
               onClose={clearDestination}
             />
+            {convoyNotice ? (
+              <View
+                pointerEvents="none"
+                style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
+              >
+                <View style={[styles.convoyNotice, chrome.surface]}>
+                  <Ionicons name="flag" size={16} color={chrome.text} />
+                  <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={{ flex: 1 }}>
+                    {convoyNotice.name} cambió el destino: {convoyNotice.label}
+                  </AppText>
+                </View>
+              </View>
+            ) : null}
             {offerConvoyDestination && partyDestination ? (
               <View
                 pointerEvents="box-none"
                 style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
               >
                 <ConvoyDestinationCard
-                  setterName={
-                    convoyDestinationSetter?.profile.displayName ?? "Un piloto"
-                  }
+                  setterName={setterName}
                   label={partyDestination.label}
                   changed
                   onFollow={followConvoyDestination}
@@ -1104,9 +1183,7 @@ export default function NavigationScreen() {
 
                 {offerConvoyDestination && partyDestination ? (
                   <ConvoyDestinationCard
-                    setterName={
-                      convoyDestinationSetter?.profile.displayName ?? "Un piloto"
-                    }
+                    setterName={setterName}
                     label={partyDestination.label}
                     changed={isNavigating}
                     onFollow={followConvoyDestination}
@@ -1147,6 +1224,14 @@ export default function NavigationScreen() {
 
 const styles = StyleSheet.create({
   convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg },
+  convoyNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
   root: { flex: 1, backgroundColor: colors.bg },
   overlay: {
     position: "absolute",

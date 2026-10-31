@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId } from 'react';
+import { AppState } from 'react-native';
 
 import {
   applyMemberPatches,
@@ -186,6 +187,9 @@ export function useActiveParty() {
   const query = useQuery({
     queryKey: ['party', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    // Respaldo del tiempo real: si se corta (cobertura, segundo plano), el
+    // destino y las posiciones llegan igual como mucho en 15 s.
+    refetchInterval: (current) => (current.state.data ? 15_000 : false),
     queryFn: async (): Promise<PartyView | null> => {
       if (!account || !supabase) return null;
 
@@ -216,6 +220,16 @@ export function useActiveParty() {
   });
 
   const partyId = query.data?.id ?? null;
+
+  // Al volver a la app se pone al día al momento (el canal pudo cortarse).
+  const refetchParty = query.refetch;
+  useEffect(() => {
+    if (demo) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refetchParty();
+    });
+    return () => subscription.remove();
+  }, [demo, refetchParty]);
 
   useEffect(() => {
     if (demo || !supabase || !account) return;

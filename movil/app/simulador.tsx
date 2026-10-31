@@ -54,7 +54,8 @@ export default function SimulatorScreen() {
     const store = useChosenDestination.getState();
     // Los destinos de prueba no se guardan en tus recientes.
     const recents = store.recents.filter((item) => item.label !== TEST_LABEL);
-    store.setDestination(target);
+    // Nunca se comparte con una party real.
+    store.setDestination({ ...target, personal: true });
     useChosenDestination.setState({ recents });
     store.startNavigation();
     waitForRoute();
