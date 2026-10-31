@@ -14,7 +14,8 @@ const INGEST_EVERY_MS = 2 * 60_000;
 export function useTripRecorder(
   location: { latitude: number; longitude: number; speedKmh?: number | null },
   vehicleName?: string,
-  options?: { walking?: boolean },
+  // test: viaje del simulador (no cuenta en totales ni récords).
+  options?: { walking?: boolean; test?: boolean },
 ) {
   const hydrate = useTrips((state) => state.hydrate);
   const ingestBackground = useTrips((state) => state.ingestBackground);
@@ -25,6 +26,7 @@ export function useTripRecorder(
   const trips = useTrips((state) => state.trips);
   const hydrated = useTrips((state) => state.hydrated);
   const walking = options?.walking ?? false;
+  const test = options?.test ?? false;
   const trackingEnabled = useSession((state) => state.trackingEnabled);
 
   useEffect(() => {
@@ -51,8 +53,8 @@ export function useTripRecorder(
   useEffect(() => {
     // Caminando o con tracking automático desactivado no se graba ruta de coche.
     if (walking || !trackingEnabled) return;
-    recordPoint({ latitude, longitude, speedKmh });
-  }, [latitude, longitude, speedKmh, recordPoint, trackingEnabled, walking]);
+    recordPoint({ latitude, longitude, speedKmh, test });
+  }, [latitude, longitude, speedKmh, recordPoint, trackingEnabled, walking, test]);
 
   // Al empezar a caminar (coche aparcado) se cierra el viaje de coche.
   useEffect(() => {
@@ -66,7 +68,14 @@ export function useTripRecorder(
   useEffect(() => {
     if (!hydrated) return;
     for (const trip of trips) {
-      if (!trip.endedAt || trip.recordsSubmitted || submittingRef.current.has(trip.id)) continue;
+      if (
+        !trip.endedAt ||
+        trip.test ||
+        trip.recordsSubmitted ||
+        submittingRef.current.has(trip.id)
+      ) {
+        continue;
+      }
       submittingRef.current.add(trip.id);
       void submitTripSpeedRecords(trip, vehicleName)
         .then((done) => {

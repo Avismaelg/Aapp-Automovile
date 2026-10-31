@@ -171,4 +171,147 @@ describe('registro automático de rutas', () => {
     expect(totals.drives).toBe(31);
     expect(totals.distanceM).toBeGreaterThan(30_400);
   });
+
+  it('guarda distancia, tiempo, media y máxima de un viaje con tapón', async () => {
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    let at = start;
+    let lat = LAT;
+    const step = (speedKmh: number, seconds: number) => {
+      for (let s = 0; s < seconds; s += 5) {
+        at += 5_000;
+        lat += (speedKmh / 3.6) * 5 * 0.000009;
+        record({ latitude: lat, longitude: LNG, speedKmh, at });
+      }
+    };
+    step(40, 60); // ~660 m
+    step(0, 180); // tapón de 3 min
+    step(6, 30);
+    step(72, 60); // ~1,2 km a 72 km/h
+    const lastDrivingAt = at;
+    step(4, 60); // caminando tras aparcar: no suma
+    await useTrips.getState().stopTrip();
+
+    const [trip] = useTrips.getState().trips;
+    expect(trip).toBeDefined();
+    expect(trip.distanceM).toBeGreaterThan(1_700);
+    expect(trip.distanceM).toBeLessThan(2_000);
+    expect(trip.maxSpeedKmh).toBe(72);
+    // Termina en el último punto en coche, no al terminar de caminar.
+    expect(trip.endedAt).toBe(lastDrivingAt);
+    const minutes = ((trip.endedAt ?? 0) - trip.startedAt) / 60_000;
+    expect(minutes).toBeGreaterThan(5);
+    expect(minutes).toBeLessThan(6.5);
+    // Media real con el tapón incluido: ~20 km/h.
+    expect(trip.avgSpeedKmh).toBeGreaterThan(15);
+    expect(trip.avgSpeedKmh).toBeLessThan(25);
+    expect(useTrips.getState().totals.drives).toBe(1);
+  });
+
+  it('los viajes de prueba se ven, no suman y se borran', async () => {
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    for (let index = 0; index < 20; index += 1) {
+      record({
+        latitude: north(index * 0.1),
+        longitude: LNG,
+        speedKmh: 50,
+        at: start + index * 5_000,
+        test: true,
+      });
+    }
+    expect(useTrips.getState().active?.test).toBe(true);
+    await useTrips.getState().stopTrip();
+
+    expect(useTrips.getState().trips).toHaveLength(1);
+    expect(useTrips.getState().trips[0].test).toBe(true);
+    expect(useTrips.getState().totals.drives).toBe(0);
+
+    await useTrips.getState().removeTestTrips();
+    expect(useTrips.getState().trips).toHaveLength(0);
+  });
+
+  it('un viaje real y uno de prueba nunca se mezclan', () => {
+    const start = Date.now();
+    drive(0, 6, start, 5_000);
+    const realId = useTrips.getState().active?.id;
+    expect(useTrips.getState().active?.test).toBeUndefined();
+
+    const record = useTrips.getState().recordPoint;
+    for (let index = 0; index < 4; index += 1) {
+      record({
+        latitude: north(10 + index),
+        longitude: LNG,
+        speedKmh: 40,
+        at: start + 60_000 + index * 5_000,
+        test: true,
+      });
+    }
+    const { trips, active, totals } = useTrips.getState();
+    expect(trips[0]?.id).toBe(realId);
+    expect(trips[0]?.test).toBeUndefined();
+    expect(totals.drives).toBe(1);
+    expect(active?.test).toBe(true);
+  });
+
+  it('un viaje de prueba no desplaza los 30 reales', () => {
+    const real = Array.from({ length: 30 }, (_, index) => ({
+      id: `r${index}`,
+      startedAt: Date.now() - (index + 1) * 3_600_000,
+      endedAt: Date.now() - (index + 1) * 3_600_000 + 600_000,
+      distanceM: 1_000,
+      maxSpeedKmh: 50,
+      avgSpeedKmh: 30,
+      points: [],
+    }));
+    useTrips.setState({ trips: real });
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    for (let index = 0; index < 20; index += 1) {
+      record({
+        latitude: north(index * 0.1),
+        longitude: LNG,
+        speedKmh: 50,
+        at: start + index * 5_000,
+        test: true,
+      });
+    }
+    void useTrips.getState().stopTrip();
+    const trips = useTrips.getState().trips;
+    expect(trips).toHaveLength(31);
+    expect(trips.filter((trip) => !trip.test)).toHaveLength(30);
+  });
+
+  it('los puntos reales de segundo plano no cortan un viaje de prueba', async () => {
+    const start = Date.now();
+    const record = useTrips.getState().recordPoint;
+    for (let index = 0; index < 6; index += 1) {
+      record({
+        latitude: north(index),
+        longitude: LNG,
+        speedKmh: 50,
+        at: start + index * 5_000,
+        test: true,
+      });
+    }
+    const testId = useTrips.getState().active?.id;
+    // Lote del GPS real (parado en casa) que llega al volver a primer plano.
+    await saveBackgroundBatch([
+      { latitude: LAT, longitude: LNG, speedKmh: 0, at: start + 31_000 },
+      { latitude: LAT, longitude: LNG, speedKmh: 0, at: start + 32_000 },
+    ]);
+    await useTrips.getState().ingestBackground();
+    for (let index = 6; index < 10; index += 1) {
+      record({
+        latitude: north(index),
+        longitude: LNG,
+        speedKmh: 50,
+        at: start + 30_000 + index * 5_000,
+        test: true,
+      });
+    }
+
+    expect(useTrips.getState().active?.id).toBe(testId);
+    expect(useTrips.getState().trips).toHaveLength(0);
+  });
 });

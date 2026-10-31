@@ -3,7 +3,15 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AppText, Card, EmptyState, IconButton, Screen } from '@/src/components/ui';
+import {
+  AppText,
+  EmptyState,
+  IconButton,
+  Pill,
+  Screen,
+  ScreenHeader,
+  Stat,
+} from '@/src/components/ui';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 
@@ -38,14 +46,12 @@ export default function TripsScreen() {
   const active = useTrips((state) => state.active);
   const stopTrip = useTrips((state) => state.stopTrip);
 
+  // Los viajes de prueba del simulador se ven en la lista pero no suman.
   const totals = useMemo(() => {
-    const distanceM = trips.reduce((sum, trip) => sum + trip.distanceM, 0);
-    const durationMs = trips.reduce(
-      (sum, trip) => sum + ((trip.endedAt ?? trip.startedAt) - trip.startedAt),
-      0,
-    );
-    const bestSpeed = trips.reduce((best, trip) => Math.max(best, trip.maxSpeedKmh), 0);
-    return { distanceM, durationMs, bestSpeed };
+    const real = trips.filter((trip) => !trip.test);
+    const distanceM = real.reduce((sum, trip) => sum + trip.distanceM, 0);
+    const bestSpeed = real.reduce((best, trip) => Math.max(best, trip.maxSpeedKmh), 0);
+    return { count: real.length, distanceM, bestSpeed };
   }, [trips]);
 
   const [now, setNow] = useState(() => Date.now());
@@ -56,59 +62,48 @@ export default function TripsScreen() {
     return () => clearInterval(timer);
   }, [active]);
 
-  const liveStats = active
-    ? {
-        durationMs: now - active.startedAt,
-        distanceM: active.distanceM,
-      }
-    : null;
-
   return (
     <Screen>
-      <View style={styles.header}>
-        <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
-        <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.accent}>RUTAS RECORRIDAS</AppText>
-          <AppText variant="h1" style={{ marginTop: 2 }}>Mis rutas</AppText>
-        </View>
+      <View style={styles.topBar}>
+        <IconButton icon="chevron-back" size={40} onPress={() => router.back()} />
         <IconButton
           icon="trophy-outline"
           size={40}
           onPress={() => router.push('/records' as never)}
+          accessibilityLabel="Récords"
+        />
+      </View>
+      <ScreenHeader title="Mis rutas" subtitle="Se graban solas al conducir" />
+
+      <View style={styles.summary}>
+        <Stat value={String(totals.count)} label="rutas" align="center" />
+        <Stat value={formatKm(totals.distanceM)} label="en total" align="center" />
+        <Stat
+          value={totals.bestSpeed > 0 ? formatSpeed(totals.bestSpeed) : '--'}
+          label="máxima"
+          align="center"
         />
       </View>
 
-      <Card style={styles.summary}>
-        <View style={styles.summaryItem}>
-          <AppText variant="h2">{trips.length}</AppText>
-          <AppText variant="caption" color={colors.muted}>rutas</AppText>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.summaryItem}>
-          <AppText variant="h2">{(totals.distanceM / 1000).toFixed(0)}</AppText>
-          <AppText variant="caption" color={colors.muted}>km totales</AppText>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.summaryItem}>
-          <AppText variant="h2" color={colors.lime}>
-            {totals.bestSpeed > 0 ? Math.round(totals.bestSpeed) : '--'}
-          </AppText>
-          <AppText variant="caption" color={colors.muted}>km/h máx</AppText>
-        </View>
-      </Card>
-
-      {active && liveStats ? (
-        <Card style={styles.activeCard}>
+      {active ? (
+        <View style={styles.activeCard}>
           <View style={styles.recordingDot} />
           <View style={{ flex: 1 }}>
-            <AppText variant="bodyStrong">Grabando ruta ahora</AppText>
+            <AppText variant="bodyStrong">
+              {active.test ? 'Grabando viaje de prueba' : 'Grabando ruta ahora'}
+            </AppText>
             <AppText variant="caption" color={colors.muted}>
-              {formatDuration(liveStats.durationMs)} · {formatKm(liveStats.distanceM)} ·{' '}
+              {formatDuration(now - active.startedAt)} · {formatKm(active.distanceM)} ·{' '}
               {formatSpeed(active.maxSpeedKmh)} máx
             </AppText>
           </View>
-          <IconButton icon="stop-circle-outline" size={36} tone="accent" onPress={() => void stopTrip()} />
-        </Card>
+          <IconButton
+            icon="stop"
+            size={38}
+            onPress={() => void stopTrip()}
+            accessibilityLabel="Terminar ruta"
+          />
+        </View>
       ) : null}
 
       {trips.length === 0 && !active ? (
@@ -119,86 +114,67 @@ export default function TripsScreen() {
         />
       ) : null}
 
-      {trips.map((trip) => (
-        <Card key={trip.id} style={styles.trip}>
-          <View style={styles.tripIcon}>
-            <Ionicons name="navigate" size={18} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.tripTitleRow}>
-              <AppText variant="bodyStrong">{formatDate(trip.startedAt)}</AppText>
-              {trip.recordsSubmitted ? (
-                <Ionicons name="trophy" size={13} color={colors.lime} />
-              ) : null}
+      {trips.length > 0 ? (
+        <View style={styles.group}>
+          {trips.map((trip, index) => (
+            <View key={trip.id} style={[styles.trip, index > 0 && styles.rowDivider]}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.tripTitleRow}>
+                  <AppText variant="bodyStrong">{formatDate(trip.startedAt)}</AppText>
+                  {trip.test ? <Pill label="Prueba" /> : null}
+                  {trip.recordsSubmitted ? (
+                    <Ionicons name="trophy-outline" size={13} color={colors.muted} />
+                  ) : null}
+                </View>
+                <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
+                  {formatDuration((trip.endedAt ?? trip.startedAt) - trip.startedAt)} · media{' '}
+                  {formatSpeed(trip.avgSpeedKmh)} · máx {formatSpeed(trip.maxSpeedKmh)}
+                </AppText>
+              </View>
+              <AppText variant="title">{formatKm(trip.distanceM)}</AppText>
             </View>
-            <AppText variant="caption" color={colors.muted}>
-              {formatKm(trip.distanceM)} ·{' '}
-              {formatDuration((trip.endedAt ?? trip.startedAt) - trip.startedAt)} · media{' '}
-              {formatSpeed(trip.avgSpeedKmh)}
-            </AppText>
-            <View style={styles.tripSpeedRow}>
-              <AppText variant="label" color={colors.lime}>
-                MÁX {formatSpeed(trip.maxSpeedKmh)}
-              </AppText>
-              <AppText variant="caption" color={colors.dim}>
-                {trip.points.length} puntos GPS
-              </AppText>
-            </View>
-          </View>
-        </Card>
-      ))}
+          ))}
+        </View>
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
   summary: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
     paddingVertical: spacing.lg,
-    marginBottom: spacing.md,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
   },
-  summaryItem: { flex: 1, alignItems: 'center', gap: 2 },
-  divider: { width: 1, height: 34, backgroundColor: colors.border },
   activeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginBottom: spacing.md,
-    borderColor: 'rgba(201,255,77,0.35)',
+    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
   },
-  recordingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.lime,
+  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger },
+  group: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
   },
   trip: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: 8,
-  },
-  tripIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    backgroundColor: colors.accentSoft,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSoft,
   },
   tripTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tripSpeedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 5,
-  },
 });

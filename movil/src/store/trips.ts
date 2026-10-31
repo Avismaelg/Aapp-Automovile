@@ -20,6 +20,9 @@ export type Trip = {
   avgSpeedKmh: number;
   points: TripPoint[];
   recordsSubmitted?: boolean;
+  // Grabado desde el simulador: no cuenta en totales ni récords y se borra
+  // al parar la simulación.
+  test?: boolean;
 };
 
 // Totales de toda la vida del dispositivo: el historial solo guarda los
@@ -44,8 +47,10 @@ type TripsState = {
     speedKmh: number | null;
     at?: number;
     source?: 'live' | 'background';
+    test?: boolean;
   }) => void;
   stopTrip: () => Promise<void>;
+  removeTestTrips: () => Promise<void>;
   markRecordsSubmitted: (tripId: string) => void;
 };
 
@@ -144,10 +149,13 @@ function archiveTrip(
 ): { trips: Trip[]; totals: TripTotals } {
   if (trip.distanceM < MIN_TRIP_DISTANCE_M) return { trips: state.trips, totals: state.totals };
   const finished = finishTrip(trip, endedAt);
+  const sorted = [finished, ...state.trips].sort((a, b) => b.startedAt - a.startedAt);
+  // Los viajes de prueba no ocupan sitio: nunca desplazan uno real.
+  const real = sorted.filter((item) => !item.test).slice(0, MAX_TRIPS);
+  const trips = sorted.filter((item) => item.test || real.includes(item));
+  if (trip.test) return { trips, totals: state.totals };
   return {
-    trips: [finished, ...state.trips]
-      .sort((a, b) => b.startedAt - a.startedAt)
-      .slice(0, MAX_TRIPS),
+    trips,
     totals: {
       drives: state.totals.drives + 1,
       distanceM: state.totals.distanceM + finished.distanceM,
@@ -243,8 +251,19 @@ export const useTrips = create<TripsState>((set, get) => ({
     liveBlocked = true;
   },
 
-  recordPoint: ({ latitude, longitude, speedKmh, at, source = 'live' }) => {
+  recordPoint: ({ latitude, longitude, speedKmh, at, source = 'live', test = false }) => {
     if (source === 'live' && liveBlocked) return;
+    const current = get().active;
+    // Durante una simulación el servicio de fondo sigue mandando el GPS real:
+    // esos puntos no deben cortar ni ensuciar el viaje de prueba.
+    if (source === 'background' && current?.test) return;
+    // Un viaje real y uno de prueba nunca se mezclan.
+    if (current && Boolean(current.test) !== test) {
+      set({ active: null, ...archiveTrip(get(), current, lastPointAt(current)) });
+      void persistAll();
+      fastSamples = 0;
+      pendingStart = null;
+    }
     const now = at ?? Date.now();
     // El GPS en primer plano y los lotes del servicio de fondo se solapan:
     // una muestra igual o anterior a la última ya está contada.
@@ -294,6 +313,7 @@ export const useTrips = create<TripsState>((set, get) => ({
         maxSpeedKmh: Math.max(startPoint.speedKmh ?? speed, speed),
         avgSpeedKmh: speed,
         points: [startPoint],
+        ...(test ? { test: true } : null),
       };
       lastMovingAt = now;
       set({ active: trip });
@@ -357,7 +377,17 @@ export const useTrips = create<TripsState>((set, get) => ({
   stopTrip: async () => {
     const active = get().active;
     if (!active) return;
-    set({ active: null, ...archiveTrip(get(), active, Date.now()) });
+    // Termina en el último punto en coche: caminar después no suma tiempo.
+    set({ active: null, ...archiveTrip(get(), active, lastPointAt(active)) });
+    await persistAll();
+  },
+
+  removeTestTrips: async () => {
+    const active = get().active;
+    set({
+      trips: get().trips.filter((trip) => !trip.test),
+      active: active?.test ? null : active,
+    });
     await persistAll();
   },
 

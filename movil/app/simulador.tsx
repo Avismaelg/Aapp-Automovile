@@ -2,13 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
-import { AppText, Button, Card, IconButton, Screen, SectionHeader } from '@/src/components/ui';
+import {
+  AppText,
+  Button,
+  Card,
+  IconButton,
+  Screen,
+  ScreenHeader,
+  SectionHeader,
+} from '@/src/components/ui';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import {
   armDetour,
   offsetPoint,
   PHASE_LABELS,
   runParkingScenario,
+  runRecordedTripScenario,
   runTrafficScenario,
   setCruiseKmh,
   setSimParty,
@@ -71,6 +80,13 @@ export default function SimulatorScreen() {
     toMap();
   };
 
+  const recordedTrip = () => {
+    ensureStarted();
+    useParking.getState().clearSpot();
+    runRecordedTripScenario();
+    toMap();
+  };
+
   const traffic = (withSensor: boolean) => {
     ensureStarted();
     useParking.getState().clearSpot();
@@ -80,15 +96,13 @@ export default function SimulatorScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
-        <AppText variant="h2" style={styles.title}>
-          Simulador
-        </AppText>
+      <View style={styles.topBar}>
+        <IconButton icon="chevron-back" size={40} onPress={() => router.back()} />
       </View>
+      <ScreenHeader title="Simulador" subtitle="Prueba la app sin conducir" />
 
       <Card style={styles.status}>
-        <Ionicons name="flask" size={20} color="#a78bfa" />
+        <View style={[styles.statusDot, sim.active && styles.statusDotOn]} />
         <View style={styles.statusText}>
           <AppText variant="bodyStrong">
             {sim.active ? `${PHASE_LABELS[sim.phase]} · ${Math.round(sim.fix?.speedKmh ?? 0)} km/h` : 'Apagado'}
@@ -101,7 +115,7 @@ export default function SimulatorScreen() {
         </View>
       </Card>
 
-      <SectionHeader title="Velocidad de crucero" />
+      <SectionHeader title="Velocidad de crucero (km/h)" />
       <View style={styles.speeds}>
         {SPEEDS.map((speed) => (
           <Pressable
@@ -111,8 +125,8 @@ export default function SimulatorScreen() {
             accessibilityRole="button"
             accessibilityState={{ selected: sim.cruiseKmh === speed }}
           >
-            <AppText variant="bodyStrong" color={sim.cruiseKmh === speed ? '#120802' : colors.text}>
-              {speed} km/h
+            <AppText variant="bodyStrong" color={sim.cruiseKmh === speed ? colors.bg : colors.textSoft}>
+              {speed}
             </AppText>
           </Pressable>
         ))}
@@ -147,6 +161,12 @@ export default function SimulatorScreen() {
           onPress={parking}
         />
         <Test
+          icon="stats-chart-outline"
+          title="Viaje completo (se graba)"
+          detail="Ciudad, un tapón, 1,2 km de avenida y aparcar. Se guarda en Mis rutas como prueba (no cuenta en tus totales) y se borra al parar."
+          onPress={recordedTrip}
+        />
+        <Test
           icon="hourglass"
           title="Atasco (con sensor)"
           detail="Varios minutos parado y a trompicones con el teléfono diciendo «en vehículo». No debe marcar aparcamiento."
@@ -159,7 +179,9 @@ export default function SimulatorScreen() {
           onPress={() => traffic(false)}
         />
         <View style={styles.partyRow}>
-          <Ionicons name="people" size={20} color={colors.accent} />
+          <View style={styles.testIcon}>
+            <Ionicons name="people-outline" size={18} color={colors.text} />
+          </View>
           <View style={styles.statusText}>
             <AppText variant="bodyStrong">Party en convoy</AppText>
             <AppText variant="caption" color={colors.muted}>
@@ -172,7 +194,8 @@ export default function SimulatorScreen() {
               ensureStarted();
               setSimParty(value);
             }}
-            trackColor={{ false: colors.surfaceHigh, true: colors.accent }}
+            trackColor={{ false: colors.surfaceHigh, true: colors.green }}
+            thumbColor={colors.white}
           />
         </View>
       </Card>
@@ -180,8 +203,7 @@ export default function SimulatorScreen() {
       {sim.active ? (
         <Button
           label="Parar simulación"
-          icon="stop-circle-outline"
-          variant="secondary"
+          variant="danger"
           onPress={stopSimulation}
           style={{ marginTop: spacing.lg }}
         />
@@ -209,7 +231,7 @@ function Test({
       accessibilityLabel={title}
     >
       <View style={styles.testIcon}>
-        <Ionicons name={icon} size={18} color="#120802" />
+        <Ionicons name={icon} size={18} color={colors.text} />
       </View>
       <View style={styles.statusText}>
         <AppText variant="bodyStrong">{title}</AppText>
@@ -217,34 +239,44 @@ function Test({
           {detail}
         </AppText>
       </View>
-      <Ionicons name="play" size={16} color={colors.lime} />
+      <Ionicons name="play-circle" size={26} color={colors.textSoft} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  title: { flex: 1 },
-  status: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  topBar: { flexDirection: 'row', marginTop: spacing.sm },
+  status: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg },
+  statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.dim },
+  statusDotOn: { backgroundColor: colors.green },
   statusText: { flex: 1, gap: 2 },
-  speeds: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  speed: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  speeds: {
+    flexDirection: 'row',
+    padding: 4,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  speedActive: { backgroundColor: colors.lime, borderColor: colors.lime },
-  tests: { gap: spacing.md },
-  test: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  speed: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.pill,
+  },
+  speedActive: { backgroundColor: colors.text },
+  tests: { paddingVertical: spacing.xs },
+  test: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
   testIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.lime,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  partyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  partyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
 });

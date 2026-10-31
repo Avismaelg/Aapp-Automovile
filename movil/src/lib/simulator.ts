@@ -4,6 +4,7 @@ import { partyMembers } from '@/src/data/mock';
 import { recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
 import type { MotionHint } from '@/src/lib/parking-logic';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
+import { useTrips } from '@/src/store/trips';
 
 // Simulador de pruebas: mueve tu posición por una ruta real (con frenadas en
 // las curvas), simula aparcar, caminar y volver al coche, y amigos de una
@@ -49,6 +50,8 @@ type SimState = {
   cruiseKmh: number;
   party: boolean;
   members: SimMember[];
+  // Prueba de grabación: los viajes simulados se graban (marcados como prueba).
+  recordTrips: boolean;
 };
 
 export const useSimulator = create<SimState>(() => ({
@@ -59,6 +62,7 @@ export const useSimulator = create<SimState>(() => ({
   cruiseKmh: 50,
   party: false,
   members: [],
+  recordTrips: false,
 }));
 
 export const PHASE_LABELS: Record<SimPhase, string> = {
@@ -434,18 +438,64 @@ export function runTrafficScenario(withSensor: boolean) {
   });
 }
 
+// Viaje completo grabado: ciudad, un tapón, avenida a velocidad de crucero
+// y aparcar al final. Sirve para revisar en «Mis rutas» la distancia, el
+// tiempo, la media y la máxima.
+export function runRecordedTripScenario() {
+  const origin = currentPoint();
+  if (!origin) return;
+  const heading = useSimulator.getState().fix?.heading ?? 0;
+  useSimulator.setState({ label: 'Viaje completo (se graba)', recordTrips: true });
+  emitMotion('vehicle', 'enter');
+  const city = offsetPoint(origin, heading, 500);
+  const jamEnd = offsetPoint(city, heading, 60);
+  const avenueEnd = offsetPoint(jamEnd, heading + 90, 1200);
+  drive([origin, city], 'driving', () => {
+    crawl(
+      [city, jamEnd],
+      [
+        [0, 40],
+        [6, 20],
+        [0, 30],
+        [5, 15],
+      ],
+      'traffic',
+      () => {
+        const fix = useSimulator.getState().fix;
+        const from: LatLng = fix ? [fix.latitude, fix.longitude] : jamEnd;
+        drive([from, avenueEnd], 'driving', () => {
+          wait(8, 'parking', () => {
+            emitMotion('vehicle', 'exit');
+            emitMotion('foot', 'enter');
+            walk(offsetPoint(avenueEnd, heading, 80), 'walking-away', () => idle());
+          });
+        });
+      },
+    );
+  });
+}
+
 export function stopSimulation() {
   if (timer) clearInterval(timer);
   timer = null;
   script = null;
   trail = [];
   motion = [];
+  void useTrips.getState().removeTestTrips();
   if (realSpot !== undefined) {
     if (realSpot) useParking.getState().setSpot(realSpot);
     else useParking.getState().clearSpot();
     realSpot = undefined;
   }
-  useSimulator.setState({ active: false, phase: 'idle', label: '', fix: null, party: false, members: [] });
+  useSimulator.setState({
+    active: false,
+    phase: 'idle',
+    label: '',
+    fix: null,
+    party: false,
+    members: [],
+    recordTrips: false,
+  });
 }
 
 export function isSimulating() {

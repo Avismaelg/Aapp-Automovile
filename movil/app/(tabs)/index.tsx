@@ -126,9 +126,12 @@ export default function NavigationScreen() {
   const vehicleName = primaryVehicle
     ? `${primaryVehicle.make} ${primaryVehicle.model}`
     : undefined;
-  // Los viajes simulados no se graban.
+  // Los viajes simulados no se graban, salvo en la prueba de grabación
+  // (quedan marcados como prueba y se borran al parar).
+  const simRecords = useSimulator((state) => state.recordTrips);
   const { active: activeTrip } = useTripRecorder(live.location, vehicleName, {
-    walking: walking || simulating,
+    walking: walking || (simulating && !simRecords),
+    test: simulating,
   });
   const speedLabel =
     live.location.speedKmh == null ? '--' : String(Math.round(live.location.speedKmh));
