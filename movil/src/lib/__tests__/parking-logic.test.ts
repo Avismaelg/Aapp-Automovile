@@ -211,13 +211,24 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     ...extra,
   });
 
+  // Aviso de subir al vehículo con la ubicación de ese momento (como el real).
+  const enterAt = (at: number, latitude = LAT, longitude = LNG): MotionFix => ({
+    type: 'vehicle',
+    transition: 'enter',
+    at,
+    latitude,
+    longitude,
+    accuracy: 15,
+    fixAt: at - 10_000,
+  });
+
   it('sin avisos, se mantiene', () => {
     expect(reconcileSpotWithMotion(oldSpot, [], T0 + 3_600_000).kind).toBe('keep');
   });
 
   it('subiste y bajaste del coche con la app cerrada: el coche está donde bajaste', () => {
     const events: MotionFix[] = [
-      { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
+      enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000),
     ];
     expect(reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000)).toEqual({
@@ -228,9 +239,9 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
 
   it('varios viajes con la app cerrada: vale la última bajada', () => {
     const events: MotionFix[] = [
-      { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
+      enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000),
-      { type: 'vehicle', transition: 'enter', at: T0 + 2_400_000 },
+      enterAt(T0 + 2_400_000, LAT + 5_000 * M),
       exitFix(T0 + 3_000_000, { latitude: LAT + 9_000 * M }),
     ];
     const result = reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000);
@@ -241,18 +252,18 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
   });
 
   it('subiste y no hay dónde bajaste: se quita el aparcamiento viejo', () => {
-    const events: MotionFix[] = [{ type: 'vehicle', transition: 'enter', at: T0 + 600_000 }];
+    const events: MotionFix[] = [enterAt(T0 + 600_000)];
     expect(reconcileSpotWithMotion(oldSpot, events, T0 + 900_000).kind).toBe('clear');
   });
 
   it('una ubicación imprecisa o vieja en la bajada no se usa', () => {
     const imprecise: MotionFix[] = [
-      { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
+      enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000, { accuracy: 500 }),
     ];
     expect(reconcileSpotWithMotion(oldSpot, imprecise, T0 + 3_600_000).kind).toBe('clear');
     const stale: MotionFix[] = [
-      { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
+      enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000, { fixAt: T0 }),
     ];
     expect(reconcileSpotWithMotion(oldSpot, stale, T0 + 3_600_000).kind).toBe('clear');
@@ -260,7 +271,7 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
 
   it('avisos de antes del aparcamiento no lo mueven', () => {
     const events: MotionFix[] = [
-      { type: 'vehicle', transition: 'enter', at: T0 - 1_800_000 },
+      enterAt(T0 - 1_800_000),
       exitFix(T0 - 60_000),
     ];
     expect(reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000).kind).toBe('keep');
@@ -268,9 +279,33 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
 
   it('sin aparcamiento previo, la bajada con ubicación crea uno', () => {
     const events: MotionFix[] = [
+      enterAt(T0 + 600_000),
+      exitFix(T0 + 1_800_000),
+    ];
+    expect(reconcileSpotWithMotion(null, events, T0 + 3_600_000).kind).toBe('keep');
+    const drives = [{ startedAt: T0 + 610_000, start: { latitude: LAT, longitude: LNG } }];
+    expect(reconcileSpotWithMotion(null, events, T0 + 3_600_000, drives).kind).toBe('move');
+  });
+
+  it('subir a un taxi o de copiloto lejos de tu coche no lo mueve', () => {
+    const events: MotionFix[] = [
+      enterAt(T0 + 600_000, LAT + 3_000 * M),
+      exitFix(T0 + 1_800_000),
+    ];
+    expect(reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000).kind).toBe('keep');
+  });
+
+  it('sin ubicación en la subida, decide el viaje grabado: empezó junto al coche o no', () => {
+    const noFix: MotionFix[] = [
       { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
       exitFix(T0 + 1_800_000),
     ];
-    expect(reconcileSpotWithMotion(null, events, T0 + 3_600_000).kind).toBe('move');
+    expect(reconcileSpotWithMotion(oldSpot, noFix, T0 + 3_600_000).kind).toBe('keep');
+    const fromCar = [{ startedAt: T0 + 620_000, start: { latitude: LAT + 50 * M, longitude: LNG } }];
+    expect(reconcileSpotWithMotion(oldSpot, noFix, T0 + 3_600_000, fromCar).kind).toBe('move');
+    const elsewhere = [{ startedAt: T0 + 620_000, start: { latitude: LAT + 2_000 * M, longitude: LNG } }];
+    expect(reconcileSpotWithMotion(oldSpot, noFix, T0 + 3_600_000, elsewhere).kind).toBe('keep');
+    const test = [{ startedAt: T0 + 620_000, start: { latitude: LAT, longitude: LNG }, test: true }];
+    expect(reconcileSpotWithMotion(null, noFix, T0 + 3_600_000, test).kind).toBe('keep');
   });
 });

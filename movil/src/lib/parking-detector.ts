@@ -1,6 +1,7 @@
 import { haversineMeters } from "@/src/lib/geo";
 import {
   evaluateStop,
+  OWN_CAR_RADIUS_M,
   reconcileSpotWithMotion,
   type GeoPoint,
   type MotionFix,
@@ -187,7 +188,9 @@ export function refineWithExit(spot: Spot, motion: MotionFix[]): Spot {
 // Al abrir la app: el final del último viaje grabado (también en segundo
 // plano) es donde quedó el coche, salvo que haya un aparcamiento más nuevo.
 export function spotFromTripEnd(
-  trip: { id: string; endedAt: number | null; points: GeoPoint[] } | undefined,
+  trip:
+    | { id: string; startedAt?: number; endedAt: number | null; points: GeoPoint[]; test?: boolean }
+    | undefined,
   spot: Spot | null,
   seenTripId: string | null,
   now: number,
@@ -203,7 +206,15 @@ export function spotFromTripEnd(
     return { spot: null, seen: null };
   }
   if (seenTripId === trip.id) return { spot: null, seen: null };
+  // Los viajes de prueba (simulador) nunca mueven el coche.
+  if (trip.test) return { spot: null, seen: trip.id };
   if (spot && spot.at >= trip.endedAt) return { spot: null, seen: trip.id };
+  // Un viaje que empezó lejos de tu coche aparcado no fue en tu coche (taxi,
+  // de copiloto): el coche sigue donde estaba.
+  const start = trip.points[0];
+  if (spot && start && haversineMeters(start, spot) > OWN_CAR_RADIUS_M) {
+    return { spot: null, seen: trip.id };
+  }
   return {
     spot: refineWithExit(
       { latitude: end.latitude, longitude: end.longitude, at: trip.endedAt },

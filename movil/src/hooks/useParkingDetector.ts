@@ -95,10 +95,17 @@ export function useParkingDetector(
       void whenHydrated(useParking).then(() => {
         const now = Date.now();
         const { spot, setSpot, clearSpot } = useParking.getState();
+        // Viajes grabados: distinguen tu coche de un taxi o de ir de copiloto.
+        const drives = useTrips.getState().trips.map((trip) => ({
+          startedAt: trip.startedAt,
+          start: trip.points[0] ?? null,
+          test: trip.test,
+        }));
         const decision = reconcileSpotWithMotion(
           spot,
           getMotionEvents(now - MOTION_WINDOW_MS),
           now,
+          drives,
         );
         if (decision.kind === "move") setSpot(decision.spot);
         else if (decision.kind === "clear" && !detector.pending) clearSpot();
@@ -115,14 +122,24 @@ export function useParkingDetector(
     detector.setDestination(destination ?? null);
   }, [detector, destination]);
 
-  // Empezar o parar una simulación no debe heredar paradas de antes.
-  useEffect(
-    () =>
-      useSimulator.subscribe((next, previous) => {
-        if (next.active !== previous.active) detector.reset();
-      }),
-    [detector],
-  );
+  // Empezar o parar una simulación no debe heredar paradas de antes, y el
+  // aparcamiento de la prueba no sustituye al real: al terminar vuelve el que
+  // había antes de simular.
+  useEffect(() => {
+    let realSpot: ParkingSpot | null | undefined;
+    return useSimulator.subscribe((next, previous) => {
+      if (next.active === previous.active) return;
+      detector.reset();
+      const parking = useParking.getState();
+      if (next.active) {
+        realSpot = parking.spot;
+      } else if (realSpot !== undefined) {
+        if (realSpot) parking.setSpot(realSpot);
+        else parking.clearSpot();
+        realSpot = undefined;
+      }
+    });
+  }, [detector]);
 
   useEffect(() => {
     const timer = setInterval(

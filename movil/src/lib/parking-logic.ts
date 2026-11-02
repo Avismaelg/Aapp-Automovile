@@ -142,6 +142,50 @@ export type MotionFix = MotionHint & Partial<GeoPoint> & { accuracy?: number; fi
 const FIX_MAX_ACCURACY_M = 80;
 const FIX_MAX_AGE_MS = 5 * 60_000;
 
+// Viajes grabados por Caravana (para saber si un vehículo era tu coche).
+export type DriveHint = { startedAt: number; start: GeoPoint | null; test?: boolean };
+
+// Subir a un vehículo a más de esto de tu coche aparcado no es subir a tu
+// coche (taxi, autobús, el coche de un amigo): el aparcamiento no se toca.
+export const OWN_CAR_RADIUS_M = 400;
+const ENTER_FIX_MAX_ACCURACY_M = 150;
+const DRIVE_MATCH_MS = 15 * 60_000;
+
+function metersBetween(a: GeoPoint, b: GeoPoint) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// ¿Ese «subir a un vehículo» fue subir a tu coche?
+// - Con aparcamiento guardado: si la subida fue junto al coche (por la
+//   ubicación del aviso o por dónde empezó el viaje grabado).
+// - Sin aparcamiento: solo si Caravana grabó un viaje en ese momento.
+export function enteredOwnCar(
+  spot: GeoPoint | null,
+  enter: MotionFix,
+  drives: DriveHint[],
+): boolean {
+  const near = drives.filter(
+    (drive) => !drive.test && Math.abs(drive.startedAt - enter.at) <= DRIVE_MATCH_MS,
+  );
+  if (!spot) return near.length > 0;
+  const enterFix =
+    enter.latitude != null &&
+    enter.longitude != null &&
+    enter.accuracy != null &&
+    enter.accuracy <= ENTER_FIX_MAX_ACCURACY_M &&
+    Math.abs(enter.at - (enter.fixAt ?? Infinity)) <= FIX_MAX_AGE_MS
+      ? { latitude: enter.latitude, longitude: enter.longitude }
+      : null;
+  if (enterFix) return metersBetween(enterFix, spot) <= OWN_CAR_RADIUS_M;
+  return near.some((drive) => drive.start != null && metersBetween(drive.start, spot) <= OWN_CAR_RADIUS_M);
+}
+
 export type SpotReconcile =
   | { kind: 'keep' }
   | { kind: 'move'; spot: GeoPoint & { at: number } }
@@ -149,18 +193,24 @@ export type SpotReconcile =
 
 // Con la app cerrada el GPS de fondo puede no haber grabado nada (Android lo
 // mata). El sensor de actividad sigue funcionando: si después del
-// aparcamiento guardado subiste a un vehículo y luego bajaste, el coche está
+// aparcamiento guardado subiste a TU coche y luego bajaste, el coche está
 // donde bajaste. Si subiste y no consta dónde bajaste, el punto viejo ya no
-// es fiable y se quita (mejor sin aparcamiento que uno falso).
+// es fiable y se quita (mejor sin aparcamiento que uno falso). Subir a otro
+// vehículo (taxi, autobús, de copiloto) no mueve tu coche.
 export function reconcileSpotWithMotion(
   spot: (GeoPoint & { at: number }) | null,
   events: MotionFix[],
   now: number,
+  drives: DriveHint[] = [],
 ): SpotReconcile {
   const sorted = [...events].sort((a, b) => a.at - b.at);
   const since = spot?.at ?? 0;
   const enter = sorted.find(
-    (event) => event.type === 'vehicle' && event.transition === 'enter' && event.at > since + 60_000,
+    (event) =>
+      event.type === 'vehicle' &&
+      event.transition === 'enter' &&
+      event.at > since + 60_000 &&
+      enteredOwnCar(spot, event, drives),
   );
   if (!enter) return { kind: 'keep' };
 
@@ -180,6 +230,7 @@ export function reconcileSpotWithMotion(
       { latitude: exit.latitude as number, longitude: exit.longitude as number, at: exit.at },
       sorted.filter((event) => event.at > exit.at),
       now,
+      drives,
     );
     if (later.kind !== 'keep') return later;
     return {

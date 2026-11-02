@@ -273,7 +273,8 @@ async function drive(
   profile: [number, number][],
   options: { walkTo?: LatLng; walkMode?: Mode } = {},
 ) {
-  sensor("vehicle", "enter", now + 40_000);
+  // El aviso real lleva la última ubicación del teléfono: junto al coche.
+  sensor("vehicle", "enter", now + 40_000, from);
   await travel(streets(from, to), profile);
   sensor("still", "enter", now + 10_000);
   await travel([to], [[0, 20]]);
@@ -378,7 +379,7 @@ describe("un día completo de uso", () => {
     await travel([HOME, HOME_CAR], [[4, 30]]);
     const toWork = streets(HOME_CAR, WORK_CAR);
     const half = lengthOf(toWork) / 2;
-    sensor("vehicle", "enter", now + 40_000);
+    sensor("vehicle", "enter", now + 40_000, HOME_CAR);
     await travel(toWork, [
       ...cruise(half, 45),
       [0, 90],
@@ -436,7 +437,7 @@ describe("un día completo de uso", () => {
     await travel([WORK_DESK, WORK_CAR], [[5, 110]]);
     const home = streets(WORK_CAR, HOME_CAR);
     const third = lengthOf(home) / 3;
-    sensor("vehicle", "enter", now + 40_000);
+    sensor("vehicle", "enter", now + 40_000, WORK_CAR);
     await travel(
       home.slice(0, 2),
       cruise(Math.min(third, lengthOf(home.slice(0, 2))), 50),
