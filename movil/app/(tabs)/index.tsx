@@ -68,6 +68,7 @@ import {
 } from "@/src/lib/convoy";
 import { useCreateChallenge } from "@/src/hooks/useChallenges";
 import { useTripRecorder } from "@/src/hooks/useTripRecorder";
+import { useFreeOrientation } from "@/src/hooks/useFreeOrientation";
 import { useVoiceGuidance } from "@/src/hooks/useVoiceGuidance";
 import { showError } from "@/src/lib/alerts";
 import { buildDrivingLine } from "@/src/lib/driving-line";
@@ -639,6 +640,8 @@ export default function NavigationScreen() {
   );
 
   const navigating = isNavigating && Boolean(destination);
+  // UI-04: navegando, la pantalla gira con el teléfono (soporte horizontal).
+  useFreeOrientation(navigating);
 
   // Antes de salir se ven las alternativas en gris; durante la navegación,
   // solo la ruta elegida.

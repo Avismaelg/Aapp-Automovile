@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, type Href } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -29,6 +30,11 @@ import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
 SplashScreen.preventAutoHideAsync();
+// La app va en vertical; solo el modo conducción y la navegación giran
+// (useFreeOrientation). app.json deja «default» para que iOS lo permita.
+if (Platform.OS !== 'web') {
+  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+}
 installWebAlert();
 
 const queryClient = new QueryClient({

@@ -24,6 +24,7 @@ import {
 } from '@/src/components/ui';
 import { activeChallenge, activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useFreeOrientation } from '@/src/hooks/useFreeOrientation';
 import { isDemoMode } from '@/src/lib/demo';
 import { useAuth } from '@/src/store/auth';
 import { formatClock } from '@/src/lib/format';
@@ -84,6 +85,7 @@ function DemoDriveScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
+  useFreeOrientation(true);
   const [partyTime, setPartyTime] = useState(activeParty.elapsedSeconds);
   const [challengeTime, setChallengeTime] = useState(activeChallenge.elapsedSeconds);
   const [talking, setTalking] = useState(false);
