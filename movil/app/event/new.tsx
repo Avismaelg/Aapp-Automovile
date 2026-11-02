@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Card, IconButton, Input } from '@/src/components/ui';
 import { errorMessage } from '@/src/lib/alerts';
 import { fetchRouteThrough } from '@/src/lib/event-routes';
-import type { EventRoute } from '@/src/lib/events';
+import { parseEventStart, type EventRoute } from '@/src/lib/events';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { formatSearchDistance, searchPlaces, type SearchPlace } from '@/src/lib/place-search';
 import { useCreateEvent } from '@/src/hooks/useEvents';
@@ -39,6 +39,8 @@ export default function NewEventScreen() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
   const [points, setPoints] = useState<SearchPlace[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchPlace[]>([]);
@@ -159,8 +161,17 @@ export default function NewEventScreen() {
       setFormError(t('Escribe un título para el evento.'));
       return;
     }
+    const start = parseEventStart(startDate, startTime);
+    if (!start.ok) {
+      setFormError(start.error);
+      return;
+    }
     if (points.length === 0) {
       setFormError(t('Elige al menos un punto: una ubicación o una salida y una meta.'));
+      return;
+    }
+    if (points.length > MAX_POINTS) {
+      setFormError(t('Máximo {0} puntos por evento.', MAX_POINTS));
       return;
     }
     if (points.length >= 2 && !route) {
@@ -171,17 +182,18 @@ export default function NewEventScreen() {
     }
 
     const useRoute = points.length >= 2 && route != null;
-    const start = points[0];
+    const first = points[0];
     const end = points[points.length - 1];
 
     try {
       const created = await createEvent.mutateAsync({
         title,
         description,
-        latitude: start.latitude,
-        longitude: start.longitude,
-        locationLabel: useRoute ? `${start.name} → ${end.name}` : start.name,
+        latitude: first.latitude,
+        longitude: first.longitude,
+        locationLabel: useRoute ? `${first.name} → ${end.name}` : first.name,
         route: useRoute ? route : null,
+        startsAt: start.iso,
       });
       router.replace(`/event/${created.id}` as Href);
     } catch (error) {
@@ -193,6 +205,7 @@ export default function NewEventScreen() {
 
   const canPublish =
     title.trim().length > 0 &&
+    startDate.trim().length > 0 &&
     points.length > 0 &&
     (points.length < 2 || (route != null && !calculating)) &&
     !createEvent.isPending;
@@ -232,6 +245,32 @@ export default function NewEventScreen() {
               placeholder={t('Ruta a la montaña, quedada en el malecón…')}
               maxLength={80}
             />
+            <View style={styles.dateRow}>
+              <Input
+                label={t('Fecha')}
+                value={startDate}
+                onChangeText={(value) => {
+                  setStartDate(value);
+                  setFormError(null);
+                }}
+                placeholder="AAAA-MM-DD"
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                style={styles.dateField}
+              />
+              <Input
+                label={t('Hora')}
+                value={startTime}
+                onChangeText={(value) => {
+                  setStartTime(value);
+                  setFormError(null);
+                }}
+                placeholder="HH:MM"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                style={styles.dateField}
+              />
+            </View>
             <Input
               label={t('Descripción (opcional)')}
               value={description}
@@ -431,6 +470,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md,
   },
+  dateRow: { flexDirection: 'row', gap: spacing.sm },
+  dateField: { flex: 1 },
   routeError: { borderColor: 'rgba(255,90,31,0.35)' },
   footer: {
     flexDirection: 'row',

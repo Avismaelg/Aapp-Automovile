@@ -41,3 +41,28 @@ export function formatEventDate(iso: string | null) {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${date.getDate()} ${MONTHS[date.getMonth()]} · ${hours}:${minutes}`;
 }
+
+// RF-17: fecha y hora del evento escritas como «AAAA-MM-DD» y «HH:MM» (hora
+// local). Se rechazan formatos inválidos y fechas pasadas.
+export function parseEventStart(
+  date: string,
+  time: string,
+  now = Date.now(),
+): { ok: true; iso: string } | { ok: false; error: string } {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+  if (!dateMatch) return { ok: false, error: t('Usa una fecha con formato AAAA-MM-DD.') };
+  const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(time.trim() || '00:00');
+  if (!timeMatch) return { ok: false, error: t('Usa una hora con formato HH:MM.') };
+  const [year, month, day] = [Number(dateMatch[1]), Number(dateMatch[2]), Number(dateMatch[3])];
+  const [hours, minutes] = [Number(timeMatch[1]), Number(timeMatch[2])];
+  const start = new Date(year, month - 1, day, hours, minutes);
+  const valid =
+    start.getFullYear() === year &&
+    start.getMonth() === month - 1 &&
+    start.getDate() === day &&
+    hours < 24 &&
+    minutes < 60;
+  if (!valid) return { ok: false, error: t('Esa fecha no existe.') };
+  if (start.getTime() < now) return { ok: false, error: t('La fecha del evento ya pasó. Elige una fecha futura.') };
+  return { ok: true, iso: start.toISOString() };
+}

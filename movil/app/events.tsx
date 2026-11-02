@@ -106,7 +106,7 @@ function EventCard({ event, onPress }: { event: AppEvent; onPress: () => void })
           <View style={{ flex: 1 }}>
             <AppText variant="bodyStrong" numberOfLines={1}>{event.title}</AppText>
             <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-              {event.hostName} · {formatEventDate(event.createdAt)}
+              {event.hostName} · {formatEventDate(event.startsAt ?? event.createdAt)}
             </AppText>
           </View>
           <Pill label={isRoute ? t('Ruta') : t('Ubicación')} tone={isRoute ? 'lime' : 'accent'} />

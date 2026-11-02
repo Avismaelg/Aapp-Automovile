@@ -155,12 +155,13 @@ export function useCreateEvent() {
       longitude: number | null;
       locationLabel: string | null;
       route: EventRoute | null;
+      startsAt: string | null;
     }): Promise<AppEvent> => {
       const event: AppEvent = {
         id: eventId(),
         title: input.title.trim(),
         description: input.description?.trim() || null,
-        startsAt: null,
+        startsAt: input.startsAt,
         hostName: account?.displayName ?? t('Piloto'),
         latitude: input.latitude,
         longitude: input.longitude,

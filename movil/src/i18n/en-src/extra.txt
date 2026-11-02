@@ -94,3 +94,8 @@
 =Sin permiso de ubicación · usando ubicación de demo|No location permission · using demo location
 =Sin motor de rutas disponible: es una línea directa, no una ruta por calles. Sigue las señales de tránsito.|No routing engine available: this is a straight line, not a street route. Follow the traffic signs.
 =No puedes enviarte una solicitud a ti mismo.|You can't send a request to yourself.
+=Usa una hora con formato HH:MM.|Use a time in HH:MM format.
+=Esa fecha no existe.|That date doesn't exist.
+=La fecha del evento ya pasó. Elige una fecha futura.|The event date has passed. Pick a future date.
+=Fecha|Date
+=Hora|Time

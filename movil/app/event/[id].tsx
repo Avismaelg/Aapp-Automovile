@@ -170,7 +170,7 @@ export default function EventDetailScreen() {
       <View style={styles.metaRow}>
         <Pill label={isRoute ? t('Ruta') : t('Ubicación')} tone={isRoute ? 'lime' : 'accent'} />
         <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-          {event.hostName} · {formatEventDate(event.createdAt)}
+          {event.hostName} · {formatEventDate(event.startsAt ?? event.createdAt)}
         </AppText>
       </View>
 
