@@ -1,7 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
+
+import { secureSessionStorage } from '@/src/lib/secure-session-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -12,7 +13,8 @@ export const isProductionBuild = process.env.EXPO_PUBLIC_APP_ENV === 'production
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl as string, supabaseAnonKey as string, {
       auth: {
-        storage: AsyncStorage,
+        // SW-01: sesión en el almacenamiento seguro del dispositivo.
+        storage: secureSessionStorage,
         autoRefreshToken: true,
         persistSession: true,
         // En web el enlace de confirmación de Supabase puede crear la sesión
