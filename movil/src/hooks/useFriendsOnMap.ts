@@ -7,6 +7,7 @@ import { useFriends } from '@/src/hooks/useFriends';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import {
   latestFriendPositions,
+  SHARE_OUTSIDE_PARTY,
   type FriendLocationRow,
   type PositionedFriend,
 } from '@/src/lib/party-invites';
@@ -37,10 +38,13 @@ export function useFriendsOnMap() {
     queryFn: async (): Promise<Map<string, PositionedFriend>> => {
       if (!supabase) return new Map();
       const [shared, party] = await Promise.all([
-        supabase
-          .from('friend_locations')
-          .select('user_id, lat, lng, updated_at')
-          .in('user_id', friendIds),
+        // RNF-10: fuera de una party no se lee la posición de nadie.
+        SHARE_OUTSIDE_PARTY
+          ? supabase
+              .from('friend_locations')
+              .select('user_id, lat, lng, updated_at')
+              .in('user_id', friendIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase
           .from('party_members')
           .select('user_id, last_lat, last_lng, last_seen_at')

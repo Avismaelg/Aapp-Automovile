@@ -39,7 +39,7 @@ import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
-import { lastSeenLabel } from "@/src/lib/party-invites";
+import { lastSeenLabel, SHARE_OUTSIDE_PARTY } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
 import { useFollow } from "@/src/store/follow";
 import { reachedNextStop } from "@/src/lib/stops";
@@ -297,7 +297,7 @@ export default function NavigationScreen() {
   });
   // Tus amigos te ven en su mapa (si lo permites; se pregunta una vez).
   useEffect(() => {
-    if (isDemo || friendCount === 0 || shareWithFriends !== null) return;
+    if (!SHARE_OUTSIDE_PARTY || isDemo || friendCount === 0 || shareWithFriends !== null) return;
     Alert.alert(
       t('¿Que tus amigos te vean en el mapa?'),
       t('Tus amigos verán tu última posición en su mapa, y tú la suya si también lo activan. Puedes cambiarlo en Perfil.'),

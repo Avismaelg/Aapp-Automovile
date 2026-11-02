@@ -28,6 +28,7 @@ import { useSharing } from '@/src/store/sharing';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 import { restartApp } from '@/modules/motion';
+import { SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
 import {
   distanceUnit,
   getCurrency,
@@ -306,20 +307,22 @@ export default function ProfileScreen() {
             />
           }
         />
-        <Row
-          icon="people-outline"
-          label={t('Mi ubicación para amigos')}
-          detail={t('Tus amigos te ven en su mapa')}
-          divider
-          right={
-            <Switch
-              value={shareWithFriends === true}
-              onValueChange={setShareWithFriends}
-              trackColor={{ false: colors.surfaceHigh, true: colors.green }}
-              thumbColor={colors.white}
-            />
-          }
-        />
+        {SHARE_OUTSIDE_PARTY ? (
+          <Row
+            icon="people-outline"
+            label={t('Mi ubicación para amigos')}
+            detail={t('Tus amigos te ven en su mapa')}
+            divider
+            right={
+              <Switch
+                value={shareWithFriends === true}
+                onValueChange={setShareWithFriends}
+                trackColor={{ false: colors.surfaceHigh, true: colors.green }}
+                thumbColor={colors.white}
+              />
+            }
+          />
+        ) : null}
         {profileSettings.map((setting, index) => (
           <Row
             key={setting.label}

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import { pushLivePosition, setLiveShareConfig } from '@/src/lib/live-share';
+import { SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
 import { supabase } from '@/src/lib/supabase';
 import { setConvoyMode } from '@/src/lib/tracking';
 import { useAuth } from '@/src/store/auth';
@@ -15,8 +16,9 @@ export function useLiveShare(
   { partyId, enabled }: { partyId: string | null; enabled: boolean },
 ) {
   const accountId = useAuth((state) => state.account?.id ?? null);
-  const friends = useSharing((state) => state.shareWithFriends === true);
-  const declined = useSharing((state) => state.shareWithFriends === false);
+  const chosen = useSharing((state) => state.shareWithFriends === true);
+  const friends = SHARE_OUTSIDE_PARTY && chosen;
+  const declined = !friends;
 
   useEffect(() => {
     void setLiveShareConfig({ accountId, partyId, friends });
@@ -34,7 +36,7 @@ export function useLiveShare(
     });
   }, [enabled, location]);
 
-  // Dejar de compartir borra tu última posición del servidor.
+  // Sin compartir con amigos (RNF-10) se borra tu última posición del servidor.
   useEffect(() => {
     if (!declined || !accountId || !supabase) return;
     void supabase.from('friend_locations').delete().eq('user_id', accountId);

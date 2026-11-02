@@ -6,6 +6,11 @@ import { t } from '@/src/i18n';
 
 // Las invitaciones caducan con la party (24 h); más viejas no se muestran.
 export const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+// RNF-10: la ubicación solo se comparte dentro de una party activa. La opción
+// de que tus amigos te vean fuera de la party queda desactivada (el código y la
+// tabla friend_locations se conservan por si el SRS cambia).
+export const SHARE_OUTSIDE_PARTY = false;
+
 // RNF-05: miembros por party. 5 en el plan gratuito (el del MVP); 10 es el
 // máximo que admite la base de datos.
 export const PARTY_FREE_MEMBERS = 5;

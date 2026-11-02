@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { isDeleteConfirmed } from '@/src/lib/delete-account';
-import { PARTY_FREE_MEMBERS, PARTY_MAX_MEMBERS } from '@/src/lib/party-invites';
+import { PARTY_FREE_MEMBERS, PARTY_MAX_MEMBERS, SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
 
 // Comprobaciones del SRS sobre el backend y los secretos, leyendo el propio
 // repositorio: así una migración o un cambio que las rompa falla en CI.
@@ -87,5 +87,11 @@ describe('SRS — eliminación de cuenta (RF-03, UI-06, RNF-12)', () => {
     for (const bucket of ['avatars', 'vehicles', 'posts', 'receipts']) {
       expect(allSql).toContain(`values ('${bucket}', '${bucket}'`);
     }
+  });
+});
+
+describe('SRS — privacidad de la ubicación (RNF-10)', () => {
+  it('no se comparte la ubicación fuera de una party activa', () => {
+    expect(SHARE_OUTSIDE_PARTY).toBe(false);
   });
 });
