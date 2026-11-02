@@ -28,7 +28,9 @@ const useRouteState = create<RouteState>(() => ({
   error: null,
 }));
 
-let requested: { origin: GeoPoint; destination: GeoPoint; at: number } | null = null;
+const NO_STOPS: GeoPoint[] = [];
+
+let requested: { origin: GeoPoint; destination: GeoPoint; stops: GeoPoint[]; at: number } | null = null;
 // Última posición conocida: al recalcular (p. ej. por salirte de la ruta) se
 // parte de donde estás ahora, no de donde se pidió la ruta anterior.
 let latestOrigin: GeoPoint | null = null;
@@ -53,6 +55,10 @@ function samePoint(a: GeoPoint, b: GeoPoint) {
   return Math.abs(a.latitude - b.latitude) < 0.00001 && Math.abs(a.longitude - b.longitude) < 0.00001;
 }
 
+function sameStops(a: GeoPoint[], b: GeoPoint[]) {
+  return a.length === b.length && a.every((point, index) => samePoint(point, b[index]));
+}
+
 function cancelPending() {
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingTimer = null;
@@ -62,18 +68,19 @@ function cancelPending() {
   pendingController = null;
 }
 
-function requestRoute(origin: GeoPoint, destination: GeoPoint) {
+function requestRoute(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
   latestOrigin = origin;
   const previous = requested;
   const unchanged =
     previous !== null &&
     samePoint(previous.destination, destination) &&
+    sameStops(previous.stops, stops) &&
     distanceMeters(previous.origin, origin) < 250 &&
     Date.now() - previous.at < 120_000;
   if (unchanged) return;
 
   cancelPending();
-  requested = { origin, destination, at: Date.now() };
+  requested = { origin, destination, stops, at: Date.now() };
 
   const controller = new AbortController();
   pendingController = controller;
@@ -85,6 +92,7 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint) {
       const routes = await fetchStreetRoutes({
         origin,
         destination,
+        stops,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -141,20 +149,23 @@ function selectRoute(index: number) {
 
 function retryRoute() {
   if (!requested) return;
-  const { destination } = requested;
+  const { destination, stops } = requested;
   const origin = latestOrigin ?? requested.origin;
   cancelPending();
   requested = null;
-  requestRoute(origin, destination);
+  requestRoute(origin, destination, stops);
 }
 
 export function useGraphHopperRoute({
   origin,
   destination,
+  stops = NO_STOPS,
   enabled = true,
 }: {
   origin: GeoPoint;
   destination: GeoPoint;
+  // Paradas en orden, entre la salida y el destino.
+  stops?: GeoPoint[];
   enabled?: boolean;
 }) {
   const originLatitude = origin.latitude;
@@ -162,6 +173,8 @@ export function useGraphHopperRoute({
   const destinationLatitude = destination.latitude;
   const destinationLongitude = destination.longitude;
   const { routes, selected, isLoading, error } = useRouteState();
+  // Clave estable para el efecto (las paradas llegan como array nuevo).
+  const stopsKey = stops.map((stop) => `${stop.latitude},${stop.longitude}`).join(';');
   const route = routes[selected] ?? null;
 
   useEffect(() => {
@@ -170,11 +183,18 @@ export function useGraphHopperRoute({
       return;
     }
 
+    const stopPoints = stopsKey
+      ? stopsKey.split(';').map((pair) => {
+          const [latitude, longitude] = pair.split(',').map(Number);
+          return { latitude, longitude };
+        })
+      : [];
     requestRoute(
       { latitude: originLatitude, longitude: originLongitude },
       { latitude: destinationLatitude, longitude: destinationLongitude },
+      stopPoints,
     );
-  }, [destinationLatitude, destinationLongitude, enabled, originLatitude, originLongitude]);
+  }, [destinationLatitude, destinationLongitude, enabled, originLatitude, originLongitude, stopsKey]);
 
   return {
     route,

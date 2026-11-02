@@ -54,6 +54,7 @@ type Props = {
   onToggleNorth: () => void;
   onToggleMute: () => void;
   onChangeRoute: () => void;
+  onAddStop: () => void;
   onClose: () => void;
 };
 
@@ -79,6 +80,7 @@ export function NavigationHud({
   onToggleNorth,
   onToggleMute,
   onChangeRoute,
+  onAddStop,
   onClose,
 }: Props) {
   const speedNow = Number(speedLabel);
@@ -210,6 +212,14 @@ export function NavigationHud({
               {destinationLabel}
             </AppText>
           </View>
+          <Pressable
+            style={styles.closeButton}
+            onPress={onAddStop}
+            accessibilityRole="button"
+            accessibilityLabel="Añadir parada"
+          >
+            <Ionicons name="add-circle-outline" size={22} color={INK} />
+          </Pressable>
           <Pressable
             style={styles.closeButton}
             onPress={onChangeRoute}

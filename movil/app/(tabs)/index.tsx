@@ -32,6 +32,7 @@ import { useInviteToParty } from "@/src/hooks/usePartyInvites";
 import { lastSeenLabel } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
 import { useFollow } from "@/src/store/follow";
+import { reachedNextStop } from "@/src/lib/stops";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
 import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
 import {
@@ -225,9 +226,12 @@ export default function NavigationScreen() {
     [party],
   );
 
+  const stops = useChosenDestination((state) => state.stops);
+  const removeStop = useChosenDestination((state) => state.removeStop);
   const route = useGraphHopperRoute({
     origin: live.location,
     destination: destination ?? live.location,
+    stops,
     enabled: Boolean(destination),
   });
   const retryRoute = route.retry;
@@ -615,6 +619,35 @@ export default function NavigationScreen() {
     speedKmh: live.location.speedKmh ?? null,
   });
 
+  // Parada alcanzada: se quita de la lista y la ruta sigue a la próxima.
+  const [stopNotice, setStopNotice] = useState<string | null>(null);
+  // Distancia de la próxima parada a la ruta (la ruta pasa por la calle más
+  // cercana, no por la parada exacta).
+  const nextStopOffRoadM = useMemo(() => {
+    const next = stops[0];
+    if (!next || !route.route || routeCumulative.length < 2) return 0;
+    return routeProgress(route.route.coordinates, routeCumulative, next)?.distanceM ?? 0;
+  }, [stops, route.route, routeCumulative]);
+  const atNextStop = navigating && reachedNextStop(live.location, stops, nextStopOffRoadM);
+  useEffect(() => {
+    if (!atNextStop) return;
+    const label = useChosenDestination.getState().stops[0]?.label;
+    const timer = setTimeout(() => {
+      removeStop(0);
+      if (!label) return;
+      setStopNotice(label);
+      if (!voiceMuted) Speech.speak(`Parada: ${label}`, { language: "es-ES" });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [atNextStop, removeStop, voiceMuted]);
+  useEffect(() => {
+    if (!stopNotice) return;
+    const timer = setTimeout(() => setStopNotice(null), 6_000);
+    return () => clearTimeout(timer);
+  }, [stopNotice]);
+  const addStopHere = () =>
+    router.push({ pathname: "/destino", params: { mode: "stop" } } as Href);
+
   // Llegada: a menos de 40 m del destino (o al final de la ruta) se termina
   // la navegación sola y se avisa, como Waze.
   const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
@@ -839,6 +872,7 @@ export default function NavigationScreen() {
         northUp={northUp}
         route={route.route}
         alternatives={mapAlternatives}
+        stops={stops}
         // Antes de «Iniciar», vista de la ruta entera; al iniciar te sigue.
         fitRoute={!navigating && route.route ? route.route.coordinates : null}
         fitBottom={bottomHeight + 40}
@@ -877,7 +911,11 @@ export default function NavigationScreen() {
               remainingDistanceLabel={formatRouteDistance(
                 remainingRouteM ?? route.route?.distanceM ?? 0,
               )}
-              destinationLabel={destination.label}
+              destinationLabel={
+                stops.length > 0
+                  ? `${stops[0].label} · luego ${destination.label}`
+                  : destination.label
+              }
               speedLabel={speedLabel}
               limitKmh={roadInfo.limitKmh ?? null}
               curve={drivingLine?.nextCurve ?? null}
@@ -889,11 +927,14 @@ export default function NavigationScreen() {
               onToggleNorth={toggleNorthUp}
               onToggleMute={() => setVoiceMuted((value) => !value)}
               onChangeRoute={() => router.push("/destino" as Href)}
+              onAddStop={addStopHere}
               onClose={clearDestination}
             />
+            {/* Avisos navegando: arriba, bajo la tarjeta de giro (abajo
+                tapaban el velocímetro y tu posición). */}
             <View
               pointerEvents="box-none"
-              style={[styles.convoyOffer, { bottom: insets.bottom + 150 }]}
+              style={[styles.convoyOffer, { top: insets.top + 200 }]}
             >
               {followTarget ? (
                 <View style={[styles.convoyNotice, chrome.surface]}>
@@ -928,6 +969,14 @@ export default function NavigationScreen() {
                   </Pressable>
                 </View>
               ) : null}
+              {stopNotice ? (
+                <View style={[styles.convoyNotice, chrome.surface]} pointerEvents="none">
+                  <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                  <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1} style={{ flex: 1 }}>
+                    Parada hecha: {stopNotice}
+                  </AppText>
+                </View>
+              ) : null}
               {convoyNotice ? (
                 <View style={[styles.convoyNotice, chrome.surface]} pointerEvents="none">
                   <Ionicons name="flag" size={16} color={chrome.text} />
@@ -941,6 +990,7 @@ export default function NavigationScreen() {
                   setterName={setterName}
                   label={partyDestination.label}
                   changed
+                  compact
                   onFollow={followConvoyDestination}
                   onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
                 />
@@ -1263,6 +1313,9 @@ export default function NavigationScreen() {
                     onConfirm={beginNavigation}
                     onShare={() => void shareRouteLink()}
                     onClose={clearDestination}
+                    stops={stops}
+                    onAddStop={addStopHere}
+                    onRemoveStop={removeStop}
                   />
                 ) : null}
 

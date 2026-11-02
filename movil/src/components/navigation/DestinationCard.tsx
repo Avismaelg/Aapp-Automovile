@@ -33,6 +33,9 @@ export function DestinationCard({
   onConfirm,
   onShare,
   onClose,
+  stops,
+  onAddStop,
+  onRemoveStop,
 }: {
   label: string;
   timeLabel: string | null;
@@ -49,6 +52,9 @@ export function DestinationCard({
   onConfirm: () => void;
   onShare: () => void;
   onClose: () => void;
+  stops: { label: string }[];
+  onAddStop: () => void;
+  onRemoveStop: (index: number) => void;
 }) {
   const chrome = useMapChrome();
   const failed = Boolean(error) && !loading;
@@ -111,6 +117,37 @@ export function DestinationCard({
           </AppText>
         </View>
       ) : null}
+
+      {stops.map((stop, index) => (
+        <View key={`${stop.label}-${index}`} style={styles.stopRow}>
+          <View style={styles.stopBadge}>
+            <AppText variant="caption" color="#ffffff" style={styles.stopBadgeText}>
+              {index + 1}
+            </AppText>
+          </View>
+          <AppText variant="body" color={chrome.text} numberOfLines={1} style={styles.flex}>
+            {stop.label}
+          </AppText>
+          <Pressable
+            onPress={() => onRemoveStop(index)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={`Quitar parada ${stop.label}`}
+          >
+            <Ionicons name="close" size={18} color={chrome.muted} />
+          </Pressable>
+        </View>
+      ))}
+      <Pressable
+        onPress={onAddStop}
+        style={({ pressed }) => [styles.addStop, pressed && styles.pressed]}
+        accessibilityRole="button"
+      >
+        <Ionicons name="add-circle-outline" size={18} color={GO} />
+        <AppText variant="bodyStrong" color={GO} style={styles.addStopText}>
+          Añadir parada
+        </AppText>
+      </Pressable>
 
       {options.length > 1 && !loading ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.options}>
@@ -199,6 +236,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: 2,
   },
+  stopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stopBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#f59e0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopBadgeText: { fontWeight: '800', fontSize: 12 },
+  addStop: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 2 },
+  addStopText: { fontSize: 14 },
   primary: {
     height: 56,
     borderRadius: 28,

@@ -11,17 +11,49 @@ export function ConvoyDestinationCard({
   setterName,
   label,
   changed,
+  compact = false,
   onFollow,
   onDismiss,
 }: {
   setterName: string;
   label: string;
   changed: boolean;
+  // Navegando: una sola fila, para no tapar el mapa ni el velocímetro.
+  compact?: boolean;
   onFollow: () => void;
   onDismiss: () => void;
 }) {
   const chrome = useMapChrome();
   const first = setterName.split(' ')[0];
+  if (compact) {
+    return (
+      <View style={[styles.compact, chrome.surface]}>
+        <Ionicons name="flag" size={16} color={chrome.text} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="caption" color={chrome.muted} numberOfLines={1}>
+            {first} {changed ? 'cambió el destino' : 'fijó el destino'}
+          </AppText>
+          <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
+            {label}
+          </AppText>
+        </View>
+        <Pressable
+          style={[styles.compactGo, { backgroundColor: chrome.text }]}
+          onPress={onFollow}
+          accessibilityRole="button"
+          accessibilityLabel="Ir con el convoy"
+        >
+          <Ionicons name="navigate" size={14} color={chrome.day ? '#ffffff' : colors.bg} />
+          <AppText variant="bodyStrong" color={chrome.day ? '#ffffff' : colors.bg} style={styles.buttonText}>
+            Ir
+          </AppText>
+        </Pressable>
+        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Ignorar">
+          <Ionicons name="close" size={20} color={chrome.muted} />
+        </Pressable>
+      </View>
+    );
+  }
   return (
     <View style={[styles.card, chrome.surface]}>
       <View style={styles.row}>
@@ -55,6 +87,22 @@ export function ConvoyDestinationCard({
 }
 
 const styles = StyleSheet.create({
+  compact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  compactGo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
   card: { marginTop: spacing.sm, borderRadius: radius['2xl'], padding: spacing.lg, gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   icon: {

@@ -80,13 +80,34 @@ function routeFromGraphHopperPath(path: GraphHopperPath): WorldMapRoute | null {
   };
 }
 
+// Parámetros de GraphHopper: salida, paradas en orden y destino. Con paradas
+// no hay rutas alternativas (GraphHopper no las calcula con puntos de paso).
+export function graphHopperParams(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
+  const params = [origin, ...stops, destination].map(
+    (point) => `point=${point.latitude},${point.longitude}`,
+  );
+  params.push(
+    `profile=${encodeURIComponent(GRAPHHOPPER_PROFILE)}`,
+    'points_encoded=false',
+    'instructions=true',
+    'calc_points=true',
+    'locale=es',
+  );
+  if (stops.length === 0) {
+    params.push('algorithm=alternative_route', `alternative_route.max_paths=${MAX_ROUTES}`);
+  }
+  return params;
+}
+
 export async function fetchGraphHopperRoutes({
   origin,
   destination,
+  stops = [],
   signal,
 }: {
   origin: GeoPoint;
   destination: GeoPoint;
+  stops?: GeoPoint[];
   signal?: AbortSignal;
 }): Promise<WorldMapRoute[]> {
   if (!isGraphHopperConfigured) {
@@ -99,17 +120,7 @@ export async function fetchGraphHopperRoutes({
       : `${GRAPHHOPPER_URL}/route`
     : 'https://graphhopper.com/api/1/route';
 
-  const params = [
-    `point=${origin.latitude},${origin.longitude}`,
-    `point=${destination.latitude},${destination.longitude}`,
-    `profile=${encodeURIComponent(GRAPHHOPPER_PROFILE)}`,
-    'points_encoded=false',
-    'instructions=true',
-    'calc_points=true',
-    'locale=es',
-    'algorithm=alternative_route',
-    `alternative_route.max_paths=${MAX_ROUTES}`,
-  ];
+  const params = graphHopperParams(origin, destination, stops);
 
   if (!GRAPHHOPPER_URL && GRAPHHOPPER_API_KEY) {
     params.push(`key=${encodeURIComponent(GRAPHHOPPER_API_KEY)}`);
@@ -174,17 +185,27 @@ function routeFromOsrm(route: OsrmRoute): WorldMapRoute | null {
   };
 }
 
+// URL de OSRM con paradas (alternativas solo sin paradas, como GraphHopper).
+export function osrmUrl(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
+  const path = [origin, ...stops, destination]
+    .map((point) => `${point.longitude},${point.latitude}`)
+    .join(';');
+  const alternatives = stops.length === 0 ? MAX_ROUTES : 'false';
+  return `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives}&continue_straight=false`;
+}
+
 export async function fetchOsrmRoutes({
   origin,
   destination,
+  stops = [],
   signal,
 }: {
   origin: GeoPoint;
   destination: GeoPoint;
+  stops?: GeoPoint[];
   signal?: AbortSignal;
 }): Promise<WorldMapRoute[]> {
-  const path = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
-  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=true&alternatives=${MAX_ROUTES}&continue_straight=false`;
+  const url = osrmUrl(origin, destination, stops);
 
   const response = await fetchWithTimeout(url, {
     signal,
@@ -210,10 +231,12 @@ export async function fetchOsrmRoutes({
 export async function fetchStreetRoutes({
   origin,
   destination,
+  stops = [],
   signal,
 }: {
   origin: GeoPoint;
   destination: GeoPoint;
+  stops?: GeoPoint[];
   signal?: AbortSignal;
 }): Promise<WorldMapRoute[]> {
   const byTime = (routes: WorldMapRoute[]) =>
@@ -221,14 +244,14 @@ export async function fetchStreetRoutes({
   let lastError: unknown = null;
   if (isGraphHopperConfigured) {
     try {
-      return byTime(await fetchGraphHopperRoutes({ origin, destination, signal }));
+      return byTime(await fetchGraphHopperRoutes({ origin, destination, stops, signal }));
     } catch (error) {
       if (signal?.aborted) throw error;
       lastError = error;
     }
   }
   try {
-    return byTime(await fetchOsrmRoutes({ origin, destination, signal }));
+    return byTime(await fetchOsrmRoutes({ origin, destination, stops, signal }));
   } catch (error) {
     if (signal?.aborted) throw error;
     lastError = error;

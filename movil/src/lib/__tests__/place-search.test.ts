@@ -93,3 +93,25 @@ describe('buscador de destinos', () => {
     expect(ranked).toHaveLength(1);
   });
 });
+
+describe('comercios genéricos', () => {
+  it('una «Gasolinera» de México no gana a las de tu barrio', () => {
+    const place = (id: string, name: string, distanceM: number, importance: number): SearchPlace => ({
+      id,
+      name,
+      detail: '',
+      latitude: 18 + distanceM / 1e7,
+      longitude: -69,
+      distanceM,
+      importance,
+      match: textMatch('gasolinera', name),
+    });
+    const ranked = rankPlaces([
+      place('mexico', 'Gasolinera', 2_927_000, 0.55),
+      place('venezuela', 'Gasolinera', 934_000, 0.55),
+      place('barrio', 'Gasolinera Nativa San Isidro', 7_400, 0.85),
+    ]);
+    expect(ranked[0].id).toBe('barrio');
+    expect(ranked[ranked.length - 1].id).toBe('mexico');
+  });
+});

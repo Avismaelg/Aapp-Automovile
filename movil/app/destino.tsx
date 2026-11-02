@@ -9,21 +9,36 @@ import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import {
   formatSearchDistance,
   rankPlaces,
+  searchCategory,
   searchKnownPlaces,
   searchPlaces,
   type SearchPlace,
+  type StopCategory,
 } from '@/src/lib/place-search';
 import { useChosenDestination, type ChosenDestination } from '@/src/store/destination';
 import { colors, fonts, radius, spacing } from '@/src/theme';
+
+const STOP_SHORTCUTS: { label: string; category: StopCategory; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { label: 'Gasolinera', category: 'fuel', icon: 'water-outline' },
+  { label: 'Comida', category: 'food', icon: 'restaurant-outline' },
+  { label: 'Farmacia', category: 'pharmacy', icon: 'medkit-outline' },
+  { label: 'Cajero', category: 'atm', icon: 'cash-outline' },
+  { label: 'Súper', category: 'supermarket', icon: 'cart-outline' },
+];
 
 export default function DestinationScreen() {
   const live = useLiveLocation();
   const setDestination = useChosenDestination((state) => state.setDestination);
   const startNavigation = useChosenDestination((state) => state.startNavigation);
   const recents = useChosenDestination((state) => state.recents);
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string }>();
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string; mode?: string }>();
+  // «Añadir parada»: lo que elijas se mete en la ruta en vez de cambiar el destino.
+  const isStop = params.mode === 'stop';
+  const addStop = useChosenDestination((state) => state.addStop);
 
   const [query, setQuery] = useState('');
+  // Atajo de parada activo: los resultados vienen por tipo, no por texto.
+  const [category, setCategory] = useState<StopCategory | null>(null);
   const [results, setResults] = useState<SearchPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -37,6 +52,7 @@ export default function DestinationScreen() {
   // Los destinos conocidos de RD salen al instante (y sin conexión); los de
   // internet se suman al llegar.
   const handleQueryChange = (value: string) => {
+    setCategory(null);
     setQuery(value);
     setResults(
       value.trim().length >= 3 ? rankPlaces(searchKnownPlaces(value, liveLocationRef.current)) : [],
@@ -69,7 +85,7 @@ export default function DestinationScreen() {
 
   useEffect(() => {
     const trimmed = query.trim();
-    if (trimmed.length < 3) return;
+    if (trimmed.length < 3 || category) return;
 
     const token = searchToken.current + 1;
     searchToken.current = token;
@@ -99,21 +115,47 @@ export default function DestinationScreen() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, category]);
 
-  const selectRecent = (place: ChosenDestination) => {
+  const choose = (place: ChosenDestination) => {
+    if (isStop) {
+      addStop(
+        { latitude: place.latitude, longitude: place.longitude, label: place.label },
+        liveLocationRef.current,
+      );
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+      return;
+    }
     setDestination(place);
     router.replace('/');
   };
 
-  const selectPlace = (place: SearchPlace) => {
-    setDestination({
-      latitude: place.latitude,
-      longitude: place.longitude,
-      label: place.name,
-    });
-    router.replace('/');
+  const selectRecent = (place: ChosenDestination) => choose(place);
+
+  // Atajo de parada: todas las de ese tipo cerca de ti, por cercanía.
+  const searchShortcut = async (shortcut: StopCategory, label: string) => {
+    setCategory(shortcut);
+    setQuery(label);
+    setResults([]);
+    setSearchError(null);
+    setIsSearching(true);
+    const token = searchToken.current + 1;
+    searchToken.current = token;
+    try {
+      const found = await searchCategory(shortcut, liveLocationRef.current, new AbortController().signal);
+      if (searchToken.current !== token) return;
+      setResults(found);
+      setSearchError(found.length === 0 ? `No encontramos ${label.toLowerCase()} cerca.` : null);
+    } catch {
+      if (searchToken.current === token) setSearchError('No pudimos buscar ahora. Revisa tu conexión.');
+    } finally {
+      if (searchToken.current === token) setIsSearching(false);
+    }
   };
+
+  const selectPlace = (place: SearchPlace) =>
+    choose({ latitude: place.latitude, longitude: place.longitude, label: place.name });
 
   if (isSharedRoute) {
     return (
@@ -165,7 +207,7 @@ export default function DestinationScreen() {
         <TextInput
           value={query}
           onChangeText={handleQueryChange}
-          placeholder="¿A dónde vamos?"
+          placeholder={isStop ? 'Añadir parada: gasolinera, comida…' : '¿A dónde vamos?'}
           placeholderTextColor={colors.muted}
           autoCorrect={false}
           autoFocus
@@ -181,6 +223,24 @@ export default function DestinationScreen() {
           </Pressable>
         ) : null}
       </View>
+
+      {isStop && !hasQuery ? (
+        <View style={styles.chips}>
+          {STOP_SHORTCUTS.map((shortcut) => (
+            <Pressable
+              key={shortcut.category}
+              onPress={() => void searchShortcut(shortcut.category, shortcut.label)}
+              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+              accessibilityRole="button"
+            >
+              <Ionicons name={shortcut.icon} size={16} color={colors.text} />
+              <AppText variant="bodyStrong" style={{ fontSize: 14 }}>
+                {shortcut.label}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {showRecents ? (
         <FlatList
@@ -269,6 +329,22 @@ export default function DestinationScreen() {
 }
 
 const styles = StyleSheet.create({
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceHigh,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
   safe: { flex: 1, backgroundColor: colors.bg },
   searchBar: {
     flexDirection: 'row',

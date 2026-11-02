@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { insertStop } from '@/src/lib/stops';
+
 export type ChosenDestination = {
   latitude: number;
   longitude: number;
@@ -13,12 +15,19 @@ export type ChosenDestination = {
   followId?: string;
 };
 
+export type RouteStop = { latitude: number; longitude: number; label: string };
+
 type DestinationState = {
   destination: ChosenDestination | null;
+  // Paradas en orden antes del destino.
+  stops: RouteStop[];
   recents: ChosenDestination[];
   isNavigating: boolean;
   setDestination: (destination: ChosenDestination) => void;
   clearDestination: () => void;
+  // Mete la parada donde menos alarga el viaje (desde `from`).
+  addStop: (stop: RouteStop, from: { latitude: number; longitude: number }) => void;
+  removeStop: (index: number) => void;
   startNavigation: () => void;
   stopNavigation: () => void;
 };
@@ -29,6 +38,7 @@ export const useChosenDestination = create<DestinationState>()(
   persist(
     (set) => ({
       destination: null,
+      stops: [],
       recents: [],
       isNavigating: false,
       setDestination: (destination) =>
@@ -49,7 +59,16 @@ export const useChosenDestination = create<DestinationState>()(
             ),
           ].slice(0, 4),
         })),
-      clearDestination: () => set({ destination: null, isNavigating: false }),
+      clearDestination: () => set({ destination: null, stops: [], isNavigating: false }),
+      addStop: (stop, from) =>
+        set((state) =>
+          state.destination
+            ? { stops: insertStop(from, state.stops, state.destination, stop) }
+            : // Sin destino, la «parada» pasa a ser el destino.
+              { destination: { ...stop } },
+        ),
+      removeStop: (index) =>
+        set((state) => ({ stops: state.stops.filter((_, i) => i !== index) })),
       startNavigation: () => set({ isNavigating: true }),
       stopNavigation: () => set({ isNavigating: false }),
     }),
@@ -59,6 +78,7 @@ export const useChosenDestination = create<DestinationState>()(
       // Seguir a alguien no se guarda: al reabrir, su posición ya sería vieja.
       partialize: (state) => ({
         destination: state.destination?.followId ? null : state.destination,
+        stops: state.destination?.followId ? [] : state.stops,
         recents: state.recents,
       }),
     },

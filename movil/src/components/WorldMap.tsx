@@ -72,6 +72,8 @@ const ROUTE_WIDTH: unknown = ["interpolate", ["linear"], ["zoom"], 10, 4, 13, 7,
 const ROUTE_WIDTH_GLOW: unknown = ["interpolate", ["linear"], ["zoom"], 10, 10, 13, 16, 16, 26, 18, 36];
 const ROUTE_WIDTH_ALT: unknown = ["interpolate", ["linear"], ["zoom"], 10, 3, 13, 5, 16, 8, 18, 12];
 
+const NO_STOPS: { latitude: number; longitude: number; label: string }[] = [];
+
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [],
@@ -176,6 +178,8 @@ type WorldMapProps = {
   travelMode?: WorldMapTravelMode;
   northUp?: boolean;
   fitRoute?: [number, number][] | null;
+  // Paradas de la ruta (marcadores numerados).
+  stops?: { latitude: number; longitude: number; label: string }[];
   // Alto de lo que tapa el mapa por abajo (tarjetas), para encuadrar la ruta.
   fitBottom?: number;
   autoFollow?: boolean;
@@ -272,6 +276,7 @@ export const WorldMap = memo(function WorldMap({
   travelMode = "car",
   northUp = false,
   fitRoute = null,
+  stops = NO_STOPS,
   fitBottom = 280,
   autoFollow = true,
   route = null,
@@ -415,6 +420,18 @@ export const WorldMap = memo(function WorldMap({
     );
     return gap > 25 ? { type: "FeatureCollection", features: [line([end, target])] } : EMPTY;
   }, [route, destination]);
+
+  const stopsData = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: "FeatureCollection",
+      features: stops.map((stop, index) => ({
+        type: "Feature",
+        properties: { number: String(index + 1), label: stop.label },
+        geometry: { type: "Point", coordinates: [stop.longitude, stop.latitude] },
+      })),
+    }),
+    [stops],
+  );
 
   const alternativesData = useMemo<GeoJSON.FeatureCollection>(
     () => ({
@@ -739,6 +756,44 @@ export const WorldMap = memo(function WorldMap({
               textPitchAlignment: "map",
               textAllowOverlap: true,
               textIgnorePlacement: true,
+            }}
+          />
+        </ShapeSource>
+
+        <ShapeSource id="caravana-stops" shape={stopsData}>
+          <CircleLayer
+            id="caravana-stop-dots"
+            style={{
+              circleRadius: 13,
+              circleColor: "#f59e0b",
+              circleStrokeColor: "#ffffff",
+              circleStrokeWidth: 2.5,
+              circleEmissiveStrength: 1,
+            }}
+          />
+          <SymbolLayer
+            id="caravana-stop-numbers"
+            style={{
+              textField: ["to-string", ["get", "number"]],
+              textFont: MEMBER_FONT,
+              textSize: 13,
+              textColor: "#ffffff",
+              textAllowOverlap: true,
+              textIgnorePlacement: true,
+            }}
+          />
+          <SymbolLayer
+            id="caravana-stop-labels"
+            minZoomLevel={11}
+            style={{
+              textField: ["to-string", ["get", "label"]],
+              textFont: MEMBER_FONT,
+              textSize: 12,
+              textOffset: [0, 1.6],
+              textAnchor: "top",
+              textColor: night ? "#f3f6fa" : "#0b1422",
+              textHaloColor: night ? "#0b1422" : "#ffffff",
+              textHaloWidth: 1.5,
             }}
           />
         </ShapeSource>

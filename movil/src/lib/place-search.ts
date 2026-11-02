@@ -209,14 +209,15 @@ function proximityBonus(distanceM: number | null) {
 
 // El nombre exacto pesa más que estar cerca: «punta cana» → la ciudad, no
 // «Punta Cana Resort and Club» a 1 km.
+// El bonus del nombre exacto es solo para sitios con nombre propio (ciudades,
+// aeropuertos…): un comercio llamado «Gasolinera» en México no debe ganar a
+// las de tu barrio. Lo de fuera del país y lejos casi nunca es lo buscado.
 export function placeScore(place: SearchPlace) {
   const match = place.match ?? 0.5;
-  return (
-    3 * match +
-    (match >= 0.99 ? 1 : 0) +
-    (place.importance ?? 0.4) +
-    proximityBonus(place.distanceM)
-  );
+  const importance = place.importance ?? 0.4;
+  const exact = match >= 0.99 && importance >= 0.75 ? 1 : 0;
+  const farAway = place.distanceM != null && place.distanceM > 1_000_000 ? -2 : 0;
+  return 3 * match + exact + importance + proximityBonus(place.distanceM) + farAway;
 }
 
 // Fusiona y ordena. Un mismo sitio repetido (el listado y Photon, o dos nodos
@@ -374,12 +375,91 @@ async function mapbox(query: string, near: LatLng | null, signal: AbortSignal): 
   });
 }
 
-async function photon(params: URLSearchParams, signal: AbortSignal) {
-  const response = await fetchWithTimeout(`https://photon.komoot.io/api/?${params.toString()}`, {
-    signal,
+type NominatimPlace = {
+  lat?: string;
+  lon?: string;
+  name?: string;
+  display_name?: string;
+  category?: string;
+  type?: string;
+};
+
+// Respaldo si Photon no contesta (está caído o nos limita): Nominatim, el otro
+// buscador público de OpenStreetMap. Pide un nombre que identifique la app y
+// como mucho una consulta por segundo, así que solo se usa de respaldo.
+async function nominatim(
+  query: string,
+  near: LatLng | null,
+  signal: AbortSignal,
+  { radiusDeg, bounded }: { radiusDeg: number; bounded: boolean },
+): Promise<(SearchPlace & { tag: string })[]> {
+  const params = new URLSearchParams({
+    q: query,
+    format: 'jsonv2',
+    countrycodes: 'do',
+    limit: '10',
+    'accept-language': 'es',
   });
-  const data = (await response.json()) as { features?: PhotonFeature[] };
-  return data.features ?? [];
+  if (near) {
+    params.set(
+      'viewbox',
+      [
+        near.longitude - radiusDeg,
+        near.latitude + radiusDeg,
+        near.longitude + radiusDeg,
+        near.latitude - radiusDeg,
+      ]
+        .map((value) => value.toFixed(4))
+        .join(','),
+    );
+    if (bounded) params.set('bounded', '1');
+  }
+  const response = await fetchWithTimeout(
+    `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+    { signal, headers: { 'User-Agent': 'Caravana/0.1 (app de conduccion en grupo)' } },
+  );
+  const data = (await response.json()) as NominatimPlace[];
+  return (Array.isArray(data) ? data : []).flatMap((item) => {
+    const latitude = Number(item.lat);
+    const longitude = Number(item.lon);
+    const name = item.name?.trim() || item.display_name?.split(',')[0]?.trim() || '';
+    if (!name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+    const detail = (item.display_name ?? '').split(',').slice(1, 4).join(',').trim();
+    return [
+      {
+        id: `nominatim:${name}@${latitude.toFixed(5)},${longitude.toFixed(5)}`,
+        latitude,
+        longitude,
+        name,
+        detail,
+        distanceM: near ? haversineMeters(near, { latitude, longitude }) : null,
+        importance: 0.6,
+        match: Math.max(0.45, textMatch(query, name)),
+        tag: `${item.category}:${item.type}`,
+      },
+    ];
+  });
+}
+
+// Si Photon falla, se deja de preguntarle 2 min y se va directo al respaldo
+// (antes cada búsqueda esperaba sus 15 s de tiempo agotado).
+const PHOTON_PAUSE_MS = 2 * 60_000;
+let photonDownUntil = 0;
+
+async function photon(params: URLSearchParams, signal: AbortSignal) {
+  if (Date.now() < photonDownUntil) throw new Error('Photon en pausa.');
+  try {
+    const response = await fetchWithTimeout(
+      `https://photon.komoot.io/api/?${params.toString()}`,
+      { signal },
+      5_000,
+    );
+    const data = (await response.json()) as { features?: PhotonFeature[] };
+    return data.features ?? [];
+  } catch (error) {
+    if (!signal.aborted) photonDownUntil = Date.now() + PHOTON_PAUSE_MS;
+    throw error;
+  }
 }
 
 // Búsqueda de lugares, todo a la vez: el listado de RD (instantáneo), Photon
@@ -419,6 +499,14 @@ export async function searchPlaces(
     mapbox(q, near, signal),
   ]);
   const remote = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  // Photon sin respuesta (las dos consultas): se pregunta a Nominatim.
+  if (settled[0].status === 'rejected' && settled[1].status === 'rejected') {
+    try {
+      remote.push(...(await nominatim(q, near, signal, { radiusDeg: 0.5, bounded: false })));
+    } catch {
+      // Sin respaldo: valen el listado de RD y Mapbox.
+    }
+  }
   // Sin conexión, el listado de RD sigue funcionando.
   if (remote.length === 0 && known.length === 0 && settled.every((r) => r.status === 'rejected')) {
     throw (settled[0] as PromiseRejectedResult).reason;
@@ -426,6 +514,101 @@ export async function searchPlaces(
   const places = rankPlaces([...known, ...remote]);
   // Solo se guarda si internet respondió (si no, se reintenta la próxima vez).
   if (remote.length > 0) {
+    if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+    cache.set(cacheKey, { at: Date.now(), places });
+  }
+  return places;
+}
+
+// ---------------------------------------------------------------------------
+// Paradas por tipo («Gasolinera», «Farmacia»…)
+// ---------------------------------------------------------------------------
+
+// En OpenStreetMap las gasolineras se llaman Shell, Texaco, Sunix…, no
+// «gasolinera»: buscar por nombre no las encuentra. Se busca por tipo de
+// lugar (osm_tag) con las marcas habituales de RD.
+export const STOP_CATEGORIES = {
+  // Las marcas más comunes primero: casi siempre bastan las dos primeras.
+  fuel: { tags: ['amenity:fuel'], terms: ['shell', 'texaco', 'sunix', 'isla'] },
+  food: { tags: ['amenity:fast_food', 'amenity:restaurant'], terms: ['restaurante', 'pollo', 'pizza'] },
+  pharmacy: { tags: ['amenity:pharmacy'], terms: ['farmacia', 'carol', 'gbc'] },
+  atm: { tags: ['amenity:atm', 'amenity:bank'], terms: ['banreservas', 'popular', 'bhd'] },
+  supermarket: { tags: ['shop:supermarket'], terms: ['supermercado', 'jumbo', 'nacional', 'bravo'] },
+} as const;
+
+export type StopCategory = keyof typeof STOP_CATEGORIES;
+
+// Radio en el que buscar paradas: lo de más lejos no es «de paso».
+const CATEGORY_RADIUS_M = 15_000;
+
+export async function searchCategory(
+  category: StopCategory,
+  near: LatLng,
+  signal: AbortSignal,
+): Promise<SearchPlace[]> {
+  const cacheKey = `cat:${category}@${near.latitude.toFixed(2)},${near.longitude.toFixed(2)}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.places;
+
+  const { tags, terms } = STOP_CATEGORIES[category];
+  const queries = terms.map((term) => {
+    const params = new URLSearchParams({
+      q: term,
+      limit: '8',
+      lat: near.latitude.toFixed(5),
+      lon: near.longitude.toFixed(5),
+      zoom: '14',
+      location_bias_scale: '0.2',
+    });
+    for (const tag of tags) params.append('osm_tag', tag);
+    return params;
+  });
+  // De dos en dos y parando al tener bastantes: Photon corta a quien pide
+  // mucho de golpe.
+  const found: SearchPlace[] = [];
+  let answered = false;
+  for (let i = 0; i < queries.length && found.length < 10 && Date.now() >= photonDownUntil; i += 2) {
+    const batch = await Promise.allSettled(
+      queries.slice(i, i + 2).map((params) => photon(params, signal)),
+    );
+    for (const result of batch) {
+      if (result.status !== 'fulfilled') continue;
+      answered = true;
+      for (const place of parsePhoton(result.value, '', near)) {
+        if ((place.distanceM ?? Infinity) <= CATEGORY_RADIUS_M) found.push(place);
+      }
+    }
+    if (signal.aborted) break;
+  }
+  // Photon no contestó: Nominatim con las dos primeras marcas (una por
+  // segundo, como pide su norma de uso), quedándose con los de ese tipo.
+  if (!answered) {
+    for (const term of terms.slice(0, 2)) {
+      try {
+        const results = await nominatim(term, near, signal, { radiusDeg: 0.12, bounded: true });
+        answered = true;
+        for (const place of results) {
+          if (tags.includes(place.tag as never) && (place.distanceM ?? Infinity) <= CATEGORY_RADIUS_M) {
+            found.push(place);
+          }
+        }
+      } catch {
+        // Sigue con la siguiente.
+      }
+      if (signal.aborted || found.length >= 6) break;
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+    }
+  }
+  // Ni una respuesta: es la conexión, no que no haya.
+  if (!answered) throw new Error('Sin conexión con el buscador.');
+  // Por cercanía y sin repetidos (dos nodos de la misma gasolinera).
+  const places: SearchPlace[] = [];
+  for (const place of found.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0))) {
+    if (places.some((other) => haversineMeters(place, other) < 60)) continue;
+    places.push(place);
+    if (places.length >= 15) break;
+  }
+  if (places.length > 0) {
     if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
     cache.set(cacheKey, { at: Date.now(), places });
   }

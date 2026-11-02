@@ -49,14 +49,19 @@ export default function SimulatorScreen() {
     if (!useSimulator.getState().active) startSimulation(live.location);
   };
 
-  const routeTo = (target: { latitude: number; longitude: number; label: string }) => {
+  const routeTo = (
+    target: { latitude: number; longitude: number; label: string },
+    stops: { latitude: number; longitude: number; label: string }[] = [],
+  ) => {
     ensureStarted();
     const store = useChosenDestination.getState();
     // Los destinos de prueba no se guardan en tus recientes.
     const recents = store.recents.filter((item) => item.label !== TEST_LABEL);
     // Nunca se comparte con una party real.
     store.setDestination({ ...target, personal: true });
-    useChosenDestination.setState({ recents });
+    useChosenDestination.setState({ recents, stops: [] });
+    const from = sim.fix ?? live.location;
+    for (const stop of stops) store.addStop(stop, from);
     store.startNavigation();
     waitForRoute();
     toMap();
@@ -66,6 +71,21 @@ export default function SimulatorScreen() {
     const from = sim.fix ?? live.location;
     const [latitude, longitude] = offsetPoint([from.latitude, from.longitude], 40, 1500);
     routeTo({ latitude, longitude, label: TEST_LABEL });
+  };
+
+  // Ruta de 2,2 km con dos paradas por el camino: se hacen en orden («Parada
+  // hecha») y la ruta sigue sola a la siguiente.
+  const routeWithStops = () => {
+    const from = sim.fix ?? live.location;
+    const origin: [number, number] = [from.latitude, from.longitude];
+    const at = (meters: number) => offsetPoint(origin, 40, meters);
+    const [latitude, longitude] = at(2200);
+    const [s1lat, s1lng] = at(700);
+    const [s2lat, s2lng] = at(1400);
+    routeTo({ latitude, longitude, label: TEST_LABEL }, [
+      { latitude: s1lat, longitude: s1lng, label: 'Parada de prueba 1' },
+      { latitude: s2lat, longitude: s2lng, label: 'Parada de prueba 2' },
+    ]);
   };
 
   const detour = () => {
@@ -201,6 +221,12 @@ export default function SimulatorScreen() {
           title="Atasco (solo GPS)"
           detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
           onPress={() => traffic(false)}
+        />
+        <Test
+          icon="git-commit-outline"
+          title="Ruta con 2 paradas"
+          detail="2,2 km con dos paradas por el camino. Se marcan «Parada hecha» en orden y la ruta sigue sola a la siguiente."
+          onPress={routeWithStops}
         />
         <Test
           icon="trophy-outline"

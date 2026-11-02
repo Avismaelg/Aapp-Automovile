@@ -154,8 +154,17 @@ export function instructionsFromOsrm(steps: OsrmStep[]): RouteInstruction[] {
     });
     atDistanceM += Number.isFinite(step.distance) ? step.distance : 0;
   }
-  return instructions;
+  // Con paradas OSRM manda un tramo por parada: «llegada» al final de cada uno
+  // y «salida» al empezar el siguiente. Las de en medio son tus paradas.
+  const last = instructions.length - 1;
+  return instructions
+    .map((item, index) =>
+      item.icon === 'arrive' && index < last ? { ...item, text: STOP_TEXT } : item,
+    )
+    .filter((item, index) => item.icon !== 'depart' || index === 0);
 }
+
+export const STOP_TEXT = 'Llegas a tu parada';
 
 type GraphHopperInstruction = {
   text?: string;
@@ -189,7 +198,8 @@ export function instructionsFromGraphHopper(
     const road = item.street_name?.trim() || undefined;
     return {
       icon,
-      text: item.text?.trim() || textFromIcon(icon, road),
+      // Señal 5 = punto de paso (tu parada).
+      text: sign === 5 ? STOP_TEXT : item.text?.trim() || textFromIcon(icon, road),
       road,
       atDistanceM: cumulative[Math.max(0, Math.min(startIndex, cumulative.length - 1))] ?? 0,
     };
