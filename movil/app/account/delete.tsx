@@ -23,6 +23,7 @@ import { useDeleteAccount } from '@/src/hooks/useDeleteAccount';
 import { useAuth } from '@/src/store/auth';
 import { colors, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
+import { isDeleteConfirmed } from '@/src/lib/delete-account';
 
 const consequences = [
   t('Perfil, usuario y sesión'),
@@ -39,7 +40,7 @@ export default function DeleteAccountScreen() {
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState<string | null>(null);
   const isDemo = account?.mode === 'demo';
-  const canDelete = confirmation.trim().toUpperCase() === 'ELIMINAR';
+  const canDelete = isDeleteConfirmed(confirmation);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();

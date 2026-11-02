@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { secureSessionStorage } from '@/src/lib/secure-session-storage';
+
+// jest.mock se eleva por encima de los imports.
+
 const mockSecure = new Map<string, string>();
 jest.mock('expo-secure-store', () => ({
   getItemAsync: async (key: string) => mockSecure.get(key) ?? null,
@@ -29,7 +33,6 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
-import { secureSessionStorage } from '@/src/lib/secure-session-storage';
 
 const KEY = 'sb-ecmqmgpruxclmpnnpgzv-auth-token';
 const SESSION = JSON.stringify({ access_token: 'a'.repeat(3000), refresh_token: 'r'.repeat(500) });

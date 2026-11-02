@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 
+import { isDeleteConfirmed } from '@/src/lib/delete-account';
 import { PARTY_FREE_MEMBERS, PARTY_MAX_MEMBERS } from '@/src/lib/party-invites';
 
 // Comprobaciones del SRS sobre el backend y los secretos, leyendo el propio
@@ -62,5 +63,29 @@ describe('SRS — backend y secretos', () => {
     const last = migrations.filter((sql) => /parties_max_members_check/.test(sql)).pop() ?? '';
     expect(last).toMatch(/check \(max_members between 2 and 10\)/);
     expect(last).toMatch(/max_members set default 5/);
+  });
+});
+
+describe('SRS — eliminación de cuenta (RF-03, UI-06, RNF-12)', () => {
+  it('solo acepta exactamente ELIMINAR', () => {
+    expect(isDeleteConfirmed('ELIMINAR')).toBe(true);
+    expect(isDeleteConfirmed('eliminar')).toBe(false);
+    expect(isDeleteConfirmed(' ELIMINAR ')).toBe(false);
+    expect(isDeleteConfirmed('')).toBe(false);
+  });
+
+  it('borra el usuario de Auth antes que cualquier archivo e incluye todos los buckets', () => {
+    const source = fs.readFileSync(path.join(root, 'supabase', 'functions', 'delete-account', 'index.ts'), 'utf8');
+    const deleteUserAt = source.indexOf('auth.admin.deleteUser');
+    const firstRemoveAt = source.indexOf('.remove(');
+    expect(deleteUserAt).toBeGreaterThan(0);
+    expect(firstRemoveAt).toBeGreaterThan(deleteUserAt);
+    for (const bucket of ['posts', 'vehicles', 'avatars', 'receipts']) expect(source).toContain(`'${bucket}'`);
+  });
+
+  it('SW-04: existen los buckets avatars, vehicles, posts y receipts', () => {
+    for (const bucket of ['avatars', 'vehicles', 'posts', 'receipts']) {
+      expect(allSql).toContain(`values ('${bucket}', '${bucket}'`);
+    }
   });
 });
