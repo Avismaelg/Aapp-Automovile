@@ -34,6 +34,20 @@ class MotionModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("Motion")
 
+    // Las versiones anteriores registraban con la notificación fija de
+    // expo-location; su canal ya no se usa y borrarlo quita la que quedó.
+    OnCreate {
+      try {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          manager.notificationChannels
+            .filter { it.id.endsWith("caravana-background-location") }
+            .forEach { manager.deleteNotificationChannel(it.id) }
+        }
+      } catch (_: Exception) {
+      }
+    }
+
     Function("hasPermission") { hasActivityPermission(context) }
 
     // Reinicia la app (cambio de idioma: los textos fijados al arrancar se
@@ -77,6 +91,13 @@ class MotionModule : Module() {
     }
 
     Function("getEvents") { sinceMs: Double -> MotionStore.read(context, sinceMs.toLong()) }
+
+    // Servicio con notificación solo al conducir (ver DrivingService).
+    Function("setAutoDriving") { enabled: Boolean -> DrivingService.setAuto(context, enabled) }
+    Function("setDrivingTexts") { texts: Map<String, String> -> DrivingService.setTexts(context, texts) }
+    Function("startDriving") { reason: String -> DrivingService.start(context, reason) }
+    Function("stopDriving") { reason: String -> DrivingService.stop(context, reason) }
+    Function("isDriving") { DrivingService.running }
 
     Function("isIgnoringBatteryOptimizations") {
       val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager

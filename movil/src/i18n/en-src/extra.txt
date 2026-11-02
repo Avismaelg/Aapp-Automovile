@@ -124,3 +124,4 @@
 ={0} grabados|{0} recorded
 =1 viaje en total|1 trip in total
 ={0} viajes en total|{0} trips in total
+=Conducción|Driving

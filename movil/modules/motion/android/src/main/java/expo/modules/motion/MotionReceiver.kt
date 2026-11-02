@@ -36,6 +36,23 @@ class MotionReceiver : BroadcastReceiver() {
     }
     if (events.isEmpty()) return
 
+    // La notificación de conducción solo mientras vas en un vehículo.
+    if (DrivingService.autoEnabled(context)) {
+      val latest = result.transitionEvents.maxByOrNull { it.elapsedRealTimeNanos }
+      if (latest != null) {
+        val entering = latest.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
+        when {
+          latest.activityType == DetectedActivity.IN_VEHICLE && entering ->
+            DrivingService.start(context, DrivingService.REASON_VEHICLE)
+          latest.activityType == DetectedActivity.IN_VEHICLE ||
+            latest.activityType == DetectedActivity.STILL ||
+            latest.activityType == DetectedActivity.WALKING ||
+            latest.activityType == DetectedActivity.RUNNING ->
+            DrivingService.stop(context, DrivingService.REASON_VEHICLE)
+        }
+      }
+    }
+
     val pending = goAsync()
     val save = { latitude: Double?, longitude: Double?, accuracy: Float?, fixAt: Long? ->
       events.forEach { event ->

@@ -2,7 +2,14 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
+import {
+  setAutoDriving,
+  setDrivingTexts,
+  startDriving,
+  stopDriving,
+} from '@/modules/motion';
 import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
+import { nextDrivingState, type DrivingTracker } from '@/src/lib/driving-state';
 import { checkBackgroundAlerts } from '@/src/lib/background-alerts';
 import { askLocationConsent } from '@/src/lib/location-consent';
 import { pushLivePosition } from '@/src/lib/live-share';
@@ -13,6 +20,10 @@ const TASK_NAME = 'caravana-background-location';
 // Dentro de casa el GPS llega a 100-300 m de error y fabrica rutas falsas.
 const MAX_ACCURACY_M = 50;
 
+// En Android el registro va sin notificación: parado, el sistema entrega la
+// ubicación unas pocas veces por hora (basta para recoger datos). Al conducir
+// o en una party, el servicio de conducción del módulo Motion (con su
+// notificación) hace que llegue a ritmo completo; ver DrivingService.kt.
 const UPDATE_OPTIONS: Location.LocationTaskOptions = {
   accuracy: Location.Accuracy.High,
   timeInterval: 15_000,
@@ -21,13 +32,6 @@ const UPDATE_OPTIONS: Location.LocationTaskOptions = {
   activityType: Location.ActivityType.AutomotiveNavigation,
   pausesUpdatesAutomatically: false,
   showsBackgroundLocationIndicator: true,
-  foregroundService: {
-    notificationTitle: t('Caravana está registrando tu ruta'),
-    notificationBody: t('Tu viaje se guarda automáticamente. Toca para abrir.'),
-    notificationColor: '#FF5A1F',
-    // El servicio sigue aunque el usuario cierre la app desde recientes.
-    killServiceOnDestroy: false,
-  },
 };
 
 // En una party la posición se comparte en vivo: puntos cada 3 s y sin
@@ -38,12 +42,32 @@ const CONVOY_OPTIONS: Location.LocationTaskOptions = {
   timeInterval: 3_000,
   distanceInterval: 8,
   deferredUpdatesInterval: 0,
-  foregroundService: {
-    ...UPDATE_OPTIONS.foregroundService!,
-    notificationTitle: t('Caravana · convoy en vivo'),
-    notificationBody: t('Tu party ve tu posición. Toca para abrir.'),
-  },
 };
+
+// Textos de la notificación, ya traducidos, para el servicio nativo. En una
+// party el texto avisa de que los demás te ven; la notificación sigue saliendo
+// solo mientras te mueves.
+function shareDrivingTexts() {
+  setDrivingTexts({
+    channel: t('Conducción'),
+    drivingTitle: convoyMode ? t('Caravana · convoy en vivo') : t('Caravana está registrando tu ruta'),
+    drivingBody: convoyMode
+      ? t('Tu party ve tu posición. Toca para abrir.')
+      : t('Tu viaje se guarda automáticamente. Toca para abrir.'),
+    convoyTitle: t('Caravana · convoy en vivo'),
+    convoyBody: t('Tu party ve tu posición. Toca para abrir.'),
+  });
+}
+
+// Respaldo por GPS del sensor de actividad: notificación al moverte en un
+// vehículo y fuera tras unos minutos parado.
+let driving: DrivingTracker = { active: false, lastMovingAt: null };
+function updateDriving(speedKmh: number | null, at: number) {
+  const next = nextDrivingState(driving, speedKmh, at);
+  driving = next.state;
+  if (next.action === 'start') startDriving('vehicle');
+  if (next.action === 'stop') stopDriving('vehicle');
+}
 
 let convoyMode = false;
 const currentOptions = () => (convoyMode ? CONVOY_OPTIONS : UPDATE_OPTIONS);
@@ -53,6 +77,7 @@ const currentOptions = () => (convoyMode ? CONVOY_OPTIONS : UPDATE_OPTIONS);
 export async function setConvoyMode(enabled: boolean) {
   if (Platform.OS === 'web' || enabled === convoyMode) return;
   convoyMode = enabled;
+  shareDrivingTexts();
   try {
     if (!(await hasTrackingPermissions())) return;
     if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
@@ -90,6 +115,10 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(TASK_NAME)) {
       // La más reciente va a la party y a los amigos (con la pantalla
       // bloqueada también).
       const latest = data.locations[data.locations.length - 1];
+      if (latest) {
+        const speed = latest.coords.speed;
+        updateDriving(speed != null && speed >= 0 ? speed * 3.6 : null, latest.timestamp);
+      }
       if (latest && (latest.coords.accuracy ?? 0) <= MAX_ACCURACY_M) {
         const { latitude, longitude, speed, heading } = latest.coords;
         void pushLivePosition({
@@ -142,11 +171,15 @@ export async function startTracking() {
   if (!hasPermission) {
     throw new Error(t('Necesitamos permiso de ubicación “Siempre” para registrar tus rutas.'));
   }
+  shareDrivingTexts();
+  setAutoDriving(true);
   await ensureUpdatesRunning();
 }
 
 export async function stopTracking() {
   if (Platform.OS === 'web') return;
+  setAutoDriving(false);
+  stopDriving('vehicle');
   if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
     await Location.stopLocationUpdatesAsync(TASK_NAME);
   }
@@ -159,13 +192,14 @@ export type ResumeResult = 'running' | 'no-permission' | 'error';
 // debe llamarse con la app en primer plano, Android no deja arrancar un
 // servicio de ubicación desde segundo plano.
 //
-// Ojo: si Android mata la app, el registro de la tarea sigue («started») pero
-// el servicio en primer plano ha muerto y solo llegan ubicaciones sueltas un
-// par de veces por hora. Por eso se reinicia siempre.
+// Se reinicia siempre: si Android mató la app, el registro de la tarea sigue
+// («started») pero ya no entrega ubicaciones.
 export async function resumeTracking(): Promise<ResumeResult> {
   if (Platform.OS === 'web') return 'error';
   try {
     if (!(await hasTrackingPermissions())) return 'no-permission';
+    shareDrivingTexts();
+    setAutoDriving(true);
     if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
       await Location.stopLocationUpdatesAsync(TASK_NAME);
     }
