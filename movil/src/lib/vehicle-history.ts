@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { FuelLog, MaintenanceRecord, Vehicle } from '@/src/types/models';
 import { logEnergy } from '@/src/lib/fuel';
+import { formatKmValue, getLocale, t } from '@/src/i18n';
 
 export type MaintenanceStatus = 'ok' | 'soon' | 'due';
 
 export function formatHistoryDate(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString('es-DO', {
+  return date.toLocaleDateString(getLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -16,16 +17,16 @@ export function formatHistoryDate(iso: string) {
 }
 
 export function formatMonthYear(iso?: string) {
-  if (!iso) return 'No registrado';
+  if (!iso) return t('No registrado');
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'No registrado';
-  return date.toLocaleDateString('es-DO', { month: 'short', year: 'numeric' });
+  if (Number.isNaN(date.getTime())) return t('No registrado');
+  return date.toLocaleDateString(getLocale(), { month: 'short', year: 'numeric' });
 }
 
 export function ownershipLabel(acquiredAt?: string) {
-  if (!acquiredAt) return 'Periodo no registrado';
+  if (!acquiredAt) return t('Periodo no registrado');
   const start = new Date(acquiredAt);
-  if (Number.isNaN(start.getTime())) return 'Periodo no registrado';
+  if (Number.isNaN(start.getTime())) return t('Periodo no registrado');
 
   const now = new Date();
   const months = Math.max(
@@ -33,10 +34,10 @@ export function ownershipLabel(acquiredAt?: string) {
     (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth(),
   );
 
-  if (months < 12) return `${months} ${months === 1 ? 'mes' : 'meses'} de uso`;
+  if (months < 12) return t('{0} {1} de uso', months, months === 1 ? 'mes' : 'meses');
   const years = Math.floor(months / 12);
   const rest = months % 12;
-  return `${years} ${years === 1 ? 'año' : 'años'}${rest ? ` y ${rest} meses` : ''} de uso`;
+  return t('{0} {1}{2} de uso', years, years === 1 ? 'año' : 'años', rest ? ` y ${rest} meses` : '');
 }
 
 export function maintenanceSummary(
@@ -56,17 +57,17 @@ export function maintenanceSummary(
 
   const label =
     status === 'due'
-      ? 'Mantenimiento pendiente'
+      ? t('Mantenimiento pendiente')
       : status === 'soon'
-        ? 'Servicio próximo'
-        : 'Mantenimiento al día';
+        ? t('Servicio próximo')
+        : t('Mantenimiento al día');
 
   const detail =
     status === 'due'
-      ? `Toca revisar en ${remainingKm.toLocaleString('es-DO')} km`
+      ? t('Toca revisar en {0}', formatKmValue(remainingKm))
       : status === 'soon'
-        ? `Próximo servicio en ${remainingKm.toLocaleString('es-DO')} km`
-        : `Próximo servicio en ${remainingKm.toLocaleString('es-DO')} km`;
+        ? t('Próximo servicio en {0}', formatKmValue(remainingKm))
+        : t('Próximo servicio en {0}', formatKmValue(remainingKm));
 
   return {
     records: sorted,

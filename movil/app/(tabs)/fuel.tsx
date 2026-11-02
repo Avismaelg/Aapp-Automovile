@@ -41,6 +41,7 @@ import {
 import { exportFuelReport } from '@/src/lib/pdf';
 import { isElectric, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { getCurrency, t } from '@/src/i18n';
 
 const efficiencyOptions: { key: EfficiencyUnit; label: string; suffix: string }[] = [
   { key: 'km_l', label: 'km/L', suffix: 'km/L' },
@@ -63,7 +64,7 @@ export default function FuelScreen() {
         <View style={styles.stateBox}>
           <ActivityIndicator color={colors.accent} />
           <AppText variant="caption" color={colors.muted}>
-            Cargando tu garaje…
+            {t('Cargando tu garaje…')}
           </AppText>
         </View>
       </Screen>
@@ -75,10 +76,10 @@ export default function FuelScreen() {
       <Screen>
         <EmptyState
           icon="cloud-offline-outline"
-          title="No pudimos cargar tus vehículos"
-          description="Revisa tu conexión y vuelve a intentarlo."
+          title={t('No pudimos cargar tus vehículos')}
+          description={t('Revisa tu conexión y vuelve a intentarlo.')}
         />
-        <Button label="Reintentar" variant="secondary" onPress={() => refetch()} />
+        <Button label={t('Reintentar')} variant="secondary" onPress={() => refetch()} />
       </Screen>
     );
   }
@@ -88,11 +89,11 @@ export default function FuelScreen() {
       <Screen>
         <EmptyState
           icon="car-sport-outline"
-          title="Primero añade un vehículo"
-          description="El consumo real empieza con tu primer coche, moto, EV o camión."
+          title={t('Primero añade un vehículo')}
+          description={t('El consumo real empieza con tu primer coche, moto, EV o camión.')}
         />
         <Button
-          label="Añadir vehículo"
+          label={t('Añadir vehículo')}
           icon="add"
           onPress={() => router.push('/vehicle/new')}
         />
@@ -208,25 +209,25 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
 
   const exportPdf = async () => {
     if (vehicleLogs.length === 0) {
-      Alert.alert('Sin registros', 'Registra al menos un repostaje o una carga para exportar.');
+      Alert.alert(t('Sin registros'), t('Registra al menos un repostaje o una carga para exportar.'));
       return;
     }
     try {
       await exportFuelReport({
         vehicle: `${vehicle.make} ${vehicle.model} ${vehicle.year}`,
         logs: vehicleLogs,
-        currency: 'DOP',
+        currency: getCurrency(),
       });
     } catch {
-      Alert.alert('No se pudo exportar', 'Inténtalo de nuevo desde un dispositivo compatible.');
+      Alert.alert(t('No se pudo exportar'), t('Inténtalo de nuevo desde un dispositivo compatible.'));
     }
   };
 
   return (
     <Screen>
       <ScreenHeader
-        title="Consumo"
-        subtitle="Gasto, rendimiento y repostajes"
+        title={t('Consumo')}
+        subtitle={t('Gasto, rendimiento y repostajes')}
         right={<IconButton icon="download-outline" onPress={exportPdf} />}
       />
 
@@ -255,7 +256,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         totalEnergy={totalEnergy}
       />
 
-      <SectionHeader title="Calculadora de viaje" />
+      <SectionHeader title={t('Calculadora de viaje')} />
       <Card style={styles.calculator}>
         <View style={styles.calculatorHeading}>
           <View style={[styles.calculatorIcon, electric && { backgroundColor: 'rgba(77,225,255,0.12)' }]}>
@@ -266,25 +267,25 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
             />
           </View>
           <View style={{ flex: 1 }}>
-            <AppText variant="bodyStrong">¿Cuánto cuesta esta ruta?</AppText>
+            <AppText variant="bodyStrong">{t('¿Cuánto cuesta esta ruta?')}</AppText>
             <AppText variant="caption" color={colors.muted}>
-              Usa el consumo real de tu {meta.shortLabel.toLowerCase()}.
+              {t('Usa el consumo real de tu')}{' '}{meta.shortLabel.toLowerCase()}.
             </AppText>
           </View>
         </View>
 
         <View style={styles.fieldRow}>
           <Input
-            label="Distancia"
+            label={t('Distancia')}
             value={distance}
             onChangeText={setDistance}
             keyboardType="decimal-pad"
             placeholder="320"
-            rightSlot={<AppText variant="caption" color={colors.muted}>km</AppText>}
+            rightSlot={<AppText variant="caption" color={colors.muted}>{t('km')}</AppText>}
             style={{ flex: 1.2 }}
           />
           <Input
-            label={electric ? 'Consumo' : 'Rendimiento'}
+            label={electric ? t('Consumo') : t('Rendimiento')}
             value={efficiency}
             onChangeText={setEfficiency}
             keyboardType="decimal-pad"
@@ -317,7 +318,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         </View>
 
         <Input
-          label={electric ? 'Precio de la energía' : 'Precio del combustible'}
+          label={electric ? t('Precio de la energía') : t('Precio del combustible')}
           value={price}
           onChangeText={setPrice}
           keyboardType="decimal-pad"
@@ -325,7 +326,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
           rightSlot={
             <View style={styles.priceUnit}>
               <AppText variant="caption" color={colors.muted}>
-                DOP / {electric ? 'kWh' : priceUnit === 'gal' ? 'gal' : 'L'}
+                {`${getCurrency()} /`}{' '}{electric ? 'kWh' : priceUnit === 'gal' ? 'gal' : 'L'}
               </AppText>
             </View>
           }
@@ -335,8 +336,8 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
           <View style={styles.priceToggle}>
             <Segment
               options={[
-                { key: 'gal' as PriceUnit, label: 'Por galón' },
-                { key: 'l' as PriceUnit, label: 'Por litro' },
+                { key: 'gal' as PriceUnit, label: t('Por galón') },
+                { key: 'l' as PriceUnit, label: t('Por litro') },
               ]}
               value={priceUnit}
               onChange={changePriceUnit}
@@ -346,23 +347,23 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
           <View style={styles.evHint}>
             <Ionicons name="home-outline" size={14} color={colors.cyan} />
             <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-              Tarifa de referencia: carga en casa o supercargador. Ajusta tu precio real.
+              {t('Tarifa de referencia: carga en casa o supercargador. Ajusta tu precio real.')}
             </AppText>
           </View>
         )}
 
         <View style={styles.resultGrid}>
           <View style={styles.resultCell}>
-            <AppText variant="label" color={colors.muted}>{electric ? 'kWh' : 'Litros'}</AppText>
+            <AppText variant="label" color={colors.muted}>{electric ? 'kWh' : t('Litros')}</AppText>
             <AppText variant="h3">{formatNumber(resultEnergy, 2)}</AppText>
           </View>
           <View style={styles.resultCell}>
-            <AppText variant="label" color={colors.muted}>Costo</AppText>
-            <AppText variant="h3" color={colors.accent}>{formatMoney(resultCost, 'DOP')}</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Costo')}</AppText>
+            <AppText variant="h3" color={colors.accent}>{formatMoney(resultCost)}</AppText>
           </View>
           <View style={styles.resultCell}>
             <AppText variant="label" color={colors.muted}>
-              {electric ? 'kWh/100 km' : 'L/100 km'}
+              {electric ? t('kWh/100 km') : t('L/100 km')}
             </AppText>
             <AppText variant="h3">
               {electric
@@ -381,7 +382,7 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         </View>
 
         <Button
-          label="Exportar PDF"
+          label={t('Exportar PDF')}
           icon="document-text-outline"
           variant="ghost"
           onPress={exportPdf}
@@ -390,11 +391,11 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
       </Card>
 
       <SectionHeader
-        title={electric ? 'Historial de cargas' : 'Historial'}
+        title={electric ? t('Historial de cargas') : t('Historial')}
         action={vehicleLogs.length ? `${vehicleLogs.length} registros` : undefined}
       />
       <Button
-        label={electric ? 'Registrar carga' : 'Registrar repostaje'}
+        label={electric ? t('Registrar carga') : t('Registrar repostaje')}
         icon={electric ? 'flash-outline' : 'add-circle-outline'}
         onPress={openNewLog}
         style={{ marginBottom: spacing.md }}
@@ -407,8 +408,8 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         <Ionicons name="information-circle-outline" size={13} color={colors.dim} />
         <AppText variant="caption" color={colors.dim}>
           {electric
-            ? 'Cálculo con consumo de energía real. Ajusta unidades en tu perfil.'
-            : 'Cálculo con método de tanque lleno. Ajusta unidades en tu perfil.'}
+            ? t('Cálculo con consumo de energía real. Ajusta unidades en tu perfil.')
+            : t('Cálculo con método de tanque lleno. Ajusta unidades en tu perfil.')}
         </AppText>
       </View>
     </Screen>

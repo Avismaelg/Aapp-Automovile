@@ -4,6 +4,7 @@ import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
 import { colors, radius, shadows, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 function Ring({ delay, active }: { delay: number; active: boolean }) {
   const [scale] = useState(() => new Animated.Value(0.9));
@@ -115,12 +116,12 @@ export function PTTButton({
         color={talking ? colors.accent : colors.text}
         style={{ marginTop: compact ? 4 : spacing.sm }}
       >
-        {talking ? 'Hablando…' : 'Mantén para hablar'}
+        {talking ? 'Hablando…' : t('Mantén para hablar')}
       </AppText>
       {!compact ? (
         <>
           <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-            {talking ? 'Tu voz se está compartiendo con la party' : 'Walkie-talkie con tu grupo'}
+            {talking ? t('Tu voz se está compartiendo con la party') : t('Walkie-talkie con tu grupo')}
           </AppText>
           <Waveform active={talking} />
         </>

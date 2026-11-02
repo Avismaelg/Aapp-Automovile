@@ -3,6 +3,8 @@
 // de cada curva (aceleración lateral cómoda) y se adelanta la frenada para
 // llegar a la curva ya a esa velocidad.
 
+import { displaySpeed } from '@/src/i18n';
+
 type LatLng = [number, number];
 
 export type DrivingLevel = 'go' | 'ease' | 'brake';
@@ -165,6 +167,12 @@ export function nextCurveAhead(
   return null;
 }
 
+// Velocidad de curva en la unidad del país, de 5 en 5: la misma en el disco
+// del mapa y en el aviso.
+export function curveSpeedLabel(kmh: number) {
+  return Math.round(displaySpeed(Math.round(kmh / 5) * 5) / 5) * 5;
+}
+
 export function buildDrivingLine(
   points: LatLng[],
   fromIndex: number,
@@ -197,7 +205,7 @@ export function buildDrivingLine(
     });
     features.push({
       type: 'Feature',
-      properties: { kind: 'badge', level: zone.level, speed: String(Math.round(speeds[zone.peak] / 5) * 5) },
+      properties: { kind: 'badge', level: zone.level, speed: String(curveSpeedLabel(speeds[zone.peak])) },
       geometry: { type: 'Point', coordinates: toLngLat(samples[zone.peak]) },
     });
   }

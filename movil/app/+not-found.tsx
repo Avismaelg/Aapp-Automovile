@@ -3,24 +3,25 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: 'Ruta no encontrada' }} />
+      <Stack.Screen options={{ title: t('Ruta no encontrada') }} />
       <View style={styles.container}>
         <AppText variant="display" color={colors.accent}>
-          Off-road
+          {t('Off-road')}
         </AppText>
         <AppText variant="title" align="center" style={{ marginTop: spacing.sm }}>
-          Esta ruta no existe
+          {t('Esta ruta no existe')}
         </AppText>
         <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-          Puede que el enlace haya expirado o que la party ya haya terminado.
+          {t('Puede que el enlace haya expirado o que la party ya haya terminado.')}
         </AppText>
         <Link href="/" style={styles.link}>
           <AppText variant="bodyStrong" color={colors.accent}>
-            Volver al inicio
+            {t('Volver al inicio')}
           </AppText>
         </Link>
       </View>

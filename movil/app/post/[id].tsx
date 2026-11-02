@@ -33,6 +33,7 @@ import { errorMessage } from '@/src/lib/alerts';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function PostDetailScreen() {
   const router = useRouter();
@@ -59,7 +60,7 @@ export default function PostDetailScreen() {
       setBody('');
     } catch (sendError) {
       setError(
-        errorMessage(sendError, 'No pudimos comentar.'),
+        errorMessage(sendError, t('No pudimos comentar.')),
       );
     }
   };
@@ -72,7 +73,7 @@ export default function PostDetailScreen() {
         setError(
           deleteError instanceof Error
             ? deleteError.message
-            : 'No pudimos borrar el comentario.',
+            : t('No pudimos borrar el comentario.'),
         );
       }
     };
@@ -81,9 +82,9 @@ export default function PostDetailScreen() {
       void perform();
       return;
     }
-    Alert.alert('Borrar comentario', '¿Quieres eliminar este comentario?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Borrar', style: 'destructive', onPress: () => void perform() },
+    Alert.alert(t('Borrar comentario'), t('¿Quieres eliminar este comentario?'), [
+      { text: t('Cancelar'), style: 'cancel' },
+      { text: t('Borrar'), style: 'destructive', onPress: () => void perform() },
     ]);
   };
 
@@ -91,7 +92,7 @@ export default function PostDetailScreen() {
     return (
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
-        <AppText variant="caption" color={colors.muted}>Cargando publicación…</AppText>
+        <AppText variant="caption" color={colors.muted}>{t('Cargando publicación…')}</AppText>
       </SafeAreaView>
     );
   }
@@ -100,17 +101,17 @@ export default function PostDetailScreen() {
     return (
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <Ionicons name="document-text-outline" size={34} color={colors.dim} />
-        <AppText variant="title" align="center">Publicación no disponible</AppText>
+        <AppText variant="title" align="center">{t('Publicación no disponible')}</AppText>
         <AppText variant="caption" color={colors.muted} align="center">
-          Puede ser privada o haber sido eliminada.
+          {t('Puede ser privada o haber sido eliminada.')}
         </AppText>
         <Button
-          label="Reintentar"
+          label={t('Reintentar')}
           variant="secondary"
           onPress={() => void refetch()}
           style={{ marginTop: spacing.md }}
         />
-        <Button label="Volver" variant="ghost" onPress={goBack} />
+        <Button label={t('Volver')} variant="ghost" onPress={goBack} />
       </SafeAreaView>
     );
   }
@@ -124,8 +125,8 @@ export default function PostDetailScreen() {
         <View style={styles.header}>
           <IconButton icon="arrow-back" size={40} onPress={goBack} />
           <View style={{ flex: 1 }}>
-            <AppText variant="label" color={colors.accent}>PUBLICACIÓN</AppText>
-            <AppText variant="title">Comentarios</AppText>
+            <AppText variant="label" color={colors.accent}>{t('PUBLICACIÓN')}</AppText>
+            <AppText variant="title">{t('Comentarios')}</AppText>
           </View>
           <View style={{ width: 40 }} />
         </View>
@@ -148,7 +149,7 @@ export default function PostDetailScreen() {
           />
 
           <View style={styles.commentsHeader}>
-            <AppText variant="h2">Comentarios</AppText>
+            <AppText variant="h2">{t('Comentarios')}</AppText>
             <AppText variant="caption" color={colors.muted}>
               {comments.length}
             </AppText>
@@ -162,9 +163,9 @@ export default function PostDetailScreen() {
             </View>
           ) : commentsError ? (
             <Card style={styles.commentEmpty}>
-              <AppText variant="bodyStrong">No pudimos cargar los comentarios</AppText>
+              <AppText variant="bodyStrong">{t('No pudimos cargar los comentarios')}</AppText>
               <Button
-                label="Reintentar"
+                label={t('Reintentar')}
                 size="sm"
                 variant="secondary"
                 onPress={() => void refetchComments()}
@@ -175,9 +176,9 @@ export default function PostDetailScreen() {
               <View style={styles.commentEmptyIcon}>
                 <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.accent} />
               </View>
-              <AppText variant="title" align="center">Sé el primero en comentar</AppText>
+              <AppText variant="title" align="center">{t('Sé el primero en comentar')}</AppText>
               <AppText variant="caption" color={colors.muted} align="center">
-                Pregunta por la ruta, el coche o la quedada.
+                {t('Pregunta por la ruta, el coche o la quedada.')}
               </AppText>
             </Card>
           ) : (
@@ -193,7 +194,7 @@ export default function PostDetailScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.commentTop}>
                       <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
-                        {comment.isMe ? 'Tú' : comment.profile.displayName}
+                        {comment.isMe ? t('Tú') : comment.profile.displayName}
                       </AppText>
                       <AppText variant="caption" color={colors.dim}>
                         {timeAgo(comment.createdAt)}
@@ -225,7 +226,7 @@ export default function PostDetailScreen() {
               setBody(value.slice(0, 500));
               setError(null);
             }}
-            placeholder="Escribe un comentario…"
+            placeholder={t('Escribe un comentario…')}
             multiline
             maxLength={500}
             style={styles.composerInput}

@@ -14,6 +14,7 @@ import {
 import { whenHydrated } from '@/src/lib/hydration';
 import { resumeTracking, stopTracking } from '@/src/lib/tracking';
 import { useSession } from '@/src/store/session';
+import { t } from '@/src/i18n';
 
 const BATTERY_ASKED_KEY = 'caravana.battery-asked-at';
 const MOTION_ASKED_KEY = 'caravana.motion-asked-at';
@@ -48,11 +49,11 @@ async function ensureBatteryExemption() {
   if (await askedRecently(BATTERY_ASKED_KEY)) return;
   await markAsked(BATTERY_ASKED_KEY);
   Alert.alert(
-    'Graba tus rutas con la app cerrada',
-    'Android está limitando a Caravana por ahorro de batería y deja de registrar tus viajes y dónde aparcas. Permite que funcione sin restricciones.',
+    t('Graba tus rutas con la app cerrada'),
+    t('Android está limitando a Caravana por ahorro de batería y deja de registrar tus viajes y dónde aparcas. Permite que funcione sin restricciones.'),
     [
-      { text: 'Ahora no', style: 'cancel' },
-      { text: 'Permitir', onPress: () => void requestIgnoreBatteryOptimizations() },
+      { text: t('Ahora no'), style: 'cancel' },
+      { text: t('Permitir'), onPress: () => void requestIgnoreBatteryOptimizations() },
     ],
   );
 }

@@ -37,6 +37,7 @@ import {
   vehicleKindMeta,
 } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { distanceUnit, formatKmValue, getCurrency, kmToDisplay, t } from '@/src/i18n';
 
 function SaleSpec({ label, value }: { label: string; value: string }) {
   return (
@@ -77,7 +78,7 @@ export default function VehicleSaleScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
         <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
-          Preparando la ficha…
+          {t('Preparando la ficha…')}
         </AppText>
       </SafeAreaView>
     );
@@ -88,9 +89,9 @@ export default function VehicleSaleScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <Ionicons name="document-text-outline" size={38} color={colors.dim} />
         <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-          No encontramos este vehículo
+          {t('No encontramos este vehículo')}
         </AppText>
-        <Button label="Volver" variant="secondary" onPress={() => router.back()} style={{ marginTop: spacing.xl }} />
+        <Button label={t('Volver')} variant="secondary" onPress={() => router.back()} style={{ marginTop: spacing.xl }} />
       </SafeAreaView>
     );
   }
@@ -106,12 +107,12 @@ export default function VehicleSaleScreen() {
           <Ionicons name="lock-closed-outline" size={30} color={colors.accent} />
         </View>
         <AppText variant="h2" align="center" style={{ marginTop: spacing.lg }}>
-          Ficha privada del dueño
+          {t('Ficha privada del dueño')}
         </AppText>
         <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 8 }}>
-          Solo el propietario puede generar y compartir el historial completo de venta.
+          {t('Solo el propietario puede generar y compartir el historial completo de venta.')}
         </AppText>
-        <Button label="Volver al vehículo" variant="secondary" onPress={() => router.back()} style={{ marginTop: spacing.xl }} />
+        <Button label={t('Volver al vehículo')} variant="secondary" onPress={() => router.back()} style={{ marginTop: spacing.xl }} />
       </SafeAreaView>
     );
   }
@@ -138,10 +139,10 @@ export default function VehicleSaleScreen() {
         ownerUsername,
         maintenance: records,
         fuelLogs: usage.logs,
-        currency: 'DOP',
+        currency: getCurrency(),
       });
     } catch {
-      Alert.alert('No se pudo generar la ficha', 'Inténtalo de nuevo desde un dispositivo compatible.');
+      Alert.alert(t('No se pudo generar la ficha'), t('Inténtalo de nuevo desde un dispositivo compatible.'));
     } finally {
       setSharing(false);
     }
@@ -149,7 +150,7 @@ export default function VehicleSaleScreen() {
 
   const shareSummary = async () => {
     await Share.share({
-      message: `Ficha de venta de ${vehicle.make} ${vehicle.model} ${vehicle.year} en Caravana. ${usage.fillups} repostajes/cargas, ${records.length} mantenimientos y ${vehicle.odometerKm.toLocaleString('es-DO')} km registrados. Perfil público: ${vehicleUrl(vehicle.qrSlug)}`,
+      message: t('Ficha de venta de {0} {1} {2} en Caravana. {3} repostajes/cargas, {4} mantenimientos y {5} km registrados. Perfil público: {6}', vehicle.make, vehicle.model, vehicle.year, usage.fillups, records.length, formatKmValue(vehicle.odometerKm), vehicleUrl(vehicle.qrSlug)),
       url: vehicleUrl(vehicle.qrSlug),
     });
   };
@@ -159,7 +160,7 @@ export default function VehicleSaleScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <IconButton icon="arrow-back" onPress={() => router.back()} />
-          <Pill label="Ficha de venta" tone="lime" icon="document-text" />
+          <Pill label={t('Ficha de venta')} tone="lime" icon="document-text" />
           <IconButton icon="share-social-outline" onPress={shareSummary} />
         </View>
 
@@ -170,7 +171,7 @@ export default function VehicleSaleScreen() {
           style={styles.hero}
         >
           <View style={styles.heroTop}>
-            <Pill label="Informe de propiedad" tone="lime" icon="shield-checkmark" />
+            <Pill label={t('Informe de propiedad')} tone="lime" icon="shield-checkmark" />
             <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>
               {vehicle.year}
             </AppText>
@@ -191,17 +192,17 @@ export default function VehicleSaleScreen() {
           <View style={styles.ownerRow}>
             <Avatar name={ownerName} color={me.color} size={38} uri={me.avatarUrl} ring={colors.surface} />
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.muted}>Propietario</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('Propietario')}</AppText>
               <AppText variant="bodyStrong">{ownerName} · @{ownerUsername}</AppText>
             </View>
             <Pill label={ownershipLabel(vehicle.acquiredAt)} tone="dark" />
           </View>
         </LinearGradient>
 
-        <SectionHeader title="Resumen de uso" />
+        <SectionHeader title={t('Resumen de uso')} />
         <View style={styles.statsGrid}>
           <Card style={styles.statCard}>
-            <Stat value={`${(vehicle.odometerKm / 1000).toFixed(1)}k`} label="km actuales" />
+            <Stat value={`${(kmToDisplay(vehicle.odometerKm) / 1000).toFixed(1)}k`} label={t('{0} actuales', distanceUnit())} />
           </Card>
           <Card style={styles.statCard}>
             <Stat value={String(records.length)} label="mantenimientos" />
@@ -210,23 +211,23 @@ export default function VehicleSaleScreen() {
             <Stat value={String(usage.fillups)} label={usage.electric ? 'cargas' : 'repostajes'} />
           </Card>
           <Card style={styles.statCard}>
-            <Stat value={formatMoney(totalMaintenance, 'DOP')} label="invertido en servicio" />
+            <Stat value={formatMoney(totalMaintenance)} label={t('invertido en servicio')} />
           </Card>
         </View>
 
-        <SectionHeader title="Datos del vehículo" />
+        <SectionHeader title={t('Datos del vehículo')} />
         <Card>
           <View style={styles.specGrid}>
-            <SaleSpec label="AÑO" value={String(vehicle.year)} />
+            <SaleSpec label={t('AÑO')} value={String(vehicle.year)} />
             <SaleSpec label="TIPO" value={meta.shortLabel} />
-            <SaleSpec label="ENERGÍA" value={vehicleFuelLabel(vehicle)} />
+            <SaleSpec label={t('ENERGÍA')} value={vehicleFuelLabel(vehicle)} />
             <SaleSpec label="RENDIMIENTO" value={vehicleEfficiency(vehicle)} />
-            <SaleSpec label="ODÓMETRO" value={`${vehicle.odometerKm.toLocaleString('es-DO')} km`} />
-            <SaleSpec label="EN CARAVANA DESDE" value={formatMonthYear(vehicle.acquiredAt)} />
+            <SaleSpec label={t('ODÓMETRO')} value={formatKmValue(vehicle.odometerKm)} />
+            <SaleSpec label={t('EN CARAVANA DESDE')} value={formatMonthYear(vehicle.acquiredAt)} />
           </View>
         </Card>
 
-        <SectionHeader title="Mantenimiento" action={records.length ? `${records.length} registros` : undefined} />
+        <SectionHeader title={t('Mantenimiento')} action={records.length ? `${records.length} registros` : undefined} />
         <Card style={[styles.maintenanceCard, { borderColor: `${maintenanceTone}45` }]}>
           <View style={styles.maintenanceTop}>
             <View style={[styles.maintenanceIcon, { backgroundColor: `${maintenanceTone}18` }]}>
@@ -239,7 +240,7 @@ export default function VehicleSaleScreen() {
               </AppText>
             </View>
             <Pill
-              label={summary.status === 'ok' ? 'Al día' : summary.status === 'soon' ? 'Próximo' : 'Pendiente'}
+              label={summary.status === 'ok' ? t('Al día') : summary.status === 'soon' ? t('Próximo') : t('Pendiente')}
               tone={summary.status === 'ok' ? 'lime' : summary.status === 'soon' ? 'accent' : 'danger'}
             />
           </View>
@@ -248,7 +249,7 @@ export default function VehicleSaleScreen() {
             <View style={styles.empty}>
               <Ionicons name="construct-outline" size={19} color={colors.dim} />
               <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-                No hay mantenimientos registrados todavía para este vehículo.
+                {t('No hay mantenimientos registrados todavía para este vehículo.')}
               </AppText>
             </View>
           ) : (
@@ -261,7 +262,7 @@ export default function VehicleSaleScreen() {
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyStrong" numberOfLines={1}>{record.title}</AppText>
                     <AppText variant="caption" color={colors.muted}>
-                      {formatHistoryDate(record.date)} · {record.odometerKm.toLocaleString('es-DO')} km · {record.shop}
+                      {formatHistoryDate(record.date)} · {formatKmValue(record.odometerKm)} · {record.shop}
                     </AppText>
                     {record.notes ? (
                       <AppText variant="caption" color={colors.dim} style={{ marginTop: 2 }}>
@@ -270,14 +271,14 @@ export default function VehicleSaleScreen() {
                     ) : null}
                   </View>
                   <AppText variant="caption" color={colors.textSoft}>
-                    {formatMoney(record.cost, 'DOP')}
+                    {formatMoney(record.cost)}
                   </AppText>
                 </View>
               ))}
             </View>
           )}
           <Button
-            label="Añadir mantenimiento"
+            label={t('Añadir mantenimiento')}
             icon="add-circle-outline"
             variant="secondary"
             size="sm"
@@ -288,24 +289,24 @@ export default function VehicleSaleScreen() {
           />
         </Card>
 
-        <SectionHeader title="Energía y consumo" action={usage.fillups ? `${usage.fillups} registros` : undefined} />
+        <SectionHeader title={t('Energía y consumo')} action={usage.fillups ? `${usage.fillups} registros` : undefined} />
         <Card>
           {usage.fillups === 0 ? (
             <AppText variant="caption" color={colors.muted}>
-              No hay repostajes o cargas registradas para este vehículo.
+              {t('No hay repostajes o cargas registradas para este vehículo.')}
             </AppText>
           ) : (
             <>
               <View style={styles.energySummary}>
                 <Stat
                   value={`${formatNumber(usage.totalEnergy, 1)} ${usage.electric ? 'kWh' : 'L'}`}
-                  label={usage.electric ? 'energía registrada' : 'combustible registrado'}
+                  label={usage.electric ? t('energía registrada') : t('combustible registrado')}
                   accent={meta.color}
                 />
                 <View style={styles.energyDivider} />
-                <Stat value={formatMoney(usage.totalSpent, 'DOP')} label="gasto registrado" />
+                <Stat value={formatMoney(usage.totalSpent)} label={t('gasto registrado')} />
                 <View style={styles.energyDivider} />
-                <Stat value={`${formatNumber(usage.kmTracked, 0)} km`} label="tramo medido" />
+                <Stat value={formatKmValue(usage.kmTracked)} label={t('tramo medido')} />
               </View>
               <View style={styles.recordList}>
                 {usage.logs.slice(0, 5).map((log) => (
@@ -320,11 +321,11 @@ export default function VehicleSaleScreen() {
                     <View style={{ flex: 1 }}>
                       <AppText variant="bodyStrong" numberOfLines={1}>{log.station}</AppText>
                       <AppText variant="caption" color={colors.muted}>
-                        {log.date} · {log.odometer.toLocaleString('es-DO')} km
+                        {log.date} · {formatKmValue(log.odometer)}
                       </AppText>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <AppText variant="caption" color={colors.textSoft}>{formatMoney(log.total, 'DOP')}</AppText>
+                      <AppText variant="caption" color={colors.textSoft}>{formatMoney(log.total)}</AppText>
                       <AppText variant="caption" color={colors.dim}>
                         {formatNumber(usage.electric ? log.kwh ?? 0 : log.liters, 2)}{' '}
                         {usage.electric ? 'kWh' : 'L'}
@@ -337,31 +338,30 @@ export default function VehicleSaleScreen() {
           )}
         </Card>
 
-        <SectionHeader title="Qué incluye" />
+        <SectionHeader title={t('Qué incluye')} />
         <Card style={styles.includes}>
-          <Bullet text="Datos técnicos y estado del vehículo." />
-          <Bullet text="Historial de mantenimientos con fecha, kilometraje, taller y coste." />
-          <Bullet text="Repostajes o cargas, consumo y gasto registrado." />
-          <Bullet text="Kilómetros y periodo de uso dentro de Caravana." />
+          <Bullet text={t('Datos técnicos y estado del vehículo.')} />
+          <Bullet text={t('Historial de mantenimientos con fecha, kilometraje, taller y coste.')} />
+          <Bullet text={t('Repostajes o cargas, consumo y gasto registrado.')} />
+          <Bullet text={t('Kilómetros y periodo de uso dentro de Caravana.')} />
           <View style={styles.privacyNote}>
             <Ionicons name="eye-off-outline" size={15} color={colors.lime} />
             <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-              No incluye placa, ubicación exacta, teléfono ni datos de pago. La ficha es
-              informativa y no sustituye una inspección mecánica.
+              {t('No incluye placa, ubicación exacta, teléfono ni datos de pago. La ficha es informativa y no sustituye una inspección mecánica.')}
             </AppText>
           </View>
         </Card>
 
         <View style={styles.actions}>
           <Button
-            label={sharing ? 'Generando PDF…' : 'Compartir ficha en PDF'}
+            label={sharing ? t('Generando PDF…') : t('Compartir ficha en PDF')}
             icon="document-text-outline"
             size="lg"
             loading={sharing}
             onPress={sharePdf}
           />
           <Button
-            label="Compartir resumen"
+            label={t('Compartir resumen')}
             icon="share-social-outline"
             variant="secondary"
             onPress={shareSummary}
@@ -370,7 +370,7 @@ export default function VehicleSaleScreen() {
 
         <View style={styles.footer}>
           <AppText variant="caption" color={colors.dim} align="center">
-            Documento generado por el propietario en Caravana · {formatHistoryDate(new Date().toISOString())}
+            {t('Documento generado por el propietario en Caravana ·')}{' '}{formatHistoryDate(new Date().toISOString())}
           </AppText>
         </View>
       </ScrollView>

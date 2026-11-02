@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export type RouteOption = {
   timeLabel: string;
@@ -64,7 +65,7 @@ export function DestinationCard({
       <View style={styles.header}>
         <View style={styles.titleBlock}>
           <AppText variant="caption" color={chrome.muted}>
-            Destino
+            {t('Destino')}
           </AppText>
           <AppText variant="h2" color={chrome.text} numberOfLines={1} style={styles.title}>
             {label}
@@ -75,7 +76,7 @@ export function DestinationCard({
           hitSlop={6}
           style={[styles.iconButton, { backgroundColor: chrome.chip }]}
           accessibilityRole="button"
-          accessibilityLabel="Compartir ruta"
+          accessibilityLabel={t('Compartir ruta')}
         >
           <Ionicons name="share-outline" size={19} color={chrome.text} />
         </Pressable>
@@ -84,7 +85,7 @@ export function DestinationCard({
           hitSlop={6}
           style={[styles.iconButton, { backgroundColor: chrome.chip }]}
           accessibilityRole="button"
-          accessibilityLabel="Cerrar"
+          accessibilityLabel={t('Cerrar')}
         >
           <Ionicons name="close" size={20} color={chrome.text} />
         </Pressable>
@@ -94,7 +95,7 @@ export function DestinationCard({
         <View style={styles.stateRow}>
           <ActivityIndicator color={chrome.accent} />
           <AppText variant="body" color={chrome.muted}>
-            Buscando la mejor ruta…
+            {t('Buscando la mejor ruta…')}
           </AppText>
         </View>
       ) : failed ? (
@@ -111,7 +112,7 @@ export function DestinationCard({
           </AppText>
           <AppText variant="body" color={chrome.muted} style={styles.summaryDetail}>
             {distanceLabel}
-            {arrivalLabel ? ` · llegas ${arrivalLabel}` : ''}
+            {arrivalLabel ? t(' · llegas {0}', arrivalLabel) : ''}
           </AppText>
         </View>
       ) : null}
@@ -130,7 +131,7 @@ export function DestinationCard({
             onPress={() => onRemoveStop(index)}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel={`Quitar parada ${stop.label}`}
+            accessibilityLabel={t('Quitar parada {0}', stop.label)}
           >
             <Ionicons name="close" size={18} color={chrome.muted} />
           </Pressable>
@@ -143,7 +144,7 @@ export function DestinationCard({
       >
         <Ionicons name="add-circle-outline" size={18} color={chrome.accent} />
         <AppText variant="bodyStrong" color={chrome.accent} style={styles.addStopText}>
-          Añadir parada
+          {t('Añadir parada')}
         </AppText>
       </Pressable>
 
@@ -161,13 +162,13 @@ export function DestinationCard({
                 onPress={() => onSelect(index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`Ruta ${index + 1}: ${option.timeLabel}, ${option.distanceLabel}`}
+                accessibilityLabel={t('Ruta {0}: {1}, {2}', index + 1, option.timeLabel, option.distanceLabel)}
               >
                 <AppText variant="bodyStrong" color={active ? chrome.accent : chrome.text}>
                   {option.timeLabel}
                 </AppText>
                 <AppText variant="caption" color={chrome.muted}>
-                  {option.extraMinutes === 0 ? 'Más rápida' : `+${option.extraMinutes} min`} · {option.distanceLabel}
+                  {option.extraMinutes === 0 ? t('Más rápida') : t('+{0} min', option.extraMinutes)} · {option.distanceLabel}
                 </AppText>
               </Pressable>
             );
@@ -183,7 +184,7 @@ export function DestinationCard({
         >
           <Ionicons name="refresh" size={20} color={chrome.onAccent} />
           <AppText variant="bodyStrong" color={chrome.onAccent} style={styles.primaryText}>
-            Reintentar
+            {t('Reintentar')}
           </AppText>
         </Pressable>
       ) : (
@@ -201,7 +202,7 @@ export function DestinationCard({
         >
           <Ionicons name="navigate" size={20} color={chrome.onAccent} />
           <AppText variant="bodyStrong" color={chrome.onAccent} style={styles.primaryText}>
-            Iniciar
+            {t('Iniciar')}
           </AppText>
         </Pressable>
       )}

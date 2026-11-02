@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 
 import { getLiveShareAccount } from '@/src/lib/live-share';
 import { supabase } from '@/src/lib/supabase';
+import { t } from '@/src/i18n';
 
 // Avisos con la app cerrada: invitaciones a una party, retos y cambios de
 // destino del convoy. Sin servidor de notificaciones push (haría falta
@@ -112,16 +113,16 @@ async function collect(accountId: string): Promise<PendingAlert[]> {
   for (const row of inviteRows) {
     alerts.push({
       id: `invite:${row.id}:${row.created_at}`,
-      title: `${who.get(row.inviter_id) ?? 'Un amigo'} te invita a su convoy`,
-      body: `${row.party_name} · Toca para unirte`,
+      title: t('{0} te invita a su convoy', who.get(row.inviter_id) ?? t('Un amigo')),
+      body: t('{0} · Toca para unirte', row.party_name),
       url: '/(tabs)/party',
     });
   }
   for (const row of challengeRows) {
     alerts.push({
       id: `challenge:${row.id}`,
-      title: `${who.get(row.host_id) ?? 'Un piloto'} te reta`,
-      body: `Llegar primero a ${row.to_label}`,
+      title: t('{0} te reta', who.get(row.host_id) ?? t('Un piloto')),
+      body: t('Llegar primero a {0}', row.to_label),
       url: '/(tabs)/challenges',
     });
   }
@@ -133,8 +134,8 @@ async function collect(accountId: string): Promise<PendingAlert[]> {
   ) {
     alerts.push({
       id: `destination:${partyRow.id}:${partyRow.destination_set_at}`,
-      title: `${who.get(partyRow.destination_set_by) ?? 'El convoy'} cambió el destino`,
-      body: `${partyRow.destination_label ?? 'Nuevo destino'} · Toca para ir con el convoy`,
+      title: t('{0} cambió el destino', who.get(partyRow.destination_set_by) ?? t('El convoy')),
+      body: t('{0} · Toca para ir con el convoy', partyRow.destination_label ?? t('Nuevo destino')),
       url: '/(tabs)',
     });
   }
@@ -176,7 +177,7 @@ export async function setupAlerts() {
   if (Platform.OS === 'web') return;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: 'Convoy y retos',
+      name: t('Convoy y retos'),
       importance: AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 120, 200],
     });
@@ -199,8 +200,8 @@ export async function showTestAlert() {
   await setupAlerts();
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Laura te invita a su convoy',
-      body: 'Aviso de prueba · Toca para abrir la pestaña Party',
+      title: t('Laura te invita a su convoy'),
+      body: t('Aviso de prueba · Toca para abrir la pestaña Party'),
       data: { url: '/(tabs)/party' },
     },
     trigger: {

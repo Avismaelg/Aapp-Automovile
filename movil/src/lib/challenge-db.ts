@@ -6,6 +6,7 @@ import type {
   VehicleKind,
 } from '@/src/types/models';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
+import { t } from '@/src/i18n';
 
 export type ChallengeMode = 'instant' | 'scheduled';
 export type ChallengeStatus = 'pending' | 'live' | 'finished';
@@ -121,15 +122,15 @@ export function emptyChallenge(): Challenge {
   return {
     id: 'empty',
     code: '—',
-    title: 'Aún no hay un reto activo',
-    fromLabel: 'Elige una ruta',
-    toLabel: 'Invita a un piloto',
+    title: t('Aún no hay un reto activo'),
+    fromLabel: t('Elige una ruta'),
+    toLabel: t('Invita a un piloto'),
     distanceKm: 0,
     category: 'mixed',
     status: 'pending',
     mode: 'scheduled',
     elapsedSeconds: 0,
     participants: [],
-    note: 'Crea un reto, invita a tus amigos y comparte la salida cuando todos estén listos.',
+    note: t('Crea un reto, invita a tus amigos y comparte la salida cuando todos estén listos.'),
   };
 }

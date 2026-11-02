@@ -6,6 +6,7 @@ import { AppText, Avatar } from '@/src/components/ui';
 import { memberLiveLabel } from '@/src/lib/convoy';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export type DisplayMember = {
   id: string;
@@ -55,7 +56,7 @@ export function PartyMembersRow({
           disabled={member.isMe}
           style={({ pressed }) => [styles.member, pressed && { opacity: 0.75 }]}
           accessibilityRole="button"
-          accessibilityLabel={`Seguir o retar a ${member.name}`}
+          accessibilityLabel={t('Seguir o retar a {0}', member.name)}
         >
           <Avatar
             name={member.name}
@@ -66,7 +67,7 @@ export function PartyMembersRow({
           />
           <View style={{ flex: 1 }}>
             <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
-              {member.isMe ? 'Tú' : member.name.split(' ')[0]}
+              {member.isMe ? t('Tú') : member.name.split(' ')[0]}
             </AppText>
             <AppText variant="label" color={member.isTalking ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
               {member.isTalking
@@ -82,7 +83,7 @@ export function PartyMembersRow({
                         },
                         now,
                       )
-                    : 'EN VIVO'}
+                    : t('EN VIVO')}
             </AppText>
           </View>
         </Pressable>
@@ -92,7 +93,7 @@ export function PartyMembersRow({
           style={styles.addMember}
           onPress={onInvite}
           accessibilityRole="button"
-          accessibilityLabel="Invitar"
+          accessibilityLabel={t('Invitar')}
         >
           <Ionicons name="add" size={20} color={colors.muted} />
         </Pressable>

@@ -1,6 +1,7 @@
 import { DOMINICAN_PLACES, type KnownPlace } from '@/src/data/do-places';
 import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
+import { getLanguage, t } from '@/src/i18n';
 
 export type SearchPlace = {
   id: string;
@@ -342,7 +343,7 @@ async function mapbox(query: string, near: LatLng | null, signal: AbortSignal): 
   const params = new URLSearchParams({
     q: query,
     country: 'do',
-    language: 'es',
+    language: getLanguage(),
     limit: '6',
     access_token: MAPBOX_TOKEN,
   });
@@ -398,7 +399,7 @@ async function nominatim(
     format: 'jsonv2',
     countrycodes: 'do',
     limit: '10',
-    'accept-language': 'es',
+    'accept-language': getLanguage(),
   });
   if (near) {
     params.set(
@@ -447,7 +448,7 @@ const PHOTON_PAUSE_MS = 2 * 60_000;
 let photonDownUntil = 0;
 
 async function photon(params: URLSearchParams, signal: AbortSignal) {
-  if (Date.now() < photonDownUntil) throw new Error('Photon en pausa.');
+  if (Date.now() < photonDownUntil) throw new Error(t('Photon en pausa.'));
   try {
     const response = await fetchWithTimeout(
       `https://photon.komoot.io/api/?${params.toString()}`,
@@ -600,7 +601,7 @@ export async function searchCategory(
     }
   }
   // Ni una respuesta: es la conexión, no que no haya.
-  if (!answered) throw new Error('Sin conexión con el buscador.');
+  if (!answered) throw new Error(t('Sin conexión con el buscador.'));
   // Por cercanía y sin repetidos (dos nodos de la misma gasolinera).
   const places: SearchPlace[] = [];
   for (const place of found.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0))) {
@@ -617,6 +618,6 @@ export async function searchCategory(
 
 export function formatSearchDistance(meters: number | null) {
   if (meters == null || !Number.isFinite(meters)) return null;
-  if (meters < 1000) return `a ${Math.round(meters)} m`;
-  return `a ${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+  if (meters < 1000) return t('a {0} m', Math.round(meters));
+  return t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
 }

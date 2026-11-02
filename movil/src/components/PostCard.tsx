@@ -7,13 +7,14 @@ import type { FeedPost } from '@/src/hooks/useFeed';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const kindLabels: Record<FeedPost['kind'], string> = {
-  drive: 'Ruta',
-  photo: 'Foto',
-  party: 'Party',
-  achievement: 'Logro',
-  text: 'Publicación',
+  drive: t('Ruta'),
+  photo: t('Foto'),
+  party: t('Party'),
+  achievement: t('Logro'),
+  text: t('Publicación'),
 };
 
 export function PostCard({

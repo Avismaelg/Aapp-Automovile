@@ -16,6 +16,7 @@ import { inviteMessage, sortInviteCandidates } from '@/src/lib/party-invites';
 import { profileColor } from '@/src/lib/profile-db';
 import { partyUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 // Todas las formas de añadir gente al convoy en un solo sitio:
 // amigos con un toque, código para dictar, QR para escanear y enlace para
@@ -69,7 +70,7 @@ export function InviteSheet({
       setJustInvited((list) => [...list, friendId]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (inviteError) {
-      setError(errorMessage(inviteError, 'No pudimos invitar.'));
+      setError(errorMessage(inviteError, t('No pudimos invitar.')));
     } finally {
       setPendingId(null);
     }
@@ -90,12 +91,12 @@ export function InviteSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('Cerrar')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.handle} />
         <View style={styles.header}>
-          <AppText variant="h2" style={{ flex: 1 }}>Añadir al convoy</AppText>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Cerrar">
+          <AppText variant="h2" style={{ flex: 1 }}>{t('Añadir al convoy')}</AppText>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('Cerrar')}>
             <Ionicons name="close" size={22} color={colors.muted} />
           </Pressable>
         </View>
@@ -103,11 +104,11 @@ export function InviteSheet({
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg }}>
           <View>
             <AppText variant="label" color={colors.muted} style={styles.sectionLabel}>
-              TUS AMIGOS · UN TOQUE PARA INVITAR
+              {t('TUS AMIGOS · UN TOQUE PARA INVITAR')}
             </AppText>
             {isDemo && !simulated ? (
               <AppText variant="caption" color={colors.muted}>
-                Las invitaciones reales requieren una cuenta conectada.
+                {t('Las invitaciones reales requieren una cuenta conectada.')}
               </AppText>
             ) : candidates.length === 0 ? (
               <Pressable
@@ -118,7 +119,7 @@ export function InviteSheet({
                 }}
               >
                 <Ionicons name="person-add-outline" size={18} color={colors.text} />
-                <AppText variant="bodyStrong" style={{ flex: 1 }}>Añadir amigos</AppText>
+                <AppText variant="bodyStrong" style={{ flex: 1 }}>{t('Añadir amigos')}</AppText>
                 <Ionicons name="chevron-forward" size={16} color={colors.dim} />
               </Pressable>
             ) : (
@@ -129,7 +130,7 @@ export function InviteSheet({
                   disabled={friend.state !== 'invite' || pendingId != null}
                   onPress={() => void inviteFriend(friend.id)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Invitar a ${friend.name}`}
+                  accessibilityLabel={t('Invitar a {0}', friend.name)}
                 >
                   <Avatar
                     name={friend.name}
@@ -155,29 +156,29 @@ export function InviteSheet({
           {party ? (
             <View>
               <AppText variant="label" color={colors.muted} style={styles.sectionLabel}>
-                CUALQUIERA CON LA APP
+                {t('CUALQUIERA CON LA APP')}
               </AppText>
-              <Pressable style={styles.codeBox} onPress={() => void copyCode()} accessibilityRole="button" accessibilityLabel="Copiar código">
+              <Pressable style={styles.codeBox} onPress={() => void copyCode()} accessibilityRole="button" accessibilityLabel={t('Copiar código')}>
                 <View style={{ flex: 1 }}>
-                  <AppText variant="caption" color={colors.muted}>Código de la party</AppText>
+                  <AppText variant="caption" color={colors.muted}>{t('Código de la party')}</AppText>
                   <AppText style={styles.code}>{party.code}</AppText>
                 </View>
                 <View style={styles.copyPill}>
                   <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={15} color={colors.text} />
-                  <AppText variant="caption">{copied ? 'Copiado' : 'Copiar'}</AppText>
+                  <AppText variant="caption">{copied ? t('Copiado') : t('Copiar')}</AppText>
                 </View>
               </Pressable>
 
               <Pressable style={styles.whatsapp} onPress={shareLink} accessibilityRole="button">
                 <Ionicons name="logo-whatsapp" size={20} color={colors.bg} />
-                <AppText variant="bodyStrong" color={colors.bg}>Enviar invitación</AppText>
+                <AppText variant="bodyStrong" color={colors.bg}>{t('Enviar invitación')}</AppText>
               </Pressable>
 
               <View style={styles.qr}>
                 <QRCard
                   value={partyUrl(party.code)}
                   label="PARTY"
-                  caption="Escanéalo desde Party › Escanear"
+                  caption={t('Escanéalo desde Party › Escanear')}
                   size={150}
                 />
               </View>
@@ -191,20 +192,20 @@ export function InviteSheet({
 
 function InviteButton({ state, loading }: { state: 'member' | 'invited' | 'invite'; loading: boolean }) {
   if (state === 'member') {
-    return <AppText variant="caption" color={colors.muted}>En la party</AppText>;
+    return <AppText variant="caption" color={colors.muted}>{t('En la party')}</AppText>;
   }
   if (state === 'invited') {
     return (
       <View style={[styles.invitePill, styles.invitedPill]}>
         <Ionicons name="checkmark" size={14} color={colors.textSoft} />
-        <AppText variant="caption" color={colors.textSoft}>Invitado</AppText>
+        <AppText variant="caption" color={colors.textSoft}>{t('Invitado')}</AppText>
       </View>
     );
   }
   return (
     <View style={styles.invitePill}>
       <Ionicons name={loading ? 'hourglass-outline' : 'add'} size={15} color={colors.bg} />
-      <AppText variant="caption" color={colors.bg} style={{ fontWeight: '700' }}>Invitar</AppText>
+      <AppText variant="caption" color={colors.bg} style={{ fontWeight: '700' }}>{t('Invitar')}</AppText>
     </View>
   );
 }

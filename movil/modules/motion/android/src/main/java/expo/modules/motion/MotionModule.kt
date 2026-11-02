@@ -36,6 +36,18 @@ class MotionModule : Module() {
 
     Function("hasPermission") { hasActivityPermission(context) }
 
+    // Reinicia la app (cambio de idioma: los textos fijados al arrancar se
+    // vuelven a calcular). Abre de nuevo la pantalla principal y cierra el
+    // proceso; Android lo vuelve a crear para esa pantalla.
+    Function("restartApp") {
+      val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        ?: return@Function false
+      launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      context.startActivity(launch)
+      Runtime.getRuntime().exit(0)
+      true
+    }
+
     AsyncFunction("requestPermission") { promise: Promise ->
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
         promise.resolve(true)

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { AppText } from '@/src/components/ui';
 import type { ChallengeRoute } from '@/src/types/models';
 import { colors, radius, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 export function RoutePicker({
   routes,
@@ -15,7 +16,7 @@ export function RoutePicker({
 }) {
   return (
     <>
-      <AppText variant="label" color={colors.muted} style={styles.stepLabel}>1 · RUTA</AppText>
+      <AppText variant="label" color={colors.muted} style={styles.stepLabel}>{t('1 · RUTA')}</AppText>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -33,7 +34,7 @@ export function RoutePicker({
                 {item.fromLabel.split(',')[0]} → {item.toLabel}
               </AppText>
               <AppText variant="label" color={selected ? colors.accent : colors.dim} style={{ fontSize: 8, marginTop: 2 }}>
-                {item.distanceKm} KM · {item.etaMin} MIN
+                {formatKmValue(item.distanceKm, 1).toUpperCase()} · {item.etaMin}{' '}{t('MIN')}
               </AppText>
             </Pressable>
           );

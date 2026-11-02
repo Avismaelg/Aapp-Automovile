@@ -32,9 +32,10 @@ import { showTestAlert } from '@/src/lib/background-alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useParking } from '@/src/store/parking';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const SPEEDS = [30, 50, 80, 110];
-const TEST_LABEL = 'Destino de prueba';
+const TEST_LABEL = t('Destino de prueba');
 
 // Herramienta de pruebas: mueve tu posición sin conducir para revisar rutas,
 // llegada, aparcamiento, coche 3D, línea de conducción y party.
@@ -84,8 +85,8 @@ export default function SimulatorScreen() {
     const [s1lat, s1lng] = at(700);
     const [s2lat, s2lng] = at(1400);
     routeTo({ latitude, longitude, label: TEST_LABEL }, [
-      { latitude: s1lat, longitude: s1lng, label: 'Parada de prueba 1' },
-      { latitude: s2lat, longitude: s2lng, label: 'Parada de prueba 2' },
+      { latitude: s1lat, longitude: s1lng, label: t('Parada de prueba 1') },
+      { latitude: s2lat, longitude: s2lng, label: t('Parada de prueba 2') },
     ]);
   };
 
@@ -144,23 +145,23 @@ export default function SimulatorScreen() {
       <View style={styles.topBar}>
         <IconButton icon="chevron-back" size={40} onPress={() => router.back()} />
       </View>
-      <ScreenHeader title="Simulador" subtitle="Prueba la app sin conducir" />
+      <ScreenHeader title={t('Simulador')} subtitle={t('Prueba la app sin conducir')} />
 
       <Card style={styles.status}>
         <View style={[styles.statusDot, sim.active && styles.statusDotOn]} />
         <View style={styles.statusText}>
           <AppText variant="bodyStrong">
-            {sim.active ? `${PHASE_LABELS[sim.phase]} · ${Math.round(sim.fix?.speedKmh ?? 0)} km/h` : 'Apagado'}
+            {sim.active ? t('{0} · {1} km/h', PHASE_LABELS[sim.phase], Math.round(sim.fix?.speedKmh ?? 0)) : t('Apagado')}
           </AppText>
           <AppText variant="caption" color={colors.muted}>
             {sim.active
-              ? 'Tu posición es simulada: no se graban viajes ni se publica en la party.'
-              : 'Usa tu GPS real. Elige una prueba para empezar.'}
+              ? t('Tu posición es simulada: no se graban viajes ni se publica en la party.')
+              : t('Usa tu GPS real. Elige una prueba para empezar.')}
           </AppText>
         </View>
       </Card>
 
-      <SectionHeader title="Velocidad de crucero (km/h)" />
+      <SectionHeader title={t('Velocidad de crucero (km/h)')} />
       <View style={styles.speeds}>
         {SPEEDS.map((speed) => (
           <Pressable
@@ -177,80 +178,80 @@ export default function SimulatorScreen() {
         ))}
       </View>
 
-      <SectionHeader title="Pruebas" />
+      <SectionHeader title={t('Pruebas')} />
       <Card style={styles.tests}>
         <Test
           icon="navigate"
-          title="Ruta de prueba (1,5 km)"
-          detail="Calcula una ruta real, navega con voz y línea de conducción, frena en las curvas y termina al llegar."
+          title={t('Ruta de prueba (1,5 km)')}
+          detail={t('Calcula una ruta real, navega con voz y línea de conducción, frena en las curvas y termina al llegar.')}
           onPress={testRoute}
         />
         {destination ? (
           <Test
             icon="flag"
-            title={`Ruta a ${destination.label}`}
-            detail="Recorre la ruta al destino que tienes elegido."
+            title={t('Ruta a {0}', destination.label)}
+            detail={t('Recorre la ruta al destino que tienes elegido.')}
             onPress={() => routeTo(destination)}
           />
         ) : null}
         <Test
           icon="git-branch"
-          title="Salirse de la ruta"
-          detail="Conduce un tramo, se desvía 250 m por otra calle y comprueba que la ruta se recalcula y sigue."
+          title={t('Salirse de la ruta')}
+          detail={t('Conduce un tramo, se desvía 250 m por otra calle y comprueba que la ruta se recalcula y sigue.')}
           onPress={detour}
         />
         <Test
           icon="car"
-          title="Aparcar, caminar y volver"
-          detail="Llega, aparca (el sensor detecta que bajas del coche), camina 150 m (punto azul y coche aparcado), vuelve y arranca."
+          title={t('Aparcar, caminar y volver')}
+          detail={t('Llega, aparca (el sensor detecta que bajas del coche), camina 150 m (punto azul y coche aparcado), vuelve y arranca.')}
           onPress={parking}
         />
         <Test
           icon="stats-chart-outline"
-          title="Viaje completo (se graba)"
-          detail="Ciudad, un tapón, 1,2 km de avenida y aparcar. Se guarda en Mis rutas como prueba (no cuenta en tus totales) y se borra al parar."
+          title={t('Viaje completo (se graba)')}
+          detail={t('Ciudad, un tapón, 1,2 km de avenida y aparcar. Se guarda en Mis rutas como prueba (no cuenta en tus totales) y se borra al parar.')}
           onPress={recordedTrip}
         />
         <Test
           icon="hourglass"
-          title="Atasco (con sensor)"
-          detail="Varios minutos parado y a trompicones con el teléfono diciendo «en vehículo». No debe marcar aparcamiento."
+          title={t('Atasco (con sensor)')}
+          detail={t('Varios minutos parado y a trompicones con el teléfono diciendo «en vehículo». No debe marcar aparcamiento.')}
           onPress={() => traffic(true)}
         />
         <Test
           icon="hourglass-outline"
-          title="Atasco (solo GPS)"
-          detail="El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento."
+          title={t('Atasco (solo GPS)')}
+          detail={t('El mismo tapón sin sensor de actividad. Tampoco debe marcar aparcamiento.')}
           onPress={() => traffic(false)}
         />
         <Test
           icon="git-commit-outline"
-          title="Ruta con 2 paradas"
-          detail="2,2 km con dos paradas por el camino. Se marcan «Parada hecha» en orden y la ruta sigue sola a la siguiente."
+          title={t('Ruta con 2 paradas')}
+          detail={t('2,2 km con dos paradas por el camino. Se marcan «Parada hecha» en orden y la ruta sigue sola a la siguiente.')}
           onPress={routeWithStops}
         />
         <Test
           icon="trophy-outline"
-          title="Convoy de 5 con reto"
-          detail="4 amigos salen de sitios distintos hacia tu meta (a 2,6 km). Tú vas por calles. Arriba ves la clasificación en vivo y en la pestaña Party su velocidad."
+          title={t('Convoy de 5 con reto')}
+          detail={t('4 amigos salen de sitios distintos hacia tu meta (a 2,6 km). Tú vas por calles. Arriba ves la clasificación en vivo y en la pestaña Party su velocidad.')}
           onPress={rallyTest}
         />
         <Test
           icon="notifications-outline"
-          title="Aviso con la app cerrada"
-          detail="A los 8 s llega una notificación «Laura te invita a su convoy». Sal de la app para verla; al tocarla se abre la party."
+          title={t('Aviso con la app cerrada')}
+          detail={t('A los 8 s llega una notificación «Laura te invita a su convoy». Sal de la app para verla; al tocarla se abre la party.')}
           onPress={() => void showTestAlert()}
         />
         <Test
           icon="mail-unread-outline"
-          title="Un amigo te invita a su party"
-          detail="A los 3 s llega el aviso «Laura te invita a su convoy». Con «Unirme» entras y la ves en el mapa."
+          title={t('Un amigo te invita a su party')}
+          detail={t('A los 3 s llega el aviso «Laura te invita a su convoy». Con «Unirme» entras y la ves en el mapa.')}
           onPress={invite}
         />
         <Test
           icon="people-circle-outline"
-          title="Ciudad con 1.000 usuarios"
-          detail="75 parties y gente sola usando la app a la vez. Vas en una party de 12: ves solo la tuya y un contador dice cuánto tráfico llega a tu teléfono."
+          title={t('Ciudad con 1.000 usuarios')}
+          detail={t('75 parties y gente sola usando la app a la vez. Vas en una party de 12: ves solo la tuya y un contador dice cuánto tráfico llega a tu teléfono.')}
           onPress={city}
         />
         <View style={styles.partyRow}>
@@ -258,9 +259,9 @@ export default function SimulatorScreen() {
             <Ionicons name="people-outline" size={18} color={colors.text} />
           </View>
           <View style={styles.statusText}>
-            <AppText variant="bodyStrong">Party en convoy</AppText>
+            <AppText variant="bodyStrong">{t('Party en convoy')}</AppText>
             <AppText variant="caption" color={colors.muted}>
-              Tres amigos simulados te siguen en el mapa y en la pestaña Party.
+              {t('Tres amigos simulados te siguen en el mapa y en la pestaña Party.')}
             </AppText>
           </View>
           <Switch
@@ -277,7 +278,7 @@ export default function SimulatorScreen() {
 
       {sim.active ? (
         <Button
-          label="Parar simulación"
+          label={t('Parar simulación')}
           variant="danger"
           onPress={stopSimulation}
           style={{ marginTop: spacing.lg }}

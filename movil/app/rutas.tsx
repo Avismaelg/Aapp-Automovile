@@ -14,23 +14,24 @@ import {
 } from '@/src/components/ui';
 import { useTrips, type Trip } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayKm, displaySpeed, distanceUnit, shortMonths, speedUnit, t } from '@/src/i18n';
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS = shortMonths();
 
 function formatDuration(ms: number) {
   const totalMinutes = Math.max(0, Math.round(ms / 60_000));
   if (totalMinutes < 60) return `${totalMinutes} min`;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${hours} h ${minutes} min`;
+  return t('{0} h {1} min', hours, minutes);
 }
 
 function formatKm(meters: number) {
-  return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+  return `${displayKm(meters / 1000, 1)} ${distanceUnit()}`;
 }
 
 function formatSpeed(kmh: number) {
-  return `${Math.round(kmh)} km/h`;
+  return `${displaySpeed(kmh)} ${speedUnit()}`;
 }
 
 function formatDate(timestamp: number) {
@@ -49,11 +50,11 @@ export default function TripsScreen() {
 
   const confirmRemove = (trip: Trip) => {
     Alert.alert(
-      'Borrar ruta',
-      `${formatDate(trip.startedAt)} · ${formatKm(trip.distanceM)}. Se quita de tu historial y de tus totales.`,
+      t('Borrar ruta'),
+      t('{0} · {1}. Se quita de tu historial y de tus totales.', formatDate(trip.startedAt), formatKm(trip.distanceM)),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Borrar', style: 'destructive', onPress: () => void removeTrip(trip.id) },
+        { text: t('Cancelar'), style: 'cancel' },
+        { text: t('Borrar'), style: 'destructive', onPress: () => void removeTrip(trip.id) },
       ],
     );
   };
@@ -82,20 +83,20 @@ export default function TripsScreen() {
           icon="trophy-outline"
           size={40}
           onPress={() => router.push('/records' as never)}
-          accessibilityLabel="Récords"
+          accessibilityLabel={t('Récords')}
         />
       </View>
       <ScreenHeader
-        title="Mis rutas"
-        subtitle="Se graban solas al conducir. Mantén pulsada una para borrarla."
+        title={t('Mis rutas')}
+        subtitle={t('Se graban solas al conducir. Mantén pulsada una para borrarla.')}
       />
 
       <View style={styles.summary}>
         <Stat value={String(totals.count)} label="rutas" align="center" />
-        <Stat value={formatKm(totals.distanceM)} label="en total" align="center" />
+        <Stat value={formatKm(totals.distanceM)} label={t('en total')} align="center" />
         <Stat
           value={totals.bestSpeed > 0 ? formatSpeed(totals.bestSpeed) : '--'}
-          label="máxima"
+          label={t('máxima')}
           align="center"
         />
       </View>
@@ -105,18 +106,18 @@ export default function TripsScreen() {
           <View style={styles.recordingDot} />
           <View style={{ flex: 1 }}>
             <AppText variant="bodyStrong">
-              {active.test ? 'Grabando viaje de prueba' : 'Grabando ruta ahora'}
+              {active.test ? t('Grabando viaje de prueba') : t('Grabando ruta ahora')}
             </AppText>
             <AppText variant="caption" color={colors.muted}>
               {formatDuration(now - active.startedAt)} · {formatKm(active.distanceM)} ·{' '}
-              {formatSpeed(active.maxSpeedKmh)} máx
+              {formatSpeed(active.maxSpeedKmh)}{' '}{t('máx')}
             </AppText>
           </View>
           <IconButton
             icon="stop"
             size={38}
             onPress={() => void stopTrip()}
-            accessibilityLabel="Terminar ruta"
+            accessibilityLabel={t('Terminar ruta')}
           />
         </View>
       ) : null}
@@ -124,8 +125,8 @@ export default function TripsScreen() {
       {trips.length === 0 && !active ? (
         <EmptyState
           icon="map-outline"
-          title="Todavía no hay rutas"
-          description="Cuando empieces a conducir, Caravana graba la ruta con sus velocidades y la guarda aquí, incluso en segundo plano."
+          title={t('Todavía no hay rutas')}
+          description={t('Cuando empieces a conducir, Caravana graba la ruta con sus velocidades y la guarda aquí, incluso en segundo plano.')}
         />
       ) : null}
 
@@ -136,8 +137,8 @@ export default function TripsScreen() {
               key={trip.id}
               onLongPress={() => confirmRemove(trip)}
               accessibilityRole="button"
-              accessibilityLabel={`Ruta del ${formatDate(trip.startedAt)}`}
-              accessibilityHint="Mantén pulsado para borrarla"
+              accessibilityLabel={t('Ruta del {0}', formatDate(trip.startedAt))}
+              accessibilityHint={t('Mantén pulsado para borrarla')}
               style={({ pressed }) => [
                 styles.trip,
                 index > 0 && styles.rowDivider,
@@ -147,14 +148,14 @@ export default function TripsScreen() {
               <View style={{ flex: 1 }}>
                 <View style={styles.tripTitleRow}>
                   <AppText variant="bodyStrong">{formatDate(trip.startedAt)}</AppText>
-                  {trip.test ? <Pill label="Prueba" /> : null}
+                  {trip.test ? <Pill label={t('Prueba')} /> : null}
                   {trip.recordsSubmitted ? (
                     <Ionicons name="trophy-outline" size={13} color={colors.muted} />
                   ) : null}
                 </View>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-                  {formatDuration((trip.endedAt ?? trip.startedAt) - trip.startedAt)} · media{' '}
-                  {formatSpeed(trip.avgSpeedKmh)} · máx {formatSpeed(trip.maxSpeedKmh)}
+                  {formatDuration((trip.endedAt ?? trip.startedAt) - trip.startedAt)}{' '}{t('· media')}{' '}
+                  {formatSpeed(trip.avgSpeedKmh)}{' '}{t('· máx')}{' '}{formatSpeed(trip.maxSpeedKmh)}
                 </AppText>
               </View>
               <AppText variant="title">{formatKm(trip.distanceM)}</AppText>

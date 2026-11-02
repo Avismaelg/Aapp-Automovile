@@ -2,9 +2,15 @@
 // dependencias de React ni de Supabase: las usan los hooks y las pruebas.
 
 import { partyUrl } from '@/src/lib/qr';
+import { t } from '@/src/i18n';
 
 // Las invitaciones caducan con la party (24 h); más viejas no se muestran.
 export const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+// Tiempo para responder una invitación en pantalla; luego desaparece.
+export const INVITE_ANSWER_MS = 15_000;
+// Al abrir la app solo se recuperan invitaciones recién llegadas: una de hace
+// rato ya caducó aunque nadie la respondiera.
+export const INVITE_FRESH_MS = 2 * 60 * 1000;
 // Un amigo que no comparte posición desde hace más de esto desaparece del mapa.
 export const FRIEND_LOCATION_TTL_MS = 12 * 60 * 60 * 1000;
 // Por debajo de esto se considera «en vivo».
@@ -61,16 +67,16 @@ export function extractPartyCode(raw: string): string | null {
 // enlace no abra la app (por ejemplo, si aún no la tiene instalada).
 export function inviteMessage(partyName: string, code: string) {
   return [
-    `Únete a mi convoy «${partyName}» en Caravana.`,
-    `Código: ${code.toUpperCase()}`,
-    `Ábrelo aquí: ${partyUrl(code)}`,
-    'O en la app: Party › Unirme con código.',
+    t('Únete a mi convoy «{0}» en Caravana.', partyName),
+    t('Código: {0}', code.toUpperCase()),
+    t('Ábrelo aquí: {0}', partyUrl(code)),
+    t('O en la app: Party › Unirme con código.'),
   ].join('\n');
 }
 
 export function defaultPartyName(displayName: string) {
   const first = displayName.trim().split(/\s+/)[0];
-  return first ? `Convoy de ${first}` : 'Mi convoy';
+  return first ? t('Convoy de {0}', first) : t('Mi convoy');
 }
 
 export type FriendLocationRow = {
@@ -106,13 +112,13 @@ export function latestFriendPositions(
 }
 
 export function lastSeenLabel(updatedAt: number | undefined, now: number) {
-  if (updatedAt == null) return 'En el mapa';
+  if (updatedAt == null) return t('En el mapa');
   const ago = now - updatedAt;
-  if (ago < FRIEND_LIVE_MS) return 'En vivo';
+  if (ago < FRIEND_LIVE_MS) return t('En vivo');
   const minutes = Math.round(ago / 60_000);
-  if (minutes < 60) return `Hace ${minutes} min`;
+  if (minutes < 60) return t('Hace {0} min', minutes);
   const hours = Math.round(minutes / 60);
-  return `Hace ${hours} h`;
+  return t('Hace {0} h', hours);
 }
 
 // Cuándo volver a subir tu posición para tus amigos: cada 15 s si te mueves
@@ -135,14 +141,14 @@ export function shouldPushFriendLocation(
 
 // Errores del servidor → mensajes para el usuario.
 export function inviteErrorMessage(message: string) {
-  if (message.includes('not_friends')) return 'Solo puedes invitar a tus amigos.';
-  if (message.includes('already_member')) return 'Ya está en tu party.';
-  if (message.includes('party_full')) return 'La party está llena.';
-  if (message.includes('invite_not_found')) return 'Esta invitación ya no es válida.';
-  if (message.includes('party_not_found')) return 'Esa party ya terminó.';
-  if (message.includes('not_a_member')) return 'Ya no estás en esa party.';
+  if (message.includes('not_friends')) return t('Solo puedes invitar a tus amigos.');
+  if (message.includes('already_member')) return t('Ya está en tu party.');
+  if (message.includes('party_full')) return t('La party está llena.');
+  if (message.includes('invite_not_found')) return t('Esta invitación ya no es válida.');
+  if (message.includes('party_not_found')) return t('Esa party ya terminó.');
+  if (message.includes('not_a_member')) return t('Ya no estás en esa party.');
   if (/function .* does not exist|PGRST202|Could not find the function/i.test(message)) {
-    return 'El servidor aún no tiene las invitaciones. Hay que actualizar Supabase.';
+    return t('El servidor aún no tiene las invitaciones. Hay que actualizar Supabase.');
   }
-  return 'No pudimos completar la invitación. Inténtalo de nuevo.';
+  return t('No pudimos completar la invitación. Inténtalo de nuevo.');
 }

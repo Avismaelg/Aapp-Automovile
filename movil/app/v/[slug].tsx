@@ -33,6 +33,7 @@ import {
   vehicleKindMeta,
 } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { distanceUnit, formatKmValue, kmToDisplay, t } from '@/src/i18n';
 
 function Spec({
   icon,
@@ -75,7 +76,7 @@ export default function PublicVehicleScreen() {
       <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
         <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
-          Cargando vehículo…
+          {t('Cargando vehículo…')}
         </AppText>
       </SafeAreaView>
     );
@@ -86,13 +87,13 @@ export default function PublicVehicleScreen() {
       <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
         <Ionicons name="car-outline" size={38} color={colors.dim} />
         <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-          Este vehículo ya no está público
+          {t('Este vehículo ya no está público')}
         </AppText>
         <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-          El dueño pudo cambiar la privacidad o eliminar el QR.
+          {t('El dueño pudo cambiar la privacidad o eliminar el QR.')}
         </AppText>
         <Button
-          label="Volver"
+          label={t('Volver')}
           variant="secondary"
           onPress={() => {
             if (router.canGoBack()) router.back();
@@ -120,9 +121,9 @@ export default function PublicVehicleScreen() {
 
   const share = async () => {
     await Share.share({
-      message: `${vehicle.make} ${vehicle.model} de @${ownerUsername} en Caravana: ${vehicleUrl(
+      message: t('{0} {1} de @{2} en Caravana: {3}', vehicle.make, vehicle.model, ownerUsername, vehicleUrl(
         vehicle.qrSlug,
-      )}`,
+      )),
       url: vehicleUrl(vehicle.qrSlug),
     });
   };
@@ -140,7 +141,7 @@ export default function PublicVehicleScreen() {
               else router.replace('/');
             }}
           />
-          <Pill label="Vehículo verificado por QR" tone="lime" icon="shield-checkmark" />
+          <Pill label={t('Vehículo verificado por QR')} tone="lime" icon="shield-checkmark" />
           <IconButton icon="share-social-outline" onPress={share} />
         </View>
 
@@ -179,7 +180,7 @@ export default function PublicVehicleScreen() {
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
-              <Stat value={`${(vehicle.odometerKm / 1000).toFixed(1)}k`} label="km" align="center" />
+              <Stat value={`${(kmToDisplay(vehicle.odometerKm) / 1000).toFixed(1)}k`} label={distanceUnit()} align="center" />
             </View>
           </View>
         </LinearGradient>
@@ -195,14 +196,14 @@ export default function PublicVehicleScreen() {
               online
             />
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.muted}>Pertenece a</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('Pertenece a')}</AppText>
               <AppText variant="bodyStrong">{ownerName}</AppText>
               <AppText variant="caption" color={colors.accent} style={{ marginTop: 1 }}>
                 @{ownerUsername}
               </AppText>
             </View>
             <Button
-              label="Ver perfil"
+              label={t('Ver perfil')}
               variant="secondary"
               size="sm"
               full={false}
@@ -214,7 +215,7 @@ export default function PublicVehicleScreen() {
           <View style={styles.qrRow}>
             <QRCard
               value={vehicleUrl(vehicle.qrSlug)}
-              label="VEHÍCULO"
+              label={t('VEHÍCULO')}
               caption={vehicle.qrSlug}
               size={124}
             />
@@ -222,44 +223,44 @@ export default function PublicVehicleScreen() {
               <Card style={styles.infoCard}>
                 <Ionicons name={electric ? 'flash' : 'water-outline'} size={20} color={meta.color} />
                 <AppText variant="bodyStrong" style={{ marginTop: 6 }}>
-                  {electric ? 'Movilidad eléctrica' : vehicleFuelLabel(vehicle)}
+                  {electric ? t('Movilidad eléctrica') : vehicleFuelLabel(vehicle)}
                 </AppText>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
                   {electric
-                    ? `Consumo medio: ${vehicleEfficiency(vehicle)}. Cero emisiones directas.`
-                    : `Rendimiento medio: ${vehicleEfficiency(vehicle)}.`}
+                    ? t('Consumo medio: {0}. Cero emisiones directas.', vehicleEfficiency(vehicle))
+                    : t('Rendimiento medio: {0}.', vehicleEfficiency(vehicle))}
                 </AppText>
               </Card>
               <View style={styles.privacyRow}>
                 <Ionicons name="eye-off-outline" size={15} color={colors.lime} />
                 <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-                  La placa y la ubicación no se muestran en este perfil.
+                  {t('La placa y la ubicación no se muestran en este perfil.')}
                 </AppText>
               </View>
             </View>
           </View>
 
           <SectionHeader
-            title="Datos del vehículo"
-            action={isOwner ? 'Ficha de venta' : undefined}
+            title={t('Datos del vehículo')}
+            action={isOwner ? t('Ficha de venta') : undefined}
             onAction={isOwner ? openSaleSheet : undefined}
           />
           <Card style={styles.specCard}>
             <View style={styles.specGrid}>
-              <Spec icon="calendar-outline" label="Año" value={String(vehicle.year)} />
-              <Spec icon={meta.icon} label="Tipo" value={meta.shortLabel} />
-              <Spec icon="water-outline" label="Energía" value={vehicleFuelLabel(vehicle)} />
-              <Spec icon="speedometer-outline" label="Rendimiento" value={vehicleEfficiency(vehicle)} />
+              <Spec icon="calendar-outline" label={t('Año')} value={String(vehicle.year)} />
+              <Spec icon={meta.icon} label={t('Tipo')} value={meta.shortLabel} />
+              <Spec icon="water-outline" label={t('Energía')} value={vehicleFuelLabel(vehicle)} />
+              <Spec icon="speedometer-outline" label={t('Rendimiento')} value={vehicleEfficiency(vehicle)} />
               <Spec
                 icon="navigate-outline"
-                label="Odómetro"
-                value={`${vehicle.odometerKm.toLocaleString('es-DO')} km`}
+                label={t('Odómetro')}
+                value={formatKmValue(vehicle.odometerKm)}
               />
-              <Spec icon="time-outline" label="Uso" value={ownershipLabel(vehicle.acquiredAt)} />
+              <Spec icon="time-outline" label={t('Uso')} value={ownershipLabel(vehicle.acquiredAt)} />
             </View>
           </Card>
 
-          <SectionHeader title="Mantenimiento" action={records.length ? `${records.length} registros` : undefined} />
+          <SectionHeader title={t('Mantenimiento')} action={records.length ? `${records.length} registros` : undefined} />
           <Card style={[styles.maintenanceCard, { borderColor: `${maintenanceTone}45` }]}>
             <View style={styles.maintenanceTop}>
               <View style={[styles.maintenanceIcon, { backgroundColor: `${maintenanceTone}18` }]}>
@@ -267,23 +268,23 @@ export default function PublicVehicleScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyStrong">
-                  {isOwner ? summary.label : 'Historial privado'}
+                  {isOwner ? summary.label : t('Historial privado')}
                 </AppText>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
                   {isOwner
                     ? summary.detail
-                    : 'El dueño decide si comparte los mantenimientos completos.'}
+                    : t('El dueño decide si comparte los mantenimientos completos.')}
                 </AppText>
               </View>
               <Pill
                 label={
                   isOwner
                     ? summary.status === 'ok'
-                      ? 'Al día'
+                      ? t('Al día')
                       : summary.status === 'soon'
-                        ? 'Próximo'
-                        : 'Pendiente'
-                    : 'Privado'
+                        ? t('Próximo')
+                        : t('Pendiente')
+                    : t('Privado')
                 }
                 tone={
                   isOwner
@@ -300,24 +301,24 @@ export default function PublicVehicleScreen() {
             {isOwner ? (
               <View style={styles.maintenanceMeta}>
               <View style={styles.maintenanceMetaItem}>
-                <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>ÚLTIMO SERVICIO</AppText>
+                <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('ÚLTIMO SERVICIO')}</AppText>
                 <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
                   {summary.last
                     ? `${summary.last.title} · ${formatHistoryDate(summary.last.date)}`
-                    : 'Sin registros todavía'}
+                    : t('Sin registros todavía')}
                 </AppText>
               </View>
               <View style={styles.maintenanceMetaItem}>
-                <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>PRÓXIMO</AppText>
+                <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('PRÓXIMO')}</AppText>
                 <AppText variant="caption" color={colors.textSoft}>
-                  {summary.nextKm.toLocaleString('es-DO')} km
+                  {formatKmValue(summary.nextKm)}
                 </AppText>
               </View>
               {isOwner ? (
                 <View style={styles.maintenanceMetaItem}>
-                  <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>INVERTIDO</AppText>
+                  <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('INVERTIDO')}</AppText>
                   <AppText variant="caption" color={colors.textSoft}>
-                    {formatMoney(totalMaintenance, 'DOP')}
+                    {formatMoney(totalMaintenance)}
                   </AppText>
                 </View>
               ) : null}
@@ -328,7 +329,7 @@ export default function PublicVehicleScreen() {
               <View style={styles.historyList}>
                 {records.length === 0 ? (
                   <AppText variant="caption" color={colors.muted}>
-                    Aún no hay mantenimientos registrados para este vehículo.
+                    {t('Aún no hay mantenimientos registrados para este vehículo.')}
                   </AppText>
                 ) : (
                   records.slice(0, 4).map((record) => (
@@ -339,17 +340,17 @@ export default function PublicVehicleScreen() {
                       <View style={{ flex: 1 }}>
                         <AppText variant="bodyStrong" numberOfLines={1}>{record.title}</AppText>
                         <AppText variant="caption" color={colors.muted}>
-                          {formatHistoryDate(record.date)} · {record.odometerKm.toLocaleString('es-DO')} km · {record.shop}
+                          {formatHistoryDate(record.date)} · {formatKmValue(record.odometerKm)} · {record.shop}
                         </AppText>
                       </View>
                       <AppText variant="caption" color={colors.textSoft}>
-                        {formatMoney(record.cost, 'DOP')}
+                        {formatMoney(record.cost)}
                       </AppText>
                     </View>
                   ))
                 )}
                 <Button
-                  label="Añadir mantenimiento"
+                  label={t('Añadir mantenimiento')}
                   icon="add-circle-outline"
                   variant="secondary"
                   size="sm"
@@ -363,8 +364,7 @@ export default function PublicVehicleScreen() {
               <View style={styles.privateHistory}>
                 <Ionicons name="lock-closed-outline" size={14} color={colors.muted} />
                 <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-                  El historial detallado es privado. El dueño puede compartir la ficha completa
-                  contigo si el vehículo está en venta.
+                  {t('El historial detallado es privado. El dueño puede compartir la ficha completa contigo si el vehículo está en venta.')}
                 </AppText>
               </View>
             )}
@@ -376,13 +376,12 @@ export default function PublicVehicleScreen() {
                 <Ionicons name="document-text-outline" size={24} color={colors.lime} />
               </View>
               <View style={{ flex: 1 }}>
-                <AppText variant="title">¿Vas a venderlo?</AppText>
+                <AppText variant="title">{t('¿Vas a venderlo?')}</AppText>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 4 }}>
-                  Prepara una ficha con datos, mantenimiento, consumo y kilómetros registrados
-                  para compartirla con un comprador.
+                  {t('Prepara una ficha con datos, mantenimiento, consumo y kilómetros registrados para compartirla con un comprador.')}
                 </AppText>
                 <Button
-                  label="Preparar ficha de venta"
+                  label={t('Preparar ficha de venta')}
                   icon="share-outline"
                   variant="lime"
                   size="sm"
@@ -394,12 +393,12 @@ export default function PublicVehicleScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            <Button label="Compartir QR" icon="share-outline" onPress={share} />
+            <Button label={t('Compartir QR')} icon="share-outline" onPress={share} />
             {isOwner ? (
-              <Button label="Ficha de venta" icon="document-text-outline" variant="secondary" onPress={openSaleSheet} />
+              <Button label={t('Ficha de venta')} icon="document-text-outline" variant="secondary" onPress={openSaleSheet} />
             ) : (
               <Button
-                label="Ver perfil del dueño"
+                label={t('Ver perfil del dueño')}
                 icon="person-outline"
                 variant="secondary"
                 onPress={() => router.push(`/u/${ownerUsername}`)}
@@ -409,7 +408,7 @@ export default function PublicVehicleScreen() {
 
           <View style={styles.footer}>
             <AppText variant="caption" color={colors.dim} align="center">
-              Perfil público de Caravana · {profileUrl(ownerUsername)}
+              {t('Perfil público de Caravana ·')}{' '}{profileUrl(ownerUsername)}
             </AppText>
           </View>
         </View>

@@ -1,5 +1,6 @@
 import type { FuelKind, FuelLog, Vehicle, VehicleKind } from '@/src/types/models';
 import { vehicleUrl } from '@/src/lib/qr';
+import { shortMonths, t } from '@/src/i18n';
 
 export type VehicleRow = {
   id: string;
@@ -38,11 +39,11 @@ export type FuelLogRow = {
   is_full_tank: boolean;
 };
 
-const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS_SHORT = shortMonths();
 
 function shortDate(iso: string) {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'Reciente';
+  if (Number.isNaN(date.getTime())) return t('Reciente');
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
@@ -55,7 +56,7 @@ export function mapFuelLogRow(row: FuelLogRow, vehicle: Vehicle): FuelLog {
     vehicleId: row.vehicle_id,
     kind: electric ? 'electric' : 'fuel',
     date: shortDate(row.filled_at),
-    station: row.station?.trim() || (electric ? 'Carga registrada' : 'Repostaje registrado'),
+    station: row.station?.trim() || (electric ? t('Carga registrada') : t('Repostaje registrado')),
     liters: electric ? 0 : volume,
     kwh: electric ? volume : undefined,
     pricePerLiter: Number(row.price_per_l ?? 0),

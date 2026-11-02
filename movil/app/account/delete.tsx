@@ -22,13 +22,14 @@ import {
 import { useDeleteAccount } from '@/src/hooks/useDeleteAccount';
 import { useAuth } from '@/src/store/auth';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const consequences = [
-  'Perfil, usuario y sesión',
-  'Publicaciones, fotos, likes y comentarios',
-  'Vehículos, mantenimientos y repostajes',
-  'Amigos, parties, mensajes y retos',
-  'Ficha de venta y datos asociados',
+  t('Perfil, usuario y sesión'),
+  t('Publicaciones, fotos, likes y comentarios'),
+  t('Vehículos, mantenimientos y repostajes'),
+  t('Amigos, parties, mensajes y retos'),
+  t('Ficha de venta y datos asociados'),
 ];
 
 export default function DeleteAccountScreen() {
@@ -48,7 +49,7 @@ export default function DeleteAccountScreen() {
   const remove = async () => {
     setError(null);
     if (!canDelete) {
-      setError('Escribe ELIMINAR para confirmar.');
+      setError(t('Escribe ELIMINAR para confirmar.'));
       return;
     }
 
@@ -59,7 +60,7 @@ export default function DeleteAccountScreen() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : 'No pudimos eliminar la cuenta. Inténtalo de nuevo.',
+          : t('No pudimos eliminar la cuenta. Inténtalo de nuevo.'),
       );
     }
   };
@@ -77,7 +78,7 @@ export default function DeleteAccountScreen() {
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
-            <AppText variant="label" color={colors.danger}>CUENTA</AppText>
+            <AppText variant="label" color={colors.danger}>{t('CUENTA')}</AppText>
             <View style={{ width: 40 }} />
           </View>
 
@@ -85,23 +86,23 @@ export default function DeleteAccountScreen() {
             <Ionicons name="warning-outline" size={30} color={colors.danger} />
           </View>
           <AppText variant="h1" align="center" style={{ marginTop: spacing.md }}>
-            Eliminar cuenta y datos
+            {t('Eliminar cuenta y datos')}
           </AppText>
           <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Esta acción es permanente. No se puede deshacer ni recuperar el contenido.
+            {t('Esta acción es permanente. No se puede deshacer ni recuperar el contenido.')}
           </AppText>
 
           {isDemo ? (
             <AuthNotice
               tone="info"
-              message="Estás en modo demo. Eliminar la cuenta requiere una cuenta real."
+              message={t('Estás en modo demo. Eliminar la cuenta requiere una cuenta real.')}
             />
           ) : null}
 
           <Card style={styles.card}>
-            <Pill label={account?.email ?? 'Cuenta'} tone="neutral" icon="mail-outline" />
+            <Pill label={account?.email ?? t('Cuenta')} tone="neutral" icon="mail-outline" />
             <AppText variant="bodyStrong" style={{ marginTop: spacing.md }}>
-              Se eliminarán permanentemente:
+              {t('Se eliminarán permanentemente:')}
             </AppText>
             {consequences.map((item) => (
               <View key={item} style={styles.item}>
@@ -112,13 +113,12 @@ export default function DeleteAccountScreen() {
               </View>
             ))}
             <AppText variant="caption" color={colors.dim} style={{ marginTop: spacing.md }}>
-              También se borran tus fotos publicadas y todos los datos asociados
-              a tu cuenta en nuestros servidores.
+              {t('También se borran tus fotos publicadas y todos los datos asociados a tu cuenta en nuestros servidores.')}
             </AppText>
           </Card>
 
           <Card style={styles.confirmCard}>
-            <AppText variant="bodyStrong">Confirma escribiendo ELIMINAR</AppText>
+            <AppText variant="bodyStrong">{t('Confirma escribiendo ELIMINAR')}</AppText>
             <Input
               value={confirmation}
               onChangeText={(value) => {
@@ -136,7 +136,7 @@ export default function DeleteAccountScreen() {
           {error ? <AuthNotice message={error} /> : null}
 
           <Button
-            label={deleteAccount.isPending ? 'Eliminando cuenta…' : 'Eliminar mi cuenta'}
+            label={deleteAccount.isPending ? t('Eliminando cuenta…') : t('Eliminar mi cuenta')}
             icon="trash-outline"
             variant="danger"
             size="lg"
@@ -146,7 +146,7 @@ export default function DeleteAccountScreen() {
             style={{ marginTop: spacing.lg }}
           />
           <Button
-            label="Cancelar"
+            label={t('Cancelar')}
             variant="ghost"
             onPress={goBack}
             style={{ marginTop: 8 }}

@@ -1,3 +1,4 @@
+import { t } from "@/src/i18n";
 export type ProfilePrivacy = 'public' | 'friends' | 'private';
 
 export type UserProfile = {
@@ -47,11 +48,11 @@ export function mapProfileRow(row: ProfileRow): UserProfile {
 export function privacyLabel(privacy: ProfilePrivacy) {
   switch (privacy) {
     case 'private':
-      return 'Privado';
+      return t('Privado');
     case 'friends':
-      return 'Amigos';
+      return t('Amigos');
     default:
-      return 'Público';
+      return t('Público');
   }
 }
 

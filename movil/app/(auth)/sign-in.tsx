@@ -8,6 +8,7 @@ import { AppText, Button, Input } from '@/src/components/ui';
 import { isSupabaseConfigured } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -32,16 +33,16 @@ export default function SignInScreen() {
     clearError();
 
     if (!email.trim() || !password) {
-      setError('Escribe tu correo y contraseña.');
+      setError(t('Escribe tu correo y contraseña.'));
       return;
     }
     if (!isSupabaseConfigured) {
-      setError('Configura Supabase para usar cuentas reales o entra en modo demo.');
+      setError(t('Configura Supabase para usar cuentas reales o entra en modo demo.'));
       return;
     }
 
     const result = await signIn(email, password);
-    if (!result.ok) setError(result.message ?? 'No pudimos iniciar sesión.');
+    if (!result.ok) setError(result.message ?? t('No pudimos iniciar sesión.'));
   };
 
   const useDemo = async () => {
@@ -50,17 +51,17 @@ export default function SignInScreen() {
 
   return (
     <AuthFormLayout
-      title="Bienvenido de nuevo."
-      subtitle="Tu caravana, tus rutas y tu garaje te están esperando."
+      title={t('Bienvenido de nuevo.')}
+      subtitle={t('Tu caravana, tus rutas y tu garaje te están esperando.')}
       onBack={goBack}
       footer={
         <View style={styles.footer}>
           <AppText variant="caption" color={colors.muted} align="center">
-            ¿Todavía no tienes cuenta?
+            {t('¿Todavía no tienes cuenta?')}
           </AppText>
           <Pressable onPress={() => router.replace('/sign-up')} hitSlop={8}>
             <AppText variant="bodyStrong" color={colors.accent} align="center">
-              Crear una cuenta gratis
+              {t('Crear una cuenta gratis')}
             </AppText>
           </Pressable>
         </View>
@@ -69,13 +70,13 @@ export default function SignInScreen() {
       {!isSupabaseConfigured ? (
         <AuthNotice
           tone="info"
-          message="Supabase aún no está configurado en este entorno. Puedes revisar la app completa en modo demo."
+          message={t('Supabase aún no está configurado en este entorno. Puedes revisar la app completa en modo demo.')}
         />
       ) : null}
 
       <View style={styles.form}>
         <Input
-          label="Correo electrónico"
+          label={t('Correo electrónico')}
           value={email}
           onChangeText={(value) => {
             setEmail(value);
@@ -91,13 +92,13 @@ export default function SignInScreen() {
         />
 
         <Input
-          label="Contraseña"
+          label={t('Contraseña')}
           value={password}
           onChangeText={(value) => {
             setPassword(value);
             setError(null);
           }}
-          placeholder="Tu contraseña"
+          placeholder={t('Tu contraseña')}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
@@ -109,7 +110,7 @@ export default function SignInScreen() {
             <Pressable
               onPress={() => setShowPassword((value) => !value)}
               hitSlop={10}
-              accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              accessibilityLabel={showPassword ? t('Ocultar contraseña') : t('Mostrar contraseña')}
             >
               <Ionicons
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -123,7 +124,7 @@ export default function SignInScreen() {
         {error ? <AuthNotice message={error} /> : null}
 
         <Button
-          label="Entrar"
+          label={t('Entrar')}
           icon="log-in-outline"
           size="lg"
           loading={busy}
@@ -135,13 +136,13 @@ export default function SignInScreen() {
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <AppText variant="caption" color={colors.dim}>
-            o
+            {t('o')}
           </AppText>
           <View style={styles.divider} />
         </View>
 
         <Button
-          label="Explorar sin cuenta"
+          label={t('Explorar sin cuenta')}
           icon="play-outline"
           variant="secondary"
           onPress={useDemo}
@@ -151,8 +152,7 @@ export default function SignInScreen() {
       <View style={styles.privacy}>
         <Ionicons name="shield-checkmark-outline" size={15} color={colors.lime} />
         <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-          Tu ubicación nunca se comparte fuera de una party. Puedes desactivar el
-          tracking cuando quieras.
+          {t('Tu ubicación nunca se comparte fuera de una party. Puedes desactivar el tracking cuando quieras.')}
         </AppText>
       </View>
     </AuthFormLayout>

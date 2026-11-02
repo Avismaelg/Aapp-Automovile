@@ -3,6 +3,7 @@ import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
+import { getLanguage, t } from '@/src/i18n';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -91,7 +92,7 @@ export function graphHopperParams(origin: GeoPoint, destination: GeoPoint, stops
     'points_encoded=false',
     'instructions=true',
     'calc_points=true',
-    'locale=es',
+    `locale=${getLanguage()}`,
   );
   if (stops.length === 0) {
     params.push('algorithm=alternative_route', `alternative_route.max_paths=${MAX_ROUTES}`);
@@ -111,7 +112,7 @@ export async function fetchGraphHopperRoutes({
   signal?: AbortSignal;
 }): Promise<WorldMapRoute[]> {
   if (!isGraphHopperConfigured) {
-    throw new Error('GraphHopper no está configurado.');
+    throw new Error(t('GraphHopper no está configurado.'));
   }
 
   const base = GRAPHHOPPER_URL
@@ -133,14 +134,14 @@ export async function fetchGraphHopperRoutes({
 
   const data = (await response.json()) as GraphHopperResponse;
   if (!response.ok || !data.paths?.[0]) {
-    throw new Error(data.message || 'GraphHopper no devolvió una ruta válida.');
+    throw new Error(data.message || t('GraphHopper no devolvió una ruta válida.'));
   }
 
   const routes = data.paths
     .map(routeFromGraphHopperPath)
     .filter((route): route is WorldMapRoute => route !== null);
   if (routes.length === 0) {
-    throw new Error('GraphHopper devolvió una ruta vacía.');
+    throw new Error(t('GraphHopper devolvió una ruta vacía.'));
   }
   return routes;
 }
@@ -213,14 +214,14 @@ export async function fetchOsrmRoutes({
   });
   const data = (await response.json()) as OsrmResponse;
   if (!response.ok || !data.routes?.[0]) {
-    throw new Error(data.code ? `OSRM respondió ${data.code}.` : 'OSRM no devolvió una ruta válida.');
+    throw new Error(data.code ? t('OSRM respondió {0}.', data.code) : t('OSRM no devolvió una ruta válida.'));
   }
 
   const routes = data.routes
     .map(routeFromOsrm)
     .filter((route): route is WorldMapRoute => route !== null);
   if (routes.length === 0) {
-    throw new Error('OSRM devolvió una ruta vacía.');
+    throw new Error(t('OSRM devolvió una ruta vacía.'));
   }
   return routes;
 }
@@ -258,7 +259,7 @@ export async function fetchStreetRoutes({
   }
   throw lastError instanceof Error
     ? lastError
-    : new Error('No encontramos una calle transitable entre esos puntos.');
+    : new Error(t('No encontramos una calle transitable entre esos puntos.'));
 }
 
 export function formatRouteDistance(distanceM: number) {
@@ -271,5 +272,5 @@ export function formatRouteTime(timeMs: number) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return `${hours} h ${rest} min`;
+  return t('{0} h {1} min', hours, rest);
 }

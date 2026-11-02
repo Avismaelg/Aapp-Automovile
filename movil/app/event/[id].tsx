@@ -10,6 +10,7 @@ import { formatEventDate } from '@/src/lib/events';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { useChosenDestination } from '@/src/store/destination';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const SKETCH_WIDTH = 360;
 const SKETCH_HEIGHT = 200;
@@ -59,7 +60,7 @@ function RouteSketch({ coordinates }: { coordinates: [number, number][] }) {
     <Svg
       viewBox={`0 0 ${SKETCH_WIDTH} ${SKETCH_HEIGHT}`}
       style={styles.sketch}
-      accessibilityLabel="Trazado de la ruta del evento"
+      accessibilityLabel={t('Trazado de la ruta del evento')}
     >
       {projection ? (
         <>
@@ -112,14 +113,14 @@ export default function EventDetailScreen() {
       <Screen>
         <View style={styles.header}>
           <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
-          <AppText variant="h2" style={{ flex: 1 }}>Evento</AppText>
+          <AppText variant="h2" style={{ flex: 1 }}>{t('Evento')}</AppText>
         </View>
         <Card style={styles.missing}>
           <Ionicons name="calendar-outline" size={24} color={colors.dim} />
           <AppText variant="body" color={colors.muted} style={{ textAlign: 'center' }}>
             {isLoading
-              ? 'Cargando evento…'
-              : 'No encontramos este evento. Puede que ya no esté publicado.'}
+              ? t('Cargando evento…')
+              : t('No encontramos este evento. Puede que ya no esté publicado.')}
           </AppText>
         </Card>
       </Screen>
@@ -144,11 +145,9 @@ export default function EventDetailScreen() {
   const share = async () => {
     try {
       await Share.share({
-        message: `${event.title} en Caravana${event.locationLabel ? ` · ${event.locationLabel}` : ''}${
-          event.route
+        message: t('{0} en Caravana{1}{2}\ncaravana://event/{3}', event.title, event.locationLabel ? ` · ${event.locationLabel}` : '', event.route
             ? ` · ${formatRouteDistance(event.route.distanceM)} · ${formatRouteTime(event.route.timeMs)}`
-            : ''
-        }\ncaravana://event/${event.id}`,
+            : '', event.id),
         url: `caravana://event/${event.id}`,
       });
     } catch {
@@ -161,7 +160,7 @@ export default function EventDetailScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
         <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.accent}>EVENTO</AppText>
+          <AppText variant="label" color={colors.accent}>{t('EVENTO')}</AppText>
           <AppText variant="h1" numberOfLines={2} style={{ marginTop: 2 }}>
             {event.title}
           </AppText>
@@ -169,7 +168,7 @@ export default function EventDetailScreen() {
       </View>
 
       <View style={styles.metaRow}>
-        <Pill label={isRoute ? 'Ruta' : 'Ubicación'} tone={isRoute ? 'lime' : 'accent'} />
+        <Pill label={isRoute ? t('Ruta') : t('Ubicación')} tone={isRoute ? 'lime' : 'accent'} />
         <AppText variant="caption" color={colors.muted} numberOfLines={1}>
           {event.hostName} · {formatEventDate(event.createdAt)}
         </AppText>
@@ -186,17 +185,17 @@ export default function EventDetailScreen() {
           <Card style={styles.stats}>
             <View style={styles.statItem}>
               <AppText variant="h2">{formatRouteDistance(event.route.distanceM)}</AppText>
-              <AppText variant="caption" color={colors.muted}>distancia</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('distancia')}</AppText>
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
               <AppText variant="h2">{formatRouteTime(event.route.timeMs)}</AppText>
-              <AppText variant="caption" color={colors.muted}>duración</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('duración')}</AppText>
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
               <AppText variant="h2">{event.route.coordinates.length}</AppText>
-              <AppText variant="caption" color={colors.muted}>puntos</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('puntos')}</AppText>
             </View>
           </Card>
 
@@ -205,11 +204,11 @@ export default function EventDetailScreen() {
             <View style={styles.legend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#c9ff4d' }]} />
-                <AppText variant="caption" color={colors.muted}>Salida</AppText>
+                <AppText variant="caption" color={colors.muted}>{t('Salida')}</AppText>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#ff5a1f' }]} />
-                <AppText variant="caption" color={colors.muted}>Meta</AppText>
+                <AppText variant="caption" color={colors.muted}>{t('Meta')}</AppText>
               </View>
             </View>
           </View>
@@ -227,19 +226,19 @@ export default function EventDetailScreen() {
 
       {event.pendingSync ? (
         <AppText variant="caption" color={colors.dim} style={styles.pending}>
-          Guardado en este dispositivo · pendiente de publicar en la nube.
+          {t('Guardado en este dispositivo · pendiente de publicar en la nube.')}
         </AppText>
       ) : null}
 
       <Button
-        label={isRoute ? 'Navegar a la salida' : 'Navegar al evento'}
+        label={isRoute ? t('Navegar a la salida') : t('Navegar al evento')}
         icon="navigate"
         size="lg"
         onPress={navigateToEvent}
         style={{ marginTop: spacing.md }}
       />
       <Button
-        label="Compartir evento"
+        label={t('Compartir evento')}
         variant="secondary"
         icon="share-social-outline"
         size="lg"

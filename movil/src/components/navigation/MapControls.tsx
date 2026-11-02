@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export function MapControls({
   northUp,
@@ -23,11 +24,11 @@ export function MapControls({
         style={[styles.roundControl, chrome.surface, northUp && styles.active]}
         onPress={onToggleNorth}
         accessibilityRole="button"
-        accessibilityLabel="Orientar el mapa al norte"
+        accessibilityLabel={t('Orientar el mapa al norte')}
       >
         <Ionicons name="compass-outline" size={20} color={northUp ? chrome.onAccent : chrome.text} />
         <AppText variant="label" color={northUp ? chrome.onAccent : chrome.muted} style={styles.modeText}>
-          N
+          {t('N')}
         </AppText>
       </Pressable>
       {!following ? (
@@ -35,11 +36,11 @@ export function MapControls({
           style={[styles.recenter, chrome.surface]}
           onPress={onRecenter}
           accessibilityRole="button"
-          accessibilityLabel="Recentrar mapa"
+          accessibilityLabel={t('Recentrar mapa')}
         >
           <Ionicons name="navigate" size={18} color={chrome.accent} />
           <AppText variant="bodyStrong" color={chrome.text} style={styles.recenterText}>
-            Centrar
+            {t('Centrar')}
           </AppText>
         </Pressable>
       ) : null}

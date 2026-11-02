@@ -17,6 +17,7 @@ import {
 } from '@/src/lib/map-html';
 import { useMapTheme } from '@/src/hooks/useMapTheme';
 import { colors } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 // Valor por defecto estable: un [] nuevo en cada render reenviaría el mensaje.
 const NO_ALTERNATIVES: WorldMapAlternative[] = [];
@@ -226,7 +227,7 @@ export const WorldMap = memo(function WorldMap({
 
   return createElement('iframe', {
     id: frameId,
-    title: 'Mapa Caravana',
+    title: t('Mapa Caravana'),
     srcDoc: WORLD_MAP_HTML,
     allow: 'fullscreen',
     style: {

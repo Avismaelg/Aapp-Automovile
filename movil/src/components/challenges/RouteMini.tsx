@@ -4,6 +4,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AppText } from '@/src/components/ui';
 import { colors, radius, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 export function RouteMini({
   fromLabel,
@@ -41,15 +42,15 @@ export function RouteMini({
       </Svg>
       <View style={styles.routeMiniLabels}>
         <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>SALIDA</AppText>
+          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>{t('SALIDA')}</AppText>
           <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>{fromLabel}</AppText>
         </View>
         <View style={styles.routeDistance}>
           <Ionicons name="navigate" size={11} color={colors.muted} />
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 9 }}>{distanceKm} KM</AppText>
+          <AppText variant="label" color={colors.muted} style={{ fontSize: 9 }}>{formatKmValue(distanceKm, 1).toUpperCase()}</AppText>
         </View>
         <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>META</AppText>
+          <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>{t('META')}</AppText>
           <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>{toLabel}</AppText>
         </View>
       </View>

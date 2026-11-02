@@ -6,6 +6,7 @@ import {
   isGraphHopperConfigured,
 } from '@/src/lib/graphhopper';
 import type { WorldMapRoute } from '@/src/lib/map-html';
+import { t } from '@/src/i18n';
 
 type GeoPoint = {
   latitude: number;
@@ -111,8 +112,8 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[]
         selected: 0,
         isLoading: false,
         error: offline
-          ? 'Sin conexión: no pudimos calcular la ruta. Reintentando…'
-          : 'No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.',
+          ? t('Sin conexión: no pudimos calcular la ruta. Reintentando…')
+          : t('No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.'),
       });
       // Sin conexión se reintenta solo hasta que vuelva la red.
       if (offline) {

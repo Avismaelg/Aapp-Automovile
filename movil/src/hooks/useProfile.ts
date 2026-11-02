@@ -15,6 +15,7 @@ import { mapVehicleRow, type VehicleRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoProfile } from '@/src/store/demoProfile';
+import { t } from '@/src/i18n';
 
 export function useMyProfile() {
   const account = useAuth((state) => state.account);
@@ -104,7 +105,7 @@ export function useUpdateProfile() {
       }
 
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para editar tu perfil.');
+        throw new Error(t('Inicia sesión para editar tu perfil.'));
       }
 
       const { data, error } = await supabase
@@ -122,8 +123,8 @@ export function useUpdateProfile() {
       if (error) {
         throw new Error(
           error.code === '23505'
-            ? 'Ese nombre de usuario ya está ocupado.'
-            : 'No pudimos guardar tu perfil. Inténtalo de nuevo.',
+            ? t('Ese nombre de usuario ya está ocupado.')
+            : t('No pudimos guardar tu perfil. Inténtalo de nuevo.'),
         );
       }
 
@@ -151,8 +152,8 @@ function friendProfile(username: string): UserProfile | null {
     id: friend.id,
     username: friend.username,
     displayName: friend.name,
-    bio: 'Rutas de fin de semana, café y buenas curvas. Siempre en caravana.',
-    city: 'Santo Domingo, RD',
+    bio: t('Rutas de fin de semana, café y buenas curvas. Siempre en caravana.'),
+    city: t('Santo Domingo, RD'),
     countryCode: 'DO',
     avatarUrl: null,
     privacy: 'public',

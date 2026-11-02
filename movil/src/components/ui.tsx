@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, fonts, radius, spacing } from '@/src/theme';
 import { initials } from '@/src/lib/format';
+import { t } from '@/src/i18n';
 
 type TextVariant =
   | 'display'
@@ -33,24 +34,24 @@ type TextVariant =
   | 'mono';
 
 const iconLabels: Partial<Record<keyof typeof Ionicons.glyphMap, string>> = {
-  add: 'Añadir',
-  'arrow-back': 'Volver',
-  'arrow-forward': 'Avanzar',
-  'chevron-back': 'Volver',
-  'chevron-down': 'Abrir opciones',
-  'chevron-forward': 'Abrir',
-  close: 'Cerrar',
-  create: 'Editar',
-  'create-outline': 'Editar',
-  download: 'Descargar',
-  'download-outline': 'Descargar',
-  'log-out-outline': 'Cerrar sesión',
-  refresh: 'Actualizar',
-  'scan-outline': 'Escanear QR',
-  'share-outline': 'Compartir',
-  'share-social-outline': 'Compartir',
-  'settings-outline': 'Ajustes',
-  'trash-outline': 'Eliminar',
+  add: t('Añadir'),
+  'arrow-back': t('Volver'),
+  'arrow-forward': t('Avanzar'),
+  'chevron-back': t('Volver'),
+  'chevron-down': t('Abrir opciones'),
+  'chevron-forward': t('Abrir'),
+  close: t('Cerrar'),
+  create: t('Editar'),
+  'create-outline': t('Editar'),
+  download: t('Descargar'),
+  'download-outline': t('Descargar'),
+  'log-out-outline': t('Cerrar sesión'),
+  refresh: t('Actualizar'),
+  'scan-outline': t('Escanear QR'),
+  'share-outline': t('Compartir'),
+  'share-social-outline': t('Compartir'),
+  'settings-outline': t('Ajustes'),
+  'trash-outline': t('Eliminar'),
 };
 
 function labelForIcon(icon: keyof typeof Ionicons.glyphMap) {

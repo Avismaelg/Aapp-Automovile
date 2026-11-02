@@ -25,11 +25,12 @@ import { useCreateVehicle, useGarageVehicles, useUpdateVehicle } from '@/src/hoo
 import { DEFAULT_VEHICLE_COLORS } from '@/src/lib/vehicle-db';
 import { vehicleKinds, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayToKm, distanceUnit, kmToDisplay, t } from '@/src/i18n';
 
 const fuelOptions: { key: FuelKind; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'gasoline', label: 'Gasolina', icon: 'water-outline' },
-  { key: 'diesel', label: 'Diésel', icon: 'water' },
-  { key: 'electric', label: 'Eléctrico', icon: 'flash' },
+  { key: 'gasoline', label: t('Gasolina'), icon: 'water-outline' },
+  { key: 'diesel', label: t('Diésel'), icon: 'water' },
+  { key: 'electric', label: t('Eléctrico'), icon: 'flash' },
 ];
 
 type FieldErrors = {
@@ -71,7 +72,7 @@ export default function NewVehicleScreen() {
       setModel(editingVehicle.model);
       setYear(String(editingVehicle.year));
       setNickname(editingVehicle.nickname);
-      setOdometer(String(editingVehicle.odometerKm));
+      setOdometer(String(Math.round(kmToDisplay(editingVehicle.odometerKm))));
       setEfficiency(String(editingVehicle.efficiency));
       setColor(editingVehicle.color);
       setLoadedVehicleId(editingVehicle.id);
@@ -107,19 +108,19 @@ export default function NewVehicleScreen() {
 
     const nextErrors: FieldErrors = {};
     const yearNumber = Number.parseInt(year, 10);
-    const odometerNumber = Number(odometer.replace(',', '.'));
+    const odometerNumber = Math.round(displayToKm(Number(odometer.replace(',', '.'))));
     const efficiencyNumber = Number(efficiency.replace(',', '.'));
 
-    if (!make.trim()) nextErrors.make = 'Escribe la marca.';
-    if (!model.trim()) nextErrors.model = 'Escribe el modelo.';
+    if (!make.trim()) nextErrors.make = t('Escribe la marca.');
+    if (!model.trim()) nextErrors.model = t('Escribe el modelo.');
     if (!Number.isFinite(yearNumber) || yearNumber < 1900 || yearNumber > 2100) {
-      nextErrors.year = 'Usa un año entre 1900 y 2100.';
+      nextErrors.year = t('Usa un año entre 1900 y 2100.');
     }
     if (!Number.isFinite(odometerNumber) || odometerNumber < 0) {
-      nextErrors.odometer = 'El odómetro debe ser un número positivo.';
+      nextErrors.odometer = t('El odómetro debe ser un número positivo.');
     }
     if (!Number.isFinite(efficiencyNumber) || efficiencyNumber <= 0) {
-      nextErrors.efficiency = 'Indica un consumo mayor que cero.';
+      nextErrors.efficiency = t('Indica un consumo mayor que cero.');
     }
 
     setErrors(nextErrors);
@@ -148,7 +149,7 @@ export default function NewVehicleScreen() {
       setFormError(
         error instanceof Error
           ? error.message
-          : 'No pudimos guardar el vehículo. Inténtalo de nuevo.',
+          : t('No pudimos guardar el vehículo. Inténtalo de nuevo.'),
       );
     }
   };
@@ -167,31 +168,31 @@ export default function NewVehicleScreen() {
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
             <AppText variant="label" color={colors.accent}>
-              {editingVehicle ? 'EDITAR VEHÍCULO' : 'NUEVO VEHÍCULO'}
+              {editingVehicle ? t('EDITAR VEHÍCULO') : t('NUEVO VEHÍCULO')}
             </AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
             <AppText variant="h1">
-              {editingVehicle ? 'Actualiza tu máquina.' : 'Añade tu máquina.'}
+              {editingVehicle ? t('Actualiza tu máquina.') : t('Añade tu máquina.')}
             </AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
               {editingVehicle
-                ? 'Mantén al día sus datos para que el mapa, consumo y QR sean correctos.'
-                : 'Cada coche, moto, EV o camión tiene su historial, consumo y QR propio.'}
+                ? t('Mantén al día sus datos para que el mapa, consumo y QR sean correctos.')
+                : t('Cada coche, moto, EV o camión tiene su historial, consumo y QR propio.')}
             </AppText>
           </View>
 
           {isDemo ? (
             <AuthNotice
               tone="info"
-              message="Estás en modo demo: el vehículo se guarda solo en este dispositivo."
+              message={t('Estás en modo demo: el vehículo se guarda solo en este dispositivo.')}
             />
           ) : null}
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Tipo de vehículo</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Tipo de vehículo')}</AppText>
             <View style={styles.kindGrid}>
               {vehicleKinds.map((item) => {
                 const itemMeta = vehicleKindMeta[item];
@@ -201,7 +202,7 @@ export default function NewVehicleScreen() {
                     key={item}
                     onPress={() => changeKind(item)}
                     accessibilityRole="radio"
-                    accessibilityLabel={`Tipo ${itemMeta.shortLabel}`}
+                    accessibilityLabel={t('Tipo {0}', itemMeta.shortLabel)}
                     accessibilityState={{ selected: active }}
                     style={({ pressed }) => [
                       styles.kindOption,
@@ -238,35 +239,35 @@ export default function NewVehicleScreen() {
           </View>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Identidad</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Identidad')}</AppText>
             <View style={styles.fields}>
               <Input
-                label="Marca"
+                label={t('Marca')}
                 value={make}
                 onChangeText={(value) => {
                   setMake(value);
                   setErrors((current) => ({ ...current, make: undefined }));
                 }}
-                placeholder="Honda, Toyota, Tesla…"
+                placeholder={t('Honda, Toyota, Tesla…')}
                 autoCapitalize="words"
                 maxLength={40}
                 error={errors.make}
               />
               <Input
-                label="Modelo"
+                label={t('Modelo')}
                 value={model}
                 onChangeText={(value) => {
                   setModel(value);
                   setErrors((current) => ({ ...current, model: undefined }));
                 }}
-                placeholder="Civic, Model 3, MT-07…"
+                placeholder={t('Civic, Model 3, MT-07…')}
                 autoCapitalize="words"
                 maxLength={60}
                 error={errors.model}
               />
               <View style={styles.twoColumns}>
                 <Input
-                  label="Año"
+                  label={t('Año')}
                   value={year}
                   onChangeText={(value) => {
                     setYear(value.replace(/[^0-9]/g, '').slice(0, 4));
@@ -279,16 +280,16 @@ export default function NewVehicleScreen() {
                   error={errors.year}
                 />
                 <Input
-                  label="Apodo"
+                  label={t('Apodo')}
                   value={nickname}
                   onChangeText={setNickname}
-                  placeholder="El Rojo"
+                  placeholder={t('El Rojo')}
                   maxLength={40}
                   style={styles.flex}
                 />
               </View>
               <Input
-                label="Odómetro"
+                label={t('Odómetro')}
                 value={odometer}
                 onChangeText={(value) => {
                   setOdometer(value.replace(/[^0-9.,]/g, ''));
@@ -296,7 +297,7 @@ export default function NewVehicleScreen() {
                 }}
                 placeholder="48210"
                 keyboardType="decimal-pad"
-                rightSlot={<AppText variant="caption" color={colors.dim}>km</AppText>}
+                rightSlot={<AppText variant="caption" color={colors.dim}>{distanceUnit()}</AppText>}
                 error={errors.odometer}
               />
             </View>
@@ -304,7 +305,7 @@ export default function NewVehicleScreen() {
 
           {!electric ? (
             <View style={styles.section}>
-              <AppText variant="label" color={colors.muted}>Combustible</AppText>
+              <AppText variant="label" color={colors.muted}>{t('Combustible')}</AppText>
               <View style={styles.fuelRow}>
                 {availableFuels.map((option) => {
                   const active = fuel === option.key;
@@ -340,7 +341,7 @@ export default function NewVehicleScreen() {
 
           <View style={styles.section}>
             <AppText variant="label" color={colors.muted}>
-              {electric ? 'Consumo eléctrico' : 'Consumo combinado'}
+              {electric ? t('Consumo eléctrico') : t('Consumo combinado')}
             </AppText>
             <Input
               value={efficiency}
@@ -352,18 +353,18 @@ export default function NewVehicleScreen() {
               keyboardType="decimal-pad"
               rightSlot={
                 <AppText variant="caption" color={colors.dim}>
-                  {electric ? 'kWh/100 km' : 'km/L'}
+                  {electric ? t('kWh/100 km') : 'km/L'}
                 </AppText>
               }
               error={errors.efficiency}
             />
             <AppText variant="caption" color={colors.dim} style={{ marginTop: 6 }}>
-              Puedes ajustarlo después con tus repostajes reales.
+              {t('Puedes ajustarlo después con tus repostajes reales.')}
             </AppText>
           </View>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Color</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Color')}</AppText>
             <View style={styles.colorRow}>
               {DEFAULT_VEHICLE_COLORS.map((item) => (
                 <Pressable
@@ -376,7 +377,7 @@ export default function NewVehicleScreen() {
                     { backgroundColor: item },
                     color === item && styles.colorDotActive,
                   ]}
-                  accessibilityLabel={`Color ${item}`}
+                  accessibilityLabel={t('Color {0}', item)}
                 >
                   {color === item ? (
                     <Ionicons
@@ -396,14 +397,14 @@ export default function NewVehicleScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <AppText variant="bodyStrong" numberOfLines={1}>
-                {make.trim() || 'Tu'} {model.trim() || 'vehículo'}
+                {make.trim() || t('Tu')} {model.trim() || t('vehículo')}
               </AppText>
               <AppText variant="caption" color={colors.muted}>
-                {meta.shortLabel} · {year || 'Año'} ·{' '}
-                {electric ? 'Eléctrico' : fuel === 'diesel' ? 'Diésel' : 'Gasolina'}
+                {meta.shortLabel} · {year || t('Año')} ·{' '}
+                {electric ? t('Eléctrico') : fuel === 'diesel' ? t('Diésel') : t('Gasolina')}
               </AppText>
             </View>
-            {firstVehicle ? <Pill label="Principal" tone="accent" icon="star" /> : null}
+            {firstVehicle ? <Pill label={t('Principal')} tone="accent" icon="star" /> : null}
           </Card>
 
           {formError ? <AuthNotice message={formError} /> : null}
@@ -412,8 +413,8 @@ export default function NewVehicleScreen() {
             label={createVehicle.isPending || updateVehicle.isPending
               ? 'Guardando…'
               : editingVehicle
-                ? 'Guardar cambios'
-                : 'Guardar vehículo'}
+                ? t('Guardar cambios')
+                : t('Guardar vehículo')}
             icon="checkmark-circle-outline"
             size="lg"
             loading={createVehicle.isPending || updateVehicle.isPending}
@@ -424,8 +425,7 @@ export default function NewVehicleScreen() {
           <View style={styles.footer}>
             <Ionicons name="lock-closed-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              La placa y el odómetro son privados. Solo el perfil público que tú
-              elijas se comparte por QR.
+              {t('La placa y el odómetro son privados. Solo el perfil público que tú elijas se comparte por QR.')}
             </AppText>
           </View>
         </ScrollView>

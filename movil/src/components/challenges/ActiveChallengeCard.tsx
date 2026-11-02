@@ -7,6 +7,7 @@ import type { Challenge, ChallengeParticipant } from '@/src/types/models';
 import { formatClock } from '@/src/lib/format';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 type Props = {
   active: Challenge;
@@ -56,14 +57,14 @@ export function ActiveChallengeCard({
         <Pill
           label={
             active.status === 'live'
-              ? 'Reto en vivo'
+              ? t('Reto en vivo')
               : active.status === 'pending'
                 ? activeIsInvite
-                  ? 'Invitación recibida'
+                  ? t('Invitación recibida')
                   : activeIsWaiting
-                    ? 'Esperando salida'
-                    : 'Invitación pendiente'
-                : 'Reto finalizado'
+                    ? t('Esperando salida')
+                    : t('Invitación pendiente')
+                : t('Reto finalizado')
           }
           tone={
             active.status === 'live'
@@ -83,7 +84,7 @@ export function ActiveChallengeCard({
           }
         />
         <Pill
-          label={active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
+          label={active.category === 'mixed' ? t('Mixto') : vehicleKindMeta[active.category].shortLabel}
           tone="dark"
         />
       </View>
@@ -92,19 +93,19 @@ export function ActiveChallengeCard({
       <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
         {active.status === 'live'
           ? activeIsInvite
-            ? 'Sala en marcha. Acepta para unirte a la salida.'
-            : `${active.mode === 'instant' ? 'Sala rápida' : 'En curso'} · ${standings.length} participantes · código ${active.code}`
+            ? t('Sala en marcha. Acepta para unirte a la salida.')
+            : t('{0} · {1} participantes · código {2}', active.mode === 'instant' ? t('Sala rápida') : t('En curso'), standings.length, active.code)
           : active.status === 'pending'
             ? activeIsInvite
-              ? 'Te invitaron a este reto. Acepta para unirte.'
+              ? t('Te invitaron a este reto. Acepta para unirte.')
               : activeIsWaiting
-                ? 'Estás dentro. El anfitrión iniciará la salida.'
+                ? t('Estás dentro. El anfitrión iniciará la salida.')
                 : activeReadyToStart
-                  ? 'Ya hay rivales listos. Puedes iniciar la salida.'
+                  ? t('Ya hay rivales listos. Puedes iniciar la salida.')
                   : activeHostReady
-                    ? 'No hay rivales aceptados. Invita a otro piloto.'
-                    : 'Esperando que tus rivales acepten el reto'
-            : 'Resultado final del reto'}
+                    ? t('No hay rivales aceptados. Invita a otro piloto.')
+                    : t('Esperando que tus rivales acepten el reto')
+            : t('Resultado final del reto')}
       </AppText>
 
       <RouteMini
@@ -115,7 +116,7 @@ export function ActiveChallengeCard({
 
       <View style={styles.liveStats}>
         <View style={[styles.liveStat, styles.liveStatTime]}>
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>TIEMPO</AppText>
+          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('TIEMPO')}</AppText>
           <AppText
             variant="mono"
             color={colors.accent}
@@ -127,23 +128,23 @@ export function ActiveChallengeCard({
         </View>
         <View style={styles.liveDivider} />
         <View style={styles.liveStat}>
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>DISTANCIA</AppText>
+          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('DISTANCIA')}</AppText>
           <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-            {active.distanceKm} km
+            {formatKmValue(active.distanceKm, 1)}
           </AppText>
         </View>
         <View style={styles.liveDivider} />
         <View style={styles.liveStat}>
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>LÍDER</AppText>
+          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('LÍDER')}</AppText>
           <AppText variant="h3" color={colors.lime} numberOfLines={1} style={{ fontSize: 18 }}>
-            {standings[0]?.isMe ? 'Tú' : standings[0]?.name.split(' ')[0] ?? '—'}
+            {standings[0]?.isMe ? t('Tú') : standings[0]?.name.split(' ')[0] ?? '—'}
           </AppText>
         </View>
         <View style={styles.liveDivider} />
         <View style={styles.liveStat}>
-          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>CATEGORÍA</AppText>
+          <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('CATEGORÍA')}</AppText>
           <AppText variant="h3" numberOfLines={1} style={{ fontSize: 18 }}>
-            {active.category === 'mixed' ? 'Mixto' : vehicleKindMeta[active.category].shortLabel}
+            {active.category === 'mixed' ? t('Mixto') : vehicleKindMeta[active.category].shortLabel}
           </AppText>
         </View>
       </View>
@@ -152,14 +153,14 @@ export function ActiveChallengeCard({
         {activeIsInvite ? (
           <>
             <Button
-              label="Aceptar reto"
+              label={t('Aceptar reto')}
               icon="checkmark-circle-outline"
               loading={respondPending}
               onPress={() => onRespond(true)}
               style={{ flex: 1 }}
             />
             <Button
-              label="Rechazar"
+              label={t('Rechazar')}
               icon="close"
               variant="secondary"
               full={false}
@@ -170,13 +171,13 @@ export function ActiveChallengeCard({
         ) : active.status === 'pending' && activeIsWaiting ? (
           <>
             <Button
-              label="Esperando al anfitrión"
+              label={t('Esperando al anfitrión')}
               icon="time-outline"
               disabled
               style={{ flex: 1 }}
             />
             <Button
-              label="Compartir"
+              label={t('Compartir')}
               icon="share-social-outline"
               variant="secondary"
               full={false}
@@ -187,7 +188,7 @@ export function ActiveChallengeCard({
         ) : active.status === 'pending' ? (
           <>
             <Button
-              label="Iniciar reto"
+              label={t('Iniciar reto')}
               icon="flag"
               loading={startPending}
               disabled={!isDemo && !activeReadyToStart}
@@ -195,7 +196,7 @@ export function ActiveChallengeCard({
               style={{ flex: 1 }}
             />
             <Button
-              label="Compartir"
+              label={t('Compartir')}
               icon="share-social-outline"
               variant="secondary"
               full={false}
@@ -206,7 +207,7 @@ export function ActiveChallengeCard({
         ) : active.status === 'live' ? (
           <>
             <Button
-              label={activeIsHost ? 'Finalizar reto' : 'Compartir reto'}
+              label={activeIsHost ? t('Finalizar reto') : t('Compartir reto')}
               icon={activeIsHost ? 'stop-circle-outline' : 'share-social-outline'}
               loading={activeIsHost ? finishPending : false}
               onPress={() => activeIsHost ? onFinish() : onShare()}
@@ -214,7 +215,7 @@ export function ActiveChallengeCard({
             />
             {activeIsHost ? (
               <Button
-                label="Compartir"
+                label={t('Compartir')}
                 icon="share-social-outline"
                 variant="secondary"
                 full={false}
@@ -225,7 +226,7 @@ export function ActiveChallengeCard({
           </>
         ) : (
           <Button
-            label="Compartir resultado"
+            label={t('Compartir resultado')}
             icon="share-outline"
             onPress={onShare}
             style={{ flex: 1 }}

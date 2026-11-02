@@ -36,24 +36,25 @@ import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayKm, distanceUnit, formatKmValue, t } from '@/src/i18n';
 
 const quickActions = [
-  { label: 'Party', icon: 'radio-outline' as const, href: '/party' },
-  { label: 'Eventos', icon: 'calendar-outline' as const, href: '/events' },
-  { label: 'Retos', icon: 'flag-outline' as const, href: '/challenges' },
-  { label: 'Rutas', icon: 'map-outline' as const, href: '/rutas' },
-  { label: 'Récords', icon: 'trophy-outline' as const, href: '/records' },
-  { label: 'Repostaje', icon: 'water-outline' as const, href: '/fuel' },
-  { label: 'Mi QR', icon: 'qr-code-outline' as const, href: '/scan' },
-  { label: 'Garaje', icon: 'car-sport-outline' as const, href: '/garage' },
-  { label: 'Conducir', icon: 'navigate-outline' as const, href: '/drive' },
+  { label: t('Party'), icon: 'radio-outline' as const, href: '/party' },
+  { label: t('Eventos'), icon: 'calendar-outline' as const, href: '/events' },
+  { label: t('Retos'), icon: 'flag-outline' as const, href: '/challenges' },
+  { label: t('Rutas'), icon: 'map-outline' as const, href: '/rutas' },
+  { label: t('Récords'), icon: 'trophy-outline' as const, href: '/records' },
+  { label: t('Repostaje'), icon: 'water-outline' as const, href: '/fuel' },
+  { label: t('Mi QR'), icon: 'qr-code-outline' as const, href: '/scan' },
+  { label: t('Garaje'), icon: 'car-sport-outline' as const, href: '/garage' },
+  { label: t('Conducir'), icon: 'navigate-outline' as const, href: '/drive' },
 ];
 
 function greeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Buenos días';
-  if (hour < 19) return 'Buenas tardes';
-  return 'Buenas noches';
+  if (hour < 12) return t('Buenos días');
+  if (hour < 19) return t('Buenas tardes');
+  return t('Buenas noches');
 }
 
 export default function ActividadScreen() {
@@ -88,7 +89,7 @@ export default function ActividadScreen() {
         car: `@${entry.profile.username}`,
         vehicleKind: 'car',
         online: false,
-        status: entry.profile.city || 'Amigo',
+        status: entry.profile.city || t('Amigo'),
       }));
 
   const goBack = () => {
@@ -100,8 +101,8 @@ export default function ActividadScreen() {
     if (Platform.OS === 'web') {
       setTrackingEnabled(next);
       Alert.alert(
-        next ? 'Tracking activado' : 'Tracking en pausa',
-        'En la web es una simulación. En el móvil se usa el GPS en segundo plano con tu permiso.',
+        next ? t('Tracking activado') : t('Tracking en pausa'),
+        t('En la web es una simulación. En el móvil se usa el GPS en segundo plano con tu permiso.'),
       );
       return;
     }
@@ -110,24 +111,24 @@ export default function ActividadScreen() {
       else await stopTracking();
       setTrackingEnabled(next);
     } catch (error) {
-      showError('No se pudo cambiar el tracking', error, 'Revisa los permisos de ubicación.');
+      showError(t('No se pudo cambiar el tracking'), error, t('Revisa los permisos de ubicación.'));
     }
   };
 
   const openTrackingOptions = () => {
     Alert.alert(
-      'Tracking automático',
+      t('Tracking automático'),
       trackingEnabled
-        ? 'Caravana detecta tus viajes y los guarda en tu perfil. Puedes pausarlo cuando quieras.'
-        : 'El tracking está en pausa. Actívalo para registrar tus rutas automáticamente.',
+        ? t('Caravana detecta tus viajes y los guarda en tu perfil. Puedes pausarlo cuando quieras.')
+        : t('El tracking está en pausa. Actívalo para registrar tus rutas automáticamente.'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('Cancelar'), style: 'cancel' },
         {
-          text: trackingEnabled ? 'Pausar' : 'Activar',
+          text: trackingEnabled ? t('Pausar') : t('Activar'),
           onPress: () => toggleTracking(!trackingEnabled),
         },
         {
-          text: 'Ajustes',
+          text: t('Ajustes'),
           onPress: () => router.push('/(tabs)/profile'),
         },
       ],
@@ -155,34 +156,34 @@ export default function ActividadScreen() {
       <View style={styles.hero}>
         <View style={styles.heroValueRow}>
           <AppText variant="display" style={{ fontSize: 44, lineHeight: 48 }}>
-            {Math.round(stats.km).toLocaleString('es-DO')}
+            {displayKm(stats.km)}
           </AppText>
           <AppText variant="h3" color={colors.muted} style={{ marginBottom: 6, marginLeft: 6 }}>
-            km
+            {distanceUnit()}
           </AppText>
         </View>
         <AppText variant="body" color={colors.muted}>
-          {stats.drives} {stats.drives === 1 ? 'ruta' : 'rutas'} · {stats.hours} h al volante
+          {stats.drives} {stats.drives === 1 ? 'ruta' : 'rutas'} · {stats.hours}{' '}{t('h al volante')}
         </AppText>
 
         <Pressable style={styles.trackingRow} onPress={openTrackingOptions}>
           <View style={[styles.liveDot, !trackingEnabled && styles.liveDotPaused]} />
           <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-            {trackingEnabled ? 'Tracking automático activo' : 'Tracking automático en pausa'}
+            {trackingEnabled ? t('Tracking automático activo') : t('Tracking automático en pausa')}
           </AppText>
           <Ionicons name="chevron-forward" size={14} color={colors.dim} />
         </Pressable>
 
         <View style={styles.heroActions}>
           <Button
-            label="Salir en party"
+            label={t('Salir en party')}
             size="sm"
             full={false}
             style={{ flex: 1 }}
             onPress={() => router.push('/(tabs)/party')}
           />
           <Button
-            label="Repostar"
+            label={t('Repostar')}
             variant="secondary"
             size="sm"
             full={false}
@@ -219,22 +220,22 @@ export default function ActividadScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="caption" color={colors.muted}>
-              {bannerChallenge.status === 'live' ? 'Reto en curso' : 'Reto pendiente'} ·{' '}
-              {bannerChallenge.participants.length} participantes
+              {bannerChallenge.status === 'live' ? t('Reto en curso') : t('Reto pendiente')} ·{' '}
+              {bannerChallenge.participants.length}{' '}{t('participantes')}
             </AppText>
             <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
               {bannerChallenge.title}
             </AppText>
             <AppText variant="caption" color={colors.muted} style={{ marginTop: 1 }}>
               {bannerChallenge.fromLabel} → {bannerChallenge.toLabel} ·{' '}
-              {bannerLeader ? `${bannerLeader.isMe ? 'Tú' : bannerLeader.name.split(' ')[0]} lidera` : ''}
+              {bannerLeader ? `${bannerLeader.isMe ? t('Tú') : bannerLeader.name.split(' ')[0]} lidera` : ''}
             </AppText>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.dim} />
         </Pressable>
       ) : null}
 
-      <SectionHeader title="En la carretera" action="Ver party" onAction={() => router.push('/(tabs)/party')} />
+      <SectionHeader title={t('En la carretera')} action={t('Ver party')} onAction={() => router.push('/(tabs)/party')} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -243,8 +244,8 @@ export default function ActividadScreen() {
         {roadFriends.length === 0 ? (
           <Pressable onPress={() => router.push('/friends')} style={styles.friendCard}>
             <Ionicons name="person-add-outline" size={22} color={colors.textSoft} />
-            <AppText variant="bodyStrong" style={{ marginTop: 10 }}>Añade amigos</AppText>
-            <AppText variant="caption" color={colors.muted}>Verás aquí a tu gente.</AppText>
+            <AppText variant="bodyStrong" style={{ marginTop: 10 }}>{t('Añade amigos')}</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('Verás aquí a tu gente.')}</AppText>
           </Pressable>
         ) : null}
         {roadFriends.map((friend) => (
@@ -259,7 +260,7 @@ export default function ActividadScreen() {
                 <View style={styles.friendLive}>
                   <View style={styles.friendLiveDot} />
                   <AppText variant="label" color={colors.green} style={{ fontSize: 8 }}>
-                    LIVE
+                    {t('LIVE')}
                   </AppText>
                 </View>
               ) : null}
@@ -273,7 +274,7 @@ export default function ActividadScreen() {
             <View style={styles.friendBottom}>
               <Ionicons name="navigate-outline" size={11} color={colors.muted} />
               <AppText variant="caption" color={colors.muted}>
-                {friend.distanceKm ? `${friend.distanceKm} km` : friend.status}
+                {friend.distanceKm ? formatKmValue(friend.distanceKm) : friend.status}
               </AppText>
             </View>
           </Pressable>
@@ -281,8 +282,8 @@ export default function ActividadScreen() {
       </ScrollView>
 
       <SectionHeader
-        title="Actividad"
-        action="Publicar"
+        title={t('Actividad')}
+        action={t('Publicar')}
         onAction={() => router.push('/post/new')}
       />
       {feedIsDemo ? (
@@ -290,16 +291,16 @@ export default function ActividadScreen() {
       ) : feedLoading ? (
         <View style={styles.feedState}>
           <ActivityIndicator color={colors.textSoft} />
-          <AppText variant="caption" color={colors.muted}>Cargando actividad…</AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Cargando actividad…')}</AppText>
         </View>
       ) : feedError ? (
         <Card style={styles.feedEmpty}>
-          <AppText variant="bodyStrong">No pudimos cargar el feed</AppText>
+          <AppText variant="bodyStrong">{t('No pudimos cargar el feed')}</AppText>
           <AppText variant="caption" color={colors.muted}>
-            Revisa tu conexión y vuelve a intentarlo.
+            {t('Revisa tu conexión y vuelve a intentarlo.')}
           </AppText>
           <Button
-            label="Reintentar"
+            label={t('Reintentar')}
             variant="secondary"
             onPress={() => refetchFeed()}
             style={{ marginTop: spacing.sm }}
@@ -310,12 +311,12 @@ export default function ActividadScreen() {
           <View style={styles.feedEmptyIcon}>
             <Ionicons name="sparkles-outline" size={24} color={colors.textSoft} />
           </View>
-          <AppText variant="title" align="center">Sé el primero en compartir</AppText>
+          <AppText variant="title" align="center">{t('Sé el primero en compartir')}</AppText>
           <AppText variant="caption" color={colors.muted} align="center">
-            Publica una ruta, una foto o una idea para arrancar tu caravana.
+            {t('Publica una ruta, una foto o una idea para arrancar tu caravana.')}
           </AppText>
           <Button
-            label="Crear publicación"
+            label={t('Crear publicación')}
             onPress={() => router.push('/post/new')}
             style={{ marginTop: spacing.md }}
           />
@@ -340,7 +341,7 @@ export default function ActividadScreen() {
       <View style={styles.footer}>
         <Ionicons name="shield-checkmark" size={13} color={colors.dim} />
         <AppText variant="caption" color={colors.dim}>
-          Tu ubicación solo se comparte dentro de una party.
+          {t('Tu ubicación solo se comparte dentro de una party.')}
         </AppText>
       </View>
     </Screen>

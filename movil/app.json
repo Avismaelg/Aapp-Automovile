@@ -92,7 +92,8 @@
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "expo-web-browser",
-      "@rnmapbox/maps"
+      "@rnmapbox/maps",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

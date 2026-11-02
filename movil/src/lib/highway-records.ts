@@ -4,6 +4,7 @@ import { isDemoMode } from '@/src/lib/demo';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import type { Trip } from '@/src/store/trips';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 export type HighwaySegment = {
   id: string;
@@ -32,8 +33,8 @@ export const DEFAULT_HIGHWAY_SEGMENTS: HighwaySegment[] = [
   {
     id: 'las-americas',
     slug: 'las-americas',
-    name: 'Autopista de las Américas',
-    city: 'Santo Domingo',
+    name: t('Autopista de las Américas'),
+    city: t('Santo Domingo'),
     speedLimitKmh: 80,
     polyline: [
       [18.478, -69.925],
@@ -45,8 +46,8 @@ export const DEFAULT_HIGHWAY_SEGMENTS: HighwaySegment[] = [
   {
     id: 'duarte',
     slug: 'duarte',
-    name: 'Autopista Duarte',
-    city: 'Santo Domingo',
+    name: t('Autopista Duarte'),
+    city: t('Santo Domingo'),
     speedLimitKmh: 100,
     polyline: [
       [18.5, -69.97],
@@ -57,8 +58,8 @@ export const DEFAULT_HIGHWAY_SEGMENTS: HighwaySegment[] = [
   {
     id: 'del-coral',
     slug: 'del-coral',
-    name: 'Autopista del Coral',
-    city: 'La Romana',
+    name: t('Autopista del Coral'),
+    city: t('La Romana'),
     speedLimitKmh: 110,
     polyline: [
       [18.56, -68.9],
@@ -69,8 +70,8 @@ export const DEFAULT_HIGHWAY_SEGMENTS: HighwaySegment[] = [
   {
     id: '30-de-mayo',
     slug: '30-de-mayo',
-    name: 'Autopista 30 de Mayo',
-    city: 'Santo Domingo',
+    name: t('Autopista 30 de Mayo'),
+    city: t('Santo Domingo'),
     speedLimitKmh: 80,
     polyline: [
       [18.44, -69.96],

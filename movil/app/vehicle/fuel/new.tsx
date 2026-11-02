@@ -17,10 +17,11 @@ import { AppText, Button, Card, IconButton, Input } from '@/src/components/ui';
 import { useAddFuelLog, useFuelLogs } from '@/src/hooks/useFuelLogs';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { errorMessage } from '@/src/lib/alerts';
-import { formatMoney, formatNumber } from '@/src/lib/format';
+import { formatMoney } from '@/src/lib/format';
 import { isElectric } from '@/src/lib/vehicles';
 import type { Vehicle } from '@/src/types/models';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayToKm, distanceUnit, formatKmValue, getCurrency, t } from '@/src/i18n';
 
 function parseNumber(value: string) {
   const number = Number(value.replace(',', '.'));
@@ -51,9 +52,9 @@ export default function NewFuelLogScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <Ionicons name="car-outline" size={36} color={colors.dim} />
         <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-          No encontramos el vehículo
+          {t('No encontramos el vehículo')}
         </AppText>
-        <Button label="Volver" variant="secondary" onPress={goBack} style={{ marginTop: spacing.xl }} />
+        <Button label={t('Volver')} variant="secondary" onPress={goBack} style={{ marginTop: spacing.xl }} />
       </SafeAreaView>
     );
   }
@@ -94,21 +95,21 @@ function FuelLogForm({
 
   const save = async () => {
     setError(null);
-    const odometerNumber = parseNumber(odometer);
+    const odometerNumber = Math.round(displayToKm(parseNumber(odometer)));
     if (!(odometerNumber > 0)) {
-      setError('Escribe los kilómetros que marca el odómetro.');
+      setError(t('Escribe los kilómetros que marca el odómetro.'));
       return;
     }
     if (odometerNumber < lastOdometer) {
-      setError(`El odómetro no puede ser menor que el último registro (${formatNumber(lastOdometer, 0)} km).`);
+      setError(t('El odómetro no puede ser menor que el último registro ({0}).', formatKmValue(lastOdometer)));
       return;
     }
     if (!(amountNumber > 0)) {
-      setError(electric ? 'Escribe los kWh cargados.' : 'Escribe los litros repostados.');
+      setError(electric ? t('Escribe los kWh cargados.') : t('Escribe los litros repostados.'));
       return;
     }
     if (!(totalNumber > 0) || pricePerUnit == null) {
-      setError('Escribe el importe total pagado.');
+      setError(t('Escribe el importe total pagado.'));
       return;
     }
 
@@ -124,7 +125,7 @@ function FuelLogForm({
       });
       onDone();
     } catch (saveError) {
-      setError(errorMessage(saveError, 'No pudimos guardar el registro.'));
+      setError(errorMessage(saveError, t('No pudimos guardar el registro.')));
     }
   };
 
@@ -148,24 +149,24 @@ function FuelLogForm({
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">{electric ? 'Registra la carga.' : 'Registra el repostaje.'}</AppText>
+            <AppText variant="h1">{electric ? t('Registra la carga.') : t('Registra el repostaje.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
-              {vehicle.make} {vehicle.model} · último registro {formatNumber(lastOdometer, 0)} km
+              {vehicle.make} {vehicle.model}{' '}{t('· último registro')}{' '}{formatKmValue(lastOdometer)}
             </AppText>
           </View>
 
           <Card style={styles.section}>
             <Input
-              label="Odómetro"
+              label={t('Odómetro')}
               value={odometer}
               onChangeText={setOdometer}
               placeholder={String(Math.round(lastOdometer))}
               keyboardType="decimal-pad"
-              rightSlot={<AppText variant="caption" color={colors.dim}>km</AppText>}
+              rightSlot={<AppText variant="caption" color={colors.dim}>{distanceUnit()}</AppText>}
             />
             <View style={styles.row}>
               <Input
-                label={electric ? 'Energía' : 'Cantidad'}
+                label={electric ? t('Energía') : t('Cantidad')}
                 value={amount}
                 onChangeText={setAmount}
                 placeholder={electric ? '42' : '38,5'}
@@ -174,19 +175,19 @@ function FuelLogForm({
                 style={styles.flex}
               />
               <Input
-                label="Importe"
+                label={t('Importe')}
                 value={total}
                 onChangeText={setTotal}
                 placeholder="0"
                 keyboardType="decimal-pad"
-                rightSlot={<AppText variant="caption" color={colors.dim}>DOP</AppText>}
+                rightSlot={<AppText variant="caption" color={colors.dim}>{getCurrency()}</AppText>}
                 style={styles.flex}
               />
             </View>
             <AppText variant="caption" color={colors.muted}>
               {pricePerUnit != null
-                ? `Precio: ${formatMoney(pricePerUnit, 'DOP')} por ${unit}`
-                : 'El precio por unidad se calcula con la cantidad y el importe.'}
+                ? t('Precio: {0} por {1}', formatMoney(pricePerUnit), unit)
+                : t('El precio por unidad se calcula con la cantidad y el importe.')}
             </AppText>
 
             <Pressable
@@ -201,18 +202,18 @@ function FuelLogForm({
                 color={fullTank ? colors.lime : colors.muted}
               />
               <View style={styles.flex}>
-                <AppText variant="bodyStrong">{electric ? 'Batería al 100 %' : 'Tanque lleno'}</AppText>
+                <AppText variant="bodyStrong">{electric ? t('Batería al 100 %') : t('Tanque lleno')}</AppText>
                 <AppText variant="caption" color={colors.muted}>
-                  Necesario para calcular tu consumo real entre registros.
+                  {t('Necesario para calcular tu consumo real entre registros.')}
                 </AppText>
               </View>
             </Pressable>
 
             <Input
-              label={electric ? 'Cargador' : 'Estación'}
+              label={electric ? t('Cargador') : t('Estación')}
               value={station}
               onChangeText={setStation}
-              placeholder={electric ? 'Casa, supercargador…' : 'Nombre de la estación'}
+              placeholder={electric ? t('Casa, supercargador…') : t('Nombre de la estación')}
               maxLength={120}
             />
           </Card>
@@ -220,7 +221,7 @@ function FuelLogForm({
           {error ? <AuthNotice message={error} /> : null}
 
           <Button
-            label={addFuelLog.isPending ? 'Guardando…' : electric ? 'Guardar carga' : 'Guardar repostaje'}
+            label={addFuelLog.isPending ? 'Guardando…' : electric ? t('Guardar carga') : t('Guardar repostaje')}
             icon="checkmark-circle-outline"
             size="lg"
             loading={addFuelLog.isPending}

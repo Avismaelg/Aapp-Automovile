@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/src/components/ui';
 import type { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 type Props = {
   name: string;
@@ -22,7 +23,7 @@ export function PartyTitle({ name, destination, duration, routeStatus, streetRou
       <View style={styles.destinationRow}>
         <Ionicons name="location" size={13} color={colors.accent} />
         <AppText variant="caption" color={colors.textSoft}>
-          {destination} · ETA {duration}
+          {destination}{' '}{t('· ETA')}{' '}{duration}
         </AppText>
       </View>
       <View style={styles.gpsRow}>
@@ -43,7 +44,7 @@ export function PartyTitle({ name, destination, duration, routeStatus, streetRou
         {live.status === 'denied' || live.status === 'error' || live.status === 'demo' ? (
           <Pressable onPress={live.retry} hitSlop={8}>
             <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
-              REINTENTAR
+              {t('REINTENTAR')}
             </AppText>
           </Pressable>
         ) : null}

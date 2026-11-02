@@ -21,6 +21,7 @@ import { filterString, partySubscriptions } from '@/src/lib/realtime-routing';
 import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 export type PartyRole = 'host' | 'member' | 'sweeper';
 
@@ -98,7 +99,7 @@ function fallbackProfile(id: string): UserProfile {
   return {
     id,
     username: 'piloto',
-    displayName: 'Piloto',
+    displayName: t('Piloto'),
     bio: '',
     city: '',
     countryCode: 'DO',
@@ -110,7 +111,7 @@ function fallbackProfile(id: string): UserProfile {
 }
 
 async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView> {
-  if (!supabase) throw new Error('Supabase no está configurado.');
+  if (!supabase) throw new Error(t('Supabase no está configurado.'));
 
   const { data: memberRows, error } = await supabase
     .from('party_members')
@@ -341,8 +342,8 @@ export function useCreateParty() {
       destinationLat?: number;
       destinationLng?: number;
     }) => {
-      if (demo) throw new Error('Las parties reales requieren una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para crear una party.');
+      if (demo) throw new Error(t('Las parties reales requieren una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para crear una party.'));
 
       // Solo una party activa a la vez: crear una nueva te saca de la anterior.
       await leaveOtherParties(account.id, null);
@@ -363,7 +364,7 @@ export function useCreateParty() {
         .select('id, invite_code')
         .single();
 
-      if (error) throw new Error('No pudimos crear la party. Inténtalo de nuevo.');
+      if (error) throw new Error(t('No pudimos crear la party. Inténtalo de nuevo.'));
 
       const { error: memberError } = await supabase.from('party_members').insert({
         party_id: data.id,
@@ -374,7 +375,7 @@ export function useCreateParty() {
 
       if (memberError) {
         await supabase.from('parties').delete().eq('id', data.id);
-        throw new Error('No pudimos unirte como anfitrión de la party.');
+        throw new Error(t('No pudimos unirte como anfitrión de la party.'));
       }
 
       return { id: data.id as string, code: data.invite_code as string };
@@ -392,8 +393,8 @@ export function useJoinParty() {
 
   return useMutation({
     mutationFn: async (code: string) => {
-      if (demo) throw new Error('Unirse a una party real requiere una cuenta.');
-      if (!supabase || !account) throw new Error('Inicia sesión para unirte a la party.');
+      if (demo) throw new Error(t('Unirse a una party real requiere una cuenta.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para unirte a la party.'));
 
       const { data, error } = await supabase.rpc('join_party', {
         p_code: code.trim().toUpperCase(),
@@ -401,12 +402,12 @@ export function useJoinParty() {
 
       if (error) {
         if (error.message.includes('party_not_found')) {
-          throw new Error('No encontramos una party con ese código.');
+          throw new Error(t('No encontramos una party con ese código.'));
         }
         if (error.message.includes('party_full')) {
-          throw new Error('La party está llena.');
+          throw new Error(t('La party está llena.'));
         }
-        throw new Error('No pudimos unirnos a la party. Revisa el código.');
+        throw new Error(t('No pudimos unirnos a la party. Revisa el código.'));
       }
 
       const party = Array.isArray(data) ? data[0] : data;
@@ -426,8 +427,8 @@ export function useLeaveParty() {
 
   return useMutation({
     mutationFn: async ({ partyId, isHost }: { partyId: string; isHost: boolean }) => {
-      if (demo) throw new Error('Salir de una party real requiere una cuenta.');
-      if (!supabase || !account) throw new Error('Inicia sesión para salir de la party.');
+      if (demo) throw new Error(t('Salir de una party real requiere una cuenta.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para salir de la party.'));
 
       const now = new Date().toISOString();
       const { error } = await supabase
@@ -436,7 +437,7 @@ export function useLeaveParty() {
         .eq('party_id', partyId)
         .eq('user_id', account.id);
 
-      if (error) throw new Error('No pudimos salir de la party.');
+      if (error) throw new Error(t('No pudimos salir de la party.'));
 
       if (isHost) {
         await supabase
@@ -466,7 +467,7 @@ export function useSetVoiceChannel() {
       channelSlug: PartyVoiceChannelSlug;
     }) => {
       if (demo) return;
-      if (!supabase || !account) throw new Error('Inicia sesión para cambiar de canal.');
+      if (!supabase || !account) throw new Error(t('Inicia sesión para cambiar de canal.'));
 
       const { error } = await supabase
         .from('party_members')
@@ -474,7 +475,7 @@ export function useSetVoiceChannel() {
         .eq('party_id', partyId)
         .eq('user_id', account.id);
 
-      if (error) throw new Error('No pudimos cambiar el canal de voz.');
+      if (error) throw new Error(t('No pudimos cambiar el canal de voz.'));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['party'] });
@@ -500,7 +501,7 @@ export function useSetPartyDestination() {
       lng: number | null;
     }) => {
       if (demo) return;
-      if (!supabase || !account) throw new Error('Inicia sesión para compartir la ruta.');
+      if (!supabase || !account) throw new Error(t('Inicia sesión para compartir la ruta.'));
 
       const { error } = await supabase.rpc('set_party_destination', {
         p_party_id: partyId,
@@ -511,12 +512,12 @@ export function useSetPartyDestination() {
 
       if (error) {
         if (error.message.includes('not_a_member')) {
-          throw new Error('No perteneces a esta party.');
+          throw new Error(t('No perteneces a esta party.'));
         }
         if (error.message.includes('party_not_found')) {
-          throw new Error('La party ya no existe.');
+          throw new Error(t('La party ya no existe.'));
         }
-        throw new Error('No pudimos actualizar el destino de la caravana.');
+        throw new Error(t('No pudimos actualizar el destino de la caravana.'));
       }
     },
     onSuccess: () => {
@@ -623,9 +624,9 @@ export function useSendPartyMessage() {
 
   return useMutation({
     mutationFn: async ({ partyId, body }: { partyId: string; body: string }) => {
-      if (demo) throw new Error('El chat real requiere una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para enviar mensajes.');
-      if (!body.trim()) throw new Error('Escribe un mensaje.');
+      if (demo) throw new Error(t('El chat real requiere una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para enviar mensajes.'));
+      if (!body.trim()) throw new Error(t('Escribe un mensaje.'));
 
       const { error } = await supabase.from('party_messages').insert({
         party_id: partyId,
@@ -633,7 +634,7 @@ export function useSendPartyMessage() {
         body: body.trim(),
       });
 
-      if (error) throw new Error('No pudimos enviar el mensaje.');
+      if (error) throw new Error(t('No pudimos enviar el mensaje.'));
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({

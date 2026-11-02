@@ -30,6 +30,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const privacyOptions: {
   key: ProfilePrivacy;
@@ -39,21 +40,21 @@ const privacyOptions: {
 }[] = [
   {
     key: 'public',
-    label: 'Público',
+    label: t('Público'),
     icon: 'globe-outline',
-    detail: 'Cualquiera con tu QR o @usuario puede ver tu perfil.',
+    detail: t('Cualquiera con tu QR o @usuario puede ver tu perfil.'),
   },
   {
     key: 'friends',
-    label: 'Amigos',
+    label: t('Amigos'),
     icon: 'people-outline',
-    detail: 'Solo tus amigos aceptados ven los detalles.',
+    detail: t('Solo tus amigos aceptados ven los detalles.'),
   },
   {
     key: 'private',
-    label: 'Privado',
+    label: t('Privado'),
     icon: 'lock-closed-outline',
-    detail: 'El QR muestra solo una tarjeta mínima.',
+    detail: t('El QR muestra solo una tarjeta mínima.'),
   },
 ];
 
@@ -65,7 +66,7 @@ export default function EditProfileScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
         <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
-          Cargando tu perfil…
+          {t('Cargando tu perfil…')}
         </AppText>
       </SafeAreaView>
     );
@@ -76,10 +77,10 @@ export default function EditProfileScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <Ionicons name="cloud-offline-outline" size={36} color={colors.dim} />
         <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-          No pudimos cargar tu perfil
+          {t('No pudimos cargar tu perfil')}
         </AppText>
         <Button
-          label="Reintentar"
+          label={t('Reintentar')}
           variant="secondary"
           onPress={() => refetch()}
           style={{ marginTop: spacing.xl }}
@@ -112,11 +113,11 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
   const save = async () => {
     setFormError(null);
     if (displayName.trim().length < 2) {
-      setFormError('El nombre debe tener al menos 2 caracteres.');
+      setFormError(t('El nombre debe tener al menos 2 caracteres.'));
       return;
     }
     if (bio.length > 280) {
-      setFormError('La bio admite un máximo de 280 caracteres.');
+      setFormError(t('La bio admite un máximo de 280 caracteres.'));
       return;
     }
 
@@ -132,7 +133,7 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
       setFormError(
         error instanceof Error
           ? error.message
-          : 'No pudimos guardar el perfil. Inténtalo de nuevo.',
+          : t('No pudimos guardar el perfil. Inténtalo de nuevo.'),
       );
     }
   };
@@ -150,14 +151,14 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
-            <AppText variant="label" color={colors.accent}>EDITAR PERFIL</AppText>
+            <AppText variant="label" color={colors.accent}>{t('EDITAR PERFIL')}</AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">Tu identidad en la carretera.</AppText>
+            <AppText variant="h1">{t('Tu identidad en la carretera.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
-              Este perfil aparece cuando alguien escanea tu QR o abre tu @usuario.
+              {t('Este perfil aparece cuando alguien escanea tu QR o abre tu @usuario.')}
             </AppText>
           </View>
 
@@ -173,47 +174,47 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
               <AppText variant="title">{displayName || profile.displayName}</AppText>
               <AppText variant="caption" color={colors.accent}>@{username}</AppText>
               <AppText variant="caption" color={colors.muted} style={{ marginTop: 4 }}>
-                La subida de foto de perfil llegará en la siguiente fase.
+                {t('La subida de foto de perfil llegará en la siguiente fase.')}
               </AppText>
             </View>
-            <Pill label={isDemo ? 'Demo' : 'Cuenta'} tone={isDemo ? 'neutral' : 'lime'} />
+            <Pill label={isDemo ? t('Demo') : t('Cuenta')} tone={isDemo ? 'neutral' : 'lime'} />
           </Card>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Datos públicos</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Datos públicos')}</AppText>
             <Input
-              label="Nombre visible"
+              label={t('Nombre visible')}
               value={displayName}
               onChangeText={(value) => {
                 setDisplayName(value);
                 setFormError(null);
               }}
-              placeholder="Tu nombre o apodo"
+              placeholder={t('Tu nombre o apodo')}
               maxLength={60}
               autoCapitalize="words"
             />
             <Input
-              label="Usuario"
+              label={t('Usuario')}
               value={`@${username}`}
               editable={false}
               rightSlot={<Ionicons name="lock-closed-outline" size={15} color={colors.dim} />}
             />
             <Input
-              label="Ciudad"
+              label={t('Ciudad')}
               value={city}
               onChangeText={setCity}
-              placeholder="Santo Domingo, RD"
+              placeholder={t('Santo Domingo, RD')}
               maxLength={80}
               autoCapitalize="words"
             />
             <Input
-              label="Bio"
+              label={t('Bio')}
               value={bio}
               onChangeText={(value) => {
                 setBio(value.slice(0, 280));
                 setFormError(null);
               }}
-              placeholder="Cuéntanos qué te mueve"
+              placeholder={t('Cuéntanos qué te mueve')}
               multiline
               maxLength={280}
               inputStyle={styles.bioInput}
@@ -228,7 +229,7 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
           </View>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Privacidad del perfil</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Privacidad del perfil')}</AppText>
             <View style={styles.privacyGrid}>
               {privacyOptions.map((option) => {
                 const selected = privacy === option.key;
@@ -266,19 +267,18 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
             <View style={styles.privacyNote}>
               <Ionicons name="shield-checkmark-outline" size={15} color={colors.lime} />
               <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-                Ahora mismo: <AppText variant="bodyStrong" color={colors.textSoft}>{privacyLabel(privacy)}</AppText>.
-                La ubicación en vivo nunca se muestra en el perfil público.
+                {t('Ahora mismo:')}{' '}<AppText variant="bodyStrong" color={colors.textSoft}>{privacyLabel(privacy)}</AppText>{t('. La ubicación en vivo nunca se muestra en el perfil público.')}
               </AppText>
             </View>
           </View>
 
           {formError ? <AuthNotice message={formError} /> : null}
           {updateProfile.isError && !formError ? (
-            <AuthNotice message="No pudimos guardar los cambios." />
+            <AuthNotice message={t('No pudimos guardar los cambios.')} />
           ) : null}
 
           <Button
-            label={updateProfile.isPending ? 'Guardando…' : 'Guardar cambios'}
+            label={updateProfile.isPending ? 'Guardando…' : t('Guardar cambios')}
             icon="checkmark-circle-outline"
             size="lg"
             loading={updateProfile.isPending}
@@ -286,7 +286,7 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
             style={{ marginTop: spacing.sm }}
           />
           <Button
-            label="Ver mi perfil público"
+            label={t('Ver mi perfil público')}
             icon="person-circle-outline"
             variant="ghost"
             onPress={() => router.push(`/u/${username}`)}
@@ -295,8 +295,7 @@ function EditProfileForm({ profile, isDemo }: { profile: UserProfile; isDemo: bo
           <View style={styles.footer}>
             <Ionicons name="shield-checkmark-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              Tu correo, teléfono y ubicación no se publican. El QR solo contiene tu
-              @usuario o el slug de tu vehículo.
+              {t('Tu correo, teléfono y ubicación no se publican. El QR solo contiene tu @usuario o el slug de tu vehículo.')}
             </AppText>
           </View>
         </ScrollView>

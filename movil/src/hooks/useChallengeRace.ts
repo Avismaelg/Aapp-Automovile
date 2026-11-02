@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import { reportChallengeProgress, useChallenges } from '@/src/hooks/useChallenges';
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import { challengeProgress, placeLabel, shouldReportProgress, type Point } from '@/src/lib/convoy';
+import { t } from '@/src/i18n';
 
 const START_KEY = (id: string) => `caravana-challenge-start-${id}`;
 
@@ -21,7 +22,7 @@ export function useChallengeRace(location: LiveLocation, enabled: boolean) {
   const challengeId = racing?.id ?? null;
   const endLat = racing?.endLat ?? null;
   const endLng = racing?.endLng ?? null;
-  const title = racing?.title ?? 'Reto';
+  const title = racing?.title ?? t('Reto');
   const goal = racing?.toLabel ?? '';
 
   // Punto de salida: donde estabas al empezar (se guarda por si cierras la app).
@@ -59,7 +60,7 @@ export function useChallengeRace(location: LiveLocation, enabled: boolean) {
       .then((rank) => {
         if (progress.arrived && rank) {
           void AsyncStorage.removeItem(START_KEY(challengeId)).catch(() => {});
-          Alert.alert(placeLabel(rank), `${title} · meta: ${goal}`);
+          Alert.alert(placeLabel(rank), t('{0} · meta: {1}', title, goal));
         }
       })
       .catch(() => {

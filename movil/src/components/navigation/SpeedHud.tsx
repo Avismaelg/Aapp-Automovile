@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
+import { displaySpeed, speedUnit } from '@/src/i18n';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, radius } from '@/src/theme';
 
@@ -19,7 +20,7 @@ export function SpeedHud({
 }) {
   const chrome = useMapChrome();
   const speed = Number(speedLabel);
-  const over = limitKmh != null && Number.isFinite(speed) && speed > limitKmh + 5;
+  const over = limitKmh != null && Number.isFinite(speed) && speed > displaySpeed(limitKmh + 5);
 
   return (
     <View style={styles.wrap}>
@@ -31,14 +32,14 @@ export function SpeedHud({
           <View style={styles.unitRow}>
             <View style={[styles.liveDot, !isLive && styles.liveDotOff]} />
             <AppText variant="label" color={over ? '#ffe4e6' : chrome.muted} style={styles.unit}>
-              {isLive ? 'km/h' : 'demo'}
+              {isLive ? speedUnit() : 'demo'}
             </AppText>
           </View>
         </View>
         {limitKmh != null ? (
           <View style={styles.limit}>
             <AppText variant="label" style={styles.limitText}>
-              {limitKmh}
+              {displaySpeed(limitKmh)}
             </AppText>
           </View>
         ) : null}

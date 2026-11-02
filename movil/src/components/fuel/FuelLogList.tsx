@@ -6,16 +6,17 @@ import { logEnergy, logUnit } from '@/src/lib/fuel';
 import type { FuelLog } from '@/src/types/models';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import { colors, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boolean }) {
   return logs.length === 0 ? (
     <Card style={styles.emptyCard}>
       <Ionicons name="battery-half-outline" size={24} color={colors.dim} />
       <AppText variant="bodyStrong" style={{ marginTop: 8 }}>
-        Sin registros para este vehículo
+        {t('Sin registros para este vehículo')}
       </AppText>
       <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 4 }}>
-        Guarda tu primer repostaje o carga para ver el consumo real.
+        {t('Guarda tu primer repostaje o carga para ver el consumo real.')}
       </AppText>
     </Card>
   ) : (
@@ -38,7 +39,7 @@ export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boo
             <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
               {log.station}
             </AppText>
-            <AppText variant="bodyStrong">{formatMoney(log.total, 'DOP')}</AppText>
+            <AppText variant="bodyStrong">{formatMoney(log.total)}</AppText>
           </View>
           <View style={styles.logBottom}>
             <AppText variant="caption" color={colors.muted}>{log.date}</AppText>
@@ -48,7 +49,7 @@ export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boo
             </AppText>
             <View style={styles.logDot} />
             <AppText variant="caption" color={colors.muted}>
-              {formatNumber(log.odometer, 0)} km
+              {formatKmValue(log.odometer)}
             </AppText>
           </View>
         </View>

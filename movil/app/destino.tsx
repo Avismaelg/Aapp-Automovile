@@ -17,13 +17,14 @@ import {
 } from '@/src/lib/place-search';
 import { useChosenDestination, type ChosenDestination } from '@/src/store/destination';
 import { colors, fonts, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const STOP_SHORTCUTS: { label: string; category: StopCategory; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: 'Gasolinera', category: 'fuel', icon: 'water-outline' },
-  { label: 'Comida', category: 'food', icon: 'restaurant-outline' },
-  { label: 'Farmacia', category: 'pharmacy', icon: 'medkit-outline' },
-  { label: 'Cajero', category: 'atm', icon: 'cash-outline' },
-  { label: 'Súper', category: 'supermarket', icon: 'cart-outline' },
+  { label: t('Gasolinera'), category: 'fuel', icon: 'water-outline' },
+  { label: t('Comida'), category: 'food', icon: 'restaurant-outline' },
+  { label: t('Farmacia'), category: 'pharmacy', icon: 'medkit-outline' },
+  { label: t('Cajero'), category: 'atm', icon: 'cash-outline' },
+  { label: t('Súper'), category: 'supermarket', icon: 'cart-outline' },
 ];
 
 export default function DestinationScreen() {
@@ -77,7 +78,7 @@ export default function DestinationScreen() {
     setDestination({
       latitude: sharedLatitude,
       longitude: sharedLongitude,
-      label: (Array.isArray(params.label) ? params.label[0] : params.label)?.trim() || 'Destino compartido',
+      label: (Array.isArray(params.label) ? params.label[0] : params.label)?.trim() || t('Destino compartido'),
     });
     startNavigation();
     router.replace('/');
@@ -99,12 +100,12 @@ export default function DestinationScreen() {
           const found = await searchPlaces(trimmed, liveLocationRef.current, controller.signal);
           if (searchToken.current !== token) return;
           setResults(found);
-          setSearchError(found.length === 0 ? 'Sin resultados. Prueba con otra palabra.' : null);
+          setSearchError(found.length === 0 ? t('Sin resultados. Prueba con otra palabra.') : null);
         } catch {
           if (controller.signal.aborted || searchToken.current !== token) return;
           // Solo falla si no hay internet y tampoco hay destinos conocidos.
           setResults([]);
-          setSearchError('No pudimos buscar ahora. Revisa tu conexión.');
+          setSearchError(t('No pudimos buscar ahora. Revisa tu conexión.'));
         } finally {
           if (searchToken.current === token) setIsSearching(false);
         }
@@ -146,9 +147,9 @@ export default function DestinationScreen() {
       const found = await searchCategory(shortcut, liveLocationRef.current, new AbortController().signal);
       if (searchToken.current !== token) return;
       setResults(found);
-      setSearchError(found.length === 0 ? `No encontramos ${label.toLowerCase()} cerca.` : null);
+      setSearchError(found.length === 0 ? t('No encontramos {0} cerca.', label.toLowerCase()) : null);
     } catch {
-      if (searchToken.current === token) setSearchError('No pudimos buscar ahora. Revisa tu conexión.');
+      if (searchToken.current === token) setSearchError(t('No pudimos buscar ahora. Revisa tu conexión.'));
     } finally {
       if (searchToken.current === token) setIsSearching(false);
     }
@@ -166,17 +167,16 @@ export default function DestinationScreen() {
             <View style={styles.sharedIcon}>
               <Ionicons name="share-social" size={22} color={colors.lime} />
             </View>
-            <AppText variant="h1">Ruta compartida.</AppText>
+            <AppText variant="h1">{t('Ruta compartida.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 8 }}>
-              Un amigo te compartió este destino. Al aceptarla, tu mapa trazará la
-              misma ruta por calles.
+              {t('Un amigo te compartió este destino. Al aceptarla, tu mapa trazará la misma ruta por calles.')}
             </AppText>
             <View style={styles.sharedCard}>
               <Ionicons name="flag" size={16} color={colors.accent} />
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyStrong" numberOfLines={2}>
                   {(Array.isArray(params.label) ? params.label[0] : params.label)?.trim() ||
-                    'Destino compartido'}
+                    t('Destino compartido')}
                 </AppText>
                 <AppText variant="caption" color={colors.muted}>
                   {sharedLatitude.toFixed(5)}, {sharedLongitude.toFixed(5)}
@@ -184,7 +184,7 @@ export default function DestinationScreen() {
               </View>
             </View>
             <Button
-              label="Aceptar ruta"
+              label={t('Aceptar ruta')}
               icon="checkmark-circle-outline"
               size="lg"
               onPress={acceptSharedRoute}
@@ -201,13 +201,13 @@ export default function DestinationScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.searchBar}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Volver">
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('Volver')}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
         <TextInput
           value={query}
           onChangeText={handleQueryChange}
-          placeholder={isStop ? 'Añadir parada: gasolinera, comida…' : '¿A dónde vamos?'}
+          placeholder={isStop ? t('Añadir parada: gasolinera, comida…') : t('¿A dónde vamos?')}
           placeholderTextColor={colors.muted}
           autoCorrect={false}
           autoFocus
@@ -218,7 +218,7 @@ export default function DestinationScreen() {
         {searchingNow ? (
           <ActivityIndicator size="small" color={colors.muted} />
         ) : query.length > 0 ? (
-          <Pressable onPress={() => handleQueryChange('')} hitSlop={10} accessibilityLabel="Borrar">
+          <Pressable onPress={() => handleQueryChange('')} hitSlop={10} accessibilityLabel={t('Borrar')}>
             <Ionicons name="close-circle" size={20} color={colors.dim} />
           </Pressable>
         ) : null}
@@ -250,7 +250,7 @@ export default function DestinationScreen() {
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <AppText variant="label" color={colors.muted} style={styles.sectionTitle}>
-              RECIENTES
+              {t('RECIENTES')}
             </AppText>
           }
           renderItem={({ item }) => (
@@ -258,7 +258,7 @@ export default function DestinationScreen() {
               onPress={() => selectRecent(item)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`Ir a ${item.label}`}
+              accessibilityLabel={t('Ir a {0}', item.label)}
             >
               <View style={styles.rowIcon}>
                 <Ionicons name="time-outline" size={18} color={colors.textSoft} />
@@ -288,8 +288,8 @@ export default function DestinationScreen() {
                   (hasQuery
                     ? searchingNow
                       ? 'Buscando…'
-                      : 'Escribe un poco más.'
-                    : 'Busca una calle, un lugar o una ciudad.')}
+                      : t('Escribe un poco más.')
+                    : t('Busca una calle, un lugar o una ciudad.'))}
               </AppText>
             </View>
           }
@@ -298,7 +298,7 @@ export default function DestinationScreen() {
               onPress={() => selectPlace(item)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`Ir a ${item.name}`}
+              accessibilityLabel={t('Ir a {0}', item.name)}
             >
               <View style={styles.rowIcon}>
                 <Ionicons name="location-outline" size={18} color={colors.textSoft} />
@@ -322,7 +322,7 @@ export default function DestinationScreen() {
       )}
 
       <AppText variant="caption" color={colors.dim} style={styles.footer}>
-        © OpenStreetMap
+        {t('© OpenStreetMap')}
       </AppText>
     </SafeAreaView>
   );

@@ -8,6 +8,7 @@ import { mapFuelLogRow, type FuelLogRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
+import { getCurrency, t } from '@/src/i18n';
 
 // Registros añadidos en modo demo durante la sesión (no hay backend).
 const useDemoFuelLogs = create<{ logs: FuelLog[]; add: (log: FuelLog) => void }>((set) => ({
@@ -81,10 +82,10 @@ export function useAddFuelLog() {
           id: `fl_${Date.now()}`,
           vehicleId: input.vehicle.id,
           kind: input.vehicle.fuel === 'electric' ? 'electric' : 'fuel',
-          date: 'Ahora',
+          date: t('Ahora'),
           station:
             input.station ||
-            (input.vehicle.fuel === 'electric' ? 'Carga registrada' : 'Repostaje registrado'),
+            (input.vehicle.fuel === 'electric' ? t('Carga registrada') : t('Repostaje registrado')),
           liters: input.vehicle.fuel === 'electric' ? 0 : Number(input.volume.toFixed(2)),
           kwh: input.vehicle.fuel === 'electric' ? Number(input.volume.toFixed(2)) : undefined,
           pricePerLiter: input.pricePerUnit,
@@ -97,7 +98,7 @@ export function useAddFuelLog() {
       }
 
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para guardar el repostaje.');
+        throw new Error(t('Inicia sesión para guardar el repostaje.'));
       }
 
       const { data, error } = await supabase
@@ -109,7 +110,7 @@ export function useAddFuelLog() {
           volume_l: input.volume,
           price_per_l: input.pricePerUnit,
           total_cost: input.total,
-          currency_code: 'DOP',
+          currency_code: getCurrency(),
           station: input.station,
           is_full_tank: input.fullTank ?? true,
           filled_at: new Date().toISOString(),
@@ -118,7 +119,7 @@ export function useAddFuelLog() {
         .single();
 
       if (error) {
-        throw new Error('No pudimos guardar el repostaje. Revisa tu conexión e inténtalo de nuevo.');
+        throw new Error(t('No pudimos guardar el repostaje. Revisa tu conexión e inténtalo de nuevo.'));
       }
 
       // El repostaje ya está guardado; actualizar el odómetro no debe bloquear.

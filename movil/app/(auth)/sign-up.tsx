@@ -8,6 +8,7 @@ import { AppText, Button, Card, Input } from '@/src/components/ui';
 import { isSupabaseConfigured } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 type FieldErrors = {
   displayName?: string;
@@ -50,26 +51,26 @@ export default function SignUpScreen() {
 
     const nextErrors: FieldErrors = {};
     if (displayName.trim().length < 2) {
-      nextErrors.displayName = 'Escribe tu nombre o apodo.';
+      nextErrors.displayName = t('Escribe tu nombre o apodo.');
     }
     if (!USERNAME_PATTERN.test(username.trim())) {
-      nextErrors.username = '3–24 caracteres: letras minúsculas, números o guion bajo.';
+      nextErrors.username = t('3–24 caracteres: letras minúsculas, números o guion bajo.');
     }
     if (!EMAIL_PATTERN.test(email.trim())) {
-      nextErrors.email = 'Escribe un correo válido.';
+      nextErrors.email = t('Escribe un correo válido.');
     }
     if (password.length < 8) {
-      nextErrors.password = 'Usa al menos 8 caracteres.';
+      nextErrors.password = t('Usa al menos 8 caracteres.');
     }
     if (confirmPassword !== password) {
-      nextErrors.confirmPassword = 'Las contraseñas no coinciden.';
+      nextErrors.confirmPassword = t('Las contraseñas no coinciden.');
     }
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     if (!isSupabaseConfigured) {
-      setFormError('Configura Supabase para crear cuentas reales o entra en modo demo.');
+      setFormError(t('Configura Supabase para crear cuentas reales o entra en modo demo.'));
       return;
     }
 
@@ -81,7 +82,7 @@ export default function SignUpScreen() {
     });
 
     if (!result.ok) {
-      setFormError(result.message ?? 'No pudimos crear tu cuenta.');
+      setFormError(result.message ?? t('No pudimos crear tu cuenta.'));
       return;
     }
 
@@ -93,18 +94,18 @@ export default function SignUpScreen() {
   if (sentTo) {
     return (
       <AuthFormLayout
-        title="Revisa tu correo."
-        subtitle="Solo falta un paso para arrancar."
+        title={t('Revisa tu correo.')}
+        subtitle={t('Solo falta un paso para arrancar.')}
         onBack={() => router.replace('/welcome')}
         footer={
           <View style={styles.footer}>
             <Button
-              label="Ya confirmé, iniciar sesión"
+              label={t('Ya confirmé, iniciar sesión')}
               icon="log-in-outline"
               onPress={() => router.replace('/sign-in')}
             />
             <Button
-              label="Volver al inicio"
+              label={t('Volver al inicio')}
               variant="ghost"
               onPress={() => router.replace('/welcome')}
             />
@@ -116,15 +117,14 @@ export default function SignUpScreen() {
             <Ionicons name="mail-unread-outline" size={28} color={colors.lime} />
           </View>
           <AppText variant="title" align="center" style={{ marginTop: spacing.lg }}>
-            Te enviamos un enlace de confirmación
+            {t('Te enviamos un enlace de confirmación')}
           </AppText>
           <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Abre el correo en <AppText variant="bodyStrong" color={colors.text}>{sentTo}</AppText> y
-            confirma tu cuenta.
+            {t('Abre el correo en')}{' '}<AppText variant="bodyStrong" color={colors.text}>{sentTo}</AppText>{' '}{t('y confirma tu cuenta.')}
           </AppText>
           <AuthNotice
             tone="info"
-            message="Si no aparece en unos minutos, revisa la carpeta de spam o de promociones."
+            message={t('Si no aparece en unos minutos, revisa la carpeta de spam o de promociones.')}
           />
         </Card>
       </AuthFormLayout>
@@ -133,17 +133,17 @@ export default function SignUpScreen() {
 
   return (
     <AuthFormLayout
-      title="Crea tu caravana."
-      subtitle="Un perfil, todos tus vehículos y una comunidad que comparte la carretera."
+      title={t('Crea tu caravana.')}
+      subtitle={t('Un perfil, todos tus vehículos y una comunidad que comparte la carretera.')}
       onBack={goBack}
       footer={
         <View style={styles.footer}>
           <AppText variant="caption" color={colors.muted} align="center">
-            ¿Ya tienes una cuenta?
+            {t('¿Ya tienes una cuenta?')}
           </AppText>
           <Pressable onPress={() => router.replace('/sign-in')} hitSlop={8}>
             <AppText variant="bodyStrong" color={colors.accent} align="center">
-              Iniciar sesión
+              {t('Iniciar sesión')}
             </AppText>
           </Pressable>
         </View>
@@ -152,19 +152,19 @@ export default function SignUpScreen() {
       {!isSupabaseConfigured ? (
         <AuthNotice
           tone="info"
-          message="Supabase aún no está configurado en este entorno. El formulario está listo, pero las cuentas reales necesitan las claves del proyecto."
+          message={t('Supabase aún no está configurado en este entorno. El formulario está listo, pero las cuentas reales necesitan las claves del proyecto.')}
         />
       ) : null}
 
       <View style={styles.form}>
         <Input
-          label="Nombre"
+          label={t('Nombre')}
           value={displayName}
           onChangeText={(value) => {
             setDisplayName(value);
             setErrors((current) => ({ ...current, displayName: undefined }));
           }}
-          placeholder="Cómo te verá la comunidad"
+          placeholder={t('Cómo te verá la comunidad')}
           autoCapitalize="words"
           autoComplete="name"
           textContentType="name"
@@ -173,7 +173,7 @@ export default function SignUpScreen() {
         />
 
         <Input
-          label="Usuario"
+          label={t('Usuario')}
           value={username}
           onChangeText={(value) => {
             setUsername(value.toLowerCase().replace(/\s/g, ''));
@@ -196,7 +196,7 @@ export default function SignUpScreen() {
         />
 
         <Input
-          label="Correo electrónico"
+          label={t('Correo electrónico')}
           value={email}
           onChangeText={(value) => {
             setEmail(value);
@@ -212,13 +212,13 @@ export default function SignUpScreen() {
         />
 
         <Input
-          label="Contraseña"
+          label={t('Contraseña')}
           value={password}
           onChangeText={(value) => {
             setPassword(value);
             setErrors((current) => ({ ...current, password: undefined }));
           }}
-          placeholder="Mínimo 8 caracteres"
+          placeholder={t('Mínimo 8 caracteres')}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
@@ -229,7 +229,7 @@ export default function SignUpScreen() {
             <Pressable
               onPress={() => setShowPassword((value) => !value)}
               hitSlop={10}
-              accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              accessibilityLabel={showPassword ? t('Ocultar contraseña') : t('Mostrar contraseña')}
             >
               <Ionicons
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -241,13 +241,13 @@ export default function SignUpScreen() {
         />
 
         <Input
-          label="Confirmar contraseña"
+          label={t('Confirmar contraseña')}
           value={confirmPassword}
           onChangeText={(value) => {
             setConfirmPassword(value);
             setErrors((current) => ({ ...current, confirmPassword: undefined }));
           }}
-          placeholder="Repite tu contraseña"
+          placeholder={t('Repite tu contraseña')}
           secureTextEntry={!showConfirm}
           autoCapitalize="none"
           autoCorrect={false}
@@ -260,7 +260,7 @@ export default function SignUpScreen() {
             <Pressable
               onPress={() => setShowConfirm((value) => !value)}
               hitSlop={10}
-              accessibilityLabel={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              accessibilityLabel={showConfirm ? t('Ocultar contraseña') : t('Mostrar contraseña')}
             >
               <Ionicons
                 name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
@@ -274,7 +274,7 @@ export default function SignUpScreen() {
         {formError ? <AuthNotice message={formError} /> : null}
 
         <Button
-          label="Crear cuenta"
+          label={t('Crear cuenta')}
           icon="person-add-outline"
           size="lg"
           loading={busy}
@@ -291,7 +291,7 @@ export default function SignUpScreen() {
         />
 
         <Button
-          label="Probar primero en modo demo"
+          label={t('Probar primero en modo demo')}
           icon="play-outline"
           variant="ghost"
           onPress={() => continueAsDemo()}
@@ -301,8 +301,7 @@ export default function SignUpScreen() {
       <View style={styles.legal}>
         <Ionicons name="shield-checkmark-outline" size={15} color={colors.lime} />
         <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-          Al crear tu cuenta aceptas las reglas de conducción responsable. Caravana
-          nunca premia el exceso de velocidad.
+          {t('Al crear tu cuenta aceptas las reglas de conducción responsable. Caravana nunca premia el exceso de velocidad.')}
         </AppText>
       </View>
     </AuthFormLayout>

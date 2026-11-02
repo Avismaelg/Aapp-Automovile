@@ -11,14 +11,15 @@ import {
 } from '@/src/lib/profile-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 function demoFriendProfile(friend: (typeof mockFriends)[number]): UserProfile {
   return {
     id: friend.id,
     username: friend.username,
     displayName: friend.name,
-    bio: 'Rutas de fin de semana, café y buenas curvas.',
-    city: 'Santo Domingo, RD',
+    bio: t('Rutas de fin de semana, café y buenas curvas.'),
+    city: t('Santo Domingo, RD'),
     countryCode: 'DO',
     avatarUrl: null,
     privacy: 'public',
@@ -132,12 +133,12 @@ export function useFriends() {
 
 function friendlyFriendshipError(code: string | undefined, message: string) {
   if (code === '23505') {
-    return 'Ya existe una solicitud o amistad con esta persona.';
+    return t('Ya existe una solicitud o amistad con esta persona.');
   }
   if (code === '42501' || message.toLowerCase().includes('row-level security')) {
-    return 'No tienes permiso para realizar esta acción.';
+    return t('No tienes permiso para realizar esta acción.');
   }
-  return 'No pudimos completar la solicitud. Inténtalo de nuevo.';
+  return t('No pudimos completar la solicitud. Inténtalo de nuevo.');
 }
 
 export function useSendFriendRequest() {
@@ -148,10 +149,10 @@ export function useSendFriendRequest() {
   return useMutation({
     mutationFn: async (targetId: string) => {
       if (demo) {
-        throw new Error('Las solicitudes de amistad no se guardan en modo demo.');
+        throw new Error(t('Las solicitudes de amistad no se guardan en modo demo.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para añadir amigos.');
+        throw new Error(t('Inicia sesión para añadir amigos.'));
       }
 
       const { error } = await supabase.from('friendships').insert({
@@ -178,10 +179,10 @@ export function useRespondFriendRequest() {
   return useMutation({
     mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
       if (demo) {
-        throw new Error('Las solicitudes de amistad no se guardan en modo demo.');
+        throw new Error(t('Las solicitudes de amistad no se guardan en modo demo.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para responder solicitudes.');
+        throw new Error(t('Inicia sesión para responder solicitudes.'));
       }
 
       const { error } = await supabase
@@ -212,10 +213,10 @@ export function useRemoveFriend() {
   return useMutation({
     mutationFn: async (friendshipId: string) => {
       if (demo) {
-        throw new Error('Las amistades de la demo no se pueden eliminar.');
+        throw new Error(t('Las amistades de la demo no se pueden eliminar.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para gestionar tus amigos.');
+        throw new Error(t('Inicia sesión para gestionar tus amigos.'));
       }
 
       const { error } = await supabase

@@ -1,3 +1,4 @@
+import { shortMonths, t } from "@/src/i18n";
 export type EventRoute = {
   coordinates: [number, number][];
   distanceM: number;
@@ -19,7 +20,7 @@ export type AppEvent = {
   pendingSync?: boolean;
 };
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS = shortMonths();
 
 export function eventId() {
   const bytes = new Uint8Array(16);
@@ -33,9 +34,9 @@ export function eventId() {
 }
 
 export function formatEventDate(iso: string | null) {
-  if (!iso) return 'Sin fecha';
+  if (!iso) return t('Sin fecha');
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+  if (Number.isNaN(date.getTime())) return t('Sin fecha');
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${date.getDate()} ${MONTHS[date.getMonth()]} · ${hours}:${minutes}`;

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { Vehicle, VehicleKind } from '@/src/types/models';
 import { colors } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export const vehicleKindMeta: Record<
   VehicleKind,
@@ -15,32 +16,32 @@ export const vehicleKindMeta: Record<
   }
 > = {
   car: {
-    label: 'Coche',
-    shortLabel: 'Coche',
+    label: t('Coche'),
+    shortLabel: t('Coche'),
     icon: 'car-sport',
     color: colors.accent,
     energyLabel: 'L',
     efficiencyLabel: 'km/L',
   },
   motorcycle: {
-    label: 'Motocicleta',
-    shortLabel: 'Moto',
+    label: t('Motocicleta'),
+    shortLabel: t('Moto'),
     icon: 'bicycle',
     color: colors.lime,
     energyLabel: 'L',
     efficiencyLabel: 'km/L',
   },
   ev: {
-    label: 'Eléctrico',
+    label: t('Eléctrico'),
     shortLabel: 'EV',
     icon: 'flash',
     color: colors.cyan,
     energyLabel: 'kWh',
-    efficiencyLabel: 'kWh/100 km',
+    efficiencyLabel: t('kWh/100 km'),
   },
   truck: {
-    label: 'Camión / pickup',
-    shortLabel: 'Camión',
+    label: t('Camión / pickup'),
+    shortLabel: t('Camión'),
     icon: 'bus',
     color: '#FFB84D',
     energyLabel: 'L',
@@ -59,12 +60,12 @@ export function vehicleEfficiency(vehicle: Vehicle) {
 }
 
 export function vehicleFuelLabel(vehicle: Vehicle) {
-  if (vehicle.kind === 'ev') return '100 % eléctrico';
-  if (vehicle.fuel === 'diesel') return 'Diésel';
-  return 'Gasolina';
+  if (vehicle.kind === 'ev') return t('100 % eléctrico');
+  if (vehicle.fuel === 'diesel') return t('Diésel');
+  return t('Gasolina');
 }
 
 export function vehicleCategoryLabel(category: VehicleKind | 'mixed') {
-  if (category === 'mixed') return 'Mixto';
+  if (category === 'mixed') return t('Mixto');
   return vehicleKindMeta[category].label;
 }

@@ -1,12 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
+import { INVITE_ANSWER_MS } from '@/src/lib/party-invites';
 
 // Otro piloto de la party fijó (o cambió) el destino: sigue la misma ruta con
-// un toque.
+// un toque. Si no respondes en 15 s, la tarjeta se va sola (como «Ignorar»).
 export function ConvoyDestinationCard({
   setterName,
   label,
@@ -25,13 +28,21 @@ export function ConvoyDestinationCard({
 }) {
   const chrome = useMapChrome();
   const first = setterName.split(' ')[0];
+  const dismissRef = useRef(onDismiss);
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+  useEffect(() => {
+    const timer = setTimeout(() => dismissRef.current(), INVITE_ANSWER_MS);
+    return () => clearTimeout(timer);
+  }, [label]);
   if (compact) {
     return (
       <View style={[styles.compact, chrome.surface]}>
         <Ionicons name="flag" size={16} color={chrome.text} />
         <View style={{ flex: 1 }}>
           <AppText variant="caption" color={chrome.muted} numberOfLines={1}>
-            {first} {changed ? 'cambió el destino' : 'fijó el destino'}
+            {first} {changed ? t('cambió el destino') : t('fijó el destino')}
           </AppText>
           <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
             {label}
@@ -41,14 +52,14 @@ export function ConvoyDestinationCard({
           style={[styles.compactGo, { backgroundColor: chrome.text }]}
           onPress={onFollow}
           accessibilityRole="button"
-          accessibilityLabel="Ir con el convoy"
+          accessibilityLabel={t('Ir con el convoy')}
         >
           <Ionicons name="navigate" size={14} color={chrome.day ? '#ffffff' : colors.bg} />
           <AppText variant="bodyStrong" color={chrome.day ? '#ffffff' : colors.bg} style={styles.buttonText}>
-            Ir
+            {t('Ir')}
           </AppText>
         </Pressable>
-        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Ignorar">
+        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('Ignorar')}>
           <Ionicons name="close" size={20} color={chrome.muted} />
         </Pressable>
       </View>
@@ -62,7 +73,7 @@ export function ConvoyDestinationCard({
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="caption" color={chrome.muted}>
-            {first} {changed ? 'cambió el destino del convoy' : 'fijó el destino del convoy'}
+            {first} {changed ? t('cambió el destino del convoy') : t('fijó el destino del convoy')}
           </AppText>
           <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
             {label}
@@ -72,13 +83,13 @@ export function ConvoyDestinationCard({
       <View style={styles.actions}>
         <Pressable style={[styles.button, styles.ghost]} onPress={onDismiss} accessibilityRole="button">
           <AppText variant="bodyStrong" color={chrome.textSoft} style={styles.buttonText}>
-            Ignorar
+            {t('Ignorar')}
           </AppText>
         </Pressable>
         <Pressable style={[styles.button, styles.primary]} onPress={onFollow} accessibilityRole="button">
           <Ionicons name="navigate" size={15} color={colors.bg} />
           <AppText variant="bodyStrong" color={colors.bg} style={styles.buttonText}>
-            Ir con el convoy
+            {t('Ir con el convoy')}
           </AppText>
         </Pressable>
       </View>

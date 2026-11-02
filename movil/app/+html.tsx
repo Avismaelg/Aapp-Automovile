@@ -1,5 +1,6 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { ReactNode } from 'react';
+import { t } from '@/src/i18n';
 
 export default function Root({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function Root({ children }: { children: ReactNode }) {
           name="description"
           content="Caravana: la red social del coche. Registra tus rutas, sal en party con amigos, habla por walkie-talkie y controla tu combustible."
         />
-        <title>Caravana — la red social del coche</title>
+        <title>{t('Caravana — la red social del coche')}</title>
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
       </head>

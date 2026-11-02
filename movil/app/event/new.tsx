@@ -21,14 +21,15 @@ import { formatSearchDistance, searchPlaces, type SearchPlace } from '@/src/lib/
 import { useCreateEvent } from '@/src/hooks/useEvents';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const MAX_POINTS = 5;
 
 function pointLabel(index: number, total: number) {
-  if (total === 1) return 'Ubicación';
-  if (index === 0) return 'Salida';
-  if (index === total - 1) return 'Meta';
-  return `Parada ${index}`;
+  if (total === 1) return t('Ubicación');
+  if (index === 0) return t('Salida');
+  if (index === total - 1) return t('Meta');
+  return t('Parada {0}', index);
 }
 
 export default function NewEventScreen() {
@@ -71,11 +72,11 @@ export default function NewEventScreen() {
           const found = await searchPlaces(trimmed, live.location, controller.signal);
           if (searchToken.current !== token) return;
           setResults(found);
-          setSearchError(found.length === 0 ? 'Sin resultados. Prueba otra palabra.' : null);
+          setSearchError(found.length === 0 ? t('Sin resultados. Prueba otra palabra.') : null);
         } catch {
           if (controller.signal.aborted || searchToken.current !== token) return;
           setResults([]);
-          setSearchError('No pudimos buscar ahora. Revisa tu conexión.');
+          setSearchError(t('No pudimos buscar ahora. Revisa tu conexión.'));
         } finally {
           if (searchToken.current === token) setSearching(false);
         }
@@ -122,7 +123,7 @@ export default function NewEventScreen() {
           if (controller.signal.aborted) return;
           setRoute(null);
           setRouteError(
-            errorMessage(error, 'No pudimos calcular la ruta del evento.'),
+            errorMessage(error, t('No pudimos calcular la ruta del evento.')),
           );
         } finally {
           if (!controller.signal.aborted) setCalculating(false);
@@ -133,7 +134,7 @@ export default function NewEventScreen() {
 
   const addPoint = (place: SearchPlace) => {
     if (points.length >= MAX_POINTS) {
-      setFormError(`Máximo ${MAX_POINTS} puntos por evento.`);
+      setFormError(t('Máximo {0} puntos por evento.', MAX_POINTS));
       return;
     }
     const next = [...points, place];
@@ -155,16 +156,16 @@ export default function NewEventScreen() {
   const publish = async () => {
     setFormError(null);
     if (!title.trim()) {
-      setFormError('Escribe un título para el evento.');
+      setFormError(t('Escribe un título para el evento.'));
       return;
     }
     if (points.length === 0) {
-      setFormError('Elige al menos un punto: una ubicación o una salida y una meta.');
+      setFormError(t('Elige al menos un punto: una ubicación o una salida y una meta.'));
       return;
     }
     if (points.length >= 2 && !route) {
       setFormError(
-        routeError ?? 'Espera a que se calcule la ruta o ajusta los puntos.',
+        routeError ?? t('Espera a que se calcule la ruta o ajusta los puntos.'),
       );
       return;
     }
@@ -185,7 +186,7 @@ export default function NewEventScreen() {
       router.replace(`/event/${created.id}` as Href);
     } catch (error) {
       setFormError(
-        errorMessage(error, 'No pudimos guardar el evento.'),
+        errorMessage(error, t('No pudimos guardar el evento.')),
       );
     }
   };
@@ -209,34 +210,33 @@ export default function NewEventScreen() {
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={() => router.back()} />
-            <AppText variant="label" color={colors.accent}>NUEVO EVENTO</AppText>
+            <AppText variant="label" color={colors.accent}>{t('NUEVO EVENTO')}</AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">Crea una quedada.</AppText>
+            <AppText variant="h1">{t('Crea una quedada.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
-              Elige la salida, las paradas y la meta. La ruta se calcula por
-              calles reales y se publica para todos.
+              {t('Elige la salida, las paradas y la meta. La ruta se calcula por calles reales y se publica para todos.')}
             </AppText>
           </View>
 
           <View style={styles.fields}>
             <Input
-              label="Título"
+              label={t('Título')}
               value={title}
               onChangeText={(value) => {
                 setTitle(value);
                 setFormError(null);
               }}
-              placeholder="Ruta a la montaña, quedada en el malecón…"
+              placeholder={t('Ruta a la montaña, quedada en el malecón…')}
               maxLength={80}
             />
             <Input
-              label="Descripción (opcional)"
+              label={t('Descripción (opcional)')}
               value={description}
               onChangeText={setDescription}
-              placeholder="Punto de encuentro, hora, detalles…"
+              placeholder={t('Punto de encuentro, hora, detalles…')}
               multiline
               numberOfLines={3}
               maxLength={280}
@@ -245,11 +245,11 @@ export default function NewEventScreen() {
           </View>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Puntos del evento</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Puntos del evento')}</AppText>
             <Input
               value={query}
               onChangeText={setQuery}
-              placeholder="Busca una calle, plaza o sitio…"
+              placeholder={t('Busca una calle, plaza o sitio…')}
               autoCorrect={false}
               rightSlot={
                 searchingNow ? (
@@ -269,7 +269,7 @@ export default function NewEventScreen() {
               <Card style={styles.results}>
                 {visibleResults.length === 0 ? (
                   <AppText variant="caption" color={colors.muted}>
-                    {searchError ?? 'Buscando lugares…'}
+                    {searchError ?? t('Buscando lugares…')}
                   </AppText>
                 ) : (
                   visibleResults.slice(0, 6).map((place) => (
@@ -319,8 +319,7 @@ export default function NewEventScreen() {
             ))}
 
             <AppText variant="caption" color={colors.dim}>
-              Con 1 punto el evento es una ubicación. Con 2 o más, la app crea la
-              ruta completa de salida a meta (máximo {MAX_POINTS} puntos).
+              {t('Con 1 punto el evento es una ubicación. Con 2 o más, la app crea la ruta completa de salida a meta (máximo')}{' '}{MAX_POINTS}{' '}{t('puntos).')}
             </AppText>
           </View>
 
@@ -328,7 +327,7 @@ export default function NewEventScreen() {
             <Card style={styles.routeCard}>
               <ActivityIndicator color={colors.lime} />
               <AppText variant="caption" color={colors.muted}>
-                Calculando la ruta por calles…
+                {t('Calculando la ruta por calles…')}
               </AppText>
             </Card>
           ) : route ? (
@@ -339,7 +338,7 @@ export default function NewEventScreen() {
                   {formatRouteDistance(route.distanceM)} · {formatRouteTime(route.timeMs)}
                 </AppText>
                 <AppText variant="caption" color={colors.muted}>
-                  Ruta por calles con {route.coordinates.length} puntos
+                  {t('Ruta por calles con')}{' '}{route.coordinates.length}{' '}{t('puntos')}
                 </AppText>
               </View>
             </Card>
@@ -362,7 +361,7 @@ export default function NewEventScreen() {
           ) : null}
 
           <Button
-            label={createEvent.isPending ? 'Publicando…' : 'Publicar evento'}
+            label={createEvent.isPending ? 'Publicando…' : t('Publicar evento')}
             icon="send"
             size="lg"
             loading={createEvent.isPending}
@@ -374,8 +373,7 @@ export default function NewEventScreen() {
           <View style={styles.footer}>
             <Ionicons name="globe-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              El evento es público: cualquiera puede ver la ubicación o la ruta y
-              navegar hasta la salida.
+              {t('El evento es público: cualquiera puede ver la ubicación o la ruta y navegar hasta la salida.')}
             </AppText>
           </View>
         </ScrollView>

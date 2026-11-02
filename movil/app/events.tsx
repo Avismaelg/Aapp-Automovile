@@ -7,6 +7,7 @@ import { useEvents } from '@/src/hooks/useEvents';
 import { formatEventDate, type AppEvent } from '@/src/lib/events';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function EventsScreen() {
   const router = useRouter();
@@ -17,8 +18,8 @@ export default function EventsScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
         <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.accent}>QUEDADAS CON RUTA</AppText>
-          <AppText variant="h1" style={{ marginTop: 2 }}>Eventos</AppText>
+          <AppText variant="label" color={colors.accent}>{t('QUEDADAS CON RUTA')}</AppText>
+          <AppText variant="h1" style={{ marginTop: 2 }}>{t('Eventos')}</AppText>
         </View>
         <IconButton
           icon="add"
@@ -31,7 +32,7 @@ export default function EventsScreen() {
 
       {isDemo ? (
         <AppText variant="caption" color={colors.dim} style={styles.note}>
-          Modo demo: los eventos se guardan en este dispositivo.
+          {t('Modo demo: los eventos se guardan en este dispositivo.')}
         </AppText>
       ) : null}
 
@@ -39,23 +40,22 @@ export default function EventsScreen() {
         <Card style={styles.notice}>
           <Ionicons name="cloud-offline-outline" size={16} color={colors.accent} />
           <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-            Por ahora tus eventos se guardan en este dispositivo. Se publicarán
-            para todos en cuanto el servidor esté disponible.
+            {t('Por ahora tus eventos se guardan en este dispositivo. Se publicarán para todos en cuanto el servidor esté disponible.')}
           </AppText>
         </Card>
       ) : null}
 
       {isLoading ? (
         <AppText variant="caption" color={colors.muted} style={styles.loading}>
-          Cargando eventos…
+          {t('Cargando eventos…')}
         </AppText>
       ) : null}
 
       {!isLoading && events.length === 0 ? (
         <EmptyState
           icon="calendar-outline"
-          title="Todavía no hay eventos"
-          description="Crea el primero: elige la salida, las paradas y la meta, y la app calcula la ruta por calles."
+          title={t('Todavía no hay eventos')}
+          description={t('Crea el primero: elige la salida, las paradas y la meta, y la app calcula la ruta por calles.')}
         />
       ) : null}
 
@@ -77,9 +77,9 @@ export default function EventsScreen() {
               <Ionicons name="calendar" size={20} color={colors.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText variant="bodyStrong">Crear un evento con ruta</AppText>
+              <AppText variant="bodyStrong">{t('Crear un evento con ruta')}</AppText>
               <AppText variant="caption" color={colors.muted}>
-                Salida, paradas y meta sobre calles reales.
+                {t('Salida, paradas y meta sobre calles reales.')}
               </AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.dim} />
@@ -109,13 +109,13 @@ function EventCard({ event, onPress }: { event: AppEvent; onPress: () => void })
               {event.hostName} · {formatEventDate(event.createdAt)}
             </AppText>
           </View>
-          <Pill label={isRoute ? 'Ruta' : 'Ubicación'} tone={isRoute ? 'lime' : 'accent'} />
+          <Pill label={isRoute ? t('Ruta') : t('Ubicación')} tone={isRoute ? 'lime' : 'accent'} />
         </View>
 
         {event.route ? (
           <AppText variant="caption" color={colors.textSoft}>
             {formatRouteDistance(event.route.distanceM)} · {formatRouteTime(event.route.timeMs)} ·{' '}
-            {event.route.coordinates.length} puntos
+            {event.route.coordinates.length}{' '}{t('puntos')}
           </AppText>
         ) : event.locationLabel ? (
           <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
@@ -125,7 +125,7 @@ function EventCard({ event, onPress }: { event: AppEvent; onPress: () => void })
 
         {event.pendingSync ? (
           <AppText variant="caption" color={colors.dim}>
-            Guardado en el dispositivo · pendiente de publicar
+            {t('Guardado en el dispositivo · pendiente de publicar')}
           </AppText>
         ) : null}
       </Card>

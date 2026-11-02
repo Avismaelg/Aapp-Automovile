@@ -4,8 +4,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import type { RouteInstruction, RouteInstructionIcon } from '@/src/lib/map-html';
+import { curveSpeedLabel } from '@/src/lib/driving-line';
 import { formatInstructionDistance, type nextInstruction } from '@/src/lib/route-instructions';
 import { radius, spacing } from '@/src/theme';
+import { displaySpeed, formatManeuverDistance, speedUnit, t } from '@/src/i18n';
 
 type UpcomingInstruction = NonNullable<ReturnType<typeof nextInstruction>>;
 
@@ -80,8 +82,8 @@ export function NavigationHud({
   onClose,
 }: Props) {
   const speedNow = Number(speedLabel);
-  const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > limitKmh + 5;
-  const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > curve.speedKmh + 15;
+  const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > displaySpeed(limitKmh + 5);
+  const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > displaySpeed(curve.speedKmh + 15);
   const recalculating = offRoute || !hasRoute;
   const chrome = useMapChrome();
   const panel = { backgroundColor: chrome.bg, borderColor: chrome.border, borderWidth: 1 };
@@ -95,7 +97,7 @@ export function NavigationHud({
               <Ionicons name="sync" size={30} color={chrome.onAccent} />
             </View>
             <AppText variant="h2" color={chrome.text} style={styles.flex}>
-              {offRoute ? 'Recalculando…' : 'Calculando ruta…'}
+              {offRoute ? 'Recalculando…' : t('Calculando ruta…')}
             </AppText>
           </View>
         ) : (
@@ -105,14 +107,14 @@ export function NavigationHud({
             </View>
             <View style={styles.flex}>
               <AppText variant="display" color={chrome.text} style={styles.maneuverDistance}>
-                {upcoming ? formatInstructionDistance(upcoming.remainingM) : 'Sigue recto'}
+                {upcoming ? formatInstructionDistance(upcoming.remainingM) : t('Sigue recto')}
               </AppText>
               <AppText variant="bodyStrong" color={chrome.textSoft} numberOfLines={2} style={styles.road}>
                 {upcoming
                   ? upcoming.icon !== 'arrive' && upcoming.road
                     ? upcoming.road
                     : upcoming.text
-                  : 'Continúa por la ruta'}
+                  : t('Continúa por la ruta')}
               </AppText>
             </View>
           </View>
@@ -120,7 +122,7 @@ export function NavigationHud({
         {following && !recalculating ? (
           <View style={[styles.thenRow, { backgroundColor: chrome.chip }]}>
             <AppText variant="caption" color={chrome.muted}>
-              Luego
+              {t('Luego')}
             </AppText>
             <Ionicons name={instructionIcons[following.icon]} size={16} color={chrome.text} />
           </View>
@@ -131,8 +133,8 @@ export function NavigationHud({
         <View style={[styles.curveBadge, curveUrgent && styles.curveBadgeUrgent]}>
           <Ionicons name="warning" size={14} color={curveUrgent ? '#ffffff' : '#422006'} />
           <AppText variant="bodyStrong" color={curveUrgent ? '#ffffff' : '#422006'} style={styles.curveText}>
-            Curva en {curve.distanceM < 1000 ? `${Math.round(curve.distanceM / 10) * 10} m` : '1 km'} ·{' '}
-            {curve.speedKmh} km/h
+            {t('Curva en')}{' '}{formatManeuverDistance(curve.distanceM)} ·{' '}
+            {curveSpeedLabel(curve.speedKmh)}{' '}{speedUnit()}
           </AppText>
         </View>
       ) : null}
@@ -141,7 +143,7 @@ export function NavigationHud({
         {limitKmh != null ? (
           <View style={styles.speedLimit}>
             <AppText variant="bodyStrong" style={styles.speedLimitText}>
-              {limitKmh}
+              {displaySpeed(limitKmh)}
             </AppText>
           </View>
         ) : null}
@@ -150,7 +152,7 @@ export function NavigationHud({
             {speedLabel}
           </AppText>
           <AppText variant="caption" color={overLimit ? '#ffe4e6' : chrome.muted} style={styles.speedUnit}>
-            km/h
+            {speedUnit()}
           </AppText>
         </View>
       </View>
@@ -161,11 +163,11 @@ export function NavigationHud({
             style={[styles.recenterButton, panel]}
             onPress={onRecenter}
             accessibilityRole="button"
-            accessibilityLabel="Recentrar en tu posición"
+            accessibilityLabel={t('Recentrar en tu posición')}
           >
             <Ionicons name="navigate" size={18} color={chrome.accent} />
             <AppText variant="bodyStrong" color={chrome.text} style={styles.recenterText}>
-              Centrar
+              {t('Centrar')}
             </AppText>
           </Pressable>
         ) : null}
@@ -173,7 +175,7 @@ export function NavigationHud({
           style={[styles.roundButton, panel, northUp && { backgroundColor: chrome.accent }]}
           onPress={onToggleNorth}
           accessibilityRole="button"
-          accessibilityLabel="Orientar el mapa al norte"
+          accessibilityLabel={t('Orientar el mapa al norte')}
         >
           <Ionicons name="compass-outline" size={22} color={northUp ? chrome.onAccent : chrome.text} />
         </Pressable>
@@ -181,7 +183,7 @@ export function NavigationHud({
           style={[styles.roundButton, panel, muted && { backgroundColor: chrome.accent }]}
           onPress={onToggleMute}
           accessibilityRole="button"
-          accessibilityLabel={muted ? 'Activar la voz' : 'Silenciar la voz'}
+          accessibilityLabel={muted ? t('Activar la voz') : t('Silenciar la voz')}
         >
           <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={20} color={muted ? chrome.onAccent : chrome.text} />
         </Pressable>
@@ -200,7 +202,7 @@ export function NavigationHud({
             style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Terminar la navegación"
+            accessibilityLabel={t('Terminar la navegación')}
           >
             <Ionicons name="close" size={22} color={chrome.text} />
           </Pressable>
@@ -220,7 +222,7 @@ export function NavigationHud({
             style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onAddStop}
             accessibilityRole="button"
-            accessibilityLabel="Añadir parada"
+            accessibilityLabel={t('Añadir parada')}
           >
             <Ionicons name="add-circle-outline" size={22} color={chrome.text} />
           </Pressable>
@@ -228,7 +230,7 @@ export function NavigationHud({
             style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onChangeRoute}
             accessibilityRole="button"
-            accessibilityLabel="Cambiar destino"
+            accessibilityLabel={t('Cambiar destino')}
           >
             <Ionicons name="search" size={20} color={chrome.text} />
           </Pressable>

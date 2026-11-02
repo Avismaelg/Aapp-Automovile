@@ -21,6 +21,7 @@ import { useGarageVehicles, pickVehiclePhoto, useSetVehiclePhoto } from '@/src/h
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import { isElectric, vehicleFuelLabel, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayKm, distanceUnit, t } from '@/src/i18n';
 
 function CarSilhouette() {
   return (
@@ -58,22 +59,22 @@ export default function GarageScreen() {
       if (!uri) return;
       await setPhoto.mutateAsync({ vehicleId: vehicle.id, photo: uri });
     } catch (error) {
-      showError('Foto del vehículo', error, 'No pudimos actualizar la foto.');
+      showError(t('Foto del vehículo'), error, t('No pudimos actualizar la foto.'));
     }
   };
 
   const shareQr = async () => {
     await Share.share({
-      message: `Mi perfil de Caravana: ${profileUrl(me.username)}`,
+      message: t('Mi perfil de Caravana: {0}', profileUrl(me.username)),
       url: profileUrl(me.username),
     });
   };
 
   const shareVehicle = async (item: Vehicle) => {
     await Share.share({
-      message: `${item.make} ${item.model} de @${me.username} en Caravana: ${vehicleUrl(
+      message: t('{0} {1} de @{2} en Caravana: {3}', item.make, item.model, me.username, vehicleUrl(
         item.qrSlug,
-      )}`,
+      )),
       url: vehicleUrl(item.qrSlug),
     });
   };
@@ -82,13 +83,13 @@ export default function GarageScreen() {
 
   const header = (
     <ScreenHeader
-      title="Garaje"
+      title={t('Garaje')}
       right={
         <IconButton
           icon="add"
           tone="accent"
           onPress={openNewVehicle}
-          accessibilityLabel="Añadir vehículo"
+          accessibilityLabel={t('Añadir vehículo')}
         />
       }
     />
@@ -101,7 +102,7 @@ export default function GarageScreen() {
         <View style={styles.loadingState}>
           <ActivityIndicator color={colors.textSoft} />
           <AppText variant="caption" color={colors.muted}>
-            Cargando tu garaje…
+            {t('Cargando tu garaje…')}
           </AppText>
         </View>
       </Screen>
@@ -114,10 +115,10 @@ export default function GarageScreen() {
         {header}
         <EmptyState
           icon="cloud-offline-outline"
-          title="No pudimos cargar el garaje"
-          description="Revisa tu conexión y vuelve a intentarlo. Tus vehículos siguen guardados."
+          title={t('No pudimos cargar el garaje')}
+          description={t('Revisa tu conexión y vuelve a intentarlo. Tus vehículos siguen guardados.')}
         />
-        <Button label="Reintentar" variant="secondary" onPress={() => refetch()} />
+        <Button label={t('Reintentar')} variant="secondary" onPress={() => refetch()} />
       </Screen>
     );
   }
@@ -134,7 +135,7 @@ export default function GarageScreen() {
             style={({ pressed }) => [styles.carArt, pressed && { opacity: 0.85 }]}
             accessibilityRole="button"
             accessibilityLabel={
-              vehicle.photoUrl ? 'Cambiar foto del vehículo' : 'Añadir foto del vehículo'
+              vehicle.photoUrl ? t('Cambiar foto del vehículo') : t('Añadir foto del vehículo')
             }
           >
             {vehicle.photoUrl ? (
@@ -156,8 +157,8 @@ export default function GarageScreen() {
                 {setPhoto.isPending
                   ? 'Subiendo…'
                   : vehicle.photoUrl
-                    ? 'Cambiar foto'
-                    : 'Añadir foto'}
+                    ? t('Cambiar foto')
+                    : t('Añadir foto')}
               </AppText>
             </View>
           </Pressable>
@@ -165,7 +166,7 @@ export default function GarageScreen() {
           <View style={styles.carInfo}>
             <AppText variant="caption" color={colors.muted}>
               {vehicle.make} · {vehicle.year} · {vehicleFuelLabel(vehicle)}
-              {vehicle.isPrimary ? ' · Principal' : ''}
+              {vehicle.isPrimary ? t(' · Principal') : ''}
             </AppText>
             <AppText variant="h1" style={{ marginTop: 2 }}>
               {vehicle.model}
@@ -180,15 +181,15 @@ export default function GarageScreen() {
           <View style={styles.carStats}>
             <Stat
               value={`${vehicle.efficiency.toFixed(1).replace('.', ',')}`}
-              label={electric ? 'kWh/100 km' : 'km/L'}
+              label={electric ? t('kWh/100 km') : 'km/L'}
             />
-            <Stat value={vehicle.odometerKm.toLocaleString('es-DO')} label="km recorridos" />
+            <Stat value={displayKm(vehicle.odometerKm)} label={t('{0} recorridos', distanceUnit())} />
             <Stat value={meta.shortLabel} label="tipo" />
           </View>
 
           <View style={styles.carActions}>
             <Button
-              label="Editar"
+              label={t('Editar')}
               variant="secondary"
               size="sm"
               full={false}
@@ -198,7 +199,7 @@ export default function GarageScreen() {
               }
             />
             <Button
-              label={electric ? 'Cargas' : 'Consumo'}
+              label={electric ? t('Cargas') : t('Consumo')}
               variant="secondary"
               size="sm"
               full={false}
@@ -209,7 +210,7 @@ export default function GarageScreen() {
               icon="qr-code-outline"
               size={38}
               onPress={() => shareVehicle(vehicle)}
-              accessibilityLabel="Compartir QR del vehículo"
+              accessibilityLabel={t('Compartir QR del vehículo')}
             />
           </View>
         </View>
@@ -219,13 +220,13 @@ export default function GarageScreen() {
             <Ionicons name="car-sport-outline" size={30} color={colors.textSoft} />
           </View>
           <AppText variant="h2" align="center" style={{ marginTop: spacing.lg }}>
-            Tu garaje está vacío
+            {t('Tu garaje está vacío')}
           </AppText>
           <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Añade tu coche, moto, EV o camión para registrar rutas, consumo y su QR.
+            {t('Añade tu coche, moto, EV o camión para registrar rutas, consumo y su QR.')}
           </AppText>
           <Button
-            label="Añadir vehículo"
+            label={t('Añadir vehículo')}
             onPress={openNewVehicle}
             style={{ marginTop: spacing.xl }}
           />
@@ -234,7 +235,7 @@ export default function GarageScreen() {
 
       {garageVehicles.length > 1 ? (
         <>
-          <SectionHeader title="Mis vehículos" />
+          <SectionHeader title={t('Mis vehículos')} />
           <View style={styles.group}>
             {garageVehicles.map((item, index) => {
               const itemMeta = vehicleKindMeta[item.kind];
@@ -268,7 +269,7 @@ export default function GarageScreen() {
                     </AppText>
                     <AppText variant="caption" color={colors.muted} numberOfLines={1}>
                       {item.year} · {item.nickname}
-                      {item.isPrimary ? ' · Principal' : ''}
+                      {item.isPrimary ? t(' · Principal') : ''}
                     </AppText>
                   </View>
                   {active ? <Ionicons name="checkmark" size={20} color={colors.text} /> : null}
@@ -281,22 +282,22 @@ export default function GarageScreen() {
 
       <SectionHeader title="QR" />
       <View style={styles.group}>
-        <PressableRow icon="share-outline" label="Compartir mi QR" onPress={shareQr} />
+        <PressableRow icon="share-outline" label={t('Compartir mi QR')} onPress={shareQr} />
         <PressableRow
           icon="scan-outline"
-          label="Escanear un QR"
+          label={t('Escanear un QR')}
           onPress={() => router.push('/scan')}
           divider
         />
         {garageVehicles.length > 0 ? (
-          <PressableRow icon="add" label="Añadir otro vehículo" onPress={openNewVehicle} divider />
+          <PressableRow icon="add" label={t('Añadir otro vehículo')} onPress={openNewVehicle} divider />
         ) : null}
       </View>
 
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={colors.dim} />
         <AppText variant="caption" color={colors.dim}>
-          La placa y el odómetro son privados por defecto.
+          {t('La placa y el odómetro son privados por defecto.')}
         </AppText>
       </View>
     </Screen>

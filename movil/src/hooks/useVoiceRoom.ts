@@ -8,6 +8,7 @@ import {
   RoomEvent,
 } from '@/src/lib/livekit';
 import { supabase } from '@/src/lib/supabase';
+import { t } from '@/src/i18n';
 
 type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
@@ -76,7 +77,7 @@ export function useVoiceRoom({
         if (payload.error) throw new Error(payload.error);
         if (!payload.token || !payload.url) {
           throw new Error(
-            'LiveKit no está configurado. Despliega la función livekit-token y sus secretos.',
+            t('LiveKit no está configurado. Despliega la función livekit-token y sus secretos.'),
           );
         }
 
@@ -128,15 +129,15 @@ export function useVoiceRoom({
         const message =
           connectError instanceof Error
             ? connectError.message
-            : 'No pudimos conectar la voz.';
+            : t('No pudimos conectar la voz.');
         // El usuario no necesita saber de LiveKit ni de secretos del servidor.
         const notConfigured = /livekit|secret|not found|configurad/i.test(message);
         setError(
           notConfigured
-            ? 'La voz del convoy aún no está activada. El mapa y el chat funcionan igual.'
+            ? t('La voz del convoy aún no está activada. El mapa y el chat funcionan igual.')
             : /failed to fetch|network|timeout/i.test(message)
-              ? 'No pudimos conectar la voz. Revisa tu conexión.'
-              : 'No pudimos conectar la voz ahora. Inténtalo en un momento.',
+              ? t('No pudimos conectar la voz. Revisa tu conexión.')
+              : t('No pudimos conectar la voz ahora. Inténtalo en un momento.'),
         );
         setStatus('error');
         setTalkingState(false);
@@ -174,7 +175,7 @@ export function useVoiceRoom({
       setError(
         micError instanceof Error
           ? micError.message
-          : 'No pudimos activar el micrófono.',
+          : t('No pudimos activar el micrófono.'),
       );
     }
   }, []);

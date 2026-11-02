@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
+  Atmosphere,
   BackgroundLayer,
   Camera,
   CircleLayer,
@@ -58,6 +59,7 @@ import {
   routeProgress,
 } from "@/src/lib/route-instructions";
 import { colors } from "@/src/theme";
+import { formatDistance, t } from "@/src/i18n";
 
 // Mapa nativo (Mapbox Maps SDK v11 vía @rnmapbox/maps): la cámara de
 // seguimiento y el indicador de posición los anima el motor nativo a 60 fps.
@@ -219,6 +221,10 @@ type WorldMapProps = {
   drivingLine?: GeoJSON.FeatureCollection | null;
   // Lleva la cámara a un punto (p. ej. el coche aparcado); token cambia en cada toque.
   focus?: { latitude: number; longitude: number; token: number } | null;
+  // Intro: la cámara empieza en el espacio (globo con estrellas) y vuela hasta
+  // tu posición pasados flightDelayMs; al aterrizar llama a onIntroEnd.
+  intro?: { earthAtMs: number; earthMs: number; flightAtMs: number; flightMs: number } | null;
+  onIntroEnd?: () => void;
   onFollowChange?: (following: boolean) => void;
   onMemberPress?: (memberId: string) => void;
   onAlternativePress?: (index: number) => void;
@@ -310,6 +316,8 @@ export const WorldMap = memo(function WorldMap({
   ornamentBottom = 4,
   drivingLine = null,
   focus = null,
+  intro = null,
+  onIntroEnd,
   onFollowChange,
   onMemberPress,
   onAlternativePress,
@@ -327,12 +335,14 @@ export const WorldMap = memo(function WorldMap({
   const theme = useMapTheme(location);
   const hasPermission = useLocationPermission();
   const [styleFailed, setStyleFailed] = useState(false);
+  const [introRunning, setIntroRunning] = useState(Boolean(intro));
   const [userFollowing, setFollowing] = useState(autoFollow);
   const callbacksRef = useRef({
     onFollowChange,
     onMemberPress,
     onAlternativePress,
     onError,
+    onIntroEnd,
   });
   const walking = travelMode === "walking";
   const following = autoFollow && userFollowing;
@@ -343,8 +353,9 @@ export const WorldMap = memo(function WorldMap({
       onMemberPress,
       onAlternativePress,
       onError,
+      onIntroEnd,
     };
-  }, [onFollowChange, onMemberPress, onAlternativePress, onError]);
+  }, [onFollowChange, onMemberPress, onAlternativePress, onError, onIntroEnd]);
 
   const followingRef = useRef(autoFollow);
   const changeFollowing = useCallback((value: boolean) => {
@@ -545,7 +556,7 @@ export const WorldMap = memo(function WorldMap({
         : NO_PADDING,
     [camera.topPaddingRatio, windowHeight],
   );
-  const tracking = following && hasPermission;
+  const tracking = following && hasPermission && !introRunning;
 
   // Cambia el punto azul por el coche 3D. Mapbox recrea su indicador al
   // cargar un estilo, así que se vuelve a aplicar en cada carga.
@@ -597,6 +608,54 @@ export const WorldMap = memo(function WorldMap({
     [],
   );
 
+  // Vuelo de la intro: espera al estilo (para no volar sobre un mapa vacío) y
+  // al momento en que la galaxia ya llena la pantalla.
+  const introStartedAt = useState(() => Date.now())[0];
+  const introRef = useRef(intro);
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+  useEffect(() => {
+    const plan = introRef.current;
+    if (!introRunning || !plan || styleLoads === 0) return;
+    // Si el estilo tarda, toda la secuencia se retrasa igual.
+    const elapsed = Date.now() - introStartedAt;
+    const delay = Math.max(0, plan.earthAtMs - elapsed);
+    // 1) La Tierra gira hasta tu lado del planeta.
+    const spin = setTimeout(() => {
+      const here = locationRef.current;
+      cameraRef.current?.setCamera({
+        centerCoordinate: [here.longitude, here.latitude * 0.6],
+        zoomLevel: 1.4,
+        animationMode: "easeTo",
+        animationDuration: plan.earthMs,
+      });
+    }, delay);
+    // 2) Desde el espacio hasta tu calle.
+    const flightAt = delay + (plan.flightAtMs - plan.earthAtMs);
+    const fly = setTimeout(() => {
+      const here = locationRef.current;
+      cameraRef.current?.setCamera({
+        centerCoordinate: [here.longitude, here.latitude],
+        zoomLevel: 15.5,
+        pitch: 0,
+        heading: 0,
+        animationMode: "flyTo",
+        animationDuration: plan.flightMs,
+      });
+    }, flightAt);
+    const land = setTimeout(() => {
+      setIntroRunning(false);
+      callbacksRef.current.onIntroEnd?.();
+    }, flightAt + plan.flightMs + 150);
+    return () => {
+      clearTimeout(spin);
+      clearTimeout(fly);
+      clearTimeout(land);
+    };
+  }, [introRunning, styleLoads, introStartedAt]);
+
   const handleTrackingChange = useCallback(
     (event: { nativeEvent: { payload: { followUserLocation: boolean } } }) => {
       // El motor suelta el seguimiento cuando el usuario arrastra el mapa.
@@ -645,7 +704,7 @@ export const WorldMap = memo(function WorldMap({
     setStyleFailed((failed) => {
       if (!failed)
         callbacksRef.current.onError?.(
-          "No pudimos cargar el mapa. Probamos con el mapa de respaldo.",
+          t('No pudimos cargar el mapa. Probamos con el mapa de respaldo.'),
         );
       return true;
     });
@@ -672,6 +731,7 @@ export const WorldMap = memo(function WorldMap({
         ref={mapRef}
         style={styles.map}
         styleURL={styleURL}
+        projection={introRunning ? "globe" : "mercator"}
         pitchEnabled={false}
         logoPosition={{ bottom: ornamentBottom, left: 8 }}
         attributionPosition={{ bottom: ornamentBottom, left: 96 }}
@@ -682,10 +742,18 @@ export const WorldMap = memo(function WorldMap({
       >
         <Camera
           ref={cameraRef}
-          defaultSettings={{
-            centerCoordinate: [location.longitude, location.latitude],
-            zoomLevel: 15,
-          }}
+          defaultSettings={
+            introRunning
+              ? {
+                  // Empieza mirando el otro lado del planeta para verlo girar.
+                  centerCoordinate: [location.longitude - 110, 10],
+                  zoomLevel: 0.9,
+                }
+              : {
+                  centerCoordinate: [location.longitude, location.latitude],
+                  zoomLevel: 15,
+                }
+          }
           followUserLocation={tracking}
           followUserMode={
             headingUp
@@ -698,6 +766,18 @@ export const WorldMap = memo(function WorldMap({
           followPadding={followPadding}
           onUserTrackingModeChange={handleTrackingChange}
         />
+
+        {introRunning ? (
+          <Atmosphere
+            style={{
+              color: night ? "#1b2440" : "#bcd3f5",
+              highColor: night ? "#123a8a" : "#4d8cff",
+              horizonBlend: 0.06,
+              spaceColor: "#000000",
+              starIntensity: 0.7,
+            }}
+          />
+        ) : null}
 
         <ShapeSource
           id="caravana-alternatives"
@@ -1047,10 +1127,8 @@ export const WorldMap = memo(function WorldMap({
               )}
               <Text style={styles.parkingLabel}>
                 {parkingDistance == null || parkingDistance < 25
-                  ? "Aparcado aquí"
-                  : parkingDistance < 1000
-                    ? `Tu coche · ${parkingDistance} m`
-                    : `Tu coche · ${(parkingDistance / 1000).toFixed(1).replace(".", ",")} km`}
+                  ? t('Aparcado aquí')
+                  : t('Tu coche · {0}', formatDistance(parkingDistance))}
               </Text>
             </View>
           </MarkerView>

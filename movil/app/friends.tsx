@@ -34,6 +34,7 @@ import { useInviteToParty } from '@/src/hooks/usePartyInvites';
 import { relationForTarget, type FriendEntry } from '@/src/lib/friends';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -72,7 +73,7 @@ export default function FriendsScreen() {
       setActionError(
         error instanceof Error
           ? error.message
-          : 'No pudimos completar la acción.',
+          : t('No pudimos completar la acción.'),
       );
     }
   };
@@ -87,11 +88,11 @@ export default function FriendsScreen() {
     }
 
     Alert.alert(
-      entry.status === 'accepted' ? 'Eliminar amigo' : 'Cancelar solicitud',
-      `¿Quieres quitar a ${entry.profile.displayName}?`,
+      entry.status === 'accepted' ? t('Eliminar amigo') : t('Cancelar solicitud'),
+      t('¿Quieres quitar a {0}?', entry.profile.displayName),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Quitar', style: 'destructive', onPress: () => void perform() },
+        { text: t('Cancelar'), style: 'cancel' },
+        { text: t('Quitar'), style: 'destructive', onPress: () => void perform() },
       ],
     );
   };
@@ -116,13 +117,13 @@ export default function FriendsScreen() {
 
   const renderSearchAction = (profile: UserProfile) => {
     const relation = relationFor(profile.id);
-    if (relation === 'friends') return <Pill label="Amigos" tone="lime" icon="checkmark" />;
-    if (relation === 'outgoing') return <Pill label="Enviada" tone="neutral" icon="time-outline" />;
+    if (relation === 'friends') return <Pill label={t('Amigos')} tone="lime" icon="checkmark" />;
+    if (relation === 'outgoing') return <Pill label={t('Enviada')} tone="neutral" icon="time-outline" />;
     if (relation === 'incoming') {
       const entry = entries.find((item) => item.profile.id === profile.id);
       return (
         <Button
-          label="Aceptar"
+          label={t('Aceptar')}
           size="sm"
           full={false}
           onPress={() =>
@@ -137,7 +138,7 @@ export default function FriendsScreen() {
 
     return (
       <Button
-        label="Añadir"
+        label={t('Añadir')}
         size="sm"
         full={false}
         icon="person-add-outline"
@@ -160,12 +161,12 @@ export default function FriendsScreen() {
         <AppText variant="bodyStrong" numberOfLines={1}>{profile.displayName}</AppText>
         <AppText variant="caption" color={colors.accent}>@{profile.username}</AppText>
         <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-          {profile.city || 'Caravana'}
+          {profile.city || t('Caravana')}
         </AppText>
       </View>
       {entry?.status === 'accepted' && !isDemo ? (
         <Button
-          label={invitedIds.includes(profile.id) ? 'Invitado' : 'Party'}
+          label={invitedIds.includes(profile.id) ? t('Invitado') : t('Party')}
           size="sm"
           full={false}
           variant={invitedIds.includes(profile.id) ? 'ghost' : 'primary'}
@@ -193,11 +194,11 @@ export default function FriendsScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-back" size={40} onPress={goBack} />
         <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.accent}>COMUNIDAD</AppText>
-          <AppText variant="h1">Amigos</AppText>
+          <AppText variant="label" color={colors.accent}>{t('COMUNIDAD')}</AppText>
+          <AppText variant="h1">{t('Amigos')}</AppText>
         </View>
         <Pill
-          label={isDemo ? 'Demo' : `${friends.length} amigos`}
+          label={isDemo ? t('Demo') : `${friends.length} amigos`}
           tone={isDemo ? 'neutral' : 'lime'}
           icon="people-outline"
         />
@@ -209,7 +210,7 @@ export default function FriendsScreen() {
           setSearch(value);
           setActionError(null);
         }}
-        placeholder="Buscar por nombre o @usuario"
+        placeholder={t('Buscar por nombre o @usuario')}
         autoCapitalize="none"
         autoCorrect={false}
         rightSlot={
@@ -225,7 +226,7 @@ export default function FriendsScreen() {
       {isDemo ? (
         <AuthNotice
           tone="info"
-          message="Estás en modo demo: la lista muestra amigos de ejemplo. Las solicitudes reales se activan con una cuenta."
+          message={t('Estás en modo demo: la lista muestra amigos de ejemplo. Las solicitudes reales se activan con una cuenta.')}
         />
       ) : null}
 
@@ -234,25 +235,25 @@ export default function FriendsScreen() {
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.accent} />
-          <AppText variant="caption" color={colors.muted}>Cargando amistades…</AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Cargando amistades…')}</AppText>
         </View>
       ) : null}
 
       {isError ? (
         <Card style={styles.errorCard}>
-          <AppText variant="bodyStrong">No pudimos cargar tus amigos</AppText>
-          <Button label="Reintentar" variant="secondary" onPress={() => refetch()} />
+          <AppText variant="bodyStrong">{t('No pudimos cargar tus amigos')}</AppText>
+          <Button label={t('Reintentar')} variant="secondary" onPress={() => refetch()} />
         </Card>
       ) : null}
 
       {search.trim().length >= 2 ? (
         <>
-          <SectionHeader title="Resultados" action={`${searchResults.length}`} />
+          <SectionHeader title={t('Resultados')} action={`${searchResults.length}`} />
           {searchResults.length === 0 && !searching ? (
             <Card>
-              <AppText variant="bodyStrong">Sin resultados</AppText>
+              <AppText variant="bodyStrong">{t('Sin resultados')}</AppText>
               <AppText variant="caption" color={colors.muted}>
-                Prueba con otro nombre o @usuario.
+                {t('Prueba con otro nombre o @usuario.')}
               </AppText>
             </Card>
           ) : (
@@ -279,7 +280,7 @@ export default function FriendsScreen() {
 
       {incoming.length > 0 ? (
         <>
-          <SectionHeader title="Solicitudes recibidas" action={`${incoming.length}`} />
+          <SectionHeader title={t('Solicitudes recibidas')} action={`${incoming.length}`} />
           <Card style={styles.listCard}>
             {incoming.map((entry) => (
               <View key={entry.id} style={styles.requestRow}>
@@ -296,7 +297,7 @@ export default function FriendsScreen() {
                   <AppText variant="caption" color={colors.accent}>@{entry.profile.username}</AppText>
                 </View>
                 <Button
-                  label="Aceptar"
+                  label={t('Aceptar')}
                   size="sm"
                   full={false}
                   loading={respondRequest.isPending}
@@ -317,9 +318,9 @@ export default function FriendsScreen() {
 
       {outgoing.length > 0 ? (
         <>
-          <SectionHeader title="Solicitudes enviadas" action={`${outgoing.length}`} />
+          <SectionHeader title={t('Solicitudes enviadas')} action={`${outgoing.length}`} />
           <AppText variant="caption" color={colors.muted} style={{ marginBottom: spacing.sm }}>
-            Aparecerán en tu mapa y podrás invitarlos a tu party cuando acepten.
+            {t('Aparecerán en tu mapa y podrás invitarlos a tu party cuando acepten.')}
           </AppText>
           <Card style={styles.listCard}>
             {outgoing.map((entry) => (
@@ -336,7 +337,7 @@ export default function FriendsScreen() {
                   </AppText>
                   <AppText variant="caption" color={colors.accent}>@{entry.profile.username}</AppText>
                 </View>
-                <Pill label="Pendiente" tone="neutral" icon="time-outline" />
+                <Pill label={t('Pendiente')} tone="neutral" icon="time-outline" />
                 <IconButton
                   icon="close"
                   size={32}
@@ -349,18 +350,18 @@ export default function FriendsScreen() {
         </>
       ) : null}
 
-      <SectionHeader title="Mis amigos" action={`${friends.length}`} />
+      <SectionHeader title={t('Mis amigos')} action={`${friends.length}`} />
       {friends.length === 0 && !isLoading ? (
         <Card style={styles.empty}>
           <View style={styles.emptyIcon}>
             <Ionicons name="people-outline" size={24} color={colors.accent} />
           </View>
-          <AppText variant="title" align="center">Tu caravana empieza aquí</AppText>
+          <AppText variant="title" align="center">{t('Tu caravana empieza aquí')}</AppText>
           <AppText variant="caption" color={colors.muted} align="center">
-            Busca a alguien por su @usuario o comparte tu QR de perfil.
+            {t('Busca a alguien por su @usuario o comparte tu QR de perfil.')}
           </AppText>
           <Button
-            label="Compartir mi QR"
+            label={t('Compartir mi QR')}
             variant="secondary"
             icon="qr-code-outline"
             onPress={() => router.push('/(tabs)/profile')}
@@ -376,7 +377,7 @@ export default function FriendsScreen() {
       <View style={styles.footer}>
         <Ionicons name="lock-closed-outline" size={13} color={colors.dim} />
         <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-          Las solicitudes solo son visibles para las dos personas implicadas.
+          {t('Las solicitudes solo son visibles para las dos personas implicadas.')}
         </AppText>
       </View>
     </Screen>

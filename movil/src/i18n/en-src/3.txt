@@ -1,0 +1,233 @@
+710|You need at least one rival who has accepted the challenge to start.
+711|Tires
+712|Low-resistance tires and EV alignment.
+713|New tires
+714|All-terrain tires
+715|Tires and alignment
+716|Don't share exact addresses, plates or personal data in a public post.
+717|We couldn't find the vehicle
+718|We couldn't find that vehicle.
+719|We couldn't find this event. It may no longer be published.
+720|We couldn't find this challenge
+721|We couldn't find this vehicle
+722|We couldn't find a drivable street
+723|We couldn't find a drivable street between those points.
+724|We couldn't find a drivable street between those points. Choose another destination or try again.
+725|We couldn't find a party with that code.
+726|We couldn't find any {0} nearby.
+727|We don't encourage illegal racing or reward top speed. Whoever arrives first while respecting speed limits and traffic rules wins.
+728|No friends with that type of vehicle. Try another category.
+729|No maintenance recorded yet for this vehicle.
+730|There's no code copied. Copy the invitation message and try again.
+731|No active party
+732|No fill-ups or charges recorded for this vehicle.
+733|No rivals have accepted. Invite another driver.
+734|It doesn't include the plate, exact location, phone or payment data. The sheet is informative and doesn't replace a mechanical inspection.
+735|You don't belong to this party.
+736|We couldn't open the gallery.
+737|We couldn't accept the challenge
+738|We couldn't turn on the microphone.
+739|We couldn't update the caravan's destination.
+740|We couldn't update the photo.
+741|We couldn't delete the comment.
+742|We can't search right now. Check your connection.
+743|We couldn't calculate the event route.
+744|We couldn't calculate the event route. Try again.
+745|We couldn't change channel
+746|We couldn't change the voice channel.
+747|We couldn't load the chat
+748|We couldn't load the feed
+749|We couldn't load the garage
+750|We couldn't load the map. Trying the backup map.
+751|We couldn't load the party
+752|We couldn't load the comments
+753|We couldn't load your profile
+754|We couldn't load your friends
+755|We couldn't load your challenges
+756|We couldn't load your vehicles
+757|We couldn't post the comment.
+758|We couldn't complete the action.
+759|We couldn't complete the invitation. Try again.
+760|We couldn't complete the operation. Check your connection and try again.
+761|We couldn't complete the request. Try again.
+762|We couldn't connect to Supabase. Check your connection.
+763|We can't connect the voice right now. Try again in a moment.
+764|We couldn't connect the voice.
+765|We couldn't connect the voice. Check your connection.
+766|We couldn't create the challenge.
+767|We couldn't create the challenge. Try again.
+768|We couldn't create the account. Check your connection.
+769|We couldn't create the party.
+770|We couldn't create the party. Try again.
+771|We couldn't create the room
+772|We couldn't create your account.
+773|We couldn't delete the account. Try again.
+774|We couldn't send the message.
+775|We couldn't send the challenge
+776|We couldn't send the request.
+777|We couldn't end the challenge
+778|We couldn't end the challenge.
+779|We couldn't save the event.
+780|We couldn't save the maintenance.
+781|We couldn't save the maintenance. Try again.
+782|We couldn't save the profile. Try again.
+783|We couldn't save the record.
+784|We couldn't save the fill-up. Check your connection and try again.
+785|We couldn't save the vehicle. Try again.
+786|We couldn't save the vehicle. Check your connection and try again.
+787|We couldn't save the changes.
+788|We couldn't save your profile. Try again.
+789|We couldn't start the challenge
+790|We couldn't start the challenge.
+791|We couldn't sign you in.
+792|We couldn't invite the drivers. Try again.
+793|We couldn't send the invite.
+794|We couldn't read the GPS · using demo location
+795|We couldn't read the chosen photo.
+796|We couldn't post the comment.
+797|We couldn't post. Try again.
+798|We couldn't respond
+799|We couldn't respond to the invitation.
+800|We couldn't respond.
+801|We couldn't leave
+802|We couldn't leave the party.
+803|We couldn't upload the photo.
+804|We couldn't upload the photo. Check your connection and try again.
+805|We couldn't upload the photo: {0}
+806|We couldn't join the party.
+807|We couldn't join the party. Check the code.
+808|We couldn't add you as the party host.
+809|We couldn't add you.
+810|We didn't get your account. Try again.
+811|Not recorded
+812|We couldn't change tracking
+813|We couldn't export
+814|We couldn't generate the sheet
+815|You have no friends with
+816|You have no friends with that type of vehicle. Try another category.
+817|You don't have permission to do this.
+818|You don't have a {0} vehicle. Change the category or add one to your garage.
+819|Name
+820|Station name
+821|Shop name
+822|Display name
+824|Notes
+825|Notifications
+826|Or type a code
+827|ODOMETER
+828|OPTIONS
+829|OSRM returned an empty route.
+830|OSRM didn't return a valid route.
+831|OSRM replied {0}.
+832|Hide
+833|Hide password
+834|Hide my QR
+835|Odometer
+836|Off-road
+837|Forget
+838|Organize parties, challenge your friends and keep every route, fill-up and memory of your car. All in one place.
+839|Point the map north
+840|Other
+841|STOP
+842|PARTY · CHAT
+843|NEXT
+844|PTT
+845|Real PTT in {0}.
+846|POST
+847|Simplified screen
+848|To create a real challenge you need a vehicle in your garage.
+849|Test stop 1
+850|Test stop 2
+851|Stop done:
+852|Stop {0}
+853|Stopped
+854|Stop simulation
+855|Party
+856|Caravana party
+857|Convoy party
+858|Live party
+859|Party ended
+860|Ceramic pads and disc resurfacing.
+861|Front pads and discs
+862|Pads, discs and brake fluid.
+863|Pause
+865|Paste invitation
+866|Pending
+867|{0}'s profile on Caravana: {1}
+868|Caravana public profile ·
+869|Profile verified by QR
+870|Public profile and garage when scanned.
+871|Profile, username and session
+872|Profiles, cars and parties. You can also type a party code.
+873|Period not recorded
+874|Photo permission
+875|Location permission denied · using demo location
+876|Allow
+877|Allow camera
+878|Belongs to
+879|Photon paused.
+880|Driver
+884|Give the party a name.
+885|By @username or with your QR
+886|For now your events are saved on this device. They'll be published for everyone as soon as the server is available.
+887|By arrival: whoever arrives first while obeying the law wins.
+888|Energy price
+889|Fuel price
+890|Price: {0} per {1}
+891|Ask about the route, the car or the meetup.
+892|Prepare a sheet with details, maintenance, consumption and logged kilometers to share with a buyer.
+893|Preparing the sheet…
+894|Prepare sale sheet
+895|Add a vehicle first
+896|Main
+897|Profile privacy
+898|Privacy first
+899|Privacy and location
+900|Private
+901|Try with a sample profile
+902|Try demo mode first
+903|Scheduled
+904|Owner
+905|Test
+906|Try another name or @username.
+907|Try the app without driving
+908|Tests
+909|Next
+910|Next maintenance
+911|Next service
+912|Next service in {0} km
+913|Post a route, a photo or an idea to get your caravan going.
+914|Posts, photos, likes and comments
+915|Post
+916|Post not available
+917|Post
+918|Posting to the feed requires a real account.
+919|Publish event
+920|The link may be incomplete or the user may have changed their privacy. Caravana QRs don't show personal data.
+921|The link may have expired or the party may have ended.
+922|It may have ended or the invitation may not be for your account.
+923|It may be private or may have been deleted.
+924|You can adjust it later with your real fill-ups.
+926|Point A → point B
+927|Meeting point, time, details…
+928|Event points
+929|PUBLIC
+930|Stick it in your car so people can see your profile
+931|Public
+932|QR not recognized
+933|MEETUPS WITH A ROUTE
+934|Remove
+935|Remove stop {0}
+936|What's included
+937|RECENT
+938|RETRY
+939|ROUTE
+941|Recenter on your position
+942|Recenter map
+943|Decline
+944|Recent
+945|Drive the route to the destination you've chosen.
+946|Log at least one fill-up or charge to export.
+947|Log two full-tank fill-ups to see your real consumption.
+948|Log the fill-up.
+949|Log the service.

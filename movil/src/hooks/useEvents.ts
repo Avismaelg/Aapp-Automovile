@@ -6,6 +6,7 @@ import { eventId, type AppEvent, type EventRoute } from '@/src/lib/events';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useLocalEvents } from '@/src/store/events';
+import { t } from '@/src/i18n';
 
 type EventRow = {
   id: string;
@@ -28,7 +29,7 @@ function mapRow(row: EventRow): AppEvent {
     title: row.title,
     description: row.description,
     startsAt: row.starts_at,
-    hostName: row.host_name?.trim() || 'Piloto',
+    hostName: row.host_name?.trim() || t('Piloto'),
     latitude: row.latitude,
     longitude: row.longitude,
     locationLabel: row.location_label,
@@ -160,7 +161,7 @@ export function useCreateEvent() {
         title: input.title.trim(),
         description: input.description?.trim() || null,
         startsAt: null,
-        hostName: account?.displayName ?? 'Piloto',
+        hostName: account?.displayName ?? t('Piloto'),
         latitude: input.latitude,
         longitude: input.longitude,
         locationLabel: input.locationLabel,

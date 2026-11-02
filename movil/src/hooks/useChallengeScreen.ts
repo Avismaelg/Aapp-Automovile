@@ -21,6 +21,7 @@ import { profileColor } from '@/src/lib/profile-db';
 import { challengeUrl } from '@/src/lib/qr';
 import { colors } from '@/src/theme';
 import { vehicleCategoryLabel } from '@/src/lib/vehicles';
+import { t } from '@/src/i18n';
 
 function challengeId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
@@ -158,7 +159,7 @@ export function useChallengeScreen() {
 
   const matchmake = () => {
     if (filteredFriends.length === 0) {
-      Alert.alert('Sin rivales', 'No tienes amigos con ese tipo de vehículo. Prueba otra categoría.');
+      Alert.alert(t('Sin rivales'), t('No tienes amigos con ese tipo de vehículo. Prueba otra categoría.'));
       return;
     }
     setMatching(true);
@@ -178,15 +179,15 @@ export function useChallengeScreen() {
     if (isDemo) return true;
     if (garageVehicles.length === 0) {
       Alert.alert(
-        'Añade un vehículo',
-        'Para crear un reto real necesitas un vehículo en tu garaje.',
+        t('Añade un vehículo'),
+        t('Para crear un reto real necesitas un vehículo en tu garaje.'),
       );
       return false;
     }
     if (category !== 'mixed' && myVehicle.kind !== category) {
       Alert.alert(
-        'Categoría sin vehículo',
-        `No tienes un vehículo de categoría ${vehicleCategoryLabel(category)}. Cambia la categoría o añade uno al garaje.`,
+        t('Categoría sin vehículo'),
+        t('No tienes un vehículo de categoría {0}. Cambia la categoría o añade uno al garaje.', vehicleCategoryLabel(category)),
       );
       return false;
     }
@@ -195,7 +196,7 @@ export function useChallengeScreen() {
 
   const sendChallenge = async () => {
     if (!rival) {
-      Alert.alert('Elige un rival', 'Toca un amigo o usa el emparejamiento rápido.');
+      Alert.alert(t('Elige un rival'), t('Toca un amigo o usa el emparejamiento rápido.'));
       return;
     }
     if (!ensureRealVehicle()) return;
@@ -203,7 +204,7 @@ export function useChallengeScreen() {
     if (!isDemo) {
       try {
         const result = await createChallenge.mutateAsync({
-          title: `Reto ${route.fromLabel.split(',')[0]} → ${route.toLabel}`,
+          title: t('Reto {0} → {1}', route.fromLabel.split(',')[0], route.toLabel),
           category,
           mode: 'scheduled',
           fromLabel: route.fromLabel,
@@ -211,8 +212,8 @@ export function useChallengeScreen() {
           distanceKm: route.distanceKm,
           rules:
             category === 'mixed'
-              ? 'Categoría mixta. Gana quien llegue primero respetando las normas de tránsito.'
-              : `Categoría ${vehicleCategoryLabel(category)}. Solo compiten vehículos de la misma clase.`,
+              ? t('Categoría mixta. Gana quien llegue primero respetando las normas de tránsito.')
+              : t('Categoría {0}. Solo compiten vehículos de la misma clase.', vehicleCategoryLabel(category)),
           hostVehicleId: myVehicle.id,
           hostVehicleKind: myVehicle.kind,
           invitees: [
@@ -225,11 +226,11 @@ export function useChallengeScreen() {
         });
         setSentTo(rival.name);
         Alert.alert(
-          'Reto enviado',
-          `${rival.name.split(' ')[0]} recibió la invitación. Código ${result.code}. Cuando la acepte, podrás iniciar la salida.`,
+          t('Reto enviado'),
+          t('{0} recibió la invitación. Código {1}. Cuando la acepte, podrás iniciar la salida.', rival.name.split(' ')[0], result.code),
         );
       } catch (error) {
-        showError('No pudimos enviar el reto', error);
+        showError(t('No pudimos enviar el reto'), error);
       }
       return;
     }
@@ -237,7 +238,7 @@ export function useChallengeScreen() {
     const newChallenge: Challenge = {
       id: challengeId('c'),
       code: challengeCode('R'),
-      title: `Reto ${route.fromLabel.split(',')[0]} → ${route.toLabel}`,
+      title: t('Reto {0} → {1}', route.fromLabel.split(',')[0], route.toLabel),
       fromLabel: route.fromLabel,
       toLabel: route.toLabel,
       distanceKm: route.distanceKm,
@@ -247,8 +248,8 @@ export function useChallengeScreen() {
       elapsedSeconds: 0,
       note:
         category === 'mixed'
-          ? 'Categoría mixta. Cada vehículo corre con su propio ritmo y gana quien llegue primero respetando las normas.'
-          : `Categoría ${vehicleCategoryLabel(category)}. Solo compiten vehículos de la misma clase.`,
+          ? t('Categoría mixta. Cada vehículo corre con su propio ritmo y gana quien llegue primero respetando las normas.')
+          : t('Categoría {0}. Solo compiten vehículos de la misma clase.', vehicleCategoryLabel(category)),
       participants: [
         {
           id: me.id,
@@ -276,8 +277,8 @@ export function useChallengeScreen() {
     setLocalActive(newChallenge);
     setSentTo(rival.name);
     Alert.alert(
-      'Reto enviado',
-      `${rival.name.split(' ')[0]} recibió la invitación. Cuando la acepte, ambos verán la salida y la meta en el mapa.`,
+      t('Reto enviado'),
+      t('{0} recibió la invitación. Cuando la acepte, ambos verán la salida y la meta en el mapa.', rival.name.split(' ')[0]),
     );
   };
 
@@ -313,7 +314,7 @@ export function useChallengeScreen() {
 
   const pickInstantRivals = () => {
     if (filteredFriends.length === 0) {
-      Alert.alert('Sin pilotos disponibles', 'No hay amigos con ese tipo de vehículo. Prueba otra categoría.');
+      Alert.alert(t('Sin pilotos disponibles'), t('No hay amigos con ese tipo de vehículo. Prueba otra categoría.'));
       return;
     }
 
@@ -332,7 +333,7 @@ export function useChallengeScreen() {
 
   const startInstantChallenge = async () => {
     if (selectedInstantFriends.length === 0) {
-      Alert.alert('Elige al menos un piloto', 'Un reto al momento necesita 2+ personas: tú y al menos otro piloto.');
+      Alert.alert(t('Elige al menos un piloto'), t('Un reto al momento necesita 2+ personas: tú y al menos otro piloto.'));
       return;
     }
     if (!ensureRealVehicle()) return;
@@ -340,14 +341,14 @@ export function useChallengeScreen() {
     if (!isDemo) {
       try {
         const result = await createChallenge.mutateAsync({
-          title: `Sala rápida · ${route.toLabel}`,
+          title: t('Sala rápida · {0}', route.toLabel),
           category,
           mode: 'instant',
           fromLabel: route.fromLabel,
           toLabel: route.toLabel,
           distanceKm: route.distanceKm,
           rules:
-            'Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.',
+            t('Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.'),
           hostVehicleId: myVehicle.id,
           hostVehicleKind: myVehicle.kind,
           invitees: selectedInstantFriends.map((friend) => ({
@@ -358,11 +359,11 @@ export function useChallengeScreen() {
         });
         setSentTo(null);
         Alert.alert(
-          'Sala creada',
-          `${selectedInstantFriends.length + 1} pilotos invitados hacia ${route.toLabel}. Código ${result.code}. Compártelo para que se unan.`,
+          t('Sala creada'),
+          t('{0} pilotos invitados hacia {1}. Código {2}. Compártelo para que se unan.', selectedInstantFriends.length + 1, route.toLabel, result.code),
         );
       } catch (error) {
-        showError('No pudimos crear la sala', error);
+        showError(t('No pudimos crear la sala'), error);
       }
       return;
     }
@@ -395,7 +396,7 @@ export function useChallengeScreen() {
     setLocalActive({
       id: challengeId('c_instant'),
       code,
-      title: `Sala rápida · ${route.toLabel}`,
+      title: t('Sala rápida · {0}', route.toLabel),
       fromLabel: route.fromLabel,
       toLabel: route.toLabel,
       distanceKm: route.distanceKm,
@@ -404,19 +405,19 @@ export function useChallengeScreen() {
       mode: 'instant',
       elapsedSeconds: 0,
       note:
-        'Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.',
+        t('Salida inmediata. Gana quien llegue primero a la meta respetando los límites de tránsito. Sin premios por velocidad máxima.'),
       participants,
     });
     setSentTo(null);
     Alert.alert(
-      'Reto en marcha',
-      `${participants.length} pilotos salen ahora hacia ${route.toLabel}. Comparte el código ${code} para que se unan.`,
+      t('Reto en marcha'),
+      t('{0} pilotos salen ahora hacia {1}. Comparte el código {2} para que se unan.', participants.length, route.toLabel, code),
     );
   };
 
   const promptInstantStart = () => {
     if (selectedInstantFriends.length === 0) {
-      Alert.alert('Elige al menos un piloto', 'El reto al momento necesita 2+ personas en total.');
+      Alert.alert(t('Elige al menos un piloto'), t('El reto al momento necesita 2+ personas en total.'));
       return;
     }
     if (Platform.OS === 'web') {
@@ -424,13 +425,11 @@ export function useChallengeScreen() {
       return;
     }
     Alert.alert(
-      '¿Salir ahora?',
-      `Tú y ${selectedInstantFriends.length} ${
-        selectedInstantFriends.length === 1 ? 'piloto' : 'pilotos'
-      } saldrán inmediatamente hacia ${route.toLabel}. El reto mide llegada, no velocidad.`,
+      t('¿Salir ahora?'),
+      t('Tú y {0} {1} saldrán inmediatamente hacia {2}. El reto mide llegada, no velocidad.', selectedInstantFriends.length, selectedInstantFriends.length === 1 ? 'piloto' : 'pilotos', route.toLabel),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Salir ahora', onPress: () => void startInstantChallenge() },
+        { text: t('Cancelar'), style: 'cancel' },
+        { text: t('Salir ahora'), onPress: () => void startInstantChallenge() },
       ],
     );
   };
@@ -438,26 +437,26 @@ export function useChallengeScreen() {
   const startChallenge = async () => {
     if (!isDemo) {
       if (!realActive) {
-        Alert.alert('Sin reto', 'Crea o acepta un reto antes de iniciarlo.');
+        Alert.alert(t('Sin reto'), t('Crea o acepta un reto antes de iniciarlo.'));
         return;
       }
       if (!realActive.isHost) {
-        Alert.alert('Solo el anfitrión', 'El anfitrión del reto es quien puede iniciar la salida.');
+        Alert.alert(t('Solo el anfitrión'), t('El anfitrión del reto es quien puede iniciar la salida.'));
         return;
       }
       if (!activeReadyToStart) {
         Alert.alert(
-          'Faltan pilotos',
-          'Necesitas al menos un rival que haya aceptado el reto para iniciar la salida.',
+          t('Faltan pilotos'),
+          t('Necesitas al menos un rival que haya aceptado el reto para iniciar la salida.'),
         );
         return;
       }
       try {
         await startRealChallenge.mutateAsync(realActive.id);
         setSentTo(null);
-        Alert.alert('Reto iniciado', 'La salida está en marcha. Comparte el código con los pilotos.');
+        Alert.alert(t('Reto iniciado'), t('La salida está en marcha. Comparte el código con los pilotos.'));
       } catch (error) {
-        showError('No pudimos iniciar el reto', error);
+        showError(t('No pudimos iniciar el reto'), error);
       }
       return;
     }
@@ -478,14 +477,14 @@ export function useChallengeScreen() {
     if (!isDemo) {
       if (!realActive) return;
       if (!realActive.isHost) {
-        Alert.alert('Solo el anfitrión', 'El anfitrión es quien puede cerrar el reto.');
+        Alert.alert(t('Solo el anfitrión'), t('El anfitrión es quien puede cerrar el reto.'));
         return;
       }
       try {
         await finishRealChallenge.mutateAsync(realActive.id);
-        Alert.alert('Reto finalizado', 'El resultado quedó guardado en el historial.');
+        Alert.alert(t('Reto finalizado'), t('El resultado quedó guardado en el historial.'));
       } catch (error) {
-        showError('No pudimos finalizar el reto', error);
+        showError(t('No pudimos finalizar el reto'), error);
       }
       return;
     }
@@ -493,10 +492,10 @@ export function useChallengeScreen() {
     setLocalActive((previous) => ({ ...previous, status: 'finished' }));
     const winner = standings[0];
     Alert.alert(
-      'Reto finalizado',
-      `${winner?.isMe ? 'Ganaste' : `${winner?.name ?? 'Tu rival'} ganó`} el reto. Tiempo: ${formatClock(
+      t('Reto finalizado'),
+      t('{0} el reto. Tiempo: {1}.', winner?.isMe ? 'Ganaste' : `${winner?.name ?? 'Tu rival'} ganó`, formatClock(
         active.elapsedSeconds,
-      )}.`,
+      )),
     );
   };
 
@@ -505,21 +504,21 @@ export function useChallengeScreen() {
     try {
       await respondChallenge.mutateAsync({ challengeId: realActive.id, accept });
       Alert.alert(
-        accept ? 'Estás dentro' : 'Invitación rechazada',
+        accept ? t('Estás dentro') : t('Invitación rechazada'),
         accept
-          ? 'El anfitrión ya puede iniciar la salida. Te avisaremos cuando el reto esté en vivo.'
-          : 'La invitación quedó rechazada. No se notificará a los demás pilotos.',
+          ? t('El anfitrión ya puede iniciar la salida. Te avisaremos cuando el reto esté en vivo.')
+          : t('La invitación quedó rechazada. No se notificará a los demás pilotos.'),
       );
     } catch (error) {
-      showError('No pudimos responder', error);
+      showError(t('No pudimos responder'), error);
     }
   };
 
   const shareChallenge = async () => {
     if (!hasActive) return;
-    const label = active.mode === 'instant' ? 'Sala rápida de Caravana' : 'Reto de Caravana';
+    const label = active.mode === 'instant' ? t('Sala rápida de Caravana') : t('Reto de Caravana');
     await Share.share({
-      message: `${label}: ${active.fromLabel} → ${active.toLabel} (${active.distanceKm} km). Únete con ${challengeUrl(active.code)}`,
+      message: t('{0}: {1} → {2} ({3} km). Únete con {4}', label, active.fromLabel, active.toLabel, active.distanceKm, challengeUrl(active.code)),
       url: challengeUrl(active.code),
     });
   };
@@ -537,11 +536,11 @@ export function useChallengeScreen() {
           fromLabel: challenge.fromLabel,
           toLabel: challenge.toLabel,
           distanceKm: Math.max(0, Math.round(challenge.distanceM / 100) / 10),
-          winner: winner?.profile.displayName ?? 'Sin ganador registrado',
+          winner: winner?.profile.displayName ?? t('Sin ganador registrado'),
           winnerColor: winner
             ? profileColor(winner.profile.username)
             : colors.dim,
-          time: challenge.finishedAt ? timeAgo(challenge.finishedAt) : 'Finalizado',
+          time: challenge.finishedAt ? timeAgo(challenge.finishedAt) : t('Finalizado'),
           date: `${challenge.participants.length} pilotos`,
         };
       });

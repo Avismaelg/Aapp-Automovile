@@ -14,6 +14,7 @@ import { profileColor } from '@/src/lib/profile-db';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
 import { vehicleCategoryLabel, vehicleKindMeta } from '@/src/lib/vehicles';
+import { formatKmValue, t } from '@/src/i18n';
 
 export default function ChallengeInviteScreen() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function ChallengeInviteScreen() {
       try {
         await respond.mutateAsync({ challengeId: real.id, accept: true });
       } catch (error) {
-        showError('No pudimos aceptar el reto', error);
+        showError(t('No pudimos aceptar el reto'), error);
         return;
       }
     }
@@ -59,15 +60,15 @@ export default function ChallengeInviteScreen() {
           <>
             <Ionicons name={signedOut ? 'log-in-outline' : 'flag-outline'} size={32} color={colors.dim} />
             <AppText variant="h2" align="center">
-              {signedOut ? 'Inicia sesión para ver el reto' : 'No encontramos este reto'}
+              {signedOut ? t('Inicia sesión para ver el reto') : t('No encontramos este reto')}
             </AppText>
             <AppText variant="caption" color={colors.muted} align="center">
               {signedOut
-                ? `Entra en Caravana con tu cuenta para aceptar el reto ${inviteCode}.`
-                : 'Puede que haya terminado o que la invitación no sea para tu cuenta.'}
+                ? t('Entra en Caravana con tu cuenta para aceptar el reto {0}.', inviteCode)
+                : t('Puede que haya terminado o que la invitación no sea para tu cuenta.')}
             </AppText>
             <Button
-              label={signedOut ? 'Iniciar sesión' : 'Ir a Retos'}
+              label={signedOut ? t('Iniciar sesión') : t('Ir a Retos')}
               onPress={() => router.replace(signedOut ? '/welcome' : '/(tabs)/challenges')}
               style={{ marginTop: spacing.md, alignSelf: 'stretch' }}
             />
@@ -82,7 +83,7 @@ export default function ChallengeInviteScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
         <IconButton icon="close" onPress={() => router.back()} />
-        <Pill label="Invitación a reto" tone="lime" icon="flag" />
+        <Pill label={t('Invitación a reto')} tone="lime" icon="flag" />
         <View style={{ width: 42 }} />
       </View>
 
@@ -97,7 +98,7 @@ export default function ChallengeInviteScreen() {
           <Ionicons name="flag" size={28} color={colors.lime} />
         </View>
         <AppText variant="label" color={colors.lime} style={{ marginTop: spacing.lg }}>
-          TE RETAN A LLEGAR PRIMERO
+          {t('TE RETAN A LLEGAR PRIMERO')}
         </AppText>
         <AppText variant="h1" align="center" style={{ marginTop: 6 }}>
           {challenge.title}
@@ -110,7 +111,7 @@ export default function ChallengeInviteScreen() {
         </View>
 
         <View style={styles.codeBox}>
-          <AppText variant="label" color={colors.muted}>Código del reto</AppText>
+          <AppText variant="label" color={colors.muted}>{t('Código del reto')}</AppText>
           <AppText variant="h2" color={colors.lime} style={{ letterSpacing: 4 }}>
             {inviteCode}
           </AppText>
@@ -131,8 +132,8 @@ export default function ChallengeInviteScreen() {
             <Circle cx={286} cy={18} r={7} fill={colors.accent} />
           </Svg>
           <View style={styles.routeLabels}>
-            <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>SALIDA</AppText>
-            <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>META</AppText>
+            <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>{t('SALIDA')}</AppText>
+            <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>{t('META')}</AppText>
           </View>
         </View>
 
@@ -140,7 +141,7 @@ export default function ChallengeInviteScreen() {
           <View style={styles.hostRow}>
             <Avatar name={host.name} color={host.color} size={42} ring={colors.border} online />
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.muted}>Te invita</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('Te invita')}</AppText>
               <AppText variant="bodyStrong">{host.name}</AppText>
               <AppText variant="caption" color={colors.muted}>
                 {host.vehicle} · {vehicleKindMeta[host.vehicleKind].shortLabel}
@@ -152,32 +153,32 @@ export default function ChallengeInviteScreen() {
         <View style={styles.metaGrid}>
           <View style={styles.metaCell}>
             <Ionicons name="map-outline" size={18} color={colors.accent} />
-            <AppText variant="h3">{challenge.distanceKm} km</AppText>
-            <AppText variant="caption" color={colors.muted}>punto A → B</AppText>
+            <AppText variant="h3">{formatKmValue(challenge.distanceKm, 1)}</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('punto A → B')}</AppText>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaCell}>
             <Ionicons name="people-outline" size={18} color={colors.cyan} />
             <AppText variant="h3">{challenge.participants.length}</AppText>
-            <AppText variant="caption" color={colors.muted}>participantes</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('participantes')}</AppText>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaCell}>
             <Ionicons name="shuffle" size={18} color={colors.lime} />
             <AppText variant="h3">{vehicleCategoryLabel(challenge.category)}</AppText>
-            <AppText variant="caption" color={colors.muted}>categoría</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('categoría')}</AppText>
           </View>
         </View>
 
         <Button
-          label={real && real.myStatus !== 'invited' ? 'Ver reto' : 'Aceptar reto'}
+          label={real && real.myStatus !== 'invited' ? t('Ver reto') : t('Aceptar reto')}
           icon="flag"
           loading={respond.isPending}
           onPress={() => void accept()}
           style={{ marginTop: spacing.xl }}
         />
         <Button
-          label="Ahora no"
+          label={t('Ahora no')}
           variant="ghost"
           onPress={() => router.back()}
           style={{ marginTop: 8 }}
@@ -187,14 +188,13 @@ export default function ChallengeInviteScreen() {
       <Card style={styles.note}>
         <Ionicons name="shield-checkmark" size={20} color={colors.lime} />
         <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-          Reto por llegada, no por velocidad. Respeta los límites y las normas. No hay apuestas
-          ni rankings de velocidad máxima.
+          {t('Reto por llegada, no por velocidad. Respeta los límites y las normas. No hay apuestas ni rankings de velocidad máxima.')}
         </AppText>
       </Card>
 
         <View style={styles.footer}>
           <AppText variant="caption" color={colors.dim} align="center">
-            Al aceptar compartes tu progreso solo con los participantes del reto.
+            {t('Al aceptar compartes tu progreso solo con los participantes del reto.')}
           </AppText>
         </View>
       </ScrollView>

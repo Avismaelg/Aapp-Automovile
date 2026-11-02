@@ -1,3 +1,4 @@
+import { t } from "@/src/i18n";
 // Reglas del convoy en tiempo real y de los retos por llegada. Sin React ni
 // Supabase: las usan los hooks, el simulador y las pruebas.
 
@@ -39,12 +40,12 @@ export function memberLiveLabel(
   member: { lastSeenAt: string | null; speedKmh: number | null; isMe?: boolean },
   now: number,
 ) {
-  if (member.isMe) return 'TÚ';
-  if (!member.lastSeenAt) return 'SIN SEÑAL';
+  if (member.isMe) return t('TÚ');
+  if (!member.lastSeenAt) return t('SIN SEÑAL');
   const age = now - Date.parse(member.lastSeenAt);
   if (!Number.isFinite(age) || age > MEMBER_STALE_MS) {
     const minutes = Math.max(1, Math.round(age / 60_000));
-    return minutes > 59 ? 'SIN SEÑAL' : `HACE ${minutes} MIN`;
+    return minutes > 59 ? t('SIN SEÑAL') : t('HACE {0} MIN', minutes);
   }
   if (member.speedKmh != null && member.speedKmh >= 5) return `${Math.round(member.speedKmh)} KM/H`;
   return 'PARADO';
@@ -183,7 +184,7 @@ export function shouldReportProgress(
 }
 
 export function placeLabel(rank: number) {
-  return rank === 1 ? '¡Has ganado!' : `Has llegado ${rank}º`;
+  return rank === 1 ? t('¡Has ganado!') : t('Has llegado {0}º', rank);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,9 +210,9 @@ export function followDestination(
 }
 
 export function followStatus(me: Point, target: Point | null, lastSeenAt: string | null, now: number) {
-  if (!target) return 'sin posición';
-  if (lastSeenAt && now - Date.parse(lastSeenAt) > MEMBER_STALE_MS) return 'sin señal';
+  if (!target) return t('sin posición');
+  if (lastSeenAt && now - Date.parse(lastSeenAt) > MEMBER_STALE_MS) return t('sin señal');
   const meters = metersBetween(me, target);
-  if (meters <= FOLLOW_CAUGHT_M) return 'a tu lado';
-  return meters < 1000 ? `a ${Math.round(meters / 10) * 10} m` : `a ${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+  if (meters <= FOLLOW_CAUGHT_M) return t('a tu lado');
+  return meters < 1000 ? t('a {0} m', Math.round(meters / 10) * 10) : t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
 }

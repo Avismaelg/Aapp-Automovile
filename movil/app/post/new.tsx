@@ -28,15 +28,16 @@ import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useCreatePost, type FeedVisibility } from '@/src/hooks/useFeed';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const visibilityOptions: {
   key: FeedVisibility;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: 'public', label: 'Público', icon: 'globe-outline' },
-  { key: 'friends', label: 'Amigos', icon: 'people-outline' },
-  { key: 'private', label: 'Solo yo', icon: 'lock-closed-outline' },
+  { key: 'public', label: t('Público'), icon: 'globe-outline' },
+  { key: 'friends', label: t('Amigos'), icon: 'people-outline' },
+  { key: 'private', label: t('Solo yo'), icon: 'lock-closed-outline' },
 ];
 
 export default function NewPostScreen() {
@@ -61,8 +62,8 @@ export default function NewPostScreen() {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
-          'Permiso de fotos',
-          'Caravana necesita acceso a tus fotos para adjuntar una imagen al post.',
+          t('Permiso de fotos'),
+          t('Caravana necesita acceso a tus fotos para adjuntar una imagen al post.'),
         );
         return;
       }
@@ -79,14 +80,14 @@ export default function NewPostScreen() {
         mimeType: asset.mimeType ?? 'image/jpeg',
       });
     } catch {
-      setError('No pudimos abrir la galería.');
+      setError(t('No pudimos abrir la galería.'));
     }
   };
 
   const publish = async () => {
     setError(null);
     if (caption.trim().length === 0 && !image) {
-      setError('Escribe algo o añade una foto antes de publicar.');
+      setError(t('Escribe algo o añade una foto antes de publicar.'));
       return;
     }
 
@@ -101,7 +102,7 @@ export default function NewPostScreen() {
       setError(
         publishError instanceof Error
           ? publishError.message
-          : 'No pudimos publicar. Inténtalo de nuevo.',
+          : t('No pudimos publicar. Inténtalo de nuevo.'),
       );
     }
   };
@@ -119,21 +120,21 @@ export default function NewPostScreen() {
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
-            <AppText variant="label" color={colors.accent}>NUEVA PUBLICACIÓN</AppText>
+            <AppText variant="label" color={colors.accent}>{t('NUEVA PUBLICACIÓN')}</AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">Comparte la carretera.</AppText>
+            <AppText variant="h1">{t('Comparte la carretera.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
-              Una ruta, una foto, una quedada o una idea. Tu caravana lo verá en el feed.
+              {t('Una ruta, una foto, una quedada o una idea. Tu caravana lo verá en el feed.')}
             </AppText>
           </View>
 
           {isDemo ? (
             <AuthNotice
               tone="info"
-              message="Estás en modo demo: publicar requiere una cuenta real."
+              message={t('Estás en modo demo: publicar requiere una cuenta real.')}
             />
           ) : null}
 
@@ -144,7 +145,7 @@ export default function NewPostScreen() {
               <AppText variant="caption" color={colors.muted}>@{me.username}</AppText>
             </View>
             <Pill
-              label={image ? 'Foto' : 'Texto'}
+              label={image ? t('Foto') : t('Texto')}
               tone="neutral"
               icon={image ? 'image-outline' : 'text-outline'}
             />
@@ -156,7 +157,7 @@ export default function NewPostScreen() {
               setCaption(value.slice(0, 500));
               setError(null);
             }}
-            placeholder="¿Qué está pasando en la carretera?"
+            placeholder={t('¿Qué está pasando en la carretera?')}
             multiline
             maxLength={500}
             inputStyle={styles.captionInput}
@@ -187,9 +188,9 @@ export default function NewPostScreen() {
                 <Ionicons name="image-outline" size={20} color={colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <AppText variant="bodyStrong">Añadir una foto</AppText>
+                <AppText variant="bodyStrong">{t('Añadir una foto')}</AppText>
                 <AppText variant="caption" color={colors.muted}>
-                  JPG, PNG o WebP · máximo 5 MB
+                  {t('JPG, PNG o WebP · máximo 5 MB')}
                 </AppText>
               </View>
               <Ionicons name="add-circle-outline" size={20} color={colors.muted} />
@@ -197,7 +198,7 @@ export default function NewPostScreen() {
           )}
 
           <AppText variant="label" color={colors.muted} style={{ marginTop: spacing.lg }}>
-            ¿Quién puede verlo?
+            {t('¿Quién puede verlo?')}
           </AppText>
           <View style={styles.visibilityRow}>
             {visibilityOptions.map((option) => {
@@ -230,7 +231,7 @@ export default function NewPostScreen() {
           {error ? <AuthNotice message={error} /> : null}
 
           <Button
-            label={createPost.isPending ? 'Publicando…' : 'Publicar'}
+            label={createPost.isPending ? 'Publicando…' : t('Publicar')}
             icon="send-outline"
             size="lg"
             loading={createPost.isPending}
@@ -242,8 +243,7 @@ export default function NewPostScreen() {
           <View style={styles.footer}>
             <Ionicons name="shield-checkmark-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              No compartas direcciones exactas, placas ni datos personales en una
-              publicación pública.
+              {t('No compartas direcciones exactas, placas ni datos personales en una publicación pública.')}
             </AppText>
           </View>
         </ScrollView>

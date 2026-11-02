@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
 import { checkBackgroundAlerts } from '@/src/lib/background-alerts';
 import { pushLivePosition } from '@/src/lib/live-share';
+import { t } from '@/src/i18n';
 
 const TASK_NAME = 'caravana-background-location';
 // Un fix con más error que esto ensucia la ruta más de lo que aporta.
@@ -20,8 +21,8 @@ const UPDATE_OPTIONS: Location.LocationTaskOptions = {
   pausesUpdatesAutomatically: false,
   showsBackgroundLocationIndicator: true,
   foregroundService: {
-    notificationTitle: 'Caravana está registrando tu ruta',
-    notificationBody: 'Tu viaje se guarda automáticamente. Toca para abrir.',
+    notificationTitle: t('Caravana está registrando tu ruta'),
+    notificationBody: t('Tu viaje se guarda automáticamente. Toca para abrir.'),
     notificationColor: '#FF5A1F',
     // El servicio sigue aunque el usuario cierre la app desde recientes.
     killServiceOnDestroy: false,
@@ -38,8 +39,8 @@ const CONVOY_OPTIONS: Location.LocationTaskOptions = {
   deferredUpdatesInterval: 0,
   foregroundService: {
     ...UPDATE_OPTIONS.foregroundService!,
-    notificationTitle: 'Caravana · convoy en vivo',
-    notificationBody: 'Tu party ve tu posición. Toca para abrir.',
+    notificationTitle: t('Caravana · convoy en vivo'),
+    notificationBody: t('Tu party ve tu posición. Toca para abrir.'),
   },
 };
 
@@ -132,12 +133,12 @@ async function ensureUpdatesRunning() {
 
 export async function startTracking() {
   if (Platform.OS === 'web') {
-    throw new Error('El tracking en segundo plano no está disponible en web.');
+    throw new Error(t('El tracking en segundo plano no está disponible en web.'));
   }
 
   const hasPermission = await requestTrackingPermissions();
   if (!hasPermission) {
-    throw new Error('Necesitamos permiso de ubicación “Siempre” para registrar tus rutas.');
+    throw new Error(t('Necesitamos permiso de ubicación “Siempre” para registrar tus rutas.'));
   }
   await ensureUpdatesRunning();
 }

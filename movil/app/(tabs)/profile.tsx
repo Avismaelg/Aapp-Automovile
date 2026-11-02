@@ -27,13 +27,33 @@ import { useSession } from '@/src/store/session';
 import { useSharing } from '@/src/store/sharing';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
+import { restartApp } from '@/modules/motion';
+import {
+  distanceUnit,
+  getCurrency,
+  getLanguagePreference,
+  saveLanguagePreference,
+  t,
+  type LanguagePreference,
+} from '@/src/i18n';
+
+// Los idiomas se nombran en su propio idioma, para encontrarlos aunque no
+// entiendas el actual.
+const LANGUAGE_NAMES: Record<Exclude<LanguagePreference, 'auto'>, string> = {
+  es: 'Español',
+  en: 'English',
+};
+
+function languageLabel(preference: LanguagePreference) {
+  return preference === 'auto' ? t('Automático') : LANGUAGE_NAMES[preference];
+}
 
 const settings = [
-  { icon: 'lock-closed-outline' as const, label: 'Privacidad y ubicación', value: 'Amigos' },
-  { icon: 'speedometer-outline' as const, label: 'Unidades y moneda', value: 'km · DOP' },
-  { icon: 'notifications-outline' as const, label: 'Notificaciones', value: 'Activadas' },
-  { icon: 'shield-checkmark-outline' as const, label: 'Seguridad', value: '' },
-  { icon: 'help-circle-outline' as const, label: 'Ayuda y soporte', value: '' },
+  { icon: 'lock-closed-outline' as const, label: t('Privacidad y ubicación'), value: t('Amigos') },
+  { icon: 'speedometer-outline' as const, label: t('Unidades y moneda'), value: `${distanceUnit()} · ${getCurrency()}` },
+  { icon: 'notifications-outline' as const, label: t('Notificaciones'), value: t('Activadas') },
+  { icon: 'shield-checkmark-outline' as const, label: t('Seguridad'), value: '' },
+  { icon: 'help-circle-outline' as const, label: t('Ayuda y soporte'), value: '' },
 ];
 
 export default function ProfileScreen() {
@@ -63,7 +83,7 @@ export default function ProfileScreen() {
 
   const shareProfile = async () => {
     await Share.share({
-      message: `Mi perfil de Caravana: ${profileUrl(username)}`,
+      message: t('Mi perfil de Caravana: {0}', profileUrl(username)),
       url: profileUrl(username),
     });
   };
@@ -78,7 +98,7 @@ export default function ProfileScreen() {
       else await stopTracking();
       setTrackingEnabled(next);
     } catch (error) {
-      showError('No se pudo cambiar el tracking', error, 'Revisa los permisos de ubicación.');
+      showError(t('No se pudo cambiar el tracking'), error, t('Revisa los permisos de ubicación.'));
     }
   };
 
@@ -93,14 +113,14 @@ export default function ProfileScreen() {
     }
 
     Alert.alert(
-      isDemo ? 'Salir del modo demo' : 'Cerrar sesión',
+      isDemo ? t('Salir del modo demo') : t('Cerrar sesión'),
       isDemo
-        ? 'Volverás a la pantalla de bienvenida. Los datos de la demo siguen en este dispositivo.'
-        : 'Tendrás que iniciar sesión de nuevo para acceder a tus rutas y tu garaje.',
+        ? t('Volverás a la pantalla de bienvenida. Los datos de la demo siguen en este dispositivo.')
+        : t('Tendrás que iniciar sesión de nuevo para acceder a tus rutas y tu garaje.'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('Cancelar'), style: 'cancel' },
         {
-          text: isDemo ? 'Salir' : 'Cerrar sesión',
+          text: isDemo ? t('Salir') : t('Cerrar sesión'),
           style: 'destructive',
           onPress: () => {
             void leaveSession();
@@ -108,6 +128,26 @@ export default function ProfileScreen() {
         },
       ],
     );
+  };
+
+  const [language, setLanguage] = useState(getLanguagePreference);
+
+  const applyLanguage = (next: LanguagePreference) => {
+    setLanguage(next);
+    if (!saveLanguagePreference(next)) return;
+    // Muchos textos se calculan al arrancar: se reinicia para que todo cambie.
+    if (!restartApp()) {
+      Alert.alert(t('Idioma'), t('Cierra y vuelve a abrir Caravana para ver el nuevo idioma.'));
+    }
+  };
+
+  const chooseLanguage = () => {
+    Alert.alert(t('Idioma'), t('La app se reiniciará con el idioma elegido.'), [
+      { text: `${t('Automático')} (${t('idioma del teléfono')})`, onPress: () => applyLanguage('auto') },
+      { text: LANGUAGE_NAMES.es, onPress: () => applyLanguage('es') },
+      { text: LANGUAGE_NAMES.en, onPress: () => applyLanguage('en') },
+      { text: t('Cancelar'), style: 'cancel' },
+    ]);
   };
 
   const profileSettings = settings.map((setting, index) =>
@@ -146,7 +186,7 @@ export default function ProfileScreen() {
           </AppText>
         ) : null}
         <Button
-          label="Editar perfil"
+          label={t('Editar perfil')}
           variant="secondary"
           size="sm"
           full={false}
@@ -164,21 +204,21 @@ export default function ProfileScreen() {
           label="km"
           align="center"
         />
-        <Stat value={`${stats.hours} h`} label="al volante" align="center" />
+        <Stat value={`${stats.hours} h`} label={t('al volante')} align="center" />
         <Stat value={String(friendEntries.length)} label="amigos" align="center" />
       </View>
 
       <SectionHeader
-        title="Amigos"
-        action={friendEntries.length > 0 ? 'Ver todos' : undefined}
+        title={t('Amigos')}
+        action={friendEntries.length > 0 ? t('Ver todos') : undefined}
         onAction={() => router.push('/friends')}
       />
       {friendEntries.length === 0 ? (
         <Group>
           <Row
             icon="person-add-outline"
-            label="Buscar amigos"
-            detail="Por @usuario o con tu QR"
+            label={t('Buscar amigos')}
+            detail={t('Por @usuario o con tu QR')}
             onPress={() => router.push('/friends')}
           />
         </Group>
@@ -200,14 +240,14 @@ export default function ProfileScreen() {
           <Pressable
             onPress={() => router.push('/friends')}
             accessibilityRole="button"
-            accessibilityLabel="Añadir amigos"
+            accessibilityLabel={t('Añadir amigos')}
             style={styles.friend}
           >
             <View style={styles.friendAdd}>
               <Ionicons name="add" size={22} color={colors.textSoft} />
             </View>
             <AppText variant="caption" color={colors.muted}>
-              Añadir
+              {t('Añadir')}
             </AppText>
           </Pressable>
         </View>
@@ -215,7 +255,7 @@ export default function ProfileScreen() {
 
       {achievements.length > 0 ? (
         <>
-          <SectionHeader title="Logros" />
+          <SectionHeader title={t('Logros')} />
           <Group>
             {achievements.map((achievement, index) => (
               <Row
@@ -230,12 +270,12 @@ export default function ProfileScreen() {
         </>
       ) : null}
 
-      <SectionHeader title="Mi QR" />
+      <SectionHeader title={t('Mi QR')} />
       <Group>
         <Row
           icon="qr-code-outline"
-          label={showQr ? 'Ocultar mi QR' : 'Mostrar mi QR'}
-          detail="Pégalo en el coche para que vean tu perfil"
+          label={showQr ? t('Ocultar mi QR') : t('Mostrar mi QR')}
+          detail={t('Pégalo en el coche para que vean tu perfil')}
           onPress={() => setShowQr((value) => !value)}
           chevron={showQr ? 'chevron-up' : 'chevron-down'}
         />
@@ -251,12 +291,12 @@ export default function ProfileScreen() {
         ) : null}
       </Group>
 
-      <SectionHeader title="Ajustes" />
+      <SectionHeader title={t('Ajustes')} />
       <Group>
         <Row
           icon="navigate-outline"
-          label="Tracking automático"
-          detail="Detecta y guarda tus rutas"
+          label={t('Tracking automático')}
+          detail={t('Detecta y guarda tus rutas')}
           right={
             <Switch
               value={trackingEnabled}
@@ -268,8 +308,8 @@ export default function ProfileScreen() {
         />
         <Row
           icon="people-outline"
-          label="Mi ubicación para amigos"
-          detail="Tus amigos te ven en su mapa"
+          label={t('Mi ubicación para amigos')}
+          detail={t('Tus amigos te ven en su mapa')}
           divider
           right={
             <Switch
@@ -293,42 +333,49 @@ export default function ProfileScreen() {
               } else {
                 Alert.alert(
                   setting.label,
-                  'Esta preferencia estará disponible en una próxima versión.',
+                  t('Esta preferencia estará disponible en una próxima versión.'),
                 );
               }
             }}
           />
         ))}
         <Row
+          icon="language-outline"
+          label={t('Idioma')}
+          value={languageLabel(language)}
+          divider
+          onPress={chooseLanguage}
+        />
+        <Row
           icon="flask-outline"
-          label="Simulador de pruebas"
-          detail="Rutas, aparcamiento y party sin conducir"
+          label={t('Simulador de pruebas')}
+          detail={t('Rutas, aparcamiento y party sin conducir')}
           divider
           onPress={() => router.push('/simulador' as Href)}
         />
       </Group>
 
-      <SectionHeader title="Cuenta" />
+      <SectionHeader title={t('Cuenta')} />
       <Group>
         <Row
           icon={isDemo ? 'phone-portrait-outline' : 'cloud-done-outline'}
-          label={isDemo ? 'Modo demo' : 'Cuenta conectada'}
+          label={isDemo ? t('Modo demo') : t('Cuenta conectada')}
           detail={
             isDemo
-              ? 'Datos solo en este dispositivo. Crea una cuenta para guardarlos en la nube.'
-              : (account?.email ?? 'Sesión local')
+              ? t('Datos solo en este dispositivo. Crea una cuenta para guardarlos en la nube.')
+              : (account?.email ?? t('Sesión local'))
           }
         />
         <Row
           icon="log-out-outline"
-          label={busy ? 'Saliendo…' : isDemo ? 'Salir del modo demo' : 'Cerrar sesión'}
+          label={busy ? 'Saliendo…' : isDemo ? t('Salir del modo demo') : t('Cerrar sesión')}
           divider
           onPress={busy ? undefined : confirmSignOut}
         />
         {!isDemo ? (
           <Row
             icon="trash-outline"
-            label="Eliminar cuenta y datos"
+            label={t('Eliminar cuenta y datos')}
             tone="danger"
             divider
             onPress={() => router.push('/account/delete' as Href)}
@@ -337,7 +384,7 @@ export default function ProfileScreen() {
       </Group>
 
       <AppText variant="caption" color={colors.dim} align="center" style={styles.footer}>
-        Caravana v0.1 · Tu ubicación solo se comparte dentro de una party.
+        {t('Caravana v0.1 · Tu ubicación solo se comparte dentro de una party.')}
       </AppText>
     </Screen>
   );

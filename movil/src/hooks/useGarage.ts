@@ -16,9 +16,10 @@ import { vehicleUrl } from '@/src/lib/qr';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth, type Account } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
+import { t } from '@/src/i18n';
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
-const PHOTO_TOO_LARGE = 'La foto es demasiado grande. Usa una imagen de 8 MB o menos.';
+const PHOTO_TOO_LARGE = t('La foto es demasiado grande. Usa una imagen de 8 MB o menos.');
 
 function ownerOf(account: Account) {
   return { id: account.id, username: account.username, name: account.displayName };
@@ -91,12 +92,12 @@ export function useGarageVehicles() {
 function friendlyGarageError(message: string) {
   const normalized = message.toLowerCase();
   if (normalized.includes('duplicate key')) {
-    return 'Ese vehículo ya existe o hay un conflicto con el vehículo principal.';
+    return t('Ese vehículo ya existe o hay un conflicto con el vehículo principal.');
   }
   if (normalized.includes('row-level security') || normalized.includes('permission')) {
-    return 'Tu sesión no tiene permiso para guardar este vehículo. Vuelve a iniciar sesión.';
+    return t('Tu sesión no tiene permiso para guardar este vehículo. Vuelve a iniciar sesión.');
   }
-  return 'No pudimos guardar el vehículo. Revisa tu conexión e inténtalo de nuevo.';
+  return t('No pudimos guardar el vehículo. Revisa tu conexión e inténtalo de nuevo.');
 }
 
 export type VehiclePhotoSelection = {
@@ -108,7 +109,7 @@ export type VehiclePhotoSelection = {
 export async function pickVehiclePhoto(): Promise<VehiclePhotoSelection | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    throw new Error('Necesitamos permiso para ver tus fotos.');
+    throw new Error(t('Necesitamos permiso para ver tus fotos.'));
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -120,7 +121,7 @@ export async function pickVehiclePhoto(): Promise<VehiclePhotoSelection | null> 
 
   if (result.canceled || result.assets.length === 0) return null;
   const asset = result.assets[0];
-  if (asset.type !== 'image') throw new Error('El archivo elegido no es una imagen.');
+  if (asset.type !== 'image') throw new Error(t('El archivo elegido no es una imagen.'));
   if (asset.fileSize != null && asset.fileSize > MAX_PHOTO_BYTES) {
     throw new Error(PHOTO_TOO_LARGE);
   }
@@ -144,11 +145,11 @@ export function useSetVehiclePhoto() {
         return photo.uri;
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para subir la foto.');
+        throw new Error(t('Inicia sesión para subir la foto.'));
       }
 
       const file = await fetch(photo.uri);
-      if (!file.ok) throw new Error('No pudimos leer la foto elegida.');
+      if (!file.ok) throw new Error(t('No pudimos leer la foto elegida.'));
       const bytes = await file.arrayBuffer();
       if (bytes.byteLength > MAX_PHOTO_BYTES) {
         throw new Error(PHOTO_TOO_LARGE);
@@ -160,7 +161,7 @@ export function useSetVehiclePhoto() {
         .upload(path, bytes, { contentType: photo.mimeType, upsert: true });
 
       if (uploadError) {
-        throw new Error('No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+        throw new Error(t('No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.'));
       }
 
       const { data: publicUrl } = supabase.storage.from('vehicles').getPublicUrl(path);
@@ -171,7 +172,7 @@ export function useSetVehiclePhoto() {
         .eq('owner_id', account.id);
 
       if (updateError) {
-        throw new Error('La foto se subió pero no pudimos guardarla en el vehículo.');
+        throw new Error(t('La foto se subió pero no pudimos guardarla en el vehículo.'));
       }
 
       return publicUrl.publicUrl;
@@ -208,7 +209,7 @@ export function useCreateVehicle() {
       }
 
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para guardar tu vehículo.');
+        throw new Error(t('Inicia sesión para guardar tu vehículo.'));
       }
 
       // El trigger vehicles_single_primary desmarca el principal anterior.
@@ -239,7 +240,7 @@ export function useUpdateVehicle() {
     mutationFn: async ({ vehicleId, input }: { vehicleId: string; input: NewVehicleInput }) => {
       if (demo) {
         const current = useDemoGarage.getState().vehicles.find((item) => item.id === vehicleId);
-        if (!current) throw new Error('No encontramos ese vehículo.');
+        if (!current) throw new Error(t('No encontramos ese vehículo.'));
 
         const updated: Vehicle = { ...current, ...demoVehicleFields(input) };
 
@@ -248,7 +249,7 @@ export function useUpdateVehicle() {
       }
 
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para editar tu vehículo.');
+        throw new Error(t('Inicia sesión para editar tu vehículo.'));
       }
 
       // El trigger vehicles_single_primary desmarca el principal anterior.

@@ -1,0 +1,184 @@
+1160|Your party sees your position. Tap to open.
+1161|Your profile
+1162|Your position is simulated: no trips are recorded and nothing is posted to the party.
+1163|Your position: {0} of {1}
+1164|Your next challenge starts below
+1165|Your session doesn't have permission to save this vehicle. Sign in again.
+1166|Your location is never shared outside a party. You can turn off tracking whenever you want.
+1167|Your location is only shared with the members while you're in the party.
+1168|Your location is only shared with the members while the party is active. When it ends, broadcasting stops and the history is deleted after 30 days.
+1169|Your location is only shared inside a party.
+1170|Your trip is saved automatically. Tap to open.
+1171|Your voice is being shared with the party
+1172|Your friends see you on their map
+1173|Your friends will see your last position on their map, and you'll see theirs if they turn it on too. You can change it in Profile.
+1174|YOU
+1175|Title
+1176|You
+1177|You and
+1178|You and {0} {1} will leave right away towards {2}. The challenge measures arrival, not speed.
+1179|Location
+1180|Approximate location · waiting for permission or GPS signal
+1181|Live location
+1182|A friend
+1183|A friend shared this destination with you. When you accept it, your map will draw the same route on streets.
+1184|A friend invites you to their party
+1185|One profile, all your vehicles and a community that shares the road.
+1186|A driver
+1187|An instant challenge needs 2+ people: you and at least one other driver.
+1188|A route, a photo, a meetup or an idea. Your caravan will see it in the feed.
+1189|Units and currency
+1190|Join
+1191|Join the party
+1192|Join a party
+1193|Joining a real party requires an account.
+1194|Joining…
+1195|Joining…
+1196|Use at least 8 characters.
+1197|Use the real consumption of your
+1198|Uses your real GPS. Pick a test to start.
+1199|Use a year between 1900 and 2100.
+1200|Use a date in YYYY-MM-DD format.
+1201|Use
+1202|Username
+1203|VEHICLE
+1204|VS. PREVIOUS RECORD
+1205|Several minutes stopped and stop-and-go with the phone saying «in vehicle». It shouldn't mark parking.
+1206|Vehicle
+1207|Private vehicle
+1208|Vehicle verified by QR
+1209|Vehicles, maintenance and fill-ups
+1210|Cruise speed (km/h)
+1211|Overdue by {0} km
+1212|See standings
+1213|See the convoy on the map
+1214|See my parked car on the map
+1215|See my public profile
+1216|See party
+1217|See profile
+1218|See owner's profile
+1219|See summary
+1220|See challenge
+1221|See all
+1222|See vehicle
+1223|You'll see your people here.
+1224|You'll see the answer in the Challenges tab.
+1225|Full trip (recorded)
+1226|Longest trip
+1227|Back
+1228|Back to Party
+1229|Back to home
+1230|Back to the vehicle
+1231|You'll return to the welcome screen. The demo data stays on this device.
+1232|Walking back to the car
+1233|Sample voice in demo mode.
+1234|Voice not available
+1235|Voice {0}
+1236|Walkie-talkie with your group
+1237|I've confirmed, sign in
+1238|Already in your party.
+1239|There's already a request or friendship with this person.
+1240|Rivals are ready. You can start.
+1241|You're no longer in that party.
+1242|Already friends
+1243|I already have an account
+1244|Yamaha Center
+1245|Colonial Zone
+1246|next to you
+1247|{0} km away
+1248|{0} m away
+1249|behind the wheel
+1250|nearby
+1251|changed the destination
+1252|changed the convoy's destination
+1253|changed the destination:
+1256|category
+1257|fuel logged
+1258|chooses to share. The live location never appears here.
+1259|distance
+1260|duration
+1261|on Caravana
+1262|in a caravan.
+1263|in total
+1264|energy logged
+1265|set the destination
+1266|set the convoy's destination
+1267|logged spending
+1268|h behind the wheel
+1269|{0} d ago
+1270|{0} h ago
+1271|{0} min ago
+1272|invested in service
+1275|current km
+1276|km together · 1 h 12 min
+1277|km driven
+1281|the finish
+1282|average
+1285|max
+1286|top
+1287|or
+1288|participants
+1289|people are already on the road
+1290|drivers ready
+1291|on WhatsApp while you wait.
+1292|positions
+1293|point A → B
+1294|points
+1295|points).
+1298|no position
+1299|no signal
+1300|invites you to their convoy
+1301|challenges you
+1302|measured stretch
+1303|you
+1304|vehicle
+1305|vehicles
+1307|and confirm your account.
+1308|{0} the challenge. Time: {1}.
+1309|{0} on Caravana{1}{2}\ncaravana://event/{3}
+1310|{0} h {1} min
+1311|{0} km recorded
+1312|{0} will see it instantly. When they accept, they'll appear in your party.
+1313|{0} isn't sharing their location right now
+1314|{0} drivers invited to {1}. Code {2}. Share it so they can join.
+1315|{0} drivers are leaving now for {1}. Share code {2} so they can join.
+1316|{0} got the invitation. When they accept, you'll both see the start and the finish on the map.
+1317|{0} got the invitation. Code {1}. When they accept, you'll be able to start.
+1318|{0} records
+1319|{0} users in {1} parties · you receive {2} of {3} msg/s
+1320|{0} vehicles
+1321|{0} is already in your party.
+1322|{0} {1} by @{2} on Caravana: {3}
+1323|{0} {1} of use
+1324|{0} {1} in total
+1325|{0} {1}{2} of use
+1326|{0} · then {1}
+1327|{0} · finish: {1}
+1328|{0} · {1} km/h
+1329|{0} · {1} participants · code {2}
+1330|{0} · {1}. It's removed from your history and your totals.
+1331|{0}: {1} → {2} ({3} km). Join with {4}
+1332|You won!
+1336| · ETA
+1337| · waiting for their position
+1338| · limit
+1339| · average
+1340| · max
+1341| · vehicle public profile
+1342| · last record
+1343|Where to?
+1344|How much does this route cost?
+1345|Didn't expect this invitation? Block the host from their profile.
+1346|Forget the saved location?
+1347|Let your friends see you on the map?
+1348|Delete this comment?
+1349|Remove {0}?
+1350|Who can see it?
+1351|What's happening on the road?
+1352|Leave now?
+1353|Don't have an account yet?
+1354|Selling it?
+1355|Already have an account?
+1356|LAST SERVICE
+1357|LAST RECORDS
+1358|Latest consumption

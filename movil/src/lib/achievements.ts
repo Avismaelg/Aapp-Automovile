@@ -2,6 +2,7 @@ import type { Ionicons } from '@expo/vector-icons';
 
 import { formatNumber } from '@/src/lib/format';
 import type { Trip, TripTotals } from '@/src/store/trips';
+import { t } from '@/src/i18n';
 
 export type Achievement = {
   id: string;
@@ -34,13 +35,13 @@ export function tripAchievements(
   const list: Achievement[] = [
     {
       id: 'distance',
-      title: `${formatNumber(totalKm, 0)} km grabados`,
-      detail: `${totals.drives} ${totals.drives === 1 ? 'viaje' : 'viajes'} en total`,
+      title: t('{0} km grabados', formatNumber(totalKm, 0)),
+      detail: t('{0} {1} en total', totals.drives, totals.drives === 1 ? 'viaje' : 'viajes'),
       icon: 'map',
     },
     {
       id: 'longest',
-      title: 'Viaje más largo',
+      title: t('Viaje más largo'),
       detail: `${formatNumber(longest.distanceM / 1000, 1)} km`,
       icon: 'navigate',
     },
@@ -48,8 +49,8 @@ export function tripAchievements(
   if (activeDays > 0) {
     list.push({
       id: 'streak',
-      title: 'En ruta',
-      detail: `${activeDays} ${activeDays === 1 ? 'día' : 'días'} con viajes en el último mes`,
+      title: t('En ruta'),
+      detail: activeDays === 1 ? t('1 día con viajes en el último mes') : t('{0} días con viajes en el último mes', activeDays),
       icon: 'calendar',
     });
   }

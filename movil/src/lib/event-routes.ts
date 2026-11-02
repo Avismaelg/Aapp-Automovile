@@ -1,6 +1,7 @@
 import type { EventRoute } from '@/src/lib/events';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
+import { t } from '@/src/i18n';
 
 type RoutePoint = { latitude: number; longitude: number };
 
@@ -20,7 +21,7 @@ export async function fetchRouteThrough(
   signal?: AbortSignal,
 ): Promise<EventRoute> {
   if (points.length < 2) {
-    throw new Error('Añade al menos una salida y una meta.');
+    throw new Error(t('Añade al menos una salida y una meta.'));
   }
 
   const path = points.map((point) => `${point.longitude},${point.latitude}`).join(';');
@@ -33,7 +34,7 @@ export async function fetchRouteThrough(
   const data = (await response.json()) as OsrmResponse;
   const route = data.routes?.[0];
   if (!response.ok || !route) {
-    throw new Error('No pudimos calcular la ruta del evento. Inténtalo de nuevo.');
+    throw new Error(t('No pudimos calcular la ruta del evento. Inténtalo de nuevo.'));
   }
 
   const coordinates = (route.geometry?.coordinates ?? [])
@@ -47,7 +48,7 @@ export async function fetchRouteThrough(
     .map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
 
   if (coordinates.length < 2) {
-    throw new Error('La ruta del evento salió vacía.');
+    throw new Error(t('La ruta del evento salió vacía.'));
   }
 
   return {

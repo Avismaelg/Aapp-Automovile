@@ -4,7 +4,7 @@ import { useEffect, useId } from 'react';
 import { isDemoMode } from '@/src/lib/demo';
 import {
   defaultPartyName,
-  INVITE_TTL_MS,
+  INVITE_FRESH_MS,
   inviteErrorMessage,
   type SentInvite,
 } from '@/src/lib/party-invites';
@@ -12,6 +12,7 @@ import { mapProfileRow, PROFILE_COLUMNS, type ProfileRow, type UserProfile } fro
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { uniqueTopic } from '@/src/lib/shared-subscription';
+import { t } from '@/src/i18n';
 
 export type IncomingPartyInvite = {
   id: string;
@@ -50,7 +51,7 @@ export function useIncomingPartyInvites() {
     retry: false,
     queryFn: async (): Promise<IncomingPartyInvite[]> => {
       if (!account || !supabase) return [];
-      const since = new Date(Date.now() - INVITE_TTL_MS).toISOString();
+      const since = new Date(Date.now() - INVITE_FRESH_MS).toISOString();
       const { data, error } = await supabase
         .from('party_invites')
         .select('id, party_id, inviter_id, invitee_id, party_name, destination_label, status, created_at')
@@ -135,7 +136,7 @@ export function useSentPartyInvites(partyId: string | undefined) {
 // Crea tu party si no tienes ninguna. Entrar en una nueva te saca de la
 // anterior (solo hay una party activa a la vez).
 async function createQuickParty(accountId: string, name: string) {
-  if (!supabase) throw new Error('Supabase no está configurado.');
+  if (!supabase) throw new Error(t('Supabase no está configurado.'));
   const now = new Date().toISOString();
   await supabase
     .from('party_members')
@@ -155,7 +156,7 @@ async function createQuickParty(accountId: string, name: string) {
     })
     .select('id, invite_code')
     .single();
-  if (error) throw new Error('No pudimos crear la party. Inténtalo de nuevo.');
+  if (error) throw new Error(t('No pudimos crear la party. Inténtalo de nuevo.'));
 
   const { error: memberError } = await supabase.from('party_members').insert({
     party_id: data.id,
@@ -165,7 +166,7 @@ async function createQuickParty(accountId: string, name: string) {
   });
   if (memberError) {
     await supabase.from('parties').delete().eq('id', data.id);
-    throw new Error('No pudimos unirte como anfitrión de la party.');
+    throw new Error(t('No pudimos unirte como anfitrión de la party.'));
   }
   return { id: data.id as string, code: data.invite_code as string };
 }
@@ -186,8 +187,8 @@ export function useInviteToParty() {
       userIds: string[];
       myName: string;
     }) => {
-      if (demo) throw new Error('Las invitaciones reales requieren una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para invitar.');
+      if (demo) throw new Error(t('Las invitaciones reales requieren una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para invitar.'));
       const targetParty = partyId ?? (await createQuickParty(account.id, defaultPartyName(myName))).id;
 
       const results = await Promise.all(
@@ -210,7 +211,7 @@ export function useAcceptPartyInvite() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (inviteId: string) => {
-      if (!supabase) throw new Error('Supabase no está configurado.');
+      if (!supabase) throw new Error(t('Supabase no está configurado.'));
       const { error } = await supabase.rpc('accept_party_invite', { p_invite_id: inviteId });
       if (error) throw new Error(inviteErrorMessage(error.message));
     },

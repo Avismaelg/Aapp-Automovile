@@ -5,6 +5,7 @@ import { AppText, Pill } from '@/src/components/ui';
 import type { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { partyVoiceChannels, type PartyVoiceChannelSlug } from '@/src/lib/party';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 type VoiceRoom = ReturnType<typeof useVoiceRoom>;
 
@@ -21,18 +22,18 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
   return (
     <View style={styles.voiceSection}>
       <View style={styles.voiceHeader}>
-        <AppText variant="label" color={colors.muted}>CANALES DE VOZ · 3</AppText>
+        <AppText variant="label" color={colors.muted}>{t('CANALES DE VOZ · 3')}</AppText>
         <Pill
           label={
             isDemo
-              ? 'Demo'
+              ? t('Demo')
               : voice.status === 'connected'
-                ? `Voz ${voice.participantCount}`
+                ? t('Voz {0}', voice.participantCount)
                 : voice.status === 'connecting'
-                  ? 'Conectando'
+                  ? t('Conectando')
                   : voice.status === 'error'
-                    ? 'Sin voz'
-                    : 'Inactivo'
+                    ? t('Sin voz')
+                    : t('Inactivo')
           }
           tone={
             voice.status === 'connected'
@@ -73,7 +74,7 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
                   {channel.name}
                 </AppText>
                 <AppText variant="label" color={selected ? colors.accent : colors.dim} style={{ fontSize: 8 }}>
-                  {channelCount(channel.slug)} EN CANAL
+                  {channelCount(channel.slug)}{' '}{t('EN CANAL')}
                 </AppText>
               </View>
               {selected ? <View style={styles.channelDot} /> : null}
@@ -88,10 +89,10 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
       ) : (
         <AppText variant="caption" color={colors.dim} numberOfLines={1}>
           {isDemo
-            ? 'Voz de ejemplo en modo demo.'
+            ? t('Voz de ejemplo en modo demo.')
             : voice.status === 'connected'
-              ? `PTT real en ${partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy'}.`
-              : 'Conectando el PTT de voz de la party…'}
+              ? t('PTT real en {0}.', partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy')
+              : t('Conectando el PTT de voz de la party…')}
         </AppText>
       )}
     </View>

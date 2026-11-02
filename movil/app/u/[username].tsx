@@ -36,6 +36,7 @@ import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function PublicProfileScreen() {
   const router = useRouter();
@@ -52,8 +53,8 @@ export default function PublicProfileScreen() {
   const isMe = profile?.id === me.id || profile?.username === me.username;
   const name = profile?.displayName ?? '';
   const color = profileColor(handle);
-  const city = profile?.city || 'Santo Domingo, RD';
-  const bio = profile?.bio || 'Rutas de fin de semana, café y buenas curvas.';
+  const city = profile?.city || t('Santo Domingo, RD');
+  const bio = profile?.bio || t('Rutas de fin de semana, café y buenas curvas.');
   const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : null;
   const relation = profile ? relationForTarget(friendEntries, profile.id) : 'none';
   const incomingRequest = friendEntries.find(
@@ -65,7 +66,7 @@ export default function PublicProfileScreen() {
 
   const share = async () => {
     await Share.share({
-      message: `Perfil de ${name} en Caravana: ${profileUrl(handle)}`,
+      message: t('Perfil de {0} en Caravana: {1}', name, profileUrl(handle)),
       url: profileUrl(handle),
     });
   };
@@ -74,7 +75,7 @@ export default function PublicProfileScreen() {
     if (!profile) return;
     setFriendError(null);
     if (isDemo) {
-      setFriendError('Las solicitudes de amistad se activan con una cuenta real.');
+      setFriendError(t('Las solicitudes de amistad se activan con una cuenta real.'));
       return;
     }
 
@@ -86,16 +87,16 @@ export default function PublicProfileScreen() {
       }
     } catch (error) {
       setFriendError(
-        errorMessage(error, 'No pudimos enviar la solicitud.'),
+        errorMessage(error, t('No pudimos enviar la solicitud.')),
       );
     }
   };
 
   const reportProfile = () => {
     Alert.alert(
-      'Reportar perfil',
-      'Si este perfil incumple las normas, guarda el usuario y envía el reporte desde Ayuda y soporte.',
-      [{ text: 'Entendido', style: 'cancel' }],
+      t('Reportar perfil'),
+      t('Si este perfil incumple las normas, guarda el usuario y envía el reporte desde Ayuda y soporte.'),
+      [{ text: t('Entendido'), style: 'cancel' }],
     );
   };
 
@@ -104,7 +105,7 @@ export default function PublicProfileScreen() {
       <SafeAreaView style={styles.notFound} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
         <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
-          Cargando perfil…
+          {t('Cargando perfil…')}
         </AppText>
       </SafeAreaView>
     );
@@ -125,14 +126,13 @@ export default function PublicProfileScreen() {
             <Ionicons name="person-circle-outline" size={36} color={colors.accent} />
           </View>
           <AppText variant="h2" align="center" style={{ marginTop: spacing.lg }}>
-            Este perfil no está disponible
+            {t('Este perfil no está disponible')}
           </AppText>
           <AppText variant="body" color={colors.muted} align="center" style={{ marginTop: 7 }}>
-            Puede que el enlace esté incompleto o que el usuario haya cambiado su
-            privacidad. Los QR de Caravana no muestran datos personales.
+            {t('Puede que el enlace esté incompleto o que el usuario haya cambiado su privacidad. Los QR de Caravana no muestran datos personales.')}
           </AppText>
           <Button
-            label="Volver al inicio"
+            label={t('Volver al inicio')}
             variant="secondary"
             onPress={() => router.replace('/')}
             style={{ marginTop: spacing.xl }}
@@ -150,7 +150,7 @@ export default function PublicProfileScreen() {
       >
         <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
-        <Pill label="Perfil verificado por QR" tone="lime" icon="shield-checkmark" />
+        <Pill label={t('Perfil verificado por QR')} tone="lime" icon="shield-checkmark" />
         <IconButton icon="share-social-outline" onPress={share} />
       </View>
 
@@ -190,31 +190,31 @@ export default function PublicProfileScreen() {
 
           <View style={styles.actions}>
             {isMe ? (
-              <Button label="Compartir mi perfil" icon="share-outline" onPress={share} />
+              <Button label={t('Compartir mi perfil')} icon="share-outline" onPress={share} />
             ) : relation === 'friends' ? (
               <Button
-                label="Ya son amigos"
+                label={t('Ya son amigos')}
                 icon="checkmark-circle-outline"
                 variant="secondary"
                 disabled
               />
             ) : relation === 'outgoing' ? (
               <Button
-                label="Solicitud enviada"
+                label={t('Solicitud enviada')}
                 icon="time-outline"
                 variant="secondary"
                 disabled
               />
             ) : relation === 'incoming' ? (
               <Button
-                label="Aceptar solicitud"
+                label={t('Aceptar solicitud')}
                 icon="person-add-outline"
                 loading={respondFriendRequest.isPending}
                 onPress={addFriend}
               />
             ) : (
               <Button
-                label="Añadir amigo"
+                label={t('Añadir amigo')}
                 icon="person-add-outline"
                 loading={sendFriendRequest.isPending}
                 onPress={addFriend}
@@ -222,21 +222,21 @@ export default function PublicProfileScreen() {
             )}
             {isMe ? (
               <Button
-                label="Editar perfil"
+                label={t('Editar perfil')}
                 variant="secondary"
                 icon="create-outline"
                 onPress={() => router.push('/profile/edit')}
               />
             ) : primaryVehicle ? (
               <Button
-                label="Ver vehículo"
+                label={t('Ver vehículo')}
                 variant="secondary"
                 icon="car-sport-outline"
                 onPress={() => router.push(`/v/${primaryVehicle.qrSlug}`)}
               />
             ) : (
               <Button
-                label="Compartir perfil"
+                label={t('Compartir perfil')}
                 variant="secondary"
                 icon="share-outline"
                 onPress={share}
@@ -254,11 +254,11 @@ export default function PublicProfileScreen() {
       <View style={styles.body}>
         <Card style={styles.stats}>
           <View style={styles.statItem}>
-            <Stat value={String(publicVehicles.length)} label="vehículos" align="center" />
+            <Stat value={String(publicVehicles.length)} label={t('vehículos')} align="center" />
           </View>
           <View style={styles.divider} />
           <View style={styles.statItem}>
-            <Stat value={joinedYear ? String(joinedYear) : '—'} label="en Caravana" align="center" />
+            <Stat value={joinedYear ? String(joinedYear) : '—'} label={t('en Caravana')} align="center" />
           </View>
           <View style={styles.divider} />
           <View style={styles.statItem}>
@@ -274,7 +274,7 @@ export default function PublicProfileScreen() {
         <View style={styles.qrRow}>
           <QRCard
             value={profileUrl(handle)}
-            label="PÚBLICO"
+            label={t('PÚBLICO')}
             caption={`@${handle}`}
             size={118}
           />
@@ -284,14 +284,13 @@ export default function PublicProfileScreen() {
                 <Ionicons name="eye-off-outline" size={18} color={colors.lime} />
               </View>
               <AppText variant="bodyStrong" style={{ marginTop: 8 }}>
-                Privacidad primero
+                {t('Privacidad primero')}
               </AppText>
               <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
-                Solo ves lo que {isMe ? 'tú' : name.split(' ')[0]} decide compartir. La ubicación
-                en vivo nunca aparece aquí.
+                {t('Solo ves lo que')}{' '}{isMe ? t('tú') : name.split(' ')[0]}{' '}{t('decide compartir. La ubicación en vivo nunca aparece aquí.')}
               </AppText>
             </Card>
-            <PressableRow icon="flag-outline" label="Reportar perfil" onPress={reportProfile} />
+            <PressableRow icon="flag-outline" label={t('Reportar perfil')} onPress={reportProfile} />
           </View>
         </View>
 
@@ -313,7 +312,7 @@ export default function PublicProfileScreen() {
                   {primaryVehicle.make} {primaryVehicle.model} {primaryVehicle.year}
                 </AppText>
                 <AppText variant="caption" color={colors.muted}>
-                  {primaryVehicle.nickname} · perfil público del vehículo
+                  {primaryVehicle.nickname}{' '}{t('· perfil público del vehículo')}
                 </AppText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.dim} />
@@ -325,9 +324,9 @@ export default function PublicProfileScreen() {
               <Ionicons name="car-outline" size={24} color={colors.dim} />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText variant="bodyStrong">Sin vehículos públicos</AppText>
+              <AppText variant="bodyStrong">{t('Sin vehículos públicos')}</AppText>
               <AppText variant="caption" color={colors.muted}>
-                El dueño no ha compartido ningún vehículo o su perfil es privado.
+                {t('El dueño no ha compartido ningún vehículo o su perfil es privado.')}
               </AppText>
             </View>
           </Card>
@@ -336,8 +335,7 @@ export default function PublicProfileScreen() {
         <View style={styles.footerNote}>
           <Ionicons name="qr-code-outline" size={15} color={colors.dim} />
           <AppText variant="caption" color={colors.dim} align="center">
-            Escaneaste el QR de {name.split(' ')[0]}. Los perfiles privados solo muestran una
-            tarjeta mínima.
+            {t('Escaneaste el QR de')}{' '}{name.split(' ')[0]}{t('. Los perfiles privados solo muestran una tarjeta mínima.')}
           </AppText>
         </View>
       </View>

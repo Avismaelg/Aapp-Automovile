@@ -5,6 +5,7 @@ import { AppText, Avatar, Card, SectionHeader } from '@/src/components/ui';
 import type { Challenge, ChallengeParticipant } from '@/src/types/models';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export function ChallengeStandings({
   standings,
@@ -15,7 +16,7 @@ export function ChallengeStandings({
 }) {
   return (
     <>
-      <SectionHeader title="Clasificación" action={status === 'live' ? 'En vivo' : undefined} />
+      <SectionHeader title={t('Clasificación')} action={status === 'live' ? t('En vivo') : undefined} />
       <Card style={styles.standingsCard}>
         {standings.map((participant, index) => {
           const kind = vehicleKindMeta[participant.vehicleKind];
@@ -33,7 +34,7 @@ export function ChallengeStandings({
               <View style={styles.standingMain}>
                 <View style={styles.standingNameRow}>
                   <AppText variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {participant.isMe ? 'Tú' : participant.name.split(' ')[0]}
+                    {participant.isMe ? t('Tú') : participant.name.split(' ')[0]}
                   </AppText>
                   <View style={[styles.kindBadge, { borderColor: `${kind.color}55` }]}>
                     <Ionicons name={kind.icon} size={10} color={kind.color} />
@@ -62,7 +63,7 @@ export function ChallengeStandings({
                   {participant.progress}%
                 </AppText>
                 <AppText variant="caption" color={colors.muted}>
-                  {status === 'finished' ? 'llegada' : `ETA ${participant.etaMin} m`}
+                  {status === 'finished' ? 'llegada' : t('ETA {0} m', participant.etaMin)}
                 </AppText>
               </View>
             </View>

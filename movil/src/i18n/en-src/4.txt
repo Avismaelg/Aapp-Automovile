@@ -1,0 +1,210 @@
+950|Log the charge.
+951|Log a service with its next mileage and we'll remind you here.
+952|Log charge
+953|Log fill-up
+954|Retry
+955|Efficiency
+956|Average efficiency: {0}.
+957|Repeat your password
+958|Report profile
+959|Fuel report
+960|Energy report
+961|Fill-up
+962|Fill-up logged
+963|Fill-ups
+964|Fill-ups or charges, consumption and logged spending.
+965|Refuel
+966|Parts, warranty or details
+967|Dominican Republic
+968|Final challenge result
+969|Results
+970|Recent results
+971|Usage summary
+972|Challenge
+973|Challenge {0}
+974|Challenge
+975|Challenge to {0}
+976|Challenge to {0}:
+977|Convoy challenge: {0}
+978|Instant challenge
+979|Caravana challenge
+980|Challenge in progress
+981|Challenge underway
+982|Live challenge
+983|Challenge sent
+984|Challenge sent to
+985|Challenge finished
+986|Challenge started
+987|Challenge pending
+988|An arrival challenge, not a speed one. Respect the limits and the rules. No bets and no top-speed rankings.
+989|Arrival challenge: whoever reaches the convoy's finish first while obeying the law wins.
+990|Arrival challenge: whoever reaches the destination first while obeying the law wins.
+991|Challenge {0} → {1}
+992|Challenges
+993|A → B challenges
+994|Responsible challenges
+995|Check the email and try again.
+996|Check the location permissions.
+997|Check your connection and try again.
+998|Check your connection and try again. Your vehicles are still saved.
+999|Check your email.
+1000|High-voltage battery check
+1001|Rival found
+1002|Rival selected
+1003|Route
+1004|Mountain route, meetup at the waterfront…
+1005|Route to {0}
+1006|Route to destination
+1007|Route shared.
+1008|Route with 2 stops
+1009|Caravana route → {0}\n{1}\nOpen it in the app: {2}
+1010|Mountain route
+1011|Test route (1.5 km)
+1012|Route of {0}
+1013|Route on streets with
+1014|Route {0}: {1}, {2}
+1015|Route, category and 2+ drivers. The room starts as soon as you confirm.
+1016|Routes
+1017|Weekend routes, coffee and good curves.
+1018|Weekend routes, coffee and good curves. Always in a caravan.
+1019|Routes, parking and party without driving
+1020|PUBLIC RECORDS
+1021|Records
+1022|Speed records on highway stretches, public for the whole community. Drive carefully and respect the limits.
+1023|START
+1024|SIMULATION · {0} · {1} km/h{2}
+1025|NO SIGNAL
+1026|Take {0}
+1027|Room created
+1028|Room underway. Accept to join the start.
+1029|Caravana quick room
+1030|Quick room · {0}
+1031|Start
+1032|Convoy start
+1033|Immediate start with 2+ drivers
+1034|Immediate start. Whoever reaches the finish first while respecting traffic limits wins. No prizes for top speed.
+1035|Start, stops and finish on real streets.
+1036|Leave
+1037|Leave now
+1038|Leave now with {0} drivers
+1039|Leave the party
+1040|Leaving a real party requires an account.
+1041|Exit driving mode
+1042|Exit demo mode
+1043|Leave in a party
+1044|Go off route
+1045|Going off route
+1046|Santiago
+1047|Santo Domingo
+1048|Santo Domingo, DR
+1049|Sara
+1050|The following will be permanently deleted:
+1051|They're recorded automatically while you drive. Press and hold one to delete it.
+1052|Follow
+1053|Follow {0}
+1054|Follow or challenge {0}
+1055|Safety
+1056|Service
+1057|Oil and filter service
+1058|Upcoming service
+1059|Local session
+1060|GPS signal lost · showing the last position
+1061|If this profile breaks the rules, save the username and send the report from Help and support.
+1062|If it doesn't arrive in a few minutes, check your spam or promotions folder.
+1063|Go straight
+1064|Following
+1065|Mute the voice
+1066|Simulation
+1067|Simulation ready
+1068|Simulator
+1069|Test simulator
+1070|No bets. No speed rankings. The challenge measures arrival, not recklessness.
+1071|No connection to the search.
+1072|Offline: we couldn't calculate the route. Retrying…
+1073|No destination
+1074|No destination · share only the live caravan
+1075|No destination; pick it later on the map
+1076|No date
+1077|No winner recorded
+1078|No drivers available
+1079|No records
+1080|No records for this vehicle
+1081|No records yet
+1082|No results
+1083|No results. Try another word.
+1084|No results. Try another word.
+1085|No challenge
+1086|No rivals
+1087|No street route
+1088|No records yet. Be the first to set one on this stretch!
+1089|No stretches yet
+1090|No vehicle
+1091|No public vehicles
+1092|No voice
+1093|Requesting location permission…
+1094|Request sent
+1095|Sent requests
+1096|Received requests
+1097|Host only
+1098|Only the owner can generate and share the full sale history.
+1099|Just one more step to get going.
+1100|You can only invite your friends.
+1101|Only your accepted friends see the details.
+1102|You only see what
+1103|Only me
+1104|Supabase isn't configured in this environment yet. The form is ready, but real accounts need the project keys.
+1105|Supabase isn't configured in this environment yet. You can explore the full app in demo mode.
+1106|Supabase isn't configured.
+1107|Supabase isn't configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to turn on real accounts.
+1108|Be the first to comment
+1109|Be the first to share
+1110|Supermarket
+1111|YOU'RE INVITED TO A PARTY
+1112|YOU'RE CHALLENGED TO ARRIVE FIRST
+1113|TIME
+1114|YOUR FRIENDS · ONE TAP TO INVITE
+1115|Shop
+1116|Shop not recorded
+1117|Your posted photos and all data linked to your account on our servers are also deleted.
+1118|Full tank
+1119|Reference rate: home charging or supercharger. Adjust your real price.
+1120|We sent you a confirmation link
+1121|Invites you
+1122|You were invited to this challenge. Accept to join.
+1123|You'll have to sign in again to access your routes and your garage.
+1124|Finish
+1125|End navigation
+1126|End party
+1127|End route
+1128|Tesla Service Center
+1129|Text
+1130|Type
+1131|Service type
+1132|Vehicle type
+1133|Type {0}
+1134|Tap a friend and the invitation arrives instantly
+1135|Check due in {0} km
+1136|Tap a friend or use quick match.
+1137|No events yet
+1138|There are no drivers to challenge yet.
+1139|No routes yet
+1140|Tracking on
+1141|Automatic tracking
+1142|Automatic tracking on
+1143|Automatic tracking paused
+1144|Tracking paused
+1145|Event route path
+1146|Three simulated friends follow you on the map and in the Party tab.
+1147|You
+1148|Your caravan starts here
+1149|Your caravan, your routes and your garage are waiting for you.
+1150|Your parked car ·
+1151|Your car · {0} km
+1152|Your car · {0} m
+1153|Your password
+1154|Your email, phone and location aren't published. The QR only contains your @username or your vehicle's slug.
+1155|Your garage is empty
+1156|Your identity in a QR
+1157|Your identity on the road.
+1158|Your best:
+1159|Your name or nickname

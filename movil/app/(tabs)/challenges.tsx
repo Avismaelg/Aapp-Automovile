@@ -12,19 +12,20 @@ import { RoutePicker } from '@/src/components/challenges/RoutePicker';
 import { colors, radius, spacing } from '@/src/theme';
 import { vehicleCategoryLabel } from '@/src/lib/vehicles';
 import { useChallengeScreen, type ChallengeMode } from '@/src/hooks/useChallengeScreen';
+import { t } from '@/src/i18n';
 
 const modeOptions: { key: ChallengeMode; label: string; icon: keyof typeof Ionicons.glyphMap; detail: string }[] = [
   {
     key: 'instant',
-    label: 'Al momento',
+    label: t('Al momento'),
     icon: 'flash',
-    detail: 'Salida inmediata con 2+ pilotos',
+    detail: t('Salida inmediata con 2+ pilotos'),
   },
   {
     key: 'scheduled',
-    label: 'Programado',
+    label: t('Programado'),
     icon: 'calendar-outline',
-    detail: 'Invita a un rival y espera',
+    detail: t('Invita a un rival y espera'),
   },
 ];
 
@@ -76,23 +77,23 @@ export default function ChallengesScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Retos" subtitle="Desafía a tus amigos en la carretera" />
+      <ScreenHeader title={t('Retos')} subtitle={t('Desafía a tus amigos en la carretera')} />
 
       {challengesLoading ? (
         <View style={styles.syncRow}>
           <ActivityIndicator size="small" color={colors.textSoft} />
-          <AppText variant="caption" color={colors.muted}>Cargando tus retos…</AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Cargando tus retos…')}</AppText>
         </View>
       ) : null}
 
       {challengesError ? (
         <Card style={styles.errorCard}>
-          <AppText variant="bodyStrong">No pudimos cargar tus retos</AppText>
+          <AppText variant="bodyStrong">{t('No pudimos cargar tus retos')}</AppText>
           <AppText variant="caption" color={colors.muted}>
-            Revisa tu conexión y vuelve a intentarlo.
+            {t('Revisa tu conexión y vuelve a intentarlo.')}
           </AppText>
           <Button
-            label="Reintentar"
+            label={t('Reintentar')}
             size="sm"
             variant="secondary"
             onPress={() => void refetchChallenges()}
@@ -103,11 +104,11 @@ export default function ChallengesScreen() {
 
       <View style={styles.matchmakingPillRow}>
         <Pill
-          label={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
+          label={challengeMode === 'instant' ? t('Reto al momento') : t('Modo programado')}
           tone="lime"
           icon={challengeMode === 'instant' ? 'flash' : 'calendar-outline'}
         />
-        <Pill label="Punto A → punto B" tone="neutral" icon="flag-outline" />
+        <Pill label={t('Punto A → punto B')} tone="neutral" icon="flag-outline" />
       </View>
 
       <View style={styles.modeSwitch}>
@@ -169,10 +170,9 @@ export default function ChallengesScreen() {
           <View style={styles.emptyActiveIcon}>
             <Ionicons name="flag-outline" size={24} color={colors.accent} />
           </View>
-          <AppText variant="h2" align="center">Tu próximo reto empieza abajo</AppText>
+          <AppText variant="h2" align="center">{t('Tu próximo reto empieza abajo')}</AppText>
           <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 6 }}>
-            Elige una ruta, una categoría y un piloto. La invitación llega a tu amigo al
-            instante.
+            {t('Elige una ruta, una categoría y un piloto. La invitación llega a tu amigo al instante.')}
           </AppText>
         </Card>
       )}
@@ -183,9 +183,9 @@ export default function ChallengesScreen() {
             <Ionicons name="checkmark" size={18} color="#120802" />
           </View>
           <View style={{ flex: 1 }}>
-            <AppText variant="bodyStrong">Reto enviado a {sentTo.split(' ')[0]}</AppText>
+            <AppText variant="bodyStrong">{t('Reto enviado a')}{' '}{sentTo.split(' ')[0]}</AppText>
             <AppText variant="caption" color={colors.muted}>
-              Comparte el código {active.code} por WhatsApp mientras esperas.
+              {t('Comparte el código')}{' '}{active.code}{' '}{t('por WhatsApp mientras esperas.')}
             </AppText>
           </View>
           <IconButton icon="share-social-outline" size={34} tone="ghost" onPress={shareChallenge} />
@@ -195,14 +195,14 @@ export default function ChallengesScreen() {
       {hasActive ? <ChallengeStandings standings={standings} status={active.status} /> : null}
 
       <SectionHeader
-        title={challengeMode === 'instant' ? 'Reto al momento' : 'Modo programado'}
-        action="Cómo funciona"
+        title={challengeMode === 'instant' ? t('Reto al momento') : t('Modo programado')}
+        action={t('Cómo funciona')}
         onAction={() =>
           Alert.alert(
-            challengeMode === 'instant' ? 'Reto al momento' : 'Cómo funciona',
+            challengeMode === 'instant' ? t('Reto al momento') : t('Cómo funciona'),
             challengeMode === 'instant'
-              ? 'Elige una ruta A → B, una categoría y uno o más pilotos disponibles. Al confirmar, la sala empieza de inmediato con 2+ participantes y gana quien llegue primero a la meta respetando las normas. No se premia la velocidad máxima.'
-              : 'Elige una ruta A → B y una categoría. La app busca un amigo disponible de esa categoría o te deja elegir uno. Al aceptar, ambos comparten progreso y el primero en entrar en la meta gana. No se premia la velocidad máxima.',
+              ? t('Elige una ruta A → B, una categoría y uno o más pilotos disponibles. Al confirmar, la sala empieza de inmediato con 2+ participantes y gana quien llegue primero a la meta respetando las normas. No se premia la velocidad máxima.')
+              : t('Elige una ruta A → B y una categoría. La app busca un amigo disponible de esa categoría o te deja elegir uno. Al aceptar, ambos comparten progreso y el primero en entrar en la meta gana. No se premia la velocidad máxima.'),
           )
         }
       />
@@ -217,12 +217,12 @@ export default function ChallengesScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="title">
-              {challengeMode === 'instant' ? 'Arma la salida ahora' : 'Encuentra tu próximo reto'}
+              {challengeMode === 'instant' ? t('Arma la salida ahora') : t('Encuentra tu próximo reto')}
             </AppText>
             <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
               {challengeMode === 'instant'
-                ? 'Ruta, categoría y 2+ pilotos. La sala arranca en cuanto confirmes.'
-                : 'Elige ruta y categoría. Emparejamos un amigo disponible o eliges tú.'}
+                ? t('Ruta, categoría y 2+ pilotos. La sala arranca en cuanto confirmes.')
+                : t('Elige ruta y categoría. Emparejamos un amigo disponible o eliges tú.')}
             </AppText>
           </View>
         </View>
@@ -237,7 +237,7 @@ export default function ChallengesScreen() {
 
         <View style={styles.friendHeader}>
           <AppText variant="label" color={colors.muted} style={styles.stepLabel}>
-            {challengeMode === 'instant' ? '3 · PILOTOS (2+)' : '3 · RIVAL'}
+            {challengeMode === 'instant' ? t('3 · PILOTOS (2+)') : t('3 · RIVAL')}
           </AppText>
           <Pressable
             onPress={challengeMode === 'instant' ? pickInstantRivals : matchmake}
@@ -257,8 +257,8 @@ export default function ChallengesScreen() {
               {challengeMode === 'scheduled' && matching
                 ? 'BUSCANDO…'
                 : challengeMode === 'instant'
-                  ? 'ELEGIR 2 ALEATORIOS'
-                  : 'EMPAREJAMIENTO RÁPIDO'}
+                  ? t('ELEGIR 2 ALEATORIOS')
+                  : t('EMPAREJAMIENTO RÁPIDO')}
             </AppText>
           </Pressable>
         </View>
@@ -287,10 +287,10 @@ export default function ChallengesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyStrong">
-                    {selectedInstantFriends.length + 1} pilotos listos
+                    {selectedInstantFriends.length + 1}{' '}{t('pilotos listos')}
                   </AppText>
                   <AppText variant="caption" color={colors.muted}>
-                    Tú y {selectedInstantFriends.map((friend) => friend.name.split(' ')[0]).join(', ')}
+                    {t('Tú y')}{' '}{selectedInstantFriends.map((friend) => friend.name.split(' ')[0]).join(', ')}
                   </AppText>
                 </View>
                 <Pill label="2+" tone="lime" icon="people" />
@@ -299,8 +299,7 @@ export default function ChallengesScreen() {
               <View style={styles.instantHint}>
                 <Ionicons name="flash-outline" size={18} color={colors.accent} />
                 <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-                  Elige al menos un piloto para formar una sala de 2+ personas. También puedes usar
-                  “Elegir 2 aleatorios”.
+                  {t('Elige al menos un piloto para formar una sala de 2+ personas. También puedes usar “Elegir 2 aleatorios”.')}
                 </AppText>
               </View>
             )}
@@ -308,8 +307,8 @@ export default function ChallengesScreen() {
             <Button
               label={
                 selectedInstantFriends.length > 0
-                  ? `Salir ahora con ${selectedInstantFriends.length + 1} pilotos`
-                  : 'Elige 2+ pilotos'
+                  ? t('Salir ahora con {0} pilotos', selectedInstantFriends.length + 1)
+                  : t('Elige 2+ pilotos')
               }
               icon="flash"
               onPress={promptInstantStart}
@@ -317,7 +316,7 @@ export default function ChallengesScreen() {
               style={{ marginTop: spacing.md }}
             />
             <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 8 }}>
-              La sala empieza al confirmar. Gana quien llega primero a la meta respetando las normas.
+              {t('La sala empieza al confirmar. Gana quien llega primero a la meta respetando las normas.')}
             </AppText>
           </>
         ) : (
@@ -327,36 +326,36 @@ export default function ChallengesScreen() {
                 <Avatar name={rival.name} color={rival.color} size={42} online />
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyStrong">
-                    {matchedFriend ? 'Rival encontrado' : 'Rival seleccionado'}: {rival.name}
+                    {matchedFriend ? t('Rival encontrado') : t('Rival seleccionado')}: {rival.name}
                   </AppText>
                   <AppText variant="caption" color={colors.muted}>
                     {rival.car} · {vehicleCategoryLabel(rival.vehicleKind)}
                   </AppText>
                 </View>
                 <Pill
-                  label={rival.online ? 'En línea' : 'Disponible'}
+                  label={rival.online ? t('En línea') : t('Disponible')}
                   tone={rival.online ? 'lime' : 'neutral'}
                 />
               </View>
             ) : null}
 
             <Button
-              label={rival ? `Enviar reto a ${rival.name.split(' ')[0]}` : 'Elige un rival'}
+              label={rival ? t('Enviar reto a {0}', rival.name.split(' ')[0]) : t('Elige un rival')}
               icon="flag"
               onPress={sendChallenge}
               disabled={!rival}
               style={{ marginTop: spacing.md }}
             />
             <AppText variant="caption" color={colors.dim} align="center" style={{ marginTop: 8 }}>
-              Sin apuestas. Sin rankings de velocidad. El reto mide llegada, no imprudencia.
+              {t('Sin apuestas. Sin rankings de velocidad. El reto mide llegada, no imprudencia.')}
             </AppText>
           </>
         )}
       </Card>
 
       <SectionHeader
-        title="Resultados recientes"
-        action={isDemo ? 'Ver todos' : recentResults.length ? `${recentResults.length}` : undefined}
+        title={t('Resultados recientes')}
+        action={isDemo ? t('Ver todos') : recentResults.length ? `${recentResults.length}` : undefined}
       />
       <RecentResults results={recentResults} />
 
@@ -365,10 +364,9 @@ export default function ChallengesScreen() {
           <Ionicons name="shield-checkmark" size={20} color={colors.lime} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText variant="bodyStrong">Retos responsables</AppText>
+          <AppText variant="bodyStrong">{t('Retos responsables')}</AppText>
           <AppText variant="caption" color={colors.muted} style={{ marginTop: 3 }}>
-            No fomentamos carreras ilegales ni premiamos la velocidad máxima. Gana quien llega
-            primero cumpliendo los límites y las normas de tránsito.
+            {t('No fomentamos carreras ilegales ni premiamos la velocidad máxima. Gana quien llega primero cumpliendo los límites y las normas de tránsito.')}
           </AppText>
         </View>
       </Card>
@@ -376,7 +374,7 @@ export default function ChallengesScreen() {
       <View style={styles.footer}>
         <Ionicons name="people-outline" size={13} color={colors.dim} />
         <AppText variant="caption" color={colors.dim}>
-          Categorías separadas para coches, motos, EV y camiones.
+          {t('Categorías separadas para coches, motos, EV y camiones.')}
         </AppText>
       </View>
     </Screen>

@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Input, Pill } from '@/src/components/ui';
 import { parseCaravanaUrl } from '@/src/lib/qr';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function ScanScreen() {
         router.push(`/party/${raw.trim().toUpperCase()}`);
         return;
       }
-      Alert.alert('QR no reconocido', 'Asegúrate de que sea un código de Caravana.');
+      Alert.alert(t('QR no reconocido'), t('Asegúrate de que sea un código de Caravana.'));
       return;
     }
 
@@ -90,14 +91,14 @@ export default function ScanScreen() {
         <Pressable style={styles.close} onPress={() => router.back()}>
           <Ionicons name="close" size={22} color={colors.text} />
         </Pressable>
-        <Pill label="Escáner" tone="neutral" icon="scan" />
+        <Pill label={t('Escáner')} tone="neutral" icon="scan" />
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.titleBlock}>
-        <AppText variant="h1">Escanea un QR</AppText>
+        <AppText variant="h1">{t('Escanea un QR')}</AppText>
         <AppText variant="body" color={colors.muted} style={{ marginTop: 4 }}>
-          Perfiles, coches y parties. También puedes escribir el código de una party.
+          {t('Perfiles, coches y parties. También puedes escribir el código de una party.')}
         </AppText>
       </View>
 
@@ -115,12 +116,12 @@ export default function ScanScreen() {
               <Ionicons name="camera-outline" size={34} color={colors.dim} />
               <AppText variant="caption" color={colors.muted} align="center" style={{ marginTop: 8 }}>
                 {Platform.OS === 'web'
-                  ? 'La cámara se activa en el móvil. Usa el código de prueba.'
-                  : 'Necesitamos permiso para usar la cámara.'}
+                  ? t('La cámara se activa en el móvil. Usa el código de prueba.')
+                  : t('Necesitamos permiso para usar la cámara.')}
               </AppText>
               {Platform.OS !== 'web' && permission && !permission.granted ? (
                 <Button
-                  label="Permitir cámara"
+                  label={t('Permitir cámara')}
                   variant="secondary"
                   size="sm"
                   onPress={requestPermission}
@@ -149,23 +150,23 @@ export default function ScanScreen() {
         <View style={styles.scannerBadge}>
           <View style={styles.liveDot} />
           <AppText variant="label" color={colors.textSoft} style={{ fontSize: 9 }}>
-            Apunta al QR del coche o del perfil
+            {t('Apunta al QR del coche o del perfil')}
           </AppText>
         </View>
       </View>
 
       <View style={styles.manualBlock}>
-        <AppText variant="label" color={colors.muted}>O escribe un código</AppText>
+        <AppText variant="label" color={colors.muted}>{t('O escribe un código')}</AppText>
         <View style={styles.manualRow}>
           <Input
             value={manual}
             onChangeText={setManual}
-            placeholder="Ej. RUTA26 o @luis_drives"
+            placeholder={t('Ej. RUTA26 o @luis_drives')}
             autoCapitalize="characters"
             style={{ flex: 1 }}
           />
           <Button
-            label="Abrir"
+            label={t('Abrir')}
             icon="arrow-forward"
             full={false}
             onPress={() => open(manual)}
@@ -178,7 +179,7 @@ export default function ScanScreen() {
         >
           <Ionicons name="sparkles-outline" size={14} color={colors.lime} />
           <AppText variant="caption" color={colors.lime}>
-            Probar con un perfil de ejemplo
+            {t('Probar con un perfil de ejemplo')}
           </AppText>
         </Pressable>
       </View>
@@ -186,7 +187,7 @@ export default function ScanScreen() {
       <View style={styles.footer}>
         <Ionicons name="shield-checkmark-outline" size={13} color={colors.dim} />
         <AppText variant="caption" color={colors.dim} align="center">
-          El QR solo contiene una URL pública. No incluye tu teléfono ni tu ubicación.
+          {t('El QR solo contiene una URL pública. No incluye tu teléfono ni tu ubicación.')}
         </AppText>
       </View>
     </SafeAreaView>

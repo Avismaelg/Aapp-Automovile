@@ -9,6 +9,7 @@ import {
 import { isDemoMode } from '@/src/lib/demo';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 export type FeedPostKind = 'drive' | 'photo' | 'party' | 'achievement' | 'text';
 export type FeedVisibility = 'public' | 'friends' | 'private';
@@ -263,13 +264,13 @@ export function useCreatePost() {
       image?: { uri: string; mimeType: string };
     }) => {
       if (demo) {
-        throw new Error('Publicar en el feed requiere una cuenta real.');
+        throw new Error(t('Publicar en el feed requiere una cuenta real.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para publicar.');
+        throw new Error(t('Inicia sesión para publicar.'));
       }
       if (!input.caption.trim() && !input.image) {
-        throw new Error('Escribe algo o añade una foto antes de publicar.');
+        throw new Error(t('Escribe algo o añade una foto antes de publicar.'));
       }
 
       const { data: post, error } = await supabase
@@ -284,7 +285,7 @@ export function useCreatePost() {
         .single();
 
       if (error || !post) {
-        throw new Error('No pudimos publicar. Inténtalo de nuevo.');
+        throw new Error(t('No pudimos publicar. Inténtalo de nuevo.'));
       }
 
       if (input.image) {
@@ -319,8 +320,8 @@ export function useCreatePost() {
           await supabase.from('posts').delete().eq('id', post.id);
           throw new Error(
             mediaError instanceof Error
-              ? `No pudimos subir la foto: ${mediaError.message}`
-              : 'No pudimos subir la foto.',
+              ? t('No pudimos subir la foto: {0}', mediaError.message)
+              : t('No pudimos subir la foto.'),
           );
         }
       }
@@ -339,10 +340,10 @@ export function useToggleLike() {
   return useMutation({
     mutationFn: async ({ postId, liked }: { postId: string; liked: boolean }) => {
       if (demo) {
-        throw new Error('Los likes necesitan una cuenta real.');
+        throw new Error(t('Los likes necesitan una cuenta real.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para dar me gusta.');
+        throw new Error(t('Inicia sesión para dar me gusta.'));
       }
 
       if (liked) {

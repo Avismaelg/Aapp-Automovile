@@ -1,6 +1,7 @@
 import * as Speech from 'expo-speech';
 import { useEffect, useRef } from 'react';
 
+import { speechLanguage } from '@/src/i18n';
 import { spokenInstruction } from '@/src/lib/route-instructions';
 import type { RouteInstruction } from '@/src/lib/map-html';
 
@@ -38,7 +39,7 @@ export function useVoiceGuidance({
     if (upcoming.icon === 'arrive' && stage === 3) return;
     Speech.stop();
     Speech.speak(spokenInstruction(upcoming.text, upcoming.remainingM), {
-      language: 'es-ES',
+      language: speechLanguage(),
       rate: 1.02,
     });
   }, [enabled, upcoming, speedKmh]);

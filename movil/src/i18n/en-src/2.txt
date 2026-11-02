@@ -1,0 +1,223 @@
+470|Missing drivers
+471|Pharmacy
+472|Feature
+473|Date
+474|Sale sheet
+475|Sale sheet for {0} {1} {2} on Caravana. {3} fill-ups/charges, {4} maintenance records and {5} km logged. Public profile: {6}
+476|Sale sheet and related data
+477|Owner's private sheet
+478|First set the convoy's destination (search it on the map and tap Go): whoever gets there first wins.
+479|HEPA filter and duct cleaning.
+480|Cabin filter
+481|Filters
+482|Finished
+483|End challenge
+485|Photo
+486|Vehicle photo
+487|Brakes
+489|Rear brakes
+490|GPS not available · using demo location
+491|Won
+492|Garage
+493|Gasoline
+494|Gas station
+495|Spending, efficiency and fill-ups
+496|Generating PDF…
+497|Turn right{0}
+498|Turn left{0}
+499|Sharp right{0}
+500|Sharp left{0}
+501|Record your routes with the app closed
+502|Recording route now
+503|Recording route ·
+504|Recording test trip
+505|GraphHopper returned an empty route.
+506|GraphHopper didn't return a valid route.
+507|GraphHopper isn't configured.
+508|GraphHopper · {0} · {1}
+509|Save your first fill-up or charge to see the real consumption.
+510|Saved on the device · pending upload
+511|Saved on this device · pending upload to the cloud.
+512|Save changes
+513|Save charge
+514|Save maintenance
+515|Save fill-up
+516|Save vehicle
+517|{0} MIN AGO
+518|{0} h ago
+519|{0} min ago
+520|You've arrived at
+521|You've arrived at your destination
+522|You've arrived at {0}
+523|You finished {0}
+524|Made for the road
+525|History
+526|Charging history
+527|Maintenance history with date, mileage, shop and cost.
+528|Private history
+529|Honda, Toyota, Tesla…
+530|INVESTED
+531|Identity
+532|Ignore
+533|Just as fast
+534|Total
+535|Idle
+536|Merge{0}
+537|Enter a consumption greater than zero.
+538|Ownership report
+539|Sign in to add friends.
+540|Sign in to delete comments.
+541|Sign in to change channel.
+542|Sign in to comment.
+543|Sign in to share the route.
+544|Sign in to create a challenge.
+545|Sign in to create a party.
+546|Sign in to like.
+547|Sign in to edit your profile.
+548|Sign in to edit your vehicle.
+549|Sign in to send messages.
+550|Sign in to end the challenge.
+551|Sign in to manage your friends.
+552|Sign in to save the fill-up.
+553|Sign in to save maintenance.
+554|Sign in to save your vehicle.
+555|Sign in to start the challenge.
+556|Sign in to invite.
+557|Sign in to post.
+558|Sign in to answer the challenge.
+559|Sign in to answer requests.
+560|Sign in to leave the party.
+561|Sign in to upload the photo.
+562|Sign in to join the party.
+563|Sign in to see the challenge
+564|Start
+565|Start challenge
+566|Sign in
+567|Inspection
+568|Try again from a compatible device.
+569|Try again.
+570|Invite a driver
+571|Invite a rival and wait
+572|Invite at least one other driver.
+573|Invitation
+574|Challenge invitation
+575|Invitation sent
+576|Invitation pending
+577|Invitation declined
+578|Invitation received
+579|Invited
+580|Invite
+581|Invite to my party
+582|Invite {0}
+583|Invite to convoy
+584|Invite friends
+585|Go
+586|Go to Challenges
+587|Go to my parked car
+588|Go to {0}
+589|Go with the convoy
+591|JPG, PNG or WebP · 5 MB max
+596|Kilometers and period of use within Caravana.
+597|Drive kit and rear tire.
+599|LIVE
+601|The bio allows a maximum of 280 characters.
+602|The road is meant to be lived
+603|The password doesn't meet the project's requirements (minimum 6 characters).
+604|The camera turns on on the phone. Use the test code.
+605|The photo is too large. Use an image of 8 MB or less.
+606|The photo was uploaded but we couldn't save it to the vehicle.
+607|The invitation was declined. The other drivers won't be notified.
+608|The party is full.
+609|The party no longer exists.
+610|The plate and odometer are private by default.
+611|The plate and odometer are private. Only the public profile you choose is shared by QR.
+612|The plate and location aren't shown on this profile.
+613|The social network for drivers
+614|The event route came back empty.
+615|The room starts when you confirm. Whoever reaches the finish first while following the rules wins.
+616|The race is on. Share the code with the drivers.
+617|Profile photo upload is coming in the next phase.
+618|Location is shared when you join
+619|Convoy voice isn't turned on yet. The map and chat work the same.
+620|Voice is still connecting. Wait a moment and try again.
+621|Demo friendships can't be removed.
+622|The passwords don't match.
+623|Real invitations require a connected account.
+624|Real parties require a connected account.
+625|Friend requests aren't saved in demo mode.
+626|Friend requests turn on with a real account.
+627|Requests are only visible to the two people involved.
+629|Laura invites you to her convoy
+630|Away from the car
+632|Liters
+633|LiveKit isn't configured. Deploy the livekit-token function and its secrets.
+634|Arrives, parks (the sensor detects you getting out), walks 150 m (blue dot and parked car), comes back and drives off.
+635|Arrival
+636|Arrive first at
+637|You'll reach your stop
+638|Achievement
+639|Achievements
+640|Real comments require an account.
+641|Real convoys require a connected account.
+642|Calculations use real energy consumption.
+643|Calculations use the full-tank method.
+644|Likes need a real account.
+645|Real maintenance requires a connected account.
+646|Maintenance records are private. They're only included in the sale sheet when you share it.
+647|Real challenges require a connected account.
+648|Then
+650|LEADER
+654|MAINTENANCE
+655|FINISH
+656|MEMBERS
+657|MIN
+658|Maintenance
+659|Maintenance up to date
+660|Maintenance due
+661|Keep right{0}
+662|Keep left{0}
+663|Keep its details up to date so the map, consumption and QR are accurate.
+664|Hold to talk
+665|Press and hold to delete it
+666|Caravana map
+667|Shared map, chat and walkie-talkie.
+668|Make
+669|Message to the caravan…
+670|Finish
+671|My QR
+672|My car
+673|My convoy
+674|My Caravana profile: {0}
+675|My location
+676|My location for friends
+677|My friends
+678|My routes
+679|My vehicles
+680|Mixed
+681|Mixed: cars, motorcycles, EVs and trucks compete on arrival. No prizes for top speed.
+682|Model
+683|Driving mode
+684|Demo mode
+685|Demo mode: events are saved on this device.
+686|Demo mode: public records require a connected account. Your best local times appear below.
+687|Local mode on: real accounts are enabled when Supabase is set up. In the demo everything is saved only on this device.
+688|Scheduled mode
+689|Show password
+690|Show my QR
+691|Motorcycle
+693|Motorcycle
+694|Motorcycles: their own category. Full gear and defensive driving.
+695|Electric mobility
+696|Fastest
+697|Maximum {0} points per event.
+698|Mine
+699|At least 8 characters
+701|NEW POST
+702|NEW EVENT
+703|NEW VEHICLE
+704|Navigate to the start
+705|Navigate to the event
+706|Needed to calculate your real consumption between records.
+707|We need “Always” location permission to record your routes.
+708|We need permission to use the camera.
+709|We need permission to see your photos.

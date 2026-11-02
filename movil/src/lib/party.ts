@@ -1,3 +1,4 @@
+import { t } from "@/src/i18n";
 export type PartyDestination = {
   id: string;
   label: string;
@@ -15,21 +16,21 @@ export const partyVoiceChannels: {
 }[] = [
   {
     slug: 'convoy',
-    name: 'Convoy',
-    shortName: 'Convoy',
-    description: 'Coordinación general de la caravana.',
+    name: t('Convoy'),
+    shortName: t('Convoy'),
+    description: t('Coordinación general de la caravana.'),
   },
   {
     slug: 'route',
-    name: 'Ruta',
-    shortName: 'Ruta',
-    description: 'Avisos de tráfico, paradas y navegación.',
+    name: t('Ruta'),
+    shortName: t('Ruta'),
+    description: t('Avisos de tráfico, paradas y navegación.'),
   },
   {
     slug: 'chat',
-    name: 'Charla',
-    shortName: 'Charla',
-    description: 'Conversación distendida del grupo.',
+    name: t('Charla'),
+    shortName: t('Charla'),
+    description: t('Conversación distendida del grupo.'),
   },
 ];
 
@@ -37,31 +38,31 @@ export const partyVoiceChannels: {
 export const partyDestinations: PartyDestination[] = [
   {
     id: 'constanza',
-    label: 'Constanza',
+    label: t('Constanza'),
     latitude: 18.9092,
     longitude: -70.7449,
   },
   {
     id: 'boca-chica',
-    label: 'Boca Chica',
+    label: t('Boca Chica'),
     latitude: 18.4539,
     longitude: -69.61,
   },
   {
     id: 'jarabacoa',
-    label: 'Jarabacoa',
+    label: t('Jarabacoa'),
     latitude: 19.1215,
     longitude: -70.6422,
   },
   {
     id: 'punta-cana',
-    label: 'Punta Cana',
+    label: t('Punta Cana'),
     latitude: 18.582,
     longitude: -68.4055,
   },
   {
     id: 'santiago',
-    label: 'Santiago',
+    label: t('Santiago'),
     latitude: 19.4517,
     longitude: -70.697,
   },

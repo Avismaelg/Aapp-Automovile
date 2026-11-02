@@ -41,6 +41,7 @@ import {
   type PartyVoiceChannelSlug,
 } from '@/src/lib/party';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function PartyScreen() {
   const router = useRouter();
@@ -155,7 +156,7 @@ export default function PartyScreen() {
       return {
         latitude: party.destinationLat,
         longitude: party.destinationLng,
-        label: party.destinationLabel ?? 'Destino',
+        label: party.destinationLabel ?? t('Destino'),
       };
     }
     return null;
@@ -167,7 +168,7 @@ export default function PartyScreen() {
       destination ?? {
         latitude: live.location.latitude,
         longitude: live.location.longitude,
-        label: 'Sin destino',
+        label: t('Sin destino'),
       },
     enabled: Boolean(destination),
   });
@@ -185,21 +186,21 @@ export default function PartyScreen() {
       ? Date.parse(party.startsAt)
       : null;
   const routeStatus = !destination
-    ? 'Sin destino · comparte solo la caravana en vivo'
+    ? t('Sin destino · comparte solo la caravana en vivo')
     : graphHopper.isLoading
-      ? 'Calculando ruta por calles…'
+      ? t('Calculando ruta por calles…')
       : graphHopper.error
-        ? 'No encontramos una calle transitable'
+        ? t('No encontramos una calle transitable')
         : graphHopper.source === 'graphhopper'
-          ? `GraphHopper · ${routeDistance} · ${routeDuration}`
+          ? t('GraphHopper · {0} · {1}', routeDistance, routeDuration)
           : graphHopper.source === 'osrm'
-            ? `Calles OSM · ${routeDistance} · ${routeDuration}`
-            : 'Sin ruta por calles';
-  const partyName = isDemo ? activeParty.name : party?.name ?? 'Party';
+            ? t('Calles OSM · {0} · {1}', routeDistance, routeDuration)
+            : t('Sin ruta por calles');
+  const partyName = isDemo ? activeParty.name : party?.name ?? t('Party');
   const partyCode = isDemo ? activeParty.code : party?.code ?? '';
   const partyDestination = isDemo
     ? activeParty.destination
-    : party?.destinationLabel ?? 'Destino por definir';
+    : party?.destinationLabel ?? t('Destino por definir');
   const memberCount = displayMembers.length;
   const channelCount = (slug: PartyVoiceChannelSlug) =>
     displayMembers.filter((member) => member.voiceChannelSlug === slug).length;
@@ -212,13 +213,13 @@ export default function PartyScreen() {
     try {
       await setVoiceChannel.mutateAsync({ partyId: party.id, channelSlug: slug });
     } catch (error) {
-      showError('No pudimos cambiar de canal', error);
+      showError(t('No pudimos cambiar de canal'), error);
     }
   };
 
   const openInvite = () => {
     if (isDemo && !simParty) {
-      Alert.alert('Invitar', 'Las invitaciones reales requieren una cuenta conectada.');
+      Alert.alert(t('Invitar'), t('Las invitaciones reales requieren una cuenta conectada.'));
       return;
     }
     setInviteOpen(true);
@@ -245,30 +246,30 @@ export default function PartyScreen() {
   // Reto instantáneo de llegada: nunca por velocidad máxima.
   const challengePilots = (title: string, pilots: DisplayMember[]) => {
     if (isDemo) {
-      Alert.alert('Retos', 'Los retos reales requieren una cuenta conectada.');
+      Alert.alert(t('Retos'), t('Los retos reales requieren una cuenta conectada.'));
       return;
     }
     const invitees = pilots
       .filter((member) => !member.isMe)
       .map((member) => ({ userId: member.id, vehicleKind: 'car' as const }));
     if (invitees.length === 0) {
-      Alert.alert('Retos', 'Todavía no hay pilotos a quienes retar.');
+      Alert.alert(t('Retos'), t('Todavía no hay pilotos a quienes retar.'));
       return;
     }
     if (!destination) {
       Alert.alert(
-        'Elige la meta',
-        'Fija primero el destino del convoy (búscalo en el mapa y pulsa Ir): gana quien llegue primero ahí.',
+        t('Elige la meta'),
+        t('Fija primero el destino del convoy (búscalo en el mapa y pulsa Ir): gana quien llegue primero ahí.'),
       );
       return;
     }
     Alert.alert(
       title,
-      'Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.',
+      t('Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('Cancelar'), style: 'cancel' },
         {
-          text: 'Reto',
+          text: t('Reto'),
           style: 'destructive',
           onPress: () => {
             void createChallenge
@@ -276,19 +277,19 @@ export default function PartyScreen() {
                 title: title.replace('Reto a ', 'Reto: '),
                 category: 'mixed',
                 mode: 'instant',
-                fromLabel: 'Salida del convoy',
+                fromLabel: t('Salida del convoy'),
                 toLabel: destination.label,
                 endLat: destination.latitude,
                 endLng: destination.longitude,
                 distanceKm: (graphHopper.route?.distanceM ?? 0) / 1000,
-                rules: 'Por llegada: gana quien llegue primero respetando las leyes.',
+                rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
                 hostVehicleId: primaryVehicle?.id,
                 hostVehicleKind: primaryVehicle?.kind ?? 'car',
                 invitees,
               })
-              .then(() => Alert.alert('Reto enviado', 'Verás la respuesta en la pestaña Retos.'))
+              .then(() => Alert.alert(t('Reto enviado'), t('Verás la respuesta en la pestaña Retos.')))
               .catch((error: unknown) =>
-                showError('Reto', error, 'No pudimos crear el reto.'),
+                showError(t('Reto'), error, t('No pudimos crear el reto.')),
               );
           },
         },
@@ -302,13 +303,13 @@ export default function PartyScreen() {
     const first = member.name.split(' ')[0];
     Alert.alert(member.name, undefined, [
       {
-        text: `Seguir a ${first}`,
+        text: t('Seguir a {0}', first),
         onPress: () => {
           const real = party?.members.find((item) => item.userId === member.id);
           if (real && (real.lastLat == null || real.lastLng == null)) {
             Alert.alert(
-              `${first} no comparte su ubicación ahora`,
-              'Cuando abra la app y se mueva, podrás seguirle.',
+              t('{0} no comparte su ubicación ahora', first),
+              t('Cuando abra la app y se mueva, podrás seguirle.'),
             );
             return;
           }
@@ -316,8 +317,8 @@ export default function PartyScreen() {
           router.replace('/');
         },
       },
-      { text: `Retar a ${first}`, onPress: () => challengePilots(`Reto a ${first}`, [member]) },
-      { text: 'Cancelar', style: 'cancel' },
+      { text: t('Retar a {0}', first), onPress: () => challengePilots(t('Reto a {0}', first), [member]) },
+      { text: t('Cancelar'), style: 'cancel' },
     ]);
   };
 
@@ -332,7 +333,7 @@ export default function PartyScreen() {
         await leaveParty.mutateAsync({ partyId: party.id, isHost: party.isHost });
         router.replace('/');
       } catch (error) {
-        showError('No pudimos salir', error);
+        showError(t('No pudimos salir'), error);
       }
     };
 
@@ -342,13 +343,13 @@ export default function PartyScreen() {
     }
 
     Alert.alert(
-      party.isHost ? 'Terminar party' : 'Salir de la party',
+      party.isHost ? t('Terminar party') : t('Salir de la party'),
       party.isHost
-        ? 'Como anfitrión, terminarás la caravana para todos.'
-        : 'Dejarás de compartir tu ubicación y el chat.',
+        ? t('Como anfitrión, terminarás la caravana para todos.')
+        : t('Dejarás de compartir tu ubicación y el chat.'),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: party.isHost ? 'Terminar' : 'Salir', style: 'destructive', onPress: () => void perform() },
+        { text: t('Cancelar'), style: 'cancel' },
+        { text: party.isHost ? t('Terminar') : t('Salir'), style: 'destructive', onPress: () => void perform() },
       ],
     );
   };
@@ -358,7 +359,7 @@ export default function PartyScreen() {
       <Screen>
         <View style={styles.state}>
           <ActivityIndicator color={colors.textSoft} />
-          <AppText variant="caption" color={colors.muted}>Cargando party…</AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Cargando party…')}</AppText>
         </View>
       </Screen>
     );
@@ -369,12 +370,12 @@ export default function PartyScreen() {
       <Screen>
         <View style={styles.state}>
           <Ionicons name="radio-outline" size={32} color={colors.dim} />
-          <AppText variant="h2" align="center">No pudimos cargar la party</AppText>
+          <AppText variant="h2" align="center">{t('No pudimos cargar la party')}</AppText>
           <AppText variant="caption" color={colors.muted} align="center">
-            Revisa tu conexión y vuelve a intentarlo.
+            {t('Revisa tu conexión y vuelve a intentarlo.')}
           </AppText>
           <Button
-            label="Reintentar"
+            label={t('Reintentar')}
             variant="secondary"
             onPress={() => void refetch()}
             style={{ marginTop: spacing.md }}
@@ -392,9 +393,9 @@ export default function PartyScreen() {
     if (!isDemo) {
       if (voice.status !== 'connected') {
         Alert.alert(
-          'Voz no disponible',
+          t('Voz no disponible'),
           voice.error ??
-            'La voz todavía se está conectando. Espera un momento e inténtalo de nuevo.',
+            t('La voz todavía se está conectando. Espera un momento e inténtalo de nuevo.'),
         );
         return;
       }
@@ -428,7 +429,7 @@ export default function PartyScreen() {
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
           <IconButton icon="chevron-down" size={40} onPress={() => router.replace('/')} />
-          <Pill label="Party en vivo" tone="danger" icon="radio" />
+          <Pill label={t('Party en vivo')} tone="danger" icon="radio" />
           <View style={styles.topActions}>
             <IconButton
               icon="locate"
@@ -459,7 +460,7 @@ export default function PartyScreen() {
 
         <View style={styles.sheetHeader}>
           <View style={{ flex: 1 }}>
-            <AppText variant="title">Caravana en curso</AppText>
+            <AppText variant="title">{t('Caravana en curso')}</AppText>
             <View style={styles.metaRow}>
               <ElapsedClock since={elapsedSince} />
               <View style={styles.metaDot} />
@@ -473,7 +474,7 @@ export default function PartyScreen() {
               {partyCode ? (
                 <>
                   <View style={styles.metaDot} />
-                  <Pressable onPress={openInvite} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Código ${partyCode}`}>
+                  <Pressable onPress={openInvite} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('Código {0}', partyCode)}>
                     <AppText variant="caption" color={colors.text} style={styles.codeText}>
                       {partyCode}
                     </AppText>
@@ -487,7 +488,7 @@ export default function PartyScreen() {
             onPress={openInvite}
           >
             <Ionicons name="person-add-outline" size={15} color={colors.text} />
-            <AppText variant="bodyStrong" style={{ fontSize: 13 }}>Invitar</AppText>
+            <AppText variant="bodyStrong" style={{ fontSize: 13 }}>{t('Invitar')}</AppText>
           </Pressable>
         </View>
 
@@ -498,7 +499,7 @@ export default function PartyScreen() {
         />
 
         <Button
-          label="Ver el convoy en el mapa"
+          label={t('Ver el convoy en el mapa')}
           variant="secondary"
           size="sm"
           icon="navigate-outline"
@@ -522,25 +523,25 @@ export default function PartyScreen() {
         <View style={styles.bottomActions}>
           <Pressable style={styles.bottomAction} onPress={() => router.push('/party/chat')}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
-            <AppText variant="caption" color={colors.textSoft}>Chat</AppText>
+            <AppText variant="caption" color={colors.textSoft}>{t('Chat')}</AppText>
           </Pressable>
           <Pressable
             style={styles.bottomAction}
             onPress={openInvite}
           >
             <Ionicons name="qr-code-outline" size={19} color={colors.text} />
-            <AppText variant="caption" color={colors.textSoft}>Código</AppText>
+            <AppText variant="caption" color={colors.textSoft}>{t('Código')}</AppText>
           </Pressable>
           <Pressable
             style={styles.bottomAction}
-            onPress={() => challengePilots(`Reto al convoy: ${partyName}`, displayMembers)}
+            onPress={() => challengePilots(t('Reto al convoy: {0}', partyName), displayMembers)}
           >
             <Ionicons name="flag-outline" size={19} color={colors.text} />
-            <AppText variant="caption" color={colors.textSoft}>Retar</AppText>
+            <AppText variant="caption" color={colors.textSoft}>{t('Retar')}</AppText>
           </Pressable>
           <Pressable style={styles.leaveAction} onPress={() => void leave()}>
             <Ionicons name="exit-outline" size={18} color={colors.danger} />
-            <AppText variant="caption" color={colors.danger}>Salir</AppText>
+            <AppText variant="caption" color={colors.danger}>{t('Salir')}</AppText>
           </Pressable>
         </View>
 

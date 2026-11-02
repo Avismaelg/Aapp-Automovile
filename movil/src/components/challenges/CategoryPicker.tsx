@@ -5,13 +5,14 @@ import { AppText } from '@/src/components/ui';
 import type { ChallengeCategory } from '@/src/types/models';
 import { vehicleKindMeta, vehicleKinds } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const categoryOptions: {
   key: ChallengeCategory;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: 'mixed', label: 'Mixto', icon: 'shuffle' },
+  { key: 'mixed', label: t('Mixto'), icon: 'shuffle' },
   ...vehicleKinds.map((kind) => ({
     key: kind,
     label: vehicleKindMeta[kind].shortLabel,
@@ -20,11 +21,11 @@ const categoryOptions: {
 ];
 
 const categoryNotes: Record<ChallengeCategory, string> = {
-  mixed: 'Mixto: coches, motos, EV y camiones compiten por llegada. Sin premios por velocidad máxima.',
-  ev: 'EV: cuenta la autonomía y las paradas de carga. La batería forma parte del reto.',
-  truck: 'Camiones: categoría propia, con límites de peso y conducción profesional.',
-  motorcycle: 'Motos: categoría propia. Equipo completo y conducción defensiva.',
-  car: 'Coches: categoría propia. Gana quien llega primero respetando las normas.',
+  mixed: t('Mixto: coches, motos, EV y camiones compiten por llegada. Sin premios por velocidad máxima.'),
+  ev: t('EV: cuenta la autonomía y las paradas de carga. La batería forma parte del reto.'),
+  truck: t('Camiones: categoría propia, con límites de peso y conducción profesional.'),
+  motorcycle: t('Motos: categoría propia. Equipo completo y conducción defensiva.'),
+  car: t('Coches: categoría propia. Gana quien llega primero respetando las normas.'),
 };
 
 export function CategoryPicker({
@@ -36,7 +37,7 @@ export function CategoryPicker({
 }) {
   return (
     <>
-      <AppText variant="label" color={colors.muted} style={styles.stepLabel}>2 · CATEGORÍA</AppText>
+      <AppText variant="label" color={colors.muted} style={styles.stepLabel}>{t('2 · CATEGORÍA')}</AppText>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

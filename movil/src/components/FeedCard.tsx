@@ -8,6 +8,7 @@ import { AppText, Avatar, Card, Pill } from '@/src/components/ui';
 import type { FeedItem } from '@/src/types/models';
 import { timeAgo } from '@/src/lib/format';
 import { colors, radius, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 function MiniRoute({ seed = 1 }: { seed?: number }) {
   const paths = [
@@ -26,7 +27,7 @@ function MiniRoute({ seed = 1 }: { seed?: number }) {
       <View style={styles.routeTag}>
         <Ionicons name="navigate" size={10} color={colors.textSoft} />
         <AppText variant="label" style={{ fontSize: 8 }}>
-          RUTA
+          {t('RUTA')}
         </AppText>
       </View>
     </View>
@@ -102,23 +103,23 @@ export function FeedCard({ item }: { item: FeedItem }) {
                 </AppText>
               ) : null}
             </View>
-            <Pill label="Automático" tone="lime" icon="flash" />
+            <Pill label={t('Automático')} tone="lime" icon="flash" />
           </View>
           <MiniRoute seed={item.routeSeed} />
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <AppText variant="h3">{item.distanceKm} km</AppText>
-              <AppText variant="caption" color={colors.muted}>distancia</AppText>
+              <AppText variant="h3">{formatKmValue(item.distanceKm, 1)}</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('distancia')}</AppText>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <AppText variant="h3">{item.durationMin} min</AppText>
-              <AppText variant="caption" color={colors.muted}>duración</AppText>
+              <AppText variant="h3">{item.durationMin}{' '}{t('min')}</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('duración')}</AppText>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <AppText variant="h3">{item.avgSpeed} km/h</AppText>
-              <AppText variant="caption" color={colors.muted}>media</AppText>
+              <AppText variant="h3">{item.avgSpeed}{' '}{t('km/h')}</AppText>
+              <AppText variant="caption" color={colors.muted}>{t('media')}</AppText>
             </View>
           </View>
         </View>
@@ -143,12 +144,12 @@ export function FeedCard({ item }: { item: FeedItem }) {
           style={styles.partyCard}
         >
           <View style={styles.partyTop}>
-            <Pill label="Party finalizada" tone="accent" icon="radio" />
-            <AppText variant="caption" color={colors.muted}>7 coches</AppText>
+            <Pill label={t('Party finalizada')} tone="accent" icon="radio" />
+            <AppText variant="caption" color={colors.muted}>{t('7 coches')}</AppText>
           </View>
           <AppText variant="h2" style={{ marginTop: 10 }}>{item.title}</AppText>
           <AppText variant="caption" color={colors.muted}>
-            {item.distanceKm} km juntos · 1 h 12 min
+            {item.distanceKm}{' '}{t('km juntos · 1 h 12 min')}
           </AppText>
           <View style={styles.partyBottom}>
             <View style={styles.stack}>
@@ -158,7 +159,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
             </View>
             <View style={styles.partyLink}>
               <Ionicons name="play-circle" size={15} color={colors.accent} />
-              <AppText variant="label" color={colors.accent}>Ver resumen</AppText>
+              <AppText variant="label" color={colors.accent}>{t('Ver resumen')}</AppText>
             </View>
           </View>
         </LinearGradient>

@@ -1,4 +1,5 @@
 import type { RouteInstruction, RouteInstructionIcon } from '@/src/lib/map-html';
+import { formatManeuverDistance, t } from '@/src/i18n';
 
 type LatLng = [number, number];
 
@@ -99,32 +100,32 @@ function textFromIcon(
   road: string | undefined,
   exit?: number,
 ) {
-  const suffix = road ? ` por ${road}` : '';
+  const suffix = road ? t(' por {0}', road) : '';
   switch (icon) {
     case 'arrive':
-      return 'Has llegado a tu destino';
+      return t('Has llegado a tu destino');
     case 'depart':
-      return road ? `Sal por ${road}` : 'Comienza tu ruta';
+      return road ? t('Sal por {0}', road) : t('Comienza tu ruta');
     case 'left':
-      return `Gira a la izquierda${suffix}`;
+      return t('Gira a la izquierda{0}', suffix);
     case 'right':
-      return `Gira a la derecha${suffix}`;
+      return t('Gira a la derecha{0}', suffix);
     case 'slight-left':
-      return `Mantente a la izquierda${suffix}`;
+      return t('Mantente a la izquierda{0}', suffix);
     case 'slight-right':
-      return `Mantente a la derecha${suffix}`;
+      return t('Mantente a la derecha{0}', suffix);
     case 'sharp-left':
-      return `Giro cerrado a la izquierda${suffix}`;
+      return t('Giro cerrado a la izquierda{0}', suffix);
     case 'sharp-right':
-      return `Giro cerrado a la derecha${suffix}`;
+      return t('Giro cerrado a la derecha{0}', suffix);
     case 'uturn':
-      return 'Da la vuelta';
+      return t('Da la vuelta');
     case 'roundabout':
-      return exit ? `En la rotonda, toma la salida ${exit}` : 'Continúa por la rotonda';
+      return exit ? t('En la rotonda, toma la salida {0}', exit) : t('Continúa por la rotonda');
     case 'merge':
-      return `Incorpórate a la vía${suffix}`;
+      return t('Incorpórate a la vía{0}', suffix);
     default:
-      return road ? `Continúa recto por ${road}` : 'Continúa recto';
+      return road ? t('Continúa recto por {0}', road) : t('Continúa recto');
   }
 }
 
@@ -164,7 +165,7 @@ export function instructionsFromOsrm(steps: OsrmStep[]): RouteInstruction[] {
     .filter((item, index) => item.icon !== 'depart' || index === 0);
 }
 
-export const STOP_TEXT = 'Llegas a tu parada';
+export const STOP_TEXT = t('Llegas a tu parada');
 
 type GraphHopperInstruction = {
   text?: string;
@@ -207,12 +208,8 @@ export function instructionsFromGraphHopper(
 }
 
 export function formatInstructionDistance(meters: number) {
-  if (!Number.isFinite(meters) || meters <= 0) return 'ahora';
-  if (meters < 1000) {
-    const rounded = meters < 100 ? Math.max(10, Math.round(meters / 10) * 10) : Math.round(meters / 50) * 50;
-    return `${rounded} m`;
-  }
-  return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+  if (!Number.isFinite(meters) || meters <= 0) return t('ahora');
+  return formatManeuverDistance(meters);
 }
 
 // Próxima maniobra a ejecutar y cuánto falta para ella.
@@ -245,7 +242,19 @@ export function followingInstruction(
 }
 
 // Texto que se dice en voz alta según lo que falta para la maniobra.
+// La distancia como se pronuncia: «300 metros», «1,5 kilómetros», «500 feet».
+function spokenDistance(meters: number) {
+  const [value, unit] = formatInstructionDistance(meters).split(' ');
+  const words: Record<string, string> = {
+    m: t('metros'),
+    km: t('kilómetros'),
+    ft: t('pies'),
+    mi: t('millas'),
+  };
+  return unit ? `${value} ${words[unit] ?? unit}` : value;
+}
+
 export function spokenInstruction(text: string, remainingM: number) {
   if (remainingM <= 60) return text;
-  return `En ${formatInstructionDistance(remainingM).replace(' m', ' metros').replace(' km', ' kilómetros')}, ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+  return t('En {0}, {1}{2}', spokenDistance(remainingM), text.charAt(0).toLowerCase(), text.slice(1));
 }

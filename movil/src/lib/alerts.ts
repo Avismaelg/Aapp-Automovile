@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
+import { t } from '@/src/i18n';
 
-export function errorMessage(error: unknown, fallback = 'Inténtalo de nuevo.') {
+export function errorMessage(error: unknown, fallback = t('Inténtalo de nuevo.')) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 

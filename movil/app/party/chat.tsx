@@ -19,6 +19,7 @@ import { errorMessage } from '@/src/lib/alerts';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export default function PartyChatScreen() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function PartyChatScreen() {
       setBody('');
     } catch (sendError) {
       setError(
-        errorMessage(sendError, 'No pudimos enviar el mensaje.'),
+        errorMessage(sendError, t('No pudimos enviar el mensaje.')),
       );
     }
   };
@@ -55,15 +56,15 @@ export default function PartyChatScreen() {
         <View style={styles.header}>
           <IconButton icon="chevron-down" size={40} onPress={goBack} />
           <View style={{ flex: 1 }}>
-            <AppText variant="label" color={colors.accent}>PARTY · CHAT</AppText>
+            <AppText variant="label" color={colors.accent}>{t('PARTY · CHAT')}</AppText>
             <AppText variant="title" numberOfLines={1}>
-              {isDemo ? 'Caravana de domingo' : party?.name ?? 'Chat'}
+              {isDemo ? t('Caravana de domingo') : party?.name ?? t('Chat')}
             </AppText>
           </View>
           <View style={styles.livePill}>
             <View style={styles.liveDot} />
             <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
-              EN VIVO
+              {t('EN VIVO')}
             </AppText>
           </View>
         </View>
@@ -71,7 +72,7 @@ export default function PartyChatScreen() {
         {isDemo ? (
           <AuthNotice
             tone="info"
-            message="Estás en modo demo: el chat real se activa con una cuenta. El PTT de voz llegará con LiveKit."
+            message={t('Estás en modo demo: el chat real se activa con una cuenta. El PTT de voz llegará con LiveKit.')}
           />
         ) : null}
 
@@ -80,21 +81,21 @@ export default function PartyChatScreen() {
         {partyLoading || isLoading ? (
           <View style={styles.state}>
             <ActivityIndicator color={colors.accent} />
-            <AppText variant="caption" color={colors.muted}>Cargando mensajes…</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('Cargando mensajes…')}</AppText>
           </View>
         ) : isError ? (
           <Card style={styles.stateCard}>
-            <AppText variant="bodyStrong">No pudimos cargar el chat</AppText>
-            <Button label="Reintentar" variant="secondary" onPress={() => void refetch()} />
+            <AppText variant="bodyStrong">{t('No pudimos cargar el chat')}</AppText>
+            <Button label={t('Reintentar')} variant="secondary" onPress={() => void refetch()} />
           </Card>
         ) : !party && !isDemo ? (
           <Card style={styles.stateCard}>
             <Ionicons name="chatbubble-outline" size={28} color={colors.dim} />
-            <AppText variant="title" align="center">No hay party activa</AppText>
+            <AppText variant="title" align="center">{t('No hay party activa')}</AppText>
             <AppText variant="caption" color={colors.muted} align="center">
-              Crea o únete a una party para abrir el chat de la caravana.
+              {t('Crea o únete a una party para abrir el chat de la caravana.')}
             </AppText>
-            <Button label="Volver a Party" variant="secondary" onPress={goBack} />
+            <Button label={t('Volver a Party')} variant="secondary" onPress={goBack} />
           </Card>
         ) : (
           <ScrollView
@@ -107,9 +108,9 @@ export default function PartyChatScreen() {
                 <View style={styles.emptyIcon}>
                   <Ionicons name="chatbubbles-outline" size={24} color={colors.accent} />
                 </View>
-                <AppText variant="title" align="center">El chat está libre</AppText>
+                <AppText variant="title" align="center">{t('El chat está libre')}</AppText>
                 <AppText variant="caption" color={colors.muted} align="center">
-                  Escribe el primer mensaje para coordinar la caravana.
+                  {t('Escribe el primer mensaje para coordinar la caravana.')}
                 </AppText>
               </View>
             ) : (
@@ -157,7 +158,7 @@ export default function PartyChatScreen() {
               setBody(value.slice(0, 500));
               setError(null);
             }}
-            placeholder={isDemo ? 'El chat real requiere cuenta' : 'Mensaje para la caravana…'}
+            placeholder={isDemo ? t('El chat real requiere cuenta') : t('Mensaje para la caravana…')}
             multiline
             maxLength={500}
             editable={!isDemo && Boolean(party)}

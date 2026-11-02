@@ -11,6 +11,7 @@ import { isDemoMode } from '@/src/lib/demo';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { uniqueTopic } from '@/src/lib/shared-subscription';
+import { t } from '@/src/i18n';
 
 export type PostComment = {
   id: string;
@@ -34,7 +35,7 @@ function fallbackProfile(id: string): UserProfile {
   return {
     id,
     username: 'piloto',
-    displayName: 'Piloto',
+    displayName: t('Piloto'),
     bio: '',
     city: '',
     countryCode: 'DO',
@@ -128,9 +129,9 @@ export function useAddComment() {
 
   return useMutation({
     mutationFn: async ({ postId, body }: { postId: string; body: string }) => {
-      if (demo) throw new Error('Los comentarios reales requieren una cuenta.');
-      if (!supabase || !account) throw new Error('Inicia sesión para comentar.');
-      if (!body.trim()) throw new Error('Escribe un comentario.');
+      if (demo) throw new Error(t('Los comentarios reales requieren una cuenta.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para comentar.'));
+      if (!body.trim()) throw new Error(t('Escribe un comentario.'));
 
       const { error } = await supabase.from('comments').insert({
         post_id: postId,
@@ -138,7 +139,7 @@ export function useAddComment() {
         body: body.trim(),
       });
 
-      if (error) throw new Error('No pudimos publicar el comentario.');
+      if (error) throw new Error(t('No pudimos publicar el comentario.'));
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['comments', variables.postId] });
@@ -155,11 +156,11 @@ export function useDeleteComment() {
 
   return useMutation({
     mutationFn: async ({ id, postId }: { id: string; postId: string }) => {
-      if (demo) throw new Error('Los comentarios reales requieren una cuenta.');
-      if (!supabase || !account) throw new Error('Inicia sesión para borrar comentarios.');
+      if (demo) throw new Error(t('Los comentarios reales requieren una cuenta.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para borrar comentarios.'));
 
       const { error } = await supabase.from('comments').delete().eq('id', id);
-      if (error) throw new Error('No pudimos borrar el comentario.');
+      if (error) throw new Error(t('No pudimos borrar el comentario.'));
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['comments', variables.postId] });

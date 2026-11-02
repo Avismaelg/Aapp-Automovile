@@ -5,6 +5,7 @@ import type { MaintenanceKind, MaintenanceRecord } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 type MaintenanceRow = {
   id: string;
@@ -28,7 +29,7 @@ function mapMaintenanceRow(row: MaintenanceRow): MaintenanceRecord {
     date: row.service_date,
     odometerKm: Number(row.odometer_km),
     cost: Number(row.cost),
-    shop: row.shop?.trim() || 'Taller no registrado',
+    shop: row.shop?.trim() || t('Taller no registrado'),
     notes: row.notes ?? undefined,
     nextKm: row.next_km == null ? undefined : Number(row.next_km),
   };
@@ -84,10 +85,10 @@ export function useAddMaintenance() {
   return useMutation({
     mutationFn: async (input: NewMaintenanceInput): Promise<MaintenanceRecord> => {
       if (demo) {
-        throw new Error('Los mantenimientos reales requieren una cuenta conectada.');
+        throw new Error(t('Los mantenimientos reales requieren una cuenta conectada.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para guardar mantenimientos.');
+        throw new Error(t('Inicia sesión para guardar mantenimientos.'));
       }
 
       const { data, error } = await supabase
@@ -108,7 +109,7 @@ export function useAddMaintenance() {
         .single();
 
       if (error) {
-        throw new Error('No pudimos guardar el mantenimiento. Inténtalo de nuevo.');
+        throw new Error(t('No pudimos guardar el mantenimiento. Inténtalo de nuevo.'));
       }
 
       return mapMaintenanceRow(data as MaintenanceRow);

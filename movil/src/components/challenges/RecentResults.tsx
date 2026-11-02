@@ -5,6 +5,7 @@ import { AppText, Card, Pill } from '@/src/components/ui';
 import type { ChallengeCategory } from '@/src/types/models';
 import { vehicleCategoryLabel } from '@/src/lib/vehicles';
 import { colors, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 export type RecentResult = {
   id: string;
@@ -24,7 +25,7 @@ export function RecentResults({ results }: { results: RecentResult[] }) {
     <Card style={styles.emptyHistory}>
       <Ionicons name="trophy-outline" size={21} color={colors.dim} />
       <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-        Aún no hay retos finalizados. Cuando cierres uno, el resultado quedará aquí.
+        {t('Aún no hay retos finalizados. Cuando cierres uno, el resultado quedará aquí.')}
       </AppText>
     </Card>
   ) : (
@@ -39,11 +40,11 @@ export function RecentResults({ results }: { results: RecentResult[] }) {
             <Pill label={vehicleCategoryLabel(item.category)} tone="neutral" />
           </View>
           <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
-            {item.fromLabel} → {item.toLabel} · {item.distanceKm} km
+            {item.fromLabel} → {item.toLabel} · {formatKmValue(item.distanceKm, 1)}
           </AppText>
           <View style={styles.recentBottom}>
             <Ionicons name="trophy-outline" size={11} color={item.winnerColor} />
-            <AppText variant="caption" color={item.winnerColor}>Ganó {item.winner}</AppText>
+            <AppText variant="caption" color={item.winnerColor}>{t('Ganó')}{' '}{item.winner}</AppText>
             <View style={styles.metaDot} />
             <AppText variant="caption" color={colors.dim}>{item.time}</AppText>
             <View style={styles.metaDot} />

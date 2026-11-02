@@ -6,6 +6,7 @@ import type { MotionHint } from '@/src/lib/parking-logic';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { matchesSubscription, partySubscriptions } from '@/src/lib/realtime-routing';
 import { useTrips } from '@/src/store/trips';
+import { getLocale, t } from '@/src/i18n';
 
 // Simulador de pruebas: mueve tu posición por una ruta real (con frenadas en
 // las curvas), simula aparcar, caminar y volver al coche, y amigos de una
@@ -73,17 +74,17 @@ export const useSimulator = create<SimState>(() => ({
 }));
 
 export const PHASE_LABELS: Record<SimPhase, string> = {
-  idle: 'Parado',
-  'waiting-route': 'Calculando ruta…',
-  driving: 'Conduciendo',
-  arrived: 'Llegada',
-  parking: 'Aparcando',
-  'walking-away': 'Caminando lejos del coche',
-  away: 'Lejos del coche',
-  'walking-back': 'Volviendo al coche',
-  'driving-off': 'Arrancando',
-  detour: 'Saliéndote de la ruta',
-  traffic: 'En un tapón',
+  idle: t('Parado'),
+  'waiting-route': t('Calculando ruta…'),
+  driving: t('Conduciendo'),
+  arrived: t('Llegada'),
+  parking: t('Aparcando'),
+  'walking-away': t('Caminando lejos del coche'),
+  away: t('Lejos del coche'),
+  'walking-back': t('Volviendo al coche'),
+  'driving-off': t('Arrancando'),
+  detour: t('Saliéndote de la ruta'),
+  traffic: t('En un tapón'),
 };
 
 const TICK_MS = 1_000;
@@ -311,7 +312,7 @@ const CONVOY = partyMembers.slice(0, 3).map((member, index) => ({
 // cada segundo se genera el tráfico de posiciones de toda la ciudad y se
 // reparte con las mismas reglas que useParty; en tu mapa solo aparece tu
 // party y el contador dice cuánto de ese tráfico llega a tu teléfono.
-const CROWD_NAMES = ['Ana', 'Luis', 'Carla', 'José', 'Mía', 'Pedro', 'Sara', 'Leo', 'Eva', 'Raúl', 'Nora', 'Iván'];
+const CROWD_NAMES = [t('Ana'), t('Luis'), t('Carla'), t('José'), t('Mía'), t('Pedro'), t('Sara'), t('Leo'), t('Eva'), t('Raúl'), t('Nora'), t('Iván')];
 const CROWD_COLORS = ['#FF5A1F', '#C9FF4D', '#4DE1FF', '#2EE6A8', '#FFD24D', '#B98CFF', '#FF8AD4', '#FFB84D'];
 const CITY_PARTY_SIZES = [12, 2, 2, 3, 3, 4, 4, 5, 6, 8, 10, 15, 20, 30, 45];
 const MY_ID = 'yo';
@@ -391,7 +392,7 @@ function moveCrowd(): SimMember[] {
     }
   });
   useSimulator.setState({
-    stats: `${(crowd.length + 1).toLocaleString('es-DO')} usuarios en ${cityParties} parties · te llegan ${received} de ${sent} msg/s`,
+    stats: t('{0} usuarios en {1} parties · te llegan {2} de {3} msg/s', (crowd.length + 1).toLocaleString(getLocale()), cityParties, received, sent),
   });
   return mine;
 }
@@ -459,7 +460,7 @@ function rallyTick() {
       arrivedAt: racer.arrivedAt,
       left: metersBetween(racer.pos, current.goal),
     })),
-    { name: 'Tú', arrivedAt: current.myArrivedAt, left: me ? metersBetween(me, current.goal) : Infinity },
+    { name: t('Tú'), arrivedAt: current.myArrivedAt, left: me ? metersBetween(me, current.goal) : Infinity },
   ].sort((a, b) =>
     a.arrivedAt && b.arrivedAt
       ? a.arrivedAt - b.arrivedAt
@@ -470,7 +471,7 @@ function rallyTick() {
           : a.left - b.left,
   );
   const stats =
-    `Reto a ${current.label}: ` +
+    t('Reto a {0}: ', current.label) +
     rows
       .slice(0, 5)
       .map((row, i) => `${i + 1}º ${row.name}${row.arrivedAt ? ' 🏁' : ` ${(row.left / 1000).toFixed(1)} km`}`)
@@ -495,7 +496,7 @@ export function startRally(goal?: { latitude: number; longitude: number; label: 
   if (!origin) return null;
   crowd = [];
   const target: LatLng = goal ? [goal.latitude, goal.longitude] : offsetPoint(origin, 40, 2_600);
-  const label = goal?.label ?? 'la meta';
+  const label = goal?.label ?? t('la meta');
   const people = partyMembers.slice(0, 4);
   rally = {
     goal: target,
@@ -533,7 +534,7 @@ export function startSimulation(origin: { latitude: number; longitude: number })
   useSimulator.setState({
     active: true,
     phase: 'idle',
-    label: 'Simulación lista',
+    label: t('Simulación lista'),
     fix: { latitude: origin.latitude, longitude: origin.longitude, speedKmh: 0, heading: 0 },
   });
   idle();
@@ -564,7 +565,7 @@ export function simulateIncomingInvite(delayMs = 3_000) {
   inviteTimer = setTimeout(() => {
     inviteTimer = null;
     useSimulator.setState({
-      invite: { id: `sim-${Date.now()}`, inviterName: 'Laura Méndez', partyName: 'Convoy de Laura' },
+      invite: { id: `sim-${Date.now()}`, inviterName: t('Laura Méndez'), partyName: t('Convoy de Laura') },
     });
   }, delayMs);
 }
@@ -596,7 +597,7 @@ export function driveRoute(points: LatLng[]) {
     });
     return true;
   }
-  useSimulator.setState({ label: 'Ruta al destino' });
+  useSimulator.setState({ label: t('Ruta al destino') });
   drive(points, 'driving');
   return true;
 }
@@ -604,7 +605,7 @@ export function driveRoute(points: LatLng[]) {
 export function waitForRoute() {
   // Cancela lo que estuviera haciendo (otra prueba) y espera parado.
   idle();
-  useSimulator.setState({ phase: 'waiting-route', label: 'Ruta al destino' });
+  useSimulator.setState({ phase: 'waiting-route', label: t('Ruta al destino') });
 }
 
 export function armDetour() {
@@ -618,7 +619,7 @@ export function runParkingScenario() {
   if (!origin) return;
   const fix = useSimulator.getState().fix;
   const heading = fix?.heading ?? 0;
-  useSimulator.setState({ label: 'Aparcar, caminar y volver' });
+  useSimulator.setState({ label: t('Aparcar, caminar y volver') });
   // Primero llega conduciendo 120 m para que haya «movimiento» previo.
   const arrival = offsetPoint(origin, heading, 120);
   emitMotion('vehicle', 'enter');
@@ -650,7 +651,7 @@ export function runTrafficScenario(withSensor: boolean) {
   if (!origin) return;
   const heading = useSimulator.getState().fix?.heading ?? 0;
   useSimulator.setState({
-    label: withSensor ? 'Atasco (con sensor)' : 'Atasco (solo GPS)',
+    label: withSensor ? t('Atasco (con sensor)') : t('Atasco (solo GPS)'),
   });
   if (withSensor) emitMotion('vehicle', 'enter');
   const jamStart = offsetPoint(origin, heading, 150);
@@ -685,7 +686,7 @@ export function runRecordedTripScenario() {
   const origin = currentPoint();
   if (!origin) return;
   const heading = useSimulator.getState().fix?.heading ?? 0;
-  useSimulator.setState({ label: 'Viaje completo (se graba)', recordTrips: true });
+  useSimulator.setState({ label: t('Viaje completo (se graba)'), recordTrips: true });
   emitMotion('vehicle', 'enter');
   const city = offsetPoint(origin, heading, 500);
   const jamEnd = offsetPoint(city, heading, 60);

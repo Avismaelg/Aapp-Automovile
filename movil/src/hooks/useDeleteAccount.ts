@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { t } from '@/src/i18n';
 
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
@@ -11,7 +12,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: async () => {
       if (account?.mode === 'demo' || !isSupabaseConfigured || !supabase) {
-        throw new Error('Eliminar la cuenta requiere una cuenta real conectada.');
+        throw new Error(t('Eliminar la cuenta requiere una cuenta real conectada.'));
       }
 
       const { data, error } = await supabase.functions.invoke('delete-account', {
@@ -33,7 +34,7 @@ export function useDeleteAccount() {
       }
 
       if (!data?.ok) {
-        throw new Error('No pudimos eliminar la cuenta. Inténtalo de nuevo.');
+        throw new Error(t('No pudimos eliminar la cuenta. Inténtalo de nuevo.'));
       }
 
       queryClient.clear();

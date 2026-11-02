@@ -22,6 +22,7 @@ import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription'
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
+import { t } from '@/src/i18n';
 
 type ChallengeRow = {
   id: string;
@@ -67,7 +68,7 @@ function fallbackProfile(id: string): UserProfile {
   return {
     id,
     username: 'piloto',
-    displayName: 'Piloto',
+    displayName: t('Piloto'),
     bio: '',
     city: '',
     countryCode: 'DO',
@@ -129,7 +130,7 @@ export function useChallengeFriends() {
         vehicleKind: vehicle.kind,
         vehicleId: vehicle.id,
         online: false,
-        status: 'Disponible',
+        status: t('Disponible'),
       },
     ];
   });
@@ -248,8 +249,8 @@ export function useChallenges() {
               vehicleLabel: vehicle
                 ? `${vehicle.make} ${vehicle.model}`
                 : participant.vehicle_id
-                  ? 'Vehículo privado'
-                  : 'Sin vehículo',
+                  ? t('Vehículo privado')
+                  : t('Sin vehículo'),
               status: participant.status,
               progressPct: Number(participant.progress_pct),
               elapsedSeconds: participant.elapsed_s,
@@ -381,13 +382,13 @@ export function useCreateChallenge() {
   return useMutation({
     mutationFn: async (input: CreateChallengeInput) => {
       if (demo) {
-        throw new Error('Los retos reales requieren una cuenta conectada.');
+        throw new Error(t('Los retos reales requieren una cuenta conectada.'));
       }
       if (!supabase || !account) {
-        throw new Error('Inicia sesión para crear un reto.');
+        throw new Error(t('Inicia sesión para crear un reto.'));
       }
       if (input.invitees.length === 0) {
-        throw new Error('Invita al menos a otro piloto.');
+        throw new Error(t('Invita al menos a otro piloto.'));
       }
 
       const { data, error } = await supabase
@@ -410,7 +411,7 @@ export function useCreateChallenge() {
         .single();
 
       if (error) {
-        throw new Error('No pudimos crear el reto. Inténtalo de nuevo.');
+        throw new Error(t('No pudimos crear el reto. Inténtalo de nuevo.'));
       }
 
       const challengeId = data.id as string;
@@ -437,7 +438,7 @@ export function useCreateChallenge() {
 
       if (participantError) {
         await supabase.from('challenges').delete().eq('id', challengeId);
-        throw new Error('No pudimos invitar a los pilotos. Inténtalo de nuevo.');
+        throw new Error(t('No pudimos invitar a los pilotos. Inténtalo de nuevo.'));
       }
 
       return { id: challengeId, code: data.code as string };
@@ -461,8 +462,8 @@ export function useRespondChallenge() {
       challengeId: string;
       accept: boolean;
     }) => {
-      if (demo) throw new Error('Los retos reales requieren una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para responder el reto.');
+      if (demo) throw new Error(t('Los retos reales requieren una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para responder el reto.'));
 
       const { error } = await supabase
         .from('challenge_participants')
@@ -470,7 +471,7 @@ export function useRespondChallenge() {
         .eq('challenge_id', challengeId)
         .eq('user_id', account.id);
 
-      if (error) throw new Error('No pudimos responder la invitación.');
+      if (error) throw new Error(t('No pudimos responder la invitación.'));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['challenges'] });
@@ -485,8 +486,8 @@ export function useStartChallenge() {
 
   return useMutation({
     mutationFn: async (challengeId: string) => {
-      if (demo) throw new Error('Los retos reales requieren una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para iniciar el reto.');
+      if (demo) throw new Error(t('Los retos reales requieren una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para iniciar el reto.'));
 
       const { error } = await supabase
         .from('challenges')
@@ -494,7 +495,7 @@ export function useStartChallenge() {
         .eq('id', challengeId)
         .eq('host_id', account.id);
 
-      if (error) throw new Error('No pudimos iniciar el reto.');
+      if (error) throw new Error(t('No pudimos iniciar el reto.'));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['challenges'] });
@@ -509,8 +510,8 @@ export function useFinishChallenge() {
 
   return useMutation({
     mutationFn: async (challengeId: string) => {
-      if (demo) throw new Error('Los retos reales requieren una cuenta conectada.');
-      if (!supabase || !account) throw new Error('Inicia sesión para finalizar el reto.');
+      if (demo) throw new Error(t('Los retos reales requieren una cuenta conectada.'));
+      if (!supabase || !account) throw new Error(t('Inicia sesión para finalizar el reto.'));
 
       const now = new Date().toISOString();
       const { error } = await supabase
@@ -519,7 +520,7 @@ export function useFinishChallenge() {
         .eq('id', challengeId)
         .eq('host_id', account.id);
 
-      if (error) throw new Error('No pudimos finalizar el reto.');
+      if (error) throw new Error(t('No pudimos finalizar el reto.'));
 
       await supabase
         .from('challenge_participants')

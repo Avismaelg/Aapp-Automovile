@@ -6,8 +6,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Card } from '@/src/components/ui';
 import { useMaintenance } from '@/src/hooks/useMaintenance';
 import type { Vehicle } from '@/src/types/models';
-import { formatNumber } from '@/src/lib/format';
 import { colors, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 // Próximo servicio según los mantenimientos registrados con "próximo a los
 // X km". Sin registros invita a crear uno en lugar de inventar una fecha.
@@ -31,9 +31,9 @@ export function NextMaintenanceCard({ vehicle }: { vehicle: Vehicle }) {
             <Ionicons name="construct" size={20} color={colors.lime} />
           </View>
           <View style={{ flex: 1 }}>
-            <AppText variant="bodyStrong">Próximo mantenimiento</AppText>
+            <AppText variant="bodyStrong">{t('Próximo mantenimiento')}</AppText>
             <AppText variant="caption" color={colors.muted}>
-              Registra un servicio con su próximo kilometraje y te avisaremos aquí.
+              {t('Registra un servicio con su próximo kilometraje y te avisaremos aquí.')}
             </AppText>
           </View>
           <Ionicons name="add-circle-outline" size={18} color={colors.lime} />
@@ -57,8 +57,8 @@ export function NextMaintenanceCard({ vehicle }: { vehicle: Vehicle }) {
         <AppText variant="bodyStrong">{next.title}</AppText>
         <AppText variant="caption" color={colors.muted}>
           {overdue
-            ? `Vencido hace ${formatNumber(-remainingKm, 0)} km`
-            : `En ${formatNumber(remainingKm, 0)} km · a los ${formatNumber(next.nextKm, 0)} km`}
+            ? t('Vencido hace {0}', formatKmValue(-remainingKm))
+            : t('En {0} · a los {1}', formatKmValue(remainingKm), formatKmValue(next.nextKm))}
         </AppText>
         <View style={styles.maintenanceTrack}>
           <View

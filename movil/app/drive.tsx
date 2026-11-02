@@ -28,6 +28,7 @@ import { isDemoMode } from '@/src/lib/demo';
 import { useAuth } from '@/src/store/auth';
 import { formatClock } from '@/src/lib/format';
 import { colors, radius, spacing } from '@/src/theme';
+import { formatKmValue, t } from '@/src/i18n';
 
 function DriveRoute({ compact }: { compact?: boolean }) {
   return (
@@ -57,11 +58,11 @@ function DriveRoute({ compact }: { compact?: boolean }) {
       </Svg>
       <View style={styles.routeLabels}>
         <View>
-          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>SALIDA</AppText>
-          <AppText variant="caption" color={colors.textSoft}>Santo Domingo</AppText>
+          <AppText variant="label" color={colors.lime} style={{ fontSize: 8 }}>{t('SALIDA')}</AppText>
+          <AppText variant="caption" color={colors.textSoft}>{t('Santo Domingo')}</AppText>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>META</AppText>
+          <AppText variant="label" color={colors.accent} style={{ fontSize: 8 }}>{t('META')}</AppText>
           <AppText variant="caption" color={colors.textSoft}>{activeParty.destination.split(',')[0]}</AppText>
         </View>
       </View>
@@ -133,16 +134,16 @@ function DemoDriveScreen() {
               <View style={styles.brandRow}>
                 <View style={styles.brandDot} />
                 <AppText variant="label" color={colors.accent} style={{ letterSpacing: 2 }}>
-                  CARAVANA
+                  {t('CARAVANA')}
                 </AppText>
               </View>
               <AppText variant={landscape ? 'h2' : 'h1'} style={{ marginTop: 4 }}>
-                Modo conducción
+                {t('Modo conducción')}
               </AppText>
             </View>
             <View style={styles.topActions}>
               {landscape ? (
-                <Pill label="Pantalla simplificada" tone="lime" icon="car-sport" />
+                <Pill label={t('Pantalla simplificada')} tone="lime" icon="car-sport" />
               ) : null}
               <IconButton
                 icon="close"
@@ -159,8 +160,8 @@ function DemoDriveScreen() {
             <View style={[styles.mainColumn, landscape && styles.mainColumnLandscape]}>
               <Card style={[styles.partyCard, landscape && styles.partyCardLandscape]}>
                 <View style={styles.cardTop}>
-                  <Pill label="Party en vivo" tone="danger" icon="radio" />
-                  <Pill label={`${partyMembers.length} vehículos`} tone="dark" icon="people" />
+                  <Pill label={t('Party en vivo')} tone="danger" icon="radio" />
+                  <Pill label={t('{0} vehículos', partyMembers.length)} tone="dark" icon="people" />
                 </View>
                 <AppText variant="h2" style={{ marginTop: spacing.md }}>
                   {activeParty.name}
@@ -171,25 +172,25 @@ function DemoDriveScreen() {
                     {activeParty.destination}
                   </AppText>
                   <AppText variant="caption" color={colors.muted}>
-                    ETA {activeParty.etaMin} min
+                    {t('ETA')}{' '}{activeParty.etaMin}{' '}{t('min')}
                   </AppText>
                 </View>
                 <DriveRoute compact={landscape} />
                 <View style={styles.partyMeta}>
                   <View style={styles.metaBlock}>
-                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>TIEMPO</AppText>
+                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('TIEMPO')}</AppText>
                     <AppText variant="mono" color={colors.lime} style={{ fontSize: 18 }}>
                       {formatClock(partyTime)}
                     </AppText>
                   </View>
                   <View style={styles.metaDivider} />
                   <View style={styles.metaBlock}>
-                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>DISTANCIA</AppText>
-                    <AppText variant="h3">{activeParty.distanceKm} km</AppText>
+                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('DISTANCIA')}</AppText>
+                    <AppText variant="h3">{formatKmValue(activeParty.distanceKm, 1)}</AppText>
                   </View>
                   <View style={styles.metaDivider} />
                   <View style={styles.metaBlock}>
-                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>MIEMBROS</AppText>
+                    <AppText variant="label" color={colors.muted} style={{ fontSize: 8 }}>{t('MIEMBROS')}</AppText>
                     <AppText variant="h3">{partyMembers.length}</AppText>
                   </View>
                 </View>
@@ -208,7 +209,7 @@ function DemoDriveScreen() {
                       />
                       <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
                         {member.username === currentUser.username
-                          ? 'Tú'
+                          ? t('Tú')
                           : member.name.split(' ')[0]}
                       </AppText>
                     </View>
@@ -229,7 +230,7 @@ function DemoDriveScreen() {
 
               <Card style={[styles.challengeCard, landscape && styles.challengeCardLandscape]}>
                 <View style={styles.cardTop}>
-                  <Pill label="Reto en curso" tone="accent" icon="flag" />
+                  <Pill label={t('Reto en curso')} tone="accent" icon="flag" />
                   <AppText variant="mono" color={colors.accent}>
                     {formatClock(challengeTime)}
                   </AppText>
@@ -249,7 +250,7 @@ function DemoDriveScreen() {
                       </AppText>
                       <Avatar name={participant.name} color={participant.color} size={28} />
                       <AppText variant="caption" color={participant.isMe ? colors.accent : colors.textSoft} numberOfLines={1} style={{ flex: 1 }}>
-                        {participant.isMe ? 'Tú' : participant.name.split(' ')[0]}
+                        {participant.isMe ? t('Tú') : participant.name.split(' ')[0]}
                       </AppText>
                       <View style={styles.miniTrack}>
                         <View
@@ -267,21 +268,21 @@ function DemoDriveScreen() {
                   ))}
                 </View>
                 <AppText variant="caption" color={colors.dim} style={{ marginTop: spacing.sm }}>
-                  {me ? `Tu posición: ${standings.findIndex((item) => item.isMe) + 1} de ${standings.length}` : ''}
-                  {leader ? ` · Lidera ${leader.isMe ? 'tú' : leader.name.split(' ')[0]}` : ''}
+                  {me ? t('Tu posición: {0} de {1}', standings.findIndex((item) => item.isMe) + 1, standings.length) : ''}
+                  {leader ? t(' · Lidera {0}', leader.isMe ? 'tú' : leader.name.split(' ')[0]) : ''}
                 </AppText>
               </Card>
 
               {!landscape ? (
                 <View style={styles.primaryActions}>
                   <Button
-                    label="Abrir party"
+                    label={t('Abrir party')}
                     icon="radio"
                     onPress={() => router.push('/(tabs)/party')}
                     size="lg"
                   />
                   <Button
-                    label="Ver clasificación"
+                    label={t('Ver clasificación')}
                     icon="podium-outline"
                     variant="secondary"
                     onPress={() => router.push('/(tabs)/challenges')}
@@ -297,7 +298,7 @@ function DemoDriveScreen() {
           >
             <Ionicons name="chevron-down" size={16} color={colors.muted} />
             <AppText variant="caption" color={colors.muted}>
-              Salir del modo conducción
+              {t('Salir del modo conducción')}
             </AppText>
           </Pressable>
         </ScrollView>

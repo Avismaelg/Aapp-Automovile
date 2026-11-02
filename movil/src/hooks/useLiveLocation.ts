@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
+import { t } from '@/src/i18n';
 
 export type LiveLocation = {
   latitude: number;
@@ -24,7 +25,7 @@ export const DEMO_LOCATION: LiveLocation = {
   source: 'demo',
 };
 
-const LOCATING_MESSAGE = 'Solicitando permiso de ubicación…';
+const LOCATING_MESSAGE = t('Solicitando permiso de ubicación…');
 
 type LiveLocationState = {
   status: LiveLocationStatus;
@@ -44,7 +45,7 @@ useSimulator.subscribe((state, previous) => {
   if (state.active && state.fix && state.fix !== previous.fix) {
     useLiveLocationState.setState({
       status: 'live',
-      message: 'Simulación',
+      message: t('Simulación'),
       location: {
         latitude: state.fix.latitude,
         longitude: state.fix.longitude,
@@ -94,7 +95,7 @@ function applyPosition(position: Location.LocationObject) {
     gpsHeading ?? (speedKmh == null || speedKmh < 10 ? previousHeading : null);
   useLiveLocationState.setState({
     status: 'live',
-    message: 'Ubicación en vivo',
+    message: t('Ubicación en vivo'),
     location: {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
@@ -141,11 +142,11 @@ function handleWatchError(id: number) {
   if (useLiveLocationState.getState().location.source === 'gps') {
     useLiveLocationState.setState({
       status: 'error',
-      message: 'Señal GPS perdida · mostrando la última posición',
+      message: t('Señal GPS perdida · mostrando la última posición'),
     });
     return;
   }
-  fallBackToDemo('error', 'No pudimos leer el GPS · usando ubicación de demo');
+  fallBackToDemo('error', t('No pudimos leer el GPS · usando ubicación de demo'));
 }
 
 async function beginSession(id: number) {
@@ -157,7 +158,7 @@ async function beginSession(id: number) {
     if (id !== session) return;
 
     if (permission.status !== 'granted') {
-      fallBackToDemo('denied', 'Permiso de ubicación denegado · usando ubicación de demo');
+      fallBackToDemo('denied', t('Permiso de ubicación denegado · usando ubicación de demo'));
       return;
     }
 
@@ -169,7 +170,7 @@ async function beginSession(id: number) {
     if (lastKnown) {
       applyPosition(lastKnown);
     } else if (useLiveLocationState.getState().status !== 'live') {
-      useLiveLocationState.setState({ message: 'Conectando con el GPS…' });
+      useLiveLocationState.setState({ message: t('Conectando con el GPS…') });
     }
 
     const subscription = await Location.watchPositionAsync(
@@ -214,7 +215,7 @@ async function beginSession(id: number) {
     }
   } catch {
     if (id !== session) return;
-    fallBackToDemo('error', 'GPS no disponible · usando ubicación de demo');
+    fallBackToDemo('error', t('GPS no disponible · usando ubicación de demo'));
   }
 }
 
@@ -233,7 +234,7 @@ function startSession(message?: string) {
     if (useLiveLocationState.getState().status !== 'locating') return;
     useLiveLocationState.setState({
       status: 'demo',
-      message: 'Ubicación aproximada · esperando permiso o señal GPS',
+      message: t('Ubicación aproximada · esperando permiso o señal GPS'),
     });
   }, 8_000);
 
@@ -278,7 +279,7 @@ export function refreshStaleLocation(maxAgeMs = 20_000) {
   const staleFix = lastFixAt > 0 && Date.now() - lastFixAt > maxAgeMs;
   if (!noFixForAWhile && !staleFix) return;
   stopSession();
-  startSession('Actualizando tu ubicación…');
+  startSession(t('Actualizando tu ubicación…'));
 }
 
 export function useLiveLocation() {

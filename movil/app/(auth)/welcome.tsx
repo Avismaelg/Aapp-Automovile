@@ -12,25 +12,26 @@ import { currentUser, friends } from '@/src/data/mock';
 import { isSupabaseConfigured } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const features = [
   {
     icon: 'radio' as const,
     color: colors.accent,
-    title: 'Party en vivo',
-    detail: 'Mapa compartido, chat y walkie-talkie.',
+    title: t('Party en vivo'),
+    detail: t('Mapa compartido, chat y walkie-talkie.'),
   },
   {
     icon: 'flag' as const,
     color: colors.lime,
-    title: 'Retos A → B',
-    detail: 'Coche, moto, EV o camión. Gana quien llega.',
+    title: t('Retos A → B'),
+    detail: t('Coche, moto, EV o camión. Gana quien llega.'),
   },
   {
     icon: 'qr-code' as const,
     color: colors.cyan,
-    title: 'Tu identidad en QR',
-    detail: 'Perfil y garaje público al escanear.',
+    title: t('Tu identidad en QR'),
+    detail: t('Perfil y garaje público al escanear.'),
   },
 ];
 
@@ -90,16 +91,15 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.hero}>
-          <Pill label="Hecho para la carretera" tone="accent" icon="navigate" />
+          <Pill label={t('Hecho para la carretera')} tone="accent" icon="navigate" />
           <AppText variant="display" style={styles.title}>
-            La carretera se vive{' '}
+            {t('La carretera se vive')}{' '}
             <AppText variant="display" color={colors.accent}>
-              en caravana.
+              {t('en caravana.')}
             </AppText>
           </AppText>
           <AppText variant="body" color={colors.textSoft} style={styles.subtitle}>
-            Organiza parties, reta a tus amigos y guarda cada ruta, repostaje y
-            recuerdo de tu coche. Todo en un solo lugar.
+            {t('Organiza parties, reta a tus amigos y guarda cada ruta, repostaje y recuerdo de tu coche. Todo en un solo lugar.')}
           </AppText>
         </View>
 
@@ -107,19 +107,19 @@ export default function WelcomeScreen() {
           <View style={styles.routeTop}>
             <View>
               <AppText variant="label" color={colors.lime} style={{ fontSize: 9 }}>
-                SALIDA
+                {t('SALIDA')}
               </AppText>
               <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
-                Zona Colonial
+                {t('Zona Colonial')}
               </AppText>
             </View>
-            <Pill label="En vivo" tone="lime" icon="radio" />
+            <Pill label={t('En vivo')} tone="lime" icon="radio" />
             <View style={{ alignItems: 'flex-end' }}>
               <AppText variant="label" color={colors.accent} style={{ fontSize: 9 }}>
-                META
+                {t('META')}
               </AppText>
               <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
-                Punta Cana
+                {t('Punta Cana')}
               </AppText>
             </View>
           </View>
@@ -143,7 +143,7 @@ export default function WelcomeScreen() {
               ))}
             </View>
             <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-              3 caravanas activas cerca de ti
+              {t('3 caravanas activas cerca de ti')}
             </AppText>
             <View style={styles.liveDot} />
           </View>
@@ -167,19 +167,19 @@ export default function WelcomeScreen() {
 
         <View style={styles.actions}>
           <Button
-            label="Crear mi cuenta"
+            label={t('Crear mi cuenta')}
             icon="person-add-outline"
             size="lg"
             onPress={() => router.push('/sign-up')}
           />
           <Button
-            label="Ya tengo cuenta"
+            label={t('Ya tengo cuenta')}
             icon="log-in-outline"
             variant="secondary"
             onPress={() => router.push('/sign-in')}
           />
           <Button
-            label={enteringDemo ? 'Entrando…' : 'Explorar en modo demo'}
+            label={enteringDemo ? 'Entrando…' : t('Explorar en modo demo')}
             icon="play-outline"
             variant="ghost"
             loading={enteringDemo}
@@ -190,14 +190,13 @@ export default function WelcomeScreen() {
         {!isSupabaseConfigured ? (
           <AuthNotice
             tone="info"
-            message="Modo local activo: las cuentas reales se habilitan al configurar Supabase. En la demo todo se guarda solo en este dispositivo."
+            message={t('Modo local activo: las cuentas reales se habilitan al configurar Supabase. En la demo todo se guarda solo en este dispositivo.')}
           />
         ) : null}
 
         <View style={styles.legal}>
           <AppText variant="caption" color={colors.dim} align="center">
-            Al continuar aceptas las reglas de conducción responsable de Caravana.
-            Los retos miden llegada, nunca velocidad.
+            {t('Al continuar aceptas las reglas de conducción responsable de Caravana. Los retos miden llegada, nunca velocidad.')}
           </AppText>
           <Pressable
             onPress={() => router.push('/sign-in')}
@@ -205,7 +204,7 @@ export default function WelcomeScreen() {
             style={styles.legalLink}
           >
             <AppText variant="caption" color={colors.textSoft}>
-              ¿Ya tienes una cuenta? <AppText variant="caption" color={colors.accent}>Entra aquí</AppText>
+              {t('¿Ya tienes una cuenta?')}{' '}<AppText variant="caption" color={colors.accent}>{t('Entra aquí')}</AppText>
             </AppText>
           </Pressable>
         </View>

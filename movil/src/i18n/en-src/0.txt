@@ -1,0 +1,217 @@
+0| (public)
+1| · Leading: {0}
+2| · Main
+3| · arrive {0}
+4|+{0} min
+5|. Invite one or change category.
+6|. Your live location is never shown on your public profile.
+7|. Private profiles only show a minimal card.
+8|1 km
+9|1 · ROUTE
+10|100% electric
+11|2 · CATEGORY
+12|2.2 km with two stops along the way. They're marked «Stop done» in order and the route moves on to the next one by itself.
+13|3 active caravans near you
+14|3 · DRIVERS (2+)
+15|3 · RIVAL
+16|3–24 characters: lowercase letters, numbers or underscore.
+17|4 friends leave from different places towards your finish (2.6 km away). You drive on real streets. At the top you see the live standings, and their speed in the Party tab.
+18|7 cars
+19|75 parties and solo drivers using the app at once. You're in a party of 12: you only see yours and a counter shows how much traffic reaches your phone.
+20|After 3 s the alert «Laura invites you to her convoy» arrives. Tap «Join» to enter and see her on the map.
+21|Open the email in
+22|Open
+23|Open options
+24|Open party
+25|Oil
+26|10W-40 oil and brake check.
+27|5W-30 diesel oil, fuel and air filter.
+28|5W-30 synthetic oil, oil filter and cabin filter.
+29|Oil and filter
+30|Accept
+31|Accept and go
+32|Accept challenge
+33|Accept route
+34|Accept request
+35|On
+36|Turn on
+37|Turn voice on
+38|Activity
+39|Update your ride.
+40|Updating your location…
+41|Update
+42|Now
+43|Right now:
+44|Not now
+45|Settings
+46|By accepting, you share your progress only with the challenge participants.
+47|By continuing you accept Caravana's responsible driving rules. Challenges measure arrival, never speed.
+48|By creating your account you accept the responsible driving rules. Caravana never rewards speeding.
+49|Up to date
+50|Instant
+51|By joining you'll share your location with the members and can use the chat.
+52|Something stopped
+53|Friend
+54|Friends
+55|Friends, parties, messages and challenges
+57|Android is limiting Caravana to save battery, so it stops recording your trips and where you park. Allow it to run without restrictions.
+58|Off
+59|Parked here
+60|Parking
+61|Park, walk and come back
+62|They'll appear on your map and you can invite them to your party once they accept.
+63|Nickname
+64|Point at the car's or profile's QR
+65|Set up the start now
+66|Starting
+67|Make sure it's a Caravana code.
+68|Traffic jam (with sensor)
+69|Traffic jam (GPS only)
+70|Automatic
+75|Highways
+77|Advance
+78|Alert with the app closed
+79|Test alert · Tap to open the Party tab
+80|Traffic, stop and navigation alerts.
+81|Help and support
+82|YEAR
+83|Add at least a start and a finish.
+84|Add friends
+85|Add your car, motorcycle, EV or truck to record routes, consumption and its QR.
+86|Add your ride.
+87|Add a vehicle
+88|Add
+89|Add to convoy
+90|Add friend
+91|Add friends
+92|Add photo
+93|Add vehicle photo
+94|Add maintenance
+95|Add another vehicle
+96|Add stop
+97|Add stop: gas station, food…
+98|Add a photo
+99|Add vehicle
+100|Year
+101|No maintenance recorded for this vehicle yet.
+102|No finished challenges yet. When you close one, the result will show up here.
+103|No active challenge yet
+104|Battery
+105|12V battery
+106|60 Ah AGM battery with an 18-month warranty.
+107|Battery at 100%
+109|Welcome back.
+110|Bio
+112|Delete
+113|Delete comment
+114|Delete route
+115|Good evening
+116|Good afternoon
+117|Good morning
+118|Search for someone by @username or share your profile QR.
+119|Search for a destination on the map and challenge again: whoever gets there first wins.
+120|Search a street, square or place…
+121|Search a street, a place or a city.
+122|Finding the best route…
+123|Searching places…
+124|Find friends
+125|Search destination
+126|Search by name or @username
+127|VOICE CHANNELS · 3
+129|CATEGORY
+130|COMMUNITY
+131|ANYONE WITH THE APP
+132|ACCOUNT
+133|Each car, motorcycle, EV or truck has its own history, consumption and QR.
+134|Chain and rear tire
+135|ATM
+136|Calculates a real route, navigates with voice and driving line, slows down for curves and ends on arrival.
+137|Trip calculator
+138|Calculating the route on streets…
+139|Calculating route on streets…
+140|Calculating route…
+141|OSM streets · {0} · {1}
+142|Change destination
+143|Change photo
+144|Change vehicle photo
+145|Oil and filter change
+146|Walking away from the car
+147|Trucks: their own category, with weight limits and professional driving.
+148|Truck
+149|Truck / pickup
+150|Cancel
+151|Cancel request
+152|Amount
+154|Sunday caravan
+155|Caravana detects your trips and saves them to your profile. You can pause it whenever you want.
+156|Caravan in progress
+157|Caravana is recording your route
+158|Caravana needs access to your photos to attach an image to the post.
+159|Caravana couldn't show this screen. Your saved data is safe.
+160|Caravana v0.1 · Your location is only shared inside a party.
+161|Caravana · live convoy
+162|Caravana — the social network for drivers
+165|Charge logged
+166|Charger
+167|Loading activity…
+168|Loading friends…
+169|Loading events…
+170|Loading event…
+171|Loading messages…
+172|Loading party…
+173|Loading profile…
+174|Loading post…
+175|Loading records…
+176|Loading your garage…
+177|Loading your profile…
+178|Loading your friends and vehicles…
+179|Loading your challenges…
+180|Loading vehicle…
+181|Charges
+182|Energy charges
+184|Home, supercharger…
+185|Mixed category. Each vehicle goes at its own pace and whoever arrives first while following the rules wins.
+186|Mixed category. Whoever arrives first while following traffic rules wins.
+187|Category without vehicle
+188|{0} category. Only vehicles of the same class compete.
+189|Separate categories for cars, motorcycles, EVs and trucks.
+190|Recenter
+191|Close
+192|Close alert
+193|Sign out
+194|Chat
+195|Chat
+196|City
+197|City with 1,000 users
+198|City, a traffic jam, 1.2 km of avenue and parking. Saved in My routes as a test (doesn't count in your totals) and deleted when you stop.
+199|Civic, Model 3, MT-07…
+200|Standings
+201|Car
+202|Parked car
+203|Car, motorcycle, EV or truck. Whoever arrives wins.
+204|Cars: their own category. Whoever arrives first while following the rules wins.
+205|Color
+206|Color {0}
+207|Fuel
+208|Comments
+209|Food
+210|Start your route
+211|As the host, you'll end the caravan for everyone.
+212|Share the code
+213|Share the road.
+214|Share
+215|Share QR
+216|Share vehicle QR
+217|Share event
+218|Share Caravana sale sheet
+219|Share sheet as PDF
+220|Share my QR
+221|Share my profile
+222|Share profile
+223|Share Caravana report
+224|Share result
+225|Share summary
+226|Share challenge
+227|Share route
+228|With 1 point the event is a location. With 2 or more, the app creates the full route from start to finish (maximum
+229|With destination

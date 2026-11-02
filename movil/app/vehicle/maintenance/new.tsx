@@ -26,6 +26,7 @@ import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useAddMaintenance } from '@/src/hooks/useMaintenance';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
+import { displayToKm, distanceUnit, formatKmValue, getCurrency, kmToDisplay, t } from '@/src/i18n';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -34,13 +35,13 @@ const maintenanceKinds: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: 'oil', label: 'Aceite', icon: 'water-outline' },
-  { key: 'tires', label: 'Neumáticos', icon: 'ellipse-outline' },
-  { key: 'brakes', label: 'Frenos', icon: 'disc-outline' },
-  { key: 'battery', label: 'Batería', icon: 'battery-charging-outline' },
-  { key: 'filters', label: 'Filtros', icon: 'filter-outline' },
-  { key: 'inspection', label: 'Inspección', icon: 'shield-checkmark-outline' },
-  { key: 'other', label: 'Otro', icon: 'construct-outline' },
+  { key: 'oil', label: t('Aceite'), icon: 'water-outline' },
+  { key: 'tires', label: t('Neumáticos'), icon: 'ellipse-outline' },
+  { key: 'brakes', label: t('Frenos'), icon: 'disc-outline' },
+  { key: 'battery', label: t('Batería'), icon: 'battery-charging-outline' },
+  { key: 'filters', label: t('Filtros'), icon: 'filter-outline' },
+  { key: 'inspection', label: t('Inspección'), icon: 'shield-checkmark-outline' },
+  { key: 'other', label: t('Otro'), icon: 'construct-outline' },
 ];
 
 export default function NewMaintenanceScreen() {
@@ -59,7 +60,7 @@ export default function NewMaintenanceScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <ActivityIndicator color={colors.accent} />
         <AppText variant="caption" color={colors.muted} style={{ marginTop: spacing.md }}>
-          Cargando vehículo…
+          {t('Cargando vehículo…')}
         </AppText>
       </SafeAreaView>
     );
@@ -70,9 +71,9 @@ export default function NewMaintenanceScreen() {
       <SafeAreaView style={styles.state} edges={['top', 'bottom']}>
         <Ionicons name="car-outline" size={36} color={colors.dim} />
         <AppText variant="h2" align="center" style={{ marginTop: spacing.md }}>
-          No encontramos el vehículo
+          {t('No encontramos el vehículo')}
         </AppText>
-        <Button label="Volver" variant="secondary" onPress={goBack} style={{ marginTop: spacing.xl }} />
+        <Button label={t('Volver')} variant="secondary" onPress={goBack} style={{ marginTop: spacing.xl }} />
       </SafeAreaView>
     );
   }
@@ -89,7 +90,7 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
   const [kind, setKind] = useState<MaintenanceKind>('oil');
   const [title, setTitle] = useState('');
   const [serviceDate, setServiceDate] = useState(TODAY);
-  const [odometer, setOdometer] = useState(String(vehicle.odometerKm));
+  const [odometer, setOdometer] = useState(String(Math.round(kmToDisplay(vehicle.odometerKm))));
   const [cost, setCost] = useState('');
   const [shop, setShop] = useState('');
   const [notes, setNotes] = useState('');
@@ -104,19 +105,19 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
   const save = async () => {
     setError(null);
     if (!title.trim()) {
-      setError('Escribe qué servicio se realizó.');
+      setError(t('Escribe qué servicio se realizó.'));
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
-      setError('Usa una fecha con formato AAAA-MM-DD.');
+      setError(t('Usa una fecha con formato AAAA-MM-DD.'));
       return;
     }
-    const odometerNumber = Number(odometer.replace(',', '.'));
+    const odometerNumber = Math.round(displayToKm(Number(odometer.replace(',', '.'))));
     const costNumber = Number(cost.replace(',', '.') || 0);
-    const nextKmNumber = nextKm ? Number(nextKm.replace(',', '.')) : undefined;
+    const nextKmNumber = nextKm ? Math.round(displayToKm(Number(nextKm.replace(',', '.')))) : undefined;
 
     if (!Number.isFinite(odometerNumber) || odometerNumber < 0) {
-      setError('El odómetro debe ser un número positivo.');
+      setError(t('El odómetro debe ser un número positivo.'));
       return;
     }
 
@@ -137,7 +138,7 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : 'No pudimos guardar el mantenimiento.',
+          : t('No pudimos guardar el mantenimiento.'),
       );
     }
   };
@@ -155,12 +156,12 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
         >
           <View style={styles.header}>
             <IconButton icon="close" size={40} onPress={goBack} />
-            <AppText variant="label" color={colors.accent}>MANTENIMIENTO</AppText>
+            <AppText variant="label" color={colors.accent}>{t('MANTENIMIENTO')}</AppText>
             <View style={{ width: 40 }} />
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">Registra el servicio.</AppText>
+            <AppText variant="h1">{t('Registra el servicio.')}</AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
               {vehicle.make} {vehicle.model} · {vehicle.year}
             </AppText>
@@ -169,7 +170,7 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
           {isDemo ? (
             <AuthNotice
               tone="info"
-              message="Estás en modo demo: los mantenimientos reales requieren una cuenta conectada."
+              message={t('Estás en modo demo: los mantenimientos reales requieren una cuenta conectada.')}
             />
           ) : null}
 
@@ -180,14 +181,14 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
             <View style={{ flex: 1 }}>
               <AppText variant="bodyStrong">{vehicle.make} {vehicle.model}</AppText>
               <AppText variant="caption" color={colors.muted}>
-                {vehicle.nickname} · {vehicle.odometerKm.toLocaleString('es-DO')} km
+                {vehicle.nickname} · {formatKmValue(vehicle.odometerKm)}
               </AppText>
             </View>
-            <Pill label={isDemo ? 'Demo' : 'Privado'} tone="neutral" />
+            <Pill label={isDemo ? t('Demo') : t('Privado')} tone="neutral" />
           </Card>
 
           <View style={styles.section}>
-            <AppText variant="label" color={colors.muted}>Tipo de servicio</AppText>
+            <AppText variant="label" color={colors.muted}>{t('Tipo de servicio')}</AppText>
             <View style={styles.kindGrid}>
               {maintenanceKinds.map((option) => {
                 const selected = kind === option.key;
@@ -216,22 +217,22 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
 
           <View style={styles.section}>
             <Input
-              label="Servicio"
+              label={t('Servicio')}
               value={title}
               onChangeText={setTitle}
-              placeholder="Cambio de aceite y filtros"
+              placeholder={t('Cambio de aceite y filtros')}
               maxLength={100}
             />
             <View style={styles.row}>
               <Input
-                label="Fecha"
+                label={t('Fecha')}
                 value={serviceDate}
                 onChangeText={setServiceDate}
                 placeholder="AAAA-MM-DD"
                 style={styles.flex}
               />
               <Input
-                label="Odómetro"
+                label={t('Odómetro')}
                 value={odometer}
                 onChangeText={setOdometer}
                 placeholder="48210"
@@ -241,36 +242,36 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
             </View>
             <View style={styles.row}>
               <Input
-                label="Coste"
+                label={t('Coste')}
                 value={cost}
                 onChangeText={setCost}
                 placeholder="0"
                 keyboardType="decimal-pad"
-                rightSlot={<AppText variant="caption" color={colors.dim}>DOP</AppText>}
+                rightSlot={<AppText variant="caption" color={colors.dim}>{getCurrency()}</AppText>}
                 style={styles.flex}
               />
               <Input
-                label="Próximo servicio"
+                label={t('Próximo servicio')}
                 value={nextKm}
                 onChangeText={setNextKm}
                 placeholder="52210"
                 keyboardType="decimal-pad"
-                rightSlot={<AppText variant="caption" color={colors.dim}>km</AppText>}
+                rightSlot={<AppText variant="caption" color={colors.dim}>{distanceUnit()}</AppText>}
                 style={styles.flex}
               />
             </View>
             <Input
-              label="Taller"
+              label={t('Taller')}
               value={shop}
               onChangeText={setShop}
-              placeholder="Nombre del taller"
+              placeholder={t('Nombre del taller')}
               maxLength={120}
             />
             <Input
-              label="Notas"
+              label={t('Notas')}
               value={notes}
               onChangeText={setNotes}
-              placeholder="Repuestos, garantía o detalles"
+              placeholder={t('Repuestos, garantía o detalles')}
               multiline
               maxLength={500}
               inputStyle={styles.notesInput}
@@ -280,7 +281,7 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
           {error ? <AuthNotice message={error} /> : null}
 
           <Button
-            label={addMaintenance.isPending ? 'Guardando…' : 'Guardar mantenimiento'}
+            label={addMaintenance.isPending ? 'Guardando…' : t('Guardar mantenimiento')}
             icon="checkmark-circle-outline"
             size="lg"
             loading={addMaintenance.isPending}
@@ -291,8 +292,7 @@ function MaintenanceForm({ vehicle }: { vehicle: Vehicle }) {
           <View style={styles.footer}>
             <Ionicons name="lock-closed-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              Los mantenimientos son privados. Solo se incluyen en la ficha de venta
-              cuando tú la compartes.
+              {t('Los mantenimientos son privados. Solo se incluyen en la ficha de venta cuando tú la compartes.')}
             </AppText>
           </View>
         </ScrollView>

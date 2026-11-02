@@ -4,11 +4,12 @@ import { AppText } from '@/src/components/ui';
 import { MAPBOX_ACCESS_TOKEN } from '@/src/lib/map/config';
 import { WORLD_MAP_PROVIDER } from '@/src/lib/map-html';
 import { colors } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 const ATTRIBUTION =
   WORLD_MAP_PROVIDER === 'maptiler'
-    ? '© MapTiler · © OpenStreetMap'
-    : '© OpenFreeMap · © OpenMapTiles · © OpenStreetMap';
+    ? t('© MapTiler · © OpenStreetMap')
+    : t('© OpenFreeMap · © OpenMapTiles · © OpenStreetMap');
 
 // Atribución obligatoria de las teselas, según el proveedor configurado.
 // En el móvil con Mapbox la atribución la pone el propio SDK (logo e «i»).

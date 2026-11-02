@@ -1,4 +1,5 @@
 import { Alert, Platform, type AlertButton } from 'react-native';
+import { t } from '@/src/i18n';
 
 // react-native-web deja Alert.alert vacío: en web ningún aviso ni
 // confirmación llegaba al usuario. Se sustituye por los diálogos del
@@ -20,7 +21,7 @@ export function installWebAlert() {
 
     // Varias acciones (p. ej. Activar / Ajustes): el diálogo del navegador
     // solo admite una, así que se usa la primera.
-    if (globalThis.confirm(`${text}\n\n${actions[0].text ?? 'Aceptar'}?`)) actions[0].onPress?.();
+    if (globalThis.confirm(`${text}\n\n${actions[0].text ?? t('Aceptar')}?`)) actions[0].onPress?.();
     else cancel?.onPress?.();
   };
 }

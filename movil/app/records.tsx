@@ -14,15 +14,16 @@ import {
 import { useTrips } from '@/src/store/trips';
 import { useAuth } from '@/src/store/auth';
 import { colors, radius, spacing } from '@/src/theme';
+import { displaySpeed, shortMonths, speedUnit, t } from '@/src/i18n';
 
 function formatSpeed(speed: number) {
-  return `${Math.round(speed)} km/h`;
+  return `${displaySpeed(speed)} ${speedUnit()}`;
 }
 
 function formatRecordDate(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = shortMonths();
   return `${date.getDate()} ${months[date.getMonth()]}`;
 }
 
@@ -68,8 +69,8 @@ export default function RecordsScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-back" size={40} onPress={() => router.back()} />
         <View style={{ flex: 1 }}>
-          <AppText variant="label" color={colors.accent}>RÉCORDS PÚBLICOS</AppText>
-          <AppText variant="h1" style={{ marginTop: 2 }}>Autopistas</AppText>
+          <AppText variant="label" color={colors.accent}>{t('RÉCORDS PÚBLICOS')}</AppText>
+          <AppText variant="h1" style={{ marginTop: 2 }}>{t('Autopistas')}</AppText>
         </View>
         <IconButton icon="refresh" size={40} onPress={() => void refetch()} />
       </View>
@@ -77,22 +78,20 @@ export default function RecordsScreen() {
       <Card style={styles.notice}>
         <Ionicons name="warning-outline" size={16} color={colors.accent} />
         <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-          Récords de velocidad en tramos de autopista, públicos para toda la
-          comunidad. Conduce con precaución y respeta los límites.
+          {t('Récords de velocidad en tramos de autopista, públicos para toda la comunidad. Conduce con precaución y respeta los límites.')}
         </AppText>
       </Card>
 
       {isDemo ? (
         <AppText variant="caption" color={colors.dim} style={styles.demoNote}>
-          Modo demo: los récords públicos requieren una cuenta conectada. Tus
-          mejores marcas locales aparecen abajo.
+          {t('Modo demo: los récords públicos requieren una cuenta conectada. Tus mejores marcas locales aparecen abajo.')}
         </AppText>
       ) : null}
 
       {isLoading || recordsLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.accent} />
-          <AppText variant="caption" color={colors.muted}>Cargando récords…</AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Cargando récords…')}</AppText>
         </View>
       ) : null}
 
@@ -116,8 +115,8 @@ export default function RecordsScreen() {
       {segments.length === 0 ? (
         <EmptyState
           icon="trophy-outline"
-          title="Sin tramos todavía"
-          description="Cuando haya tramos configurados podrás competir por el récord de cada autopista."
+          title={t('Sin tramos todavía')}
+          description={t('Cuando haya tramos configurados podrás competir por el récord de cada autopista.')}
         />
       ) : null}
     </Screen>
@@ -146,17 +145,17 @@ function SegmentCard({
             {segment.name}
           </AppText>
           <AppText variant="caption" color={colors.muted}>
-            {segment.city ?? 'República Dominicana'} · límite {segment.speedLimitKmh} km/h
+            {segment.city ?? t('República Dominicana')}{' '}{t('· límite')}{' '}{displaySpeed(segment.speedLimitKmh)}{' '}{speedUnit()}
           </AppText>
         </View>
-        <Pill label={`${top.length} récords`} tone="neutral" />
+        <Pill label={t('{0} récords', top.length)} tone="neutral" />
       </View>
 
       {top.length === 0 ? (
         <View style={styles.emptyRecords}>
           <Ionicons name="flag-outline" size={15} color={colors.dim} />
           <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-            Sin récords aún. ¡Sé el primero en marcar uno en este tramo!
+            {t('Sin récords aún. ¡Sé el primero en marcar uno en este tramo!')}
           </AppText>
         </View>
       ) : (
@@ -172,7 +171,7 @@ function SegmentCard({
                 {record.userName}
               </AppText>
               <AppText variant="caption" color={colors.dim} numberOfLines={1}>
-                {record.vehicleName ?? 'Vehículo'} · {formatRecordDate(record.recordedAt)}
+                {record.vehicleName ?? t('Vehículo')} · {formatRecordDate(record.recordedAt)}
               </AppText>
             </View>
             <AppText variant="bodyStrong" color={colors.lime}>
@@ -186,15 +185,15 @@ function SegmentCard({
         <View style={styles.myBest}>
           <Ionicons name="person" size={12} color={colors.cyan} />
           <AppText variant="caption" color={colors.cyan}>
-            Tu mejor: {formatSpeed(myBest)}
-            {myBestIsPublic ? ' (público)' : ' (local)'}
+            {t('Tu mejor:')}{' '}{formatSpeed(myBest)}
+            {myBestIsPublic ? t(' (público)') : ' (local)'}
           </AppText>
         </View>
       ) : null}
 
       <View style={styles.hintRow}>
         <AppText variant="caption" color={colors.dim}>
-          Corre en este tramo para entrar al ranking.
+          {t('Corre en este tramo para entrar al ranking.')}
         </AppText>
       </View>
     </Card>

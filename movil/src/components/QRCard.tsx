@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export function QRCard({
   value,
@@ -29,7 +30,7 @@ export function QRCard({
             color={dark ? colors.text : '#0A0D12'}
             style={{ letterSpacing: 1.5 }}
           >
-            CARAVANA
+            {t('CARAVANA')}
           </AppText>
         </View>
         <AppText
@@ -56,7 +57,7 @@ export function QRCard({
         align="center"
         style={{ marginTop: spacing.md }}
       >
-        {caption ?? 'Escanea para ver mi perfil'}
+        {caption ?? t('Escanea para ver mi perfil')}
       </AppText>
       <AppText
         variant="label"

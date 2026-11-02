@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter, type Href } from "expo-router";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Alert,
   AppState,
   Pressable,
@@ -14,6 +15,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MapAttribution } from "@/src/components/MapAttribution";
+import {
+  EARTH_MS,
+  EARTH_START_MS,
+  FLIGHT_MS,
+  FLIGHT_START_MS,
+  GalaxyIntro,
+} from "@/src/components/intro/GalaxyIntro";
+import { buildGreeting, takeFirstWelcome } from "@/src/lib/welcome";
+import { useTrips } from "@/src/store/trips";
 import { WorldMap } from "@/src/components/WorldMap";
 import {
   DestinationCard,
@@ -84,11 +94,21 @@ import {
   NIGHT_CHROME,
 } from "@/src/components/navigation/glass";
 import { colors, radius, spacing } from "@/src/theme";
+import { displaySpeed, formatDistance, getLocale, speechLanguage, speedUnit, t } from "@/src/i18n";
+
+// La intro (galaxia → globo → tu calle) solo al abrir la app, no cada vez que
+// se vuelve a esta pestaña.
+let introPlayed = false;
+const INTRO_PLAN = {
+  earthAtMs: EARTH_START_MS,
+  earthMs: EARTH_MS,
+  flightAtMs: FLIGHT_START_MS,
+  flightMs: FLIGHT_MS,
+};
 
 function formatParkingDistance(meters: number | null) {
-  if (meters == null) return "aquí cerca";
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
+  if (meters == null) return t('aquí cerca');
+  return formatDistance(meters);
 }
 
 // Pantalla inicial personal, estilo Waze: tu coche, tu destino y tus amigos
@@ -140,6 +160,17 @@ export default function NavigationScreen() {
     ];
   }, [partyOnMap, realFriends, simMembers]);
   const mapFriends = liveMembers;
+
+  const [introActive, setIntroActive] = useState(() => !introPlayed);
+  const endIntro = useCallback(() => setIntroActive(false), []);
+  useEffect(() => {
+    introPlayed = true;
+    // Con «reducir movimiento» activado no hay animación de entrada.
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (reduce) setIntroActive(false);
+    });
+  }, []);
+  const tripDistanceM = useTrips((state) => state.totals.distanceM);
 
   // «Seguir a»: el destino es la posición en vivo de un piloto del convoy y
   // se mueve con él (cada 150 m, para no recalcular la ruta sin parar).
@@ -219,7 +250,7 @@ export default function NavigationScreen() {
         ? {
             latitude: party.destinationLat,
             longitude: party.destinationLng,
-            label: party.destinationLabel ?? "Destino del convoy",
+            label: party.destinationLabel ?? t('Destino del convoy'),
             setBy: party.destinationSetBy,
             setAt: party.destinationSetAt,
           }
@@ -268,11 +299,11 @@ export default function NavigationScreen() {
   useEffect(() => {
     if (isDemo || friendCount === 0 || shareWithFriends !== null) return;
     Alert.alert(
-      "¿Que tus amigos te vean en el mapa?",
-      "Tus amigos verán tu última posición en su mapa, y tú la suya si también lo activan. Puedes cambiarlo en Perfil.",
+      t('¿Que tus amigos te vean en el mapa?'),
+      t('Tus amigos verán tu última posición en su mapa, y tú la suya si también lo activan. Puedes cambiarlo en Perfil.'),
       [
-        { text: "Ahora no", style: "cancel", onPress: () => setShareWithFriends(false) },
-        { text: "Compartir", onPress: () => setShareWithFriends(true) },
+        { text: t('Ahora no'), style: "cancel", onPress: () => setShareWithFriends(false) },
+        { text: t('Compartir'), onPress: () => setShareWithFriends(true) },
       ],
     );
   }, [isDemo, friendCount, shareWithFriends, setShareWithFriends]);
@@ -289,6 +320,21 @@ export default function NavigationScreen() {
   const vehicleName = primaryVehicle
     ? `${primaryVehicle.make} ${primaryVehicle.model}`
     : undefined;
+  const [firstWelcome] = useState(takeFirstWelcome);
+  const [introHour] = useState(() => new Date().getHours());
+  const introGreeting = useMemo(
+    () =>
+      buildGreeting({
+        name: me.name,
+        hour: introHour,
+        firstTime: firstWelcome,
+        partyName: party?.name,
+        vehicleName: primaryVehicle?.nickname || vehicleName,
+        friendsOnMap: mapFriends.length,
+        totalDistanceM: tripDistanceM,
+      }),
+    [me.name, introHour, firstWelcome, party?.name, primaryVehicle?.nickname, vehicleName, mapFriends.length, tripDistanceM],
+  );
   // Los viajes simulados no se graban, salvo en la prueba de grabación
   // (quedan marcados como prueba y se borran al parar).
   const simRecords = useSimulator((state) => state.recordTrips);
@@ -299,7 +345,7 @@ export default function NavigationScreen() {
   const speedLabel =
     live.location.speedKmh == null
       ? "--"
-      : String(Math.round(live.location.speedKmh));
+      : String(displaySpeed(live.location.speedKmh));
   const routeLine = route.route
     ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
     : null;
@@ -438,7 +484,7 @@ export default function NavigationScreen() {
 
   const arrivalLabel =
     route.route && remainingTimeMs != null
-      ? new Date(clockNow + remainingTimeMs).toLocaleTimeString("es-DO", {
+      ? new Date(clockNow + remainingTimeMs).toLocaleTimeString(getLocale(), {
           hour: "2-digit",
           minute: "2-digit",
         })
@@ -463,7 +509,7 @@ export default function NavigationScreen() {
     const mapLink = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
     try {
       await Share.share({
-        message: `Ruta de Caravana → ${label}\n${mapLink}\nÁbrela en la app: ${deepLink}`,
+        message: t('Ruta de Caravana → {0}\n{1}\nÁbrela en la app: {2}', label, mapLink, deepLink),
         url: deepLink,
       });
     } catch {
@@ -495,7 +541,7 @@ export default function NavigationScreen() {
     useChosenDestination.getState().setDestination({
       latitude: parkingSpot.latitude,
       longitude: parkingSpot.longitude,
-      label: "Mi coche",
+      label: t('Mi coche'),
       personal: true,
     });
     beginNavigation();
@@ -506,13 +552,13 @@ export default function NavigationScreen() {
   const inviteToConvoy = async (friend: WorldMapMember) => {
     if (isDemo) {
       Alert.alert(
-        "Convoy",
-        "Los convoys reales requieren una cuenta conectada.",
+        t('Convoy'),
+        t('Los convoys reales requieren una cuenta conectada.'),
       );
       return;
     }
     if (party?.members.some((member) => member.userId === friend.id)) {
-      Alert.alert("Convoy", `${friend.name.split(" ")[0]} ya está en tu party.`);
+      Alert.alert(t('Convoy'), t('{0} ya está en tu party.', friend.name.split(" ")[0]));
       return;
     }
     try {
@@ -522,35 +568,35 @@ export default function NavigationScreen() {
         myName: me.name,
       });
       Alert.alert(
-        "Invitación enviada",
-        `${friend.name.split(" ")[0]} la verá al momento. Cuando acepte, aparecerá en tu party.`,
+        t('Invitación enviada'),
+        t('{0} la verá al momento. Cuando acepte, aparecerá en tu party.', friend.name.split(" ")[0]),
       );
     } catch (error) {
-      showError("Convoy", error, "No pudimos invitar.");
+      showError(t('Convoy'), error, t('No pudimos invitar.'));
     }
   };
 
   const challengeFriend = (friend: WorldMapMember) => {
     if (isDemo) {
-      Alert.alert("Retos", "Los retos reales requieren una cuenta conectada.");
+      Alert.alert(t('Retos'), t('Los retos reales requieren una cuenta conectada.'));
       return;
     }
     // El reto es llegar primero a una meta: sin destino no hay meta.
     const goal = destination ?? partyDestination;
     if (!goal) {
       Alert.alert(
-        "Elige la meta",
-        "Busca un destino en el mapa y vuelve a retar: gana quien llegue primero ahí.",
+        t('Elige la meta'),
+        t('Busca un destino en el mapa y vuelve a retar: gana quien llegue primero ahí.'),
       );
       return;
     }
     Alert.alert(
-      `Reto a ${friend.name.split(" ")[0]}`,
-      "Reto por llegada: gana quien llegue primero al destino, respetando las leyes.",
+      t('Reto a {0}', friend.name.split(" ")[0]),
+      t('Reto por llegada: gana quien llegue primero al destino, respetando las leyes.'),
       [
-        { text: "Cancelar", style: "cancel" },
+        { text: t('Cancelar'), style: "cancel" },
         {
-          text: "Reto",
+          text: t('Reto'),
           style: "destructive",
           onPress: () => {
             void createChallenge
@@ -558,25 +604,25 @@ export default function NavigationScreen() {
                 title: `Reto: ${friend.name.split(" ")[0]}`,
                 category: "mixed",
                 mode: "instant",
-                fromLabel: "Mi ubicación",
+                fromLabel: t('Mi ubicación'),
                 toLabel: goal.label,
                 endLat: goal.latitude,
                 endLng: goal.longitude,
                 distanceKm: (route.route?.distanceM ?? 0) / 1000,
                 rules:
-                  "Por llegada: gana quien llegue primero respetando las leyes.",
+                  t('Por llegada: gana quien llegue primero respetando las leyes.'),
                 hostVehicleId: primaryVehicle?.id,
                 hostVehicleKind: primaryVehicle?.kind ?? "car",
                 invitees: [{ userId: friend.id, vehicleKind: "car" }],
               })
               .then(() =>
                 Alert.alert(
-                  "Reto enviado",
-                  "Verás la respuesta en la pestaña Retos.",
+                  t('Reto enviado'),
+                  t('Verás la respuesta en la pestaña Retos.'),
                 ),
               )
               .catch((error: unknown) =>
-                showError("Reto", error, "No pudimos crear el reto."),
+                showError(t('Reto'), error, t('No pudimos crear el reto.')),
               );
           },
         },
@@ -606,7 +652,7 @@ export default function NavigationScreen() {
               return {
                 index,
                 coordinates: option.coordinates,
-                label: extra > 0 ? `+${extra} min` : "Igual de rápida",
+                label: extra > 0 ? t('+{0} min', extra) : t('Igual de rápida'),
               };
             })
             .filter((option) => option.index !== route.selected),
@@ -637,7 +683,7 @@ export default function NavigationScreen() {
       removeStop(0);
       if (!label) return;
       setStopNotice(label);
-      if (!voiceMuted) Speech.speak(`Parada: ${label}`, { language: "es-ES" });
+      if (!voiceMuted) Speech.speak(t("Parada: {0}", label), { language: speechLanguage() });
     }, 0);
     return () => clearTimeout(timer);
   }, [atNextStop, removeStop, voiceMuted]);
@@ -673,7 +719,7 @@ export default function NavigationScreen() {
       // La guía por voz se calla al terminar la ruta: el aviso va después.
       if (!voiceMuted) {
         setTimeout(
-          () => Speech.speak(`Has llegado a ${label}`, { language: "es-ES" }),
+          () => Speech.speak(t('Has llegado a {0}', label), { language: speechLanguage() }),
           600,
         );
       }
@@ -759,7 +805,7 @@ export default function NavigationScreen() {
   const convoyDestinationSetter = party?.members.find(
     (member) => member.userId === partyDestination?.setBy,
   );
-  const setterName = convoyDestinationSetter?.profile.displayName ?? "Un piloto";
+  const setterName = convoyDestinationSetter?.profile.displayName ?? t('Un piloto');
 
   // Recuerda el destino del convoy que vas siguiendo.
   useEffect(() => {
@@ -890,6 +936,7 @@ export default function NavigationScreen() {
         vehicleKind={primaryVehicle?.kind}
         recenterToken={recenterToken}
         focus={parkingFocus}
+        intro={introActive ? INTRO_PLAN : null}
         drivingLine={drivingLine?.data ?? null}
         ornamentBottom={navigating ? 4 : bottomHeight + spacing.md + 6}
         onFollowChange={handleFollowChange}
@@ -900,10 +947,11 @@ export default function NavigationScreen() {
 
       <MapChromeContext.Provider value={chrome}>
         <View
-          pointerEvents="box-none"
+          pointerEvents={introActive ? "none" : "box-none"}
           style={[
             styles.overlay,
             { paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md },
+            introActive && styles.hidden,
           ]}
         >
           {navigating && destination ? (
@@ -922,7 +970,7 @@ export default function NavigationScreen() {
               )}
               destinationLabel={
                 stops.length > 0
-                  ? `${stops[0].label} · luego ${destination.label}`
+                  ? t('{0} · luego {1}', stops[0].label, destination.label)
                   : destination.label
               }
               speedLabel={speedLabel}
@@ -950,7 +998,7 @@ export default function NavigationScreen() {
                   <Ionicons name="navigate-circle" size={20} color={chrome.text} />
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
-                      Siguiendo a {followTarget.name.split(" ")[0]}
+                      {t('Siguiendo a')}{' '}{followTarget.name.split(" ")[0]}
                     </AppText>
                     <AppText variant="caption" color={chrome.muted}>
                       {followStatus(
@@ -970,10 +1018,10 @@ export default function NavigationScreen() {
                     }}
                     hitSlop={10}
                     accessibilityRole="button"
-                    accessibilityLabel="Dejar de seguir"
+                    accessibilityLabel={t('Dejar de seguir')}
                   >
                     <AppText variant="bodyStrong" color={chrome.muted} style={{ fontSize: 13 }}>
-                      Dejar
+                      {t('Dejar')}
                     </AppText>
                   </Pressable>
                 </View>
@@ -982,7 +1030,7 @@ export default function NavigationScreen() {
                 <View style={[styles.convoyNotice, chrome.surface]} pointerEvents="none">
                   <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
                   <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1} style={{ flex: 1 }}>
-                    Parada hecha: {stopNotice}
+                    {t('Parada hecha:')}{' '}{stopNotice}
                   </AppText>
                 </View>
               ) : null}
@@ -990,12 +1038,13 @@ export default function NavigationScreen() {
                 <View style={[styles.convoyNotice, chrome.surface]} pointerEvents="none">
                   <Ionicons name="flag" size={16} color={chrome.text} />
                   <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={{ flex: 1 }}>
-                    {convoyNotice.name} cambió el destino: {convoyNotice.label}
+                    {convoyNotice.name}{' '}{t('cambió el destino:')}{' '}{convoyNotice.label}
                   </AppText>
                 </View>
               ) : null}
               {offerConvoyDestination && partyDestination && !followTarget ? (
                 <ConvoyDestinationCard
+                  key={partyDestination.setAt}
                   setterName={setterName}
                   label={partyDestination.label}
                   changed
@@ -1012,11 +1061,11 @@ export default function NavigationScreen() {
                 <View style={[styles.convoyNotice, chrome.surface, styles.followWaiting]}>
                   <Ionicons name="navigate-circle" size={20} color={chrome.text} />
                   <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={{ flex: 1 }}>
-                    Siguiendo a {followTarget.name.split(" ")[0]} · esperando su posición
+                    {t('Siguiendo a')}{' '}{followTarget.name.split(" ")[0]}{' '}{t('· esperando su posición')}
                   </AppText>
                   <Pressable onPress={stopFollowing} hitSlop={10} accessibilityRole="button">
                     <AppText variant="bodyStrong" color={chrome.muted} style={{ fontSize: 13 }}>
-                      Dejar
+                      {t('Dejar')}
                     </AppText>
                   </Pressable>
                 </View>
@@ -1029,7 +1078,7 @@ export default function NavigationScreen() {
                     style={styles.searchTap}
                     onPress={() => router.push("/destino" as Href)}
                     accessibilityRole="button"
-                    accessibilityLabel="Buscar destino"
+                    accessibilityLabel={t('Buscar destino')}
                   >
                     <Ionicons name="search" size={20} color={chrome.accent} />
                     <AppText
@@ -1038,7 +1087,7 @@ export default function NavigationScreen() {
                       color={chrome.muted}
                       style={styles.searchText}
                     >
-                      ¿A dónde vamos?
+                      {t('¿A dónde vamos?')}
                     </AppText>
                   </Pressable>
                   <Pressable
@@ -1046,7 +1095,7 @@ export default function NavigationScreen() {
                     hitSlop={8}
                     style={styles.searchIcon}
                     accessibilityRole="button"
-                    accessibilityLabel="Actividad"
+                    accessibilityLabel={t('Actividad')}
                   >
                     <Ionicons name="pulse" size={20} color={chrome.textSoft} />
                   </Pressable>
@@ -1054,7 +1103,7 @@ export default function NavigationScreen() {
                     onPress={() => router.push("/(tabs)/profile")}
                     hitSlop={6}
                     accessibilityRole="button"
-                    accessibilityLabel="Tu perfil"
+                    accessibilityLabel={t('Tu perfil')}
                   >
                     <Avatar
                       name={me.name}
@@ -1082,7 +1131,7 @@ export default function NavigationScreen() {
                         useChosenDestination.getState().setDestination(recent);
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel={`Ir a ${recent.label}`}
+                      accessibilityLabel={t('Ir a {0}', recent.label)}
                     >
                       <Ionicons
                         name="time-outline"
@@ -1113,9 +1162,7 @@ export default function NavigationScreen() {
                   >
                     {sim.stats
                       ? sim.stats
-                      : `SIMULACIÓN · ${PHASE_LABELS[sim.phase]} · ${Math.round(sim.fix?.speedKmh ?? 0)} km/h${
-                          sim.party ? " · party" : ""
-                        }`}
+                      : t('SIMULACIÓN · {0} · {1} {2}{3}', PHASE_LABELS[sim.phase], displaySpeed(sim.fix?.speedKmh ?? 0), speedUnit(), sim.party ? " · party" : "")}
                   </AppText>
                   <Pressable
                     onPress={() => router.push("/simulador" as Href)}
@@ -1126,7 +1173,7 @@ export default function NavigationScreen() {
                       color="#7c3aed"
                       style={styles.retryText}
                     >
-                      OPCIONES
+                      {t('OPCIONES')}
                     </AppText>
                   </Pressable>
                   <Pressable onPress={stopSimulation} hitSlop={8}>
@@ -1135,7 +1182,7 @@ export default function NavigationScreen() {
                       color={colors.accent}
                       style={styles.retryText}
                     >
-                      PARAR
+                      {t('PARAR')}
                     </AppText>
                   </Pressable>
                 </View>
@@ -1152,12 +1199,12 @@ export default function NavigationScreen() {
                     numberOfLines={2}
                     style={styles.bannerText}
                   >
-                    Has llegado a {arrivedLabel}
+                    {t('Has llegado a')}{' '}{arrivedLabel}
                   </AppText>
                   <Pressable
                     onPress={() => setArrivedLabel(null)}
                     hitSlop={8}
-                    accessibilityLabel="Cerrar aviso"
+                    accessibilityLabel={t('Cerrar aviso')}
                   >
                     <Ionicons name="close" size={18} color={chrome.muted} />
                   </Pressable>
@@ -1168,16 +1215,15 @@ export default function NavigationScreen() {
                 <View style={[styles.recordingPill, chrome.surface]}>
                   <View style={styles.recordingDot} />
                   <AppText variant="caption" color={chrome.textSoft}>
-                    Grabando ruta ·{" "}
+                    {t('Grabando ruta ·')}{" "}
                     {Math.max(
                       1,
                       Math.round(
                         (recordingNow - activeTrip.startedAt) / 60_000,
                       ),
                     )}{" "}
-                    min ·{" "}
-                    {(activeTrip.distanceM / 1000).toFixed(1).replace(".", ",")}{" "}
-                    km
+                    {t('min ·')}{" "}
+                    {formatDistance(activeTrip.distanceM)}
                   </AppText>
                 </View>
               ) : null}
@@ -1195,12 +1241,12 @@ export default function NavigationScreen() {
                     onPress={showParkedCar}
                     onLongPress={() =>
                       Alert.alert(
-                        "Coche aparcado",
-                        "¿Olvidar la ubicación guardada?",
+                        t('Coche aparcado'),
+                        t('¿Olvidar la ubicación guardada?'),
                         [
-                          { text: "Cancelar", style: "cancel" },
+                          { text: t('Cancelar'), style: "cancel" },
                           {
-                            text: "Olvidar",
+                            text: t('Olvidar'),
                             style: "destructive",
                             onPress: clearParking,
                           },
@@ -1208,7 +1254,7 @@ export default function NavigationScreen() {
                       )
                     }
                     accessibilityRole="button"
-                    accessibilityLabel="Ver mi coche aparcado en el mapa"
+                    accessibilityLabel={t('Ver mi coche aparcado en el mapa')}
                   >
                     <Ionicons name="car" size={15} color={parkingTint} />
                     <AppText
@@ -1217,7 +1263,7 @@ export default function NavigationScreen() {
                       style={styles.parkingText}
                       numberOfLines={1}
                     >
-                      Tu coche aparcado ·{" "}
+                      {t('Tu coche aparcado ·')}{" "}
                       {formatParkingDistance(parkingDistance)}
                     </AppText>
                   </Pressable>
@@ -1226,7 +1272,7 @@ export default function NavigationScreen() {
                     hitSlop={8}
                     style={styles.parkingGo}
                     accessibilityRole="button"
-                    accessibilityLabel="Ir a mi coche aparcado"
+                    accessibilityLabel={t('Ir a mi coche aparcado')}
                   >
                     <Ionicons name="navigate" size={14} color={parkingTint} />
                   </Pressable>
@@ -1251,7 +1297,7 @@ export default function NavigationScreen() {
                         color={chrome.accent}
                         style={styles.retryText}
                       >
-                        REINTENTAR
+                        {t('REINTENTAR')}
                       </AppText>
                     </Pressable>
                   ) : null}
@@ -1281,7 +1327,7 @@ export default function NavigationScreen() {
                       color={chrome.accent}
                       style={styles.retryText}
                     >
-                      REINTENTAR
+                      {t('REINTENTAR')}
                     </AppText>
                   </Pressable>
                 </View>
@@ -1343,6 +1389,7 @@ export default function NavigationScreen() {
 
                 {offerConvoyDestination && partyDestination ? (
                   <ConvoyDestinationCard
+                    key={partyDestination.setAt}
                     setterName={setterName}
                     label={partyDestination.label}
                     changed={isNavigating}
@@ -1361,10 +1408,10 @@ export default function NavigationScreen() {
                     inviting={inviteToParty.isPending}
                     inviteLabel={
                       party?.members.some((member) => member.userId === selectedFriend.id)
-                        ? "En tu party"
+                        ? t('En tu party')
                         : party
-                          ? "Invitar a mi party"
-                          : "Crear party e invitar"
+                          ? t('Invitar a mi party')
+                          : t('Crear party e invitar')
                     }
                     onInvite={() => void inviteToConvoy(selectedFriend)}
                     onChallenge={() => challengeFriend(selectedFriend)}
@@ -1389,11 +1436,16 @@ export default function NavigationScreen() {
           )}
         </View>
       </MapChromeContext.Provider>
+
+      {introActive ? (
+        <GalaxyIntro greeting={introGreeting} onDone={endIntro} />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  hidden: { opacity: 0 },
   convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm },
   followWaiting: { marginBottom: spacing.sm },
   convoyNotice: {

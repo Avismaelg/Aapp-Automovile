@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/src/components/ui';
 import { colors, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 type Props = { children: ReactNode };
 
@@ -38,12 +39,12 @@ export class AppErrorBoundary extends Component<Props, State> {
             <AppText variant="h2" color={colors.accent}>!</AppText>
           </View>
           <AppText variant="h1" align="center">
-            Algo se detuvo
+            {t('Algo se detuvo')}
           </AppText>
           <AppText variant="body" color={colors.muted} align="center" style={styles.message}>
-            Caravana no pudo mostrar esta pantalla. Tus datos guardados siguen a salvo.
+            {t('Caravana no pudo mostrar esta pantalla. Tus datos guardados siguen a salvo.')}
           </AppText>
-          <Button label="Reintentar" icon="refresh" onPress={this.retry} style={styles.button} />
+          <Button label={t('Reintentar')} icon="refresh" onPress={this.retry} style={styles.button} />
         </View>
       </SafeAreaView>
     );

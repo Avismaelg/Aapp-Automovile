@@ -5,6 +5,7 @@ import { create } from 'zustand';
 
 import { currentUser } from '@/src/data/mock';
 import { isProductionBuild, isSupabaseConfigured, supabase } from '@/src/lib/supabase';
+import { t } from '@/src/i18n';
 
 const DEMO_KEY = 'caravana.auth.demo-mode';
 
@@ -170,29 +171,29 @@ function friendlyAuthError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes('invalid login credentials')) {
-    return 'Correo o contraseña incorrectos.';
+    return t('Correo o contraseña incorrectos.');
   }
   if (normalized.includes('email not confirmed')) {
-    return 'Confirma tu correo antes de iniciar sesión.';
+    return t('Confirma tu correo antes de iniciar sesión.');
   }
   if (normalized.includes('already registered') || normalized.includes('already been registered')) {
-    return 'Ese correo ya tiene una cuenta. Inicia sesión.';
+    return t('Ese correo ya tiene una cuenta. Inicia sesión.');
   }
   if (normalized.includes('password')) {
-    return 'La contraseña no cumple los requisitos del proyecto (mínimo 6 caracteres).';
+    return t('La contraseña no cumple los requisitos del proyecto (mínimo 6 caracteres).');
   }
   if (normalized.includes('rate limit') || normalized.includes('too many')) {
-    return 'Demasiados intentos. Espera un momento y vuelve a probar.';
+    return t('Demasiados intentos. Espera un momento y vuelve a probar.');
   }
   if (normalized.includes('email')) {
-    return 'Revisa el correo y vuelve a intentarlo.';
+    return t('Revisa el correo y vuelve a intentarlo.');
   }
 
-  return 'No pudimos completar la operación. Revisa tu conexión e inténtalo de nuevo.';
+  return t('No pudimos completar la operación. Revisa tu conexión e inténtalo de nuevo.');
 }
 
 function missingConfigMessage() {
-  return 'Supabase no está configurado. Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY para activar las cuentas reales.';
+  return t('Supabase no está configurado. Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY para activar las cuentas reales.');
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -213,7 +214,7 @@ export const useAuth = create<AuthState>((set) => ({
           set({
             status: 'unauthenticated',
             account: null,
-            error: 'La configuración de producción está incompleta. Contacta con soporte.',
+            error: t('La configuración de producción está incompleta. Contacta con soporte.'),
           });
           return;
         }
@@ -287,7 +288,7 @@ export const useAuth = create<AuthState>((set) => ({
       set({
         status: 'unauthenticated',
         account: null,
-        error: 'No pudimos restaurar la sesión. Vuelve a iniciar sesión.',
+        error: t('No pudimos restaurar la sesión. Vuelve a iniciar sesión.'),
       });
     }
   },
@@ -314,7 +315,7 @@ export const useAuth = create<AuthState>((set) => ({
       }
 
       if (!data.user) {
-        const message = 'No recibimos tu cuenta. Inténtalo de nuevo.';
+        const message = t('No recibimos tu cuenta. Inténtalo de nuevo.');
         set({ busy: false, error: message });
         return { ok: false, message };
       }
@@ -323,7 +324,7 @@ export const useAuth = create<AuthState>((set) => ({
       set({ status: 'authenticated', account, busy: false, error: null });
       return { ok: true };
     } catch {
-      const message = 'No pudimos conectar con Supabase. Revisa tu conexión.';
+      const message = t('No pudimos conectar con Supabase. Revisa tu conexión.');
       set({ busy: false, error: message });
       return { ok: false, message };
     }
@@ -368,10 +369,10 @@ export const useAuth = create<AuthState>((set) => ({
         ok: true,
         needsConfirmation: true,
         message:
-          'Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.',
+          t('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.'),
       };
     } catch {
-      const message = 'No pudimos crear la cuenta. Revisa tu conexión.';
+      const message = t('No pudimos crear la cuenta. Revisa tu conexión.');
       set({ busy: false, error: message });
       return { ok: false, message };
     }
@@ -379,7 +380,7 @@ export const useAuth = create<AuthState>((set) => ({
 
   continueAsDemo: async () => {
     if (isProductionBuild) {
-      set({ error: 'El modo demo no está disponible en producción.' });
+      set({ error: t('El modo demo no está disponible en producción.') });
       return;
     }
     await AsyncStorage.setItem(DEMO_KEY, '1');

@@ -17,6 +17,7 @@ type MotionNative = {
   getEvents(sinceMs: number): MotionEvent[];
   isIgnoringBatteryOptimizations(): boolean;
   requestIgnoreBatteryOptimizations(): boolean;
+  restartApp(): boolean;
 };
 
 // Solo existe en Android; en iOS y web no hay sensor de actividad y la
@@ -66,6 +67,15 @@ export function requestIgnoreBatteryOptimizations() {
   if (!native) return false;
   try {
     return native.requestIgnoreBatteryOptimizations();
+  } catch {
+    return false;
+  }
+}
+
+// Reinicia la app (Android). Devuelve false si no se pudo (iOS, web).
+export function restartApp() {
+  try {
+    return native?.restartApp() ?? false;
   } catch {
     return false;
   }

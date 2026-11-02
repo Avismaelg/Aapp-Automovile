@@ -15,6 +15,7 @@ import {
   maintenanceTotal,
   ownershipLabel,
 } from '@/src/lib/vehicle-history';
+import { getCurrency, getLanguage, getLocale, t } from '@/src/i18n';
 
 function escapeHtml(value: string) {
   return value
@@ -27,7 +28,7 @@ function escapeHtml(value: string) {
 export async function exportFuelReport({
   vehicle,
   logs,
-  currency = 'DOP',
+  currency = getCurrency(),
 }: {
   vehicle: string;
   logs: FuelLog[];
@@ -67,7 +68,7 @@ export async function exportFuelReport({
     .join('');
 
   const html = `<!doctype html>
-<html lang="es">
+<html lang="${getLanguage()}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -87,34 +88,34 @@ export async function exportFuelReport({
 </head>
 <body>
   <div class="brand">● CARAVANA</div>
-  <h1>${electric ? 'Reporte de energía' : 'Reporte de combustible'}</h1>
-  <div class="muted">${escapeHtml(vehicle)} · Generado el ${new Date().toLocaleDateString('es-DO')}</div>
+  <h1>${electric ? t('Reporte de energía') : t('Reporte de combustible')}</h1>
+  <div class="muted">${escapeHtml(vehicle)} · ${t('Generado el {0}', new Date().toLocaleDateString(getLocale()))}</div>
 
   <div class="grid">
     <div class="card">
-      <div class="muted">${electric ? 'Consumo' : 'Rendimiento'}</div>
-      <div class="value">${formatNumber(efficiency, 1)} ${electric ? 'kWh/100 km' : 'km/L'}</div>
+      <div class="muted">${electric ? t('Consumo') : t('Rendimiento')}</div>
+      <div class="value">${formatNumber(efficiency, 1)} ${electric ? t('kWh/100 km') : 'km/L'}</div>
     </div>
     <div class="card">
-      <div class="muted">${electric ? 'Energía' : 'Combustible'}</div>
+      <div class="muted">${electric ? t('Energía') : t('Combustible')}</div>
       <div class="value">${formatNumber(totalEnergy, 1)} ${energyUnit}</div>
     </div>
-    <div class="card"><div class="muted">Gasto</div><div class="value">${formatMoney(totalCost, currency)}</div></div>
+    <div class="card"><div class="muted">${t('Gasto')}</div><div class="value">${formatMoney(totalCost, currency)}</div></div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>Fecha</th><th>${electric ? 'Cargador' : 'Estación'}</th>
-        <th>${electric ? 'kWh' : 'Litros'}</th><th>Precio</th><th>Total</th><th>Odómetro</th>
+        <th>${t('Fecha')}</th><th>${electric ? t('Cargador') : t('Estación')}</th>
+        <th>${electric ? 'kWh' : t('Litros')}</th><th>${t('Precio')}</th><th>${t('Total')}</th><th>${t('Odómetro')}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
 
   <div class="footer">
-    Caravana · Reporte generado automáticamente.
-    ${electric ? 'Los cálculos usan el consumo real de energía.' : 'Los cálculos usan el método de tanque lleno.'}
+    ${t('Caravana · Reporte generado automáticamente.')}
+    ${electric ? t('Los cálculos usan el consumo real de energía.') : t('Los cálculos usan el método de tanque lleno.')}
   </div>
 </body>
 </html>`;
@@ -128,7 +129,7 @@ export async function exportFuelReport({
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
-      dialogTitle: 'Compartir reporte de Caravana',
+      dialogTitle: t('Compartir reporte de Caravana'),
       UTI: 'com.adobe.pdf',
     });
   }
@@ -141,7 +142,7 @@ export async function exportVehicleSaleReport({
   ownerUsername,
   maintenance,
   fuelLogs,
-  currency = 'DOP',
+  currency = getCurrency(),
 }: {
   vehicle: Vehicle;
   ownerName: string;
@@ -152,15 +153,15 @@ export async function exportVehicleSaleReport({
 }) {
   const electric = vehicle.fuel === 'electric';
   const kindLabels = {
-    car: 'Coche',
-    motorcycle: 'Motocicleta',
+    car: t('Coche'),
+    motorcycle: t('Motocicleta'),
     ev: 'EV',
-    truck: 'Camión / pickup',
+    truck: t('Camión / pickup'),
   } as const;
   const fuelLabels = {
-    gasoline: 'Gasolina',
-    diesel: 'Diésel',
-    electric: 'Eléctrico',
+    gasoline: t('Gasolina'),
+    diesel: t('Diésel'),
+    electric: t('Eléctrico'),
   } as const;
   const totalMaintenance = maintenanceTotal(maintenance);
   const totalEnergy = fuelLogs.reduce((sum, log) => sum + logEnergy(log), 0);
@@ -196,7 +197,7 @@ export async function exportVehicleSaleReport({
     .join('');
 
   const html = `<!doctype html>
-<html lang="es">
+<html lang="${getLanguage()}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -217,53 +218,50 @@ export async function exportVehicleSaleReport({
 </style>
 </head>
 <body>
-  <div class="brand">● CARAVANA · FICHA DE VENTA</div>
+  <div class="brand">● CARAVANA · ${t('FICHA DE VENTA')}</div>
   <h1>${escapeHtml(vehicle.make)} ${escapeHtml(vehicle.model)} ${vehicle.year}</h1>
-  <div class="muted">${escapeHtml(vehicle.nickname)} · @${escapeHtml(ownerUsername)} · Generado el ${new Date().toLocaleDateString('es-DO')}</div>
+  <div class="muted">${escapeHtml(vehicle.nickname)} · @${escapeHtml(ownerUsername)} · ${t('Generado el {0}', new Date().toLocaleDateString(getLocale()))}</div>
 
   <div class="grid">
-    <div class="card"><div class="muted">Odómetro</div><div class="value">${formatNumber(vehicle.odometerKm, 0)} km</div></div>
-    <div class="card"><div class="muted">Mantenimientos</div><div class="value">${maintenance.length}</div></div>
-    <div class="card"><div class="muted">${electric ? 'Cargas' : 'Repostajes'}</div><div class="value">${fuelLogs.length}</div></div>
-    <div class="card"><div class="muted">Invertido en servicio</div><div class="value">${formatMoney(totalMaintenance, currency)}</div></div>
+    <div class="card"><div class="muted">${t('Odómetro')}</div><div class="value">${formatNumber(vehicle.odometerKm, 0)} km</div></div>
+    <div class="card"><div class="muted">${t('Mantenimientos')}</div><div class="value">${maintenance.length}</div></div>
+    <div class="card"><div class="muted">${electric ? t('Cargas') : t('Repostajes')}</div><div class="value">${fuelLogs.length}</div></div>
+    <div class="card"><div class="muted">${t('Invertido en servicio')}</div><div class="value">${formatMoney(totalMaintenance, currency)}</div></div>
   </div>
 
-  <h2>Propietario y uso</h2>
+  <h2>${t('Propietario y uso')}</h2>
   <table class="data">
-    <tr><td>Propietario</td><td>${escapeHtml(ownerName)} (@${escapeHtml(ownerUsername)})</td></tr>
-    <tr><td>En Caravana desde</td><td>${formatMonthYear(vehicle.acquiredAt)}</td></tr>
-    <tr><td>Periodo de uso</td><td>${escapeHtml(ownershipLabel(vehicle.acquiredAt))}</td></tr>
-    <tr><td>Kilómetros medidos</td><td>${formatNumber(kmTracked, 0)} km registrados entre repostajes</td></tr>
+    <tr><td>${t('Propietario')}</td><td>${escapeHtml(ownerName)} (@${escapeHtml(ownerUsername)})</td></tr>
+    <tr><td>${t('En Caravana desde')}</td><td>${formatMonthYear(vehicle.acquiredAt)}</td></tr>
+    <tr><td>${t('Periodo de uso')}</td><td>${escapeHtml(ownershipLabel(vehicle.acquiredAt))}</td></tr>
+    <tr><td>${t('Kilómetros medidos')}</td><td>${formatNumber(kmTracked, 0)} ${t('km registrados entre repostajes')}</td></tr>
   </table>
 
-  <h2>Datos técnicos</h2>
+  <h2>${t('Datos técnicos')}</h2>
   <table class="data">
-    <tr><td>Marca / modelo</td><td>${escapeHtml(vehicle.make)} ${escapeHtml(vehicle.model)}</td></tr>
-    <tr><td>Año</td><td>${vehicle.year}</td></tr>
-    <tr><td>Carrocería</td><td>${kindLabels[vehicle.kind]}</td></tr>
-    <tr><td>Energía</td><td>${fuelLabels[vehicle.fuel]}</td></tr>
-    <tr><td>Rendimiento</td><td>${formatNumber(vehicle.efficiency, 1)} ${vehicle.efficiencyUnit === 'kwh_100km' ? 'kWh/100 km' : 'km/L'}</td></tr>
-    <tr><td>Odómetro actual</td><td>${formatNumber(vehicle.odometerKm, 0)} km</td></tr>
+    <tr><td>${t('Marca / modelo')}</td><td>${escapeHtml(vehicle.make)} ${escapeHtml(vehicle.model)}</td></tr>
+    <tr><td>${t('Año')}</td><td>${vehicle.year}</td></tr>
+    <tr><td>${t('Carrocería')}</td><td>${kindLabels[vehicle.kind]}</td></tr>
+    <tr><td>${t('Energía')}</td><td>${fuelLabels[vehicle.fuel]}</td></tr>
+    <tr><td>${t('Rendimiento')}</td><td>${formatNumber(vehicle.efficiency, 1)} ${vehicle.efficiencyUnit === 'kwh_100km' ? t('kWh/100 km') : 'km/L'}</td></tr>
+    <tr><td>${t('Odómetro actual')}</td><td>${formatNumber(vehicle.odometerKm, 0)} km</td></tr>
   </table>
 
-  <h2>Historial de mantenimiento</h2>
+  <h2>${t('Historial de mantenimiento')}</h2>
   <table>
-    <thead><tr><th>Fecha</th><th>Servicio</th><th>Odómetro</th><th>Taller</th><th>Coste</th></tr></thead>
-    <tbody>${maintenanceRows || '<tr><td colspan="5">Sin mantenimientos registrados.</td></tr>'}</tbody>
+    <thead><tr><th>${t('Fecha')}</th><th>${t('Servicio')}</th><th>${t('Odómetro')}</th><th>${t('Taller')}</th><th>${t('Coste')}</th></tr></thead>
+    <tbody>${maintenanceRows || `<tr><td colspan="5">${t('Sin mantenimientos registrados.')}</td></tr>`}</tbody>
   </table>
 
-  <h2>${electric ? 'Cargas de energía' : 'Repostajes'}</h2>
+  <h2>${electric ? t('Cargas de energía') : t('Repostajes')}</h2>
   <table>
-    <thead><tr><th>Fecha</th><th>${electric ? 'Cargador' : 'Estación'}</th><th>Energía</th><th>Coste</th><th>Odómetro</th></tr></thead>
-    <tbody>${fuelRows || '<tr><td colspan="5">Sin registros.</td></tr>'}</tbody>
+    <thead><tr><th>${t('Fecha')}</th><th>${electric ? t('Cargador') : t('Estación')}</th><th>${t('Energía')}</th><th>${t('Coste')}</th><th>${t('Odómetro')}</th></tr></thead>
+    <tbody>${fuelRows || `<tr><td colspan="5">${t('Sin registros.')}</td></tr>`}</tbody>
   </table>
 
   <div class="footer">
-    Ficha informativa generada por el propietario en Caravana. No incluye placa, ubicación exacta,
-    teléfono ni datos de pago. Los datos proceden de los registros del propietario y no sustituyen
-    una inspección mecánica independiente.<br />
-    Energía total registrada: ${formatNumber(totalEnergy, 1)} ${electric ? 'kWh' : 'L'} ·
-    Gasto total registrado: ${formatMoney(totalFuelCost, currency)}.
+    ${t('Ficha informativa generada por el propietario en Caravana. No incluye placa, ubicación exacta, teléfono ni datos de pago. Los datos proceden de los registros del propietario y no sustituyen una inspección mecánica independiente.')}<br />
+    ${t('Energía total registrada: {0} · Gasto total registrado: {1}.', `${formatNumber(totalEnergy, 1)} ${electric ? 'kWh' : 'L'}`, formatMoney(totalFuelCost, currency))}
   </div>
 </body>
 </html>`;
@@ -277,7 +275,7 @@ export async function exportVehicleSaleReport({
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
-      dialogTitle: 'Compartir ficha de venta de Caravana',
+      dialogTitle: t('Compartir ficha de venta de Caravana'),
       UTI: 'com.adobe.pdf',
     });
   }

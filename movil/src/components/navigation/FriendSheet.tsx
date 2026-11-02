@@ -4,11 +4,12 @@ import { AppText, Avatar, Button, IconButton } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 export function FriendSheet({
   friend,
-  status = 'En el mapa',
-  inviteLabel = 'Invitar al convoy',
+  status = t('En el mapa'),
+  inviteLabel = t('Invitar al convoy'),
   inviting = false,
   onInvite,
   onChallenge,
@@ -59,12 +60,12 @@ export function FriendSheet({
           size="sm"
           icon="person-add"
           loading={inviting}
-          onPress={inviteLabel === 'En tu party' ? undefined : onInvite}
+          onPress={inviteLabel === t('En tu party') ? undefined : onInvite}
           style={styles.destinationAction}
         />
         {onFollow ? (
           <Button
-            label="Seguir"
+            label={t('Seguir')}
             variant="secondary"
             size="sm"
             icon="navigate"
@@ -73,7 +74,7 @@ export function FriendSheet({
           />
         ) : null}
         <Button
-          label="Retar"
+          label={t('Retar')}
           variant="secondary"
           size="sm"
           icon="flag"

@@ -6,6 +6,7 @@ import type { ChallengeFriend } from '@/src/lib/challenge-db';
 import type { ChallengeCategory } from '@/src/types/models';
 import { vehicleCategoryLabel, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { t } from '@/src/i18n';
 
 type Props = {
   loading: boolean;
@@ -30,18 +31,18 @@ export function FriendPicker({
     <View style={styles.noRivals}>
       <ActivityIndicator size="small" color={colors.accent} />
       <AppText variant="caption" color={colors.muted}>
-        Cargando tus amigos y vehículos…
+        {t('Cargando tus amigos y vehículos…')}
       </AppText>
     </View>
   ) : friends.length === 0 ? (
     <View style={styles.noRivals}>
       <Ionicons name="people-outline" size={22} color={colors.dim} />
       <AppText variant="caption" color={colors.muted}>
-        No tienes amigos con {vehicleCategoryLabel(category).toLowerCase()}. Invita a uno o cambia de categoría.
+        {t('No tienes amigos con')}{' '}{vehicleCategoryLabel(category).toLowerCase()}{t('. Invita a uno o cambia de categoría.')}
       </AppText>
       {showFindFriends ? (
         <Button
-          label="Buscar amigos"
+          label={t('Buscar amigos')}
           size="sm"
           variant="secondary"
           icon="person-add-outline"

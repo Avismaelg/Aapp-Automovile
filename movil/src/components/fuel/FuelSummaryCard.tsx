@@ -9,6 +9,7 @@ import type { Vehicle } from '@/src/types/models';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
+import { distanceUnit, getCurrency, t } from '@/src/i18n';
 
 type Props = {
   vehicle: Vehicle;
@@ -44,7 +45,7 @@ export function FuelSummaryCard({
     >
       <View style={styles.summaryLabelRow}>
         <AppText variant="label" color={colors.muted} style={{ flex: 1 }}>
-          {latest == null ? 'Consumo de referencia' : electric ? 'Consumo eléctrico real' : 'Último consumo'}
+          {latest == null ? t('Consumo de referencia') : electric ? t('Consumo eléctrico real') : t('Último consumo')}
         </AppText>
         <View style={[styles.kindBadge, { borderColor: `${meta.color}55` }]}>
           <Ionicons name={meta.icon} size={11} color={meta.color} />
@@ -62,7 +63,7 @@ export function FuelSummaryCard({
             </AppText>
           </View>
           <AppText variant="caption" color={colors.textSoft} style={{ marginTop: -2 }}>
-            {electric ? 'kWh/100 km' : 'km/L'}
+            {electric ? t('kWh/100 km') : 'km/L'}
           </AppText>
           {change != null ? (
             <View style={styles.summaryTrendLabel}>
@@ -72,12 +73,12 @@ export function FuelSummaryCard({
                 icon={change >= 0 ? 'trending-up' : 'trending-down'}
               />
               <AppText variant="label" color={colors.dim} style={{ fontSize: 8 }}>
-                VS. REGISTRO ANTERIOR
+                {t('VS. REGISTRO ANTERIOR')}
               </AppText>
             </View>
           ) : (
             <AppText variant="caption" color={colors.dim} style={{ marginTop: spacing.sm }}>
-              Registra dos repostajes con el tanque lleno para ver tu consumo real.
+              {t('Registra dos repostajes con el tanque lleno para ver tu consumo real.')}
             </AppText>
           )}
         </View>
@@ -90,16 +91,16 @@ export function FuelSummaryCard({
               height={44}
             />
             <AppText variant="label" color={colors.dim} style={{ fontSize: 8, marginTop: 4 }}>
-              ÚLTIMOS REGISTROS
+              {t('ÚLTIMOS REGISTROS')}
             </AppText>
           </View>
         ) : null}
       </View>
 
       <View style={styles.summaryStats}>
-        <Stat value={formatNumber(costPerKm, 2)} label="DOP / km" accent={meta.color} />
+        <Stat value={formatNumber(costPerKm, 2)} label={`${getCurrency()} / ${distanceUnit()}`} accent={meta.color} />
         <View style={styles.summaryDivider} />
-        <Stat value={formatMoney(totalSpent, 'DOP')} label="gastado" />
+        <Stat value={formatMoney(totalSpent)} label={t('gastado')} />
         <View style={styles.summaryDivider} />
         <Stat value={`${formatNumber(totalEnergy, 0)} ${electric ? 'kWh' : 'L'}`} label="cargados" />
       </View>
