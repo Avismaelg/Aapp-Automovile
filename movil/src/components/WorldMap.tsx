@@ -933,7 +933,7 @@ export const WorldMap = memo(function WorldMap({
             style={{
               lineCap: "round",
               lineJoin: "round",
-              lineColor: "#4de1ff",
+              lineColor: "#FF6A33",
               lineWidth: 4,
               lineDasharray: [2, 2],
               lineOpacity: 0.9,
@@ -1091,7 +1091,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#4de1ff",
+    backgroundColor: "#FF6A33",
     borderWidth: 2,
     borderColor: "#06080b",
     alignItems: "center",
@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
   parkedLabelWrap: { paddingBottom: 30 },
   parkingLabel: {
     marginTop: 3,
-    color: "#4de1ff",
+    color: "#FF6A33",
     backgroundColor: "#06131a",
     fontSize: 10,
     fontWeight: "800",

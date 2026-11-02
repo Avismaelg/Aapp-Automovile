@@ -867,7 +867,7 @@ export default function NavigationScreen() {
   // Los controles se ven claros sobre el mapa de día y oscuros de noche.
   const chrome =
     useMapTheme(live.location) === "day" ? DAY_CHROME : NIGHT_CHROME;
-  const parkingTint = chrome.day ? "#0891b2" : colors.cyan;
+  const parkingTint = chrome.accent;
 
   return (
     <View style={styles.root}>
@@ -1031,7 +1031,7 @@ export default function NavigationScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Buscar destino"
                   >
-                    <Ionicons name="search" size={20} color="#1a73e8" />
+                    <Ionicons name="search" size={20} color={chrome.accent} />
                     <AppText
                       variant="bodyStrong"
                       numberOfLines={1}
@@ -1248,7 +1248,7 @@ export default function NavigationScreen() {
                     <Pressable onPress={live.retry} hitSlop={8}>
                       <AppText
                         variant="label"
-                        color={chrome.day ? "#2f8cff" : colors.lime}
+                        color={chrome.accent}
                         style={styles.retryText}
                       >
                         REINTENTAR
@@ -1278,7 +1278,7 @@ export default function NavigationScreen() {
                   <Pressable onPress={retryMap} hitSlop={8}>
                     <AppText
                       variant="label"
-                      color={chrome.day ? "#2f8cff" : colors.lime}
+                      color={chrome.accent}
                       style={styles.retryText}
                     >
                       REINTENTAR
