@@ -2,6 +2,7 @@ import type { EventRoute } from '@/src/lib/events';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
 import { t } from '@/src/i18n';
+import { OSRM_URL } from '@/src/lib/providers';
 
 type RoutePoint = { latitude: number; longitude: number };
 
@@ -25,7 +26,7 @@ export async function fetchRouteThrough(
   }
 
   const path = points.map((point) => `${point.longitude},${point.latitude}`).join(';');
-  const url = `https://router.project-osrm.org/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=false&alternatives=false`;
+  const url = `${OSRM_URL}/route/v1/driving/${encodeURIComponent(path)}?overview=full&geometries=geojson&steps=false&alternatives=false`;
 
   const response = await fetchWithTimeout(url, {
     signal,

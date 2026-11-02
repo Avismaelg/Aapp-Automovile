@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/src/components/ui';
+import { recordError } from '@/src/lib/error-log';
 import { colors, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
 
@@ -20,9 +21,10 @@ export class AppErrorBoundary extends Component<Props, State> {
     return { error };
   }
 
-  componentDidCatch(_error: Error, _info: ErrorInfo) {
-    // El sistema de errores de producción puede enganchar este punto más
-    // adelante sin enseñar detalles internos al usuario.
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    // RNF-21: queda en el registro local de errores (sin mostrar detalles
+    // internos al usuario).
+    void recordError('render', error);
   }
 
   retry = () => {

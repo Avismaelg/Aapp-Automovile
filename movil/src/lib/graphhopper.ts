@@ -4,6 +4,7 @@ import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
 import { formatDistance, getLanguage, t } from '@/src/i18n';
+import { GRAPHHOPPER_TIMEOUT_MS, OSRM_TIMEOUT_MS, OSRM_URL } from '@/src/lib/providers';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -126,10 +127,11 @@ export async function fetchGraphHopperRoutes({
     params.push(`key=${encodeURIComponent(GRAPHHOPPER_API_KEY)}`);
   }
 
-  const response = await fetchWithTimeout(`${base}?${params.join('&')}`, {
-    signal,
-    headers: { Accept: 'application/json' },
-  });
+  const response = await fetchWithTimeout(
+    `${base}?${params.join('&')}`,
+    { signal, headers: { Accept: 'application/json' } },
+    GRAPHHOPPER_TIMEOUT_MS,
+  );
 
   const data = (await response.json()) as GraphHopperResponse;
   if (!response.ok || !data.paths?.[0]) {
@@ -171,7 +173,6 @@ type OsrmResponse = {
 
 // Servidor público de demostración de OSRM: rutas reales por calle sin API key.
 // Para producción conviene GraphHopper propio o un OSRM hospedado.
-const OSRM_URL = 'https://router.project-osrm.org';
 
 function routeFromOsrm(route: OsrmRoute): WorldMapRoute | null {
   const coordinates = validLatLng(route.geometry?.coordinates);
@@ -207,10 +208,11 @@ export async function fetchOsrmRoutes({
 }): Promise<WorldMapRoute[]> {
   const url = osrmUrl(origin, destination, stops);
 
-  const response = await fetchWithTimeout(url, {
-    signal,
-    headers: { Accept: 'application/json' },
-  });
+  const response = await fetchWithTimeout(
+    url,
+    { signal, headers: { Accept: 'application/json' } },
+    OSRM_TIMEOUT_MS,
+  );
   const data = (await response.json()) as OsrmResponse;
   if (!response.ok || !data.routes?.[0]) {
     throw new Error(data.code ? t('OSRM respondió {0}.', data.code) : t('OSRM no devolvió una ruta válida.'));

@@ -21,6 +21,7 @@ import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
+import { installErrorLogging } from '@/src/lib/error-log';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
@@ -30,6 +31,7 @@ import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
 SplashScreen.preventAutoHideAsync();
+installErrorLogging();
 // La app va en vertical; solo el modo conducción y la navegación giran
 // (useFreeOrientation). app.json deja «default» para que iOS lo permita.
 if (Platform.OS !== 'web') {

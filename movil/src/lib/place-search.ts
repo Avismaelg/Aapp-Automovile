@@ -2,6 +2,7 @@ import { DOMINICAN_PLACES, type KnownPlace } from '@/src/data/do-places';
 import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { getLanguage, t } from '@/src/i18n';
+import { NOMINATIM_URL, PHOTON_URL } from '@/src/lib/providers';
 
 export type SearchPlace = {
   id: string;
@@ -416,7 +417,7 @@ async function nominatim(
     if (bounded) params.set('bounded', '1');
   }
   const response = await fetchWithTimeout(
-    `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+    `${NOMINATIM_URL}/search?${params.toString()}`,
     { signal, headers: { 'User-Agent': 'Caravana/0.1 (app de conduccion en grupo)' } },
   );
   const data = (await response.json()) as NominatimPlace[];
@@ -451,7 +452,7 @@ async function photon(params: URLSearchParams, signal: AbortSignal) {
   if (Date.now() < photonDownUntil) throw new Error(t('Photon en pausa.'));
   try {
     const response = await fetchWithTimeout(
-      `https://photon.komoot.io/api/?${params.toString()}`,
+      `${PHOTON_URL}/api/?${params.toString()}`,
       { signal },
       5_000,
     );

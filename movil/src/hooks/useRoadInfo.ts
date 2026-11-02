@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { fetchWithTimeout } from '@/src/lib/network';
+import { NOMINATIM_URL } from '@/src/lib/providers';
+import { getLanguage } from '@/src/i18n';
 
 export type RoadInfo = {
   limitKmh: number | null;
@@ -88,7 +90,7 @@ export function useRoadInfo(
     void (async () => {
       try {
         const reverseUrl =
-          'https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&extratags=1&accept-language=es' +
+          `${NOMINATIM_URL}/reverse?format=json&zoom=17&extratags=1&accept-language=${getLanguage()}` +
           `&lat=${sampledLatitude.toFixed(5)}&lon=${sampledLongitude.toFixed(5)}`;
         const reverse = await fetchWithTimeout(reverseUrl, {
           signal: controller.signal,
