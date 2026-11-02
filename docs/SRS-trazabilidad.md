@@ -156,7 +156,7 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | ID | Requisito | Estado | Evidencia |
 |---|---|---|---|
 | USR | Conductor, host, visitante sin cuenta, demo | ✅ | rutas públicas fuera de `Stack.Protected` (`app/_layout.tsx`), `src/lib/demo.ts` |
-| SUP-1 | Secretos LiveKit en Supabase | ⛔ | Paso manual del propietario |
+| SUP-1 | Secretos LiveKit en Supabase | ✅ | Configurados el 02/11/2026 (`livekit-token` ya no responde «no está configurado») |
 | SUP-2 | Migración de eventos en el repo | ✅ | `supabase/migrations/20261027120000_events.sql` |
 
 ## Resumen de la fase 1
@@ -259,3 +259,7 @@ Verificación (02/11/2026):
   - RNF-24, RNF-04, RNF-15 y RNF-21.
   - UI-02, RNF-20 y OTR-03.
 - 02/11/2026 — Fase 4: verificación completa (ver «Resumen final»).
+- 02/11/2026 — Ya en producción:
+  - migraciones `20261102060000` y `20261102061000` aplicadas desde el SQL Editor (el bucket `avatars` existe);
+  - secretos de LiveKit configurados.
+  - Pendiente: volver a desplegar `delete-account` con la CLI y probar el PTT con dos teléfonos.
