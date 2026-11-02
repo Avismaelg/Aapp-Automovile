@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   value: { fontSize: 24, lineHeight: 27 },
   unitRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   unit: { fontSize: 8 },
-  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green },
+  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent },
   liveDotOff: { backgroundColor: colors.dim },
   limit: {
     width: 36,

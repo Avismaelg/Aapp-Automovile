@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import Mapbox, {
+  BackgroundLayer,
   Camera,
   CircleLayer,
+  FillLayer,
   CustomLocationProvider,
   LineLayer,
   LocationPuck,
@@ -72,7 +74,29 @@ const ROUTE_WIDTH: unknown = ["interpolate", ["linear"], ["zoom"], 10, 4, 13, 7,
 const ROUTE_WIDTH_GLOW: unknown = ["interpolate", ["linear"], ["zoom"], 10, 10, 13, 16, 16, 26, 18, 36];
 const ROUTE_WIDTH_ALT: unknown = ["interpolate", ["linear"], ["zoom"], 10, 3, 13, 5, 16, 8, 18, 12];
 
+// Capas de relleno del estilo nocturno que se pasan a negro OLED.
+const OLED_FILLS: [string, string][] = [
+  ["landcover", "#050506"],
+  ["national-park", "#06090A"],
+  ["landuse", "#060607"],
+  ["land-structure-polygon", "#000000"],
+  ["water", "#07101C"],
+  ["building", "#111114"],
+];
+
 const NO_STOPS: { latitude: number; longitude: number; label: string }[] = [];
+
+// Degradado de una curva a lo largo de su zona (0 = entrada, 1 = salida): del
+// azul de la ruta al rojo en el punto más lento (el centro) y de vuelta.
+const ROUTE_BLUE = "#3d9bff";
+const CURVE_GRADIENT_BRAKE: unknown = [
+  "interpolate", ["linear"], ["line-progress"],
+  0, ROUTE_BLUE, 0.22, "#F5B014", 0.5, "#E5243F", 0.78, "#F5B014", 1, ROUTE_BLUE,
+];
+const CURVE_GRADIENT_EASE: unknown = [
+  "interpolate", ["linear"], ["line-progress"],
+  0, ROUTE_BLUE, 0.35, "#F5B014", 0.65, "#F5B014", 1, ROUTE_BLUE,
+];
 
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
@@ -812,36 +836,36 @@ export const WorldMap = memo(function WorldMap({
           />
         </ShapeSource>
 
-        {/* Línea de conducción encima de la ruta: trazos azul, amarillo y rojo. */}
-        <ShapeSource id="caravana-driving-line" shape={drivingLine ?? EMPTY}>
+        {/* Curvas por delante: del ancho de la ruta, con degradado azul →
+            ámbar → rojo en el punto más lento y vuelta a azul, y un disco con
+            la velocidad recomendada (rojo: frena; ámbar: levanta el pie). */}
+        <ShapeSource id="caravana-driving-line" shape={drivingLine ?? EMPTY} lineMetrics>
           <LineLayer
-            id="caravana-driving-line"
+            id="caravana-curve-brake"
             belowLayerID={belowLayerID}
+            filter={["all", ["==", ["get", "kind"], "curve"], ["==", ["get", "level"], "brake"]]}
             style={{
-              lineCap: "butt",
+              lineCap: "round",
               lineJoin: "round",
-              lineColor: [
-                "match",
-                ["get", "level"],
-                "brake",
-                "#ef4444",
-                "ease",
-                "#facc15",
-                "#38bdf8",
-              ],
-              lineWidth: [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                13,
-                4,
-                16,
-                9,
-                18,
-                14,
-              ],
-              lineDasharray: [1.4, 0.9],
-              lineOpacity: 0.95,
+              lineWidth: ROUTE_WIDTH as number,
+              lineBorderColor: "#1458b8",
+              lineBorderWidth: 2.5,
+              lineEmissiveStrength: 1,
+              lineGradient: CURVE_GRADIENT_BRAKE as string,
+            }}
+          />
+          <LineLayer
+            id="caravana-curve-ease"
+            belowLayerID={belowLayerID}
+            filter={["all", ["==", ["get", "kind"], "curve"], ["==", ["get", "level"], "ease"]]}
+            style={{
+              lineCap: "round",
+              lineJoin: "round",
+              lineWidth: ROUTE_WIDTH as number,
+              lineBorderColor: "#1458b8",
+              lineBorderWidth: 2.5,
+              lineEmissiveStrength: 1,
+              lineGradient: CURVE_GRADIENT_EASE as string,
             }}
           />
         </ShapeSource>
@@ -873,6 +897,35 @@ export const WorldMap = memo(function WorldMap({
           />
         </ShapeSource>
 
+        {/* El disco de la velocidad de la curva, por encima de la flecha de
+            giro (si coinciden, la velocidad es lo que importa). */}
+        <ShapeSource id="caravana-curve-badges" shape={drivingLine ?? EMPTY}>
+          <CircleLayer
+            id="caravana-curve-badge"
+            filter={["==", ["get", "kind"], "badge"]}
+            style={{
+              circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 11, 17, 16],
+              circleColor: "#ffffff",
+              circleStrokeColor: ["case", ["==", ["get", "level"], "brake"], "#E5243F", "#F5B014"],
+              circleStrokeWidth: ["interpolate", ["linear"], ["zoom"], 13, 3, 17, 4],
+              circleEmissiveStrength: 1,
+              circlePitchAlignment: "viewport",
+            }}
+          />
+          <SymbolLayer
+            id="caravana-curve-speed"
+            filter={["==", ["get", "kind"], "badge"]}
+            style={{
+              textField: ["to-string", ["get", "speed"]],
+              textFont: MEMBER_FONT,
+              textSize: ["interpolate", ["linear"], ["zoom"], 13, 11, 17, 15],
+              textColor: "#0b0f14",
+              textAllowOverlap: true,
+              textIgnorePlacement: true,
+            }}
+          />
+        </ShapeSource>
+
         <ShapeSource id="caravana-parking-line" shape={parkingLineData}>
           <LineLayer
             id="caravana-parking-line"
@@ -887,6 +940,18 @@ export const WorldMap = memo(function WorldMap({
             }}
           />
         </ShapeSource>
+
+        {/* Negro OLED de noche: el estilo de navegación nocturno de Mapbox
+            es gris pizarra; se oscurecen su fondo, terrenos y edificios (las
+            calles quedan en gris sobre negro). */}
+        {usingMapbox && night ? (
+          <>
+            <BackgroundLayer key="oled-land" id="land" existing style={{ backgroundColor: "#000000" }} />
+            {OLED_FILLS.map(([id, color]) => (
+              <FillLayer key={`oled-${id}`} id={id} existing style={{ fillColor: color }} />
+            ))}
+          </>
+        ) : null}
 
         {usingMapbox
           ? TRAFFIC_LAYERS.map((id) => (

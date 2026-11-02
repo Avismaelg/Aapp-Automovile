@@ -11,6 +11,7 @@ import {
 import { mapProfileRow, PROFILE_COLUMNS, type ProfileRow, type UserProfile } from '@/src/lib/profile-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { uniqueTopic } from '@/src/lib/shared-subscription';
 
 export type IncomingPartyInvite = {
   id: string;
@@ -85,7 +86,7 @@ export function useIncomingPartyInvites() {
     if (!enabled || !account || !supabase) return;
     const client = supabase;
     const channel = client
-      .channel(`party-invites-${account.id}-${channelId}`)
+      .channel(uniqueTopic(`party-invites-${account.id}-${channelId}`))
       .on(
         'postgres_changes',
         {

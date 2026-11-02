@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { acquireSubscription, activeSubscriptionCount } from '@/src/lib/shared-subscription';
+import { acquireSubscription, activeSubscriptionCount, uniqueTopic } from '@/src/lib/shared-subscription';
 
 describe('suscripción compartida entre pantallas', () => {
   it('tres pantallas con la misma party abren un solo canal y lo cierra la última', () => {
@@ -36,5 +36,14 @@ describe('suscripción compartida entre pantallas', () => {
     release();
     acquireSubscription('party:yo:p2', start('p2'))();
     expect(log).toEqual(['abre p1', 'cierra p1', 'abre p2', 'cierra p2']);
+  });
+});
+
+describe('nombres de canal', () => {
+  it('cada apertura usa un nombre distinto aunque la base sea la misma', () => {
+    const a = uniqueTopic('challenges-live-yo-r1');
+    const b = uniqueTopic('challenges-live-yo-r1');
+    expect(a).not.toBe(b);
+    expect(a.startsWith('challenges-live-yo-r1-')).toBe(true);
   });
 });

@@ -3,8 +3,8 @@ import type { ViewStyle } from 'react-native';
 
 import { colors } from '@/src/theme';
 
-// Colores de los controles sobre el mapa: tarjetas blancas con sombra sobre
-// el mapa de día (como Google Maps) y oscuras sobre el de noche.
+// Colores de los controles sobre el mapa: paneles blancos de día y negros
+// OLED de noche, con el naranja Caravana como acento.
 export type MapChrome = {
   day: boolean;
   bg: string;
@@ -13,6 +13,9 @@ export type MapChrome = {
   textSoft: string;
   muted: string;
   chip: string;
+  // Acento (naranja) y el color que va encima de él.
+  accent: string;
+  onAccent: string;
   surface: ViewStyle;
 };
 
@@ -25,16 +28,18 @@ const SHADOW: ViewStyle = {
 };
 
 function chrome(day: boolean): MapChrome {
-  const bg = day ? '#ffffff' : 'rgba(17,22,30,0.95)';
-  const border = day ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.1)';
+  const bg = day ? '#ffffff' : '#0D0D0F';
+  const border = day ? '#DADCE2' : '#2A2A30';
   return {
     day,
     bg,
     border,
-    text: day ? '#0f172a' : colors.text,
-    textSoft: day ? '#334155' : colors.textSoft,
-    muted: day ? '#64748b' : colors.muted,
-    chip: day ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
+    text: day ? '#0B0B0D' : colors.text,
+    textSoft: day ? '#3F3F46' : colors.textSoft,
+    muted: day ? '#5F5F6A' : colors.muted,
+    chip: day ? '#F2F2F5' : '#17171A',
+    accent: day ? '#C2410C' : colors.accent,
+    onAccent: day ? '#FFFFFF' : '#000000',
     surface: { backgroundColor: bg, borderColor: border, borderWidth: 1, ...SHADOW },
   };
 }

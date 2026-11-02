@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 
 import { AppText } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
-import { radius, spacing } from '@/src/theme';
+import { colors, radius, spacing } from '@/src/theme';
 
 export type RouteOption = {
   timeLabel: string;
@@ -12,8 +12,6 @@ export type RouteOption = {
   extraMinutes: number;
 };
 
-const GO = '#1a73e8';
-const FAST = '#16a34a';
 
 // Vista previa de la ruta: hoja inferior con el tiempo en grande, las
 // opciones de ruta y un único botón principal para empezar.
@@ -94,7 +92,7 @@ export function DestinationCard({
 
       {loading ? (
         <View style={styles.stateRow}>
-          <ActivityIndicator color={GO} />
+          <ActivityIndicator color={chrome.accent} />
           <AppText variant="body" color={chrome.muted}>
             Buscando la mejor ruta…
           </AppText>
@@ -108,7 +106,7 @@ export function DestinationCard({
         </View>
       ) : timeLabel ? (
         <View style={styles.summary}>
-          <AppText variant="display" color={FAST} style={styles.time}>
+          <AppText variant="display" color={chrome.accent} style={styles.time}>
             {timeLabel}
           </AppText>
           <AppText variant="body" color={chrome.muted} style={styles.summaryDetail}>
@@ -143,8 +141,8 @@ export function DestinationCard({
         style={({ pressed }) => [styles.addStop, pressed && styles.pressed]}
         accessibilityRole="button"
       >
-        <Ionicons name="add-circle-outline" size={18} color={GO} />
-        <AppText variant="bodyStrong" color={GO} style={styles.addStopText}>
+        <Ionicons name="add-circle-outline" size={18} color={chrome.accent} />
+        <AppText variant="bodyStrong" color={chrome.accent} style={styles.addStopText}>
           Añadir parada
         </AppText>
       </Pressable>
@@ -158,14 +156,14 @@ export function DestinationCard({
                 key={index}
                 style={[
                   styles.option,
-                  { borderColor: active ? GO : chrome.border, backgroundColor: active ? `${GO}14` : 'transparent' },
+                  { borderColor: active ? chrome.accent : chrome.border, backgroundColor: active ? `${chrome.accent}1F` : 'transparent' },
                 ]}
                 onPress={() => onSelect(index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`Ruta ${index + 1}: ${option.timeLabel}, ${option.distanceLabel}`}
               >
-                <AppText variant="bodyStrong" color={active ? GO : chrome.text}>
+                <AppText variant="bodyStrong" color={active ? chrome.accent : chrome.text}>
                   {option.timeLabel}
                 </AppText>
                 <AppText variant="caption" color={chrome.muted}>
@@ -180,11 +178,11 @@ export function DestinationCard({
       {failed ? (
         <Pressable
           onPress={onRetry}
-          style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.primary, { backgroundColor: chrome.accent }, pressed && styles.pressed]}
           accessibilityRole="button"
         >
-          <Ionicons name="refresh" size={20} color="#ffffff" />
-          <AppText variant="bodyStrong" color="#ffffff" style={styles.primaryText}>
+          <Ionicons name="refresh" size={20} color={chrome.onAccent} />
+          <AppText variant="bodyStrong" color={chrome.onAccent} style={styles.primaryText}>
             Reintentar
           </AppText>
         </Pressable>
@@ -192,12 +190,17 @@ export function DestinationCard({
         <Pressable
           onPress={onConfirm}
           disabled={!canConfirm}
-          style={({ pressed }) => [styles.primary, !canConfirm && styles.disabled, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.primary,
+            { backgroundColor: chrome.accent },
+            !canConfirm && styles.disabled,
+            pressed && styles.pressed,
+          ]}
           accessibilityRole="button"
           accessibilityState={{ disabled: !canConfirm }}
         >
-          <Ionicons name="navigate" size={20} color="#ffffff" />
-          <AppText variant="bodyStrong" color="#ffffff" style={styles.primaryText}>
+          <Ionicons name="navigate" size={20} color={chrome.onAccent} />
+          <AppText variant="bodyStrong" color={chrome.onAccent} style={styles.primaryText}>
             Iniciar
           </AppText>
         </Pressable>
@@ -251,7 +254,7 @@ const styles = StyleSheet.create({
   primary: {
     height: 56,
     borderRadius: 28,
-    backgroundColor: GO,
+    backgroundColor: colors.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

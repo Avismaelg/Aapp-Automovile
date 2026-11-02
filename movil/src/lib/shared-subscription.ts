@@ -22,6 +22,16 @@ export function acquireSubscription(key: string, start: () => () => void) {
   };
 }
 
+// Nombre de canal único por apertura. Supabase devuelve el canal existente si
+// el nombre coincide; al cambiar de party o de retos, el viejo aún se está
+// cerrando (ya «suscrito») y añadirle escuchas tumbaba la pantalla con
+// «cannot add postgres_changes callbacks … after subscribe()».
+let topicSeq = 0;
+export function uniqueTopic(base: string) {
+  topicSeq += 1;
+  return `${base}-${topicSeq}`;
+}
+
 // Solo para las pruebas.
 export function activeSubscriptionCount() {
   return active.size;

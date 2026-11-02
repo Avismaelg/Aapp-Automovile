@@ -25,8 +25,8 @@ export function MapControls({
         accessibilityRole="button"
         accessibilityLabel="Orientar el mapa al norte"
       >
-        <Ionicons name="compass-outline" size={20} color={northUp ? '#120802' : chrome.text} />
-        <AppText variant="label" color={northUp ? '#120802' : chrome.muted} style={styles.modeText}>
+        <Ionicons name="compass-outline" size={20} color={northUp ? chrome.onAccent : chrome.text} />
+        <AppText variant="label" color={northUp ? chrome.onAccent : chrome.muted} style={styles.modeText}>
           N
         </AppText>
       </Pressable>
@@ -37,7 +37,7 @@ export function MapControls({
           accessibilityRole="button"
           accessibilityLabel="Recentrar mapa"
         >
-          <Ionicons name="navigate" size={18} color="#2f8cff" />
+          <Ionicons name="navigate" size={18} color={chrome.accent} />
           <AppText variant="bodyStrong" color={chrome.text} style={styles.recenterText}>
             Centrar
           </AppText>
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  active: { backgroundColor: colors.lime, borderColor: colors.lime },
+  active: { backgroundColor: colors.accent, borderColor: colors.accent },
   modeText: { fontSize: 8, marginTop: -2 },
   recenter: {
     flexDirection: 'row',

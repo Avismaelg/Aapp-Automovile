@@ -18,7 +18,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
-import { acquireSubscription } from '@/src/lib/shared-subscription';
+import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
@@ -281,7 +281,7 @@ export function useChallenges() {
     return acquireSubscription(`challenges:${accountId}:${challengeIds}`, () => {
       const refresh = () => void queryClient.invalidateQueries({ queryKey: ['challenges'] });
       let channel = client
-        .channel(`challenges-live-${accountId}-${channelId}`)
+        .channel(uniqueTopic(`challenges-live-${accountId}-${channelId}`))
         .on(
           'postgres_changes',
           {

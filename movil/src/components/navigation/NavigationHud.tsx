@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
+import { useMapChrome } from '@/src/components/navigation/glass';
 import type { RouteInstruction, RouteInstructionIcon } from '@/src/lib/map-html';
 import { formatInstructionDistance, type nextInstruction } from '@/src/lib/route-instructions';
 import { radius, spacing } from '@/src/theme';
@@ -23,13 +24,8 @@ const instructionIcons: Record<RouteInstructionIcon, keyof typeof Ionicons.glyph
   depart: 'navigate',
 };
 
-// Paleta de navegación: verde oscuro para la maniobra (se lee de un vistazo
-// de día y de noche) y tarjeta blanca abajo.
-const MANEUVER = '#0f5132';
-const MANEUVER_DARK = '#0a3d26';
-const INK = '#0b1422';
-const SOFT = '#5b6675';
-const FAST = '#16a34a';
+// Paleta de navegación (negro OLED y naranja): paneles del color del mapa
+// (negros de noche, blancos de día) y la maniobra en un bloque naranja.
 const ALERT = '#e11d48';
 
 type Props = {
@@ -87,29 +83,31 @@ export function NavigationHud({
   const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > limitKmh + 5;
   const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > curve.speedKmh + 15;
   const recalculating = offRoute || !hasRoute;
+  const chrome = useMapChrome();
+  const panel = { backgroundColor: chrome.bg, borderColor: chrome.border, borderWidth: 1 };
 
   return (
     <View pointerEvents="box-none" style={styles.navLayer}>
-      <View style={styles.maneuverCard}>
+      <View style={[styles.maneuverCard, panel]}>
         {recalculating ? (
           <View style={styles.maneuverRow}>
-            <View style={styles.maneuverIcon}>
-              <Ionicons name="sync" size={30} color="#ffffff" />
+            <View style={[styles.maneuverIcon, { backgroundColor: chrome.accent }]}>
+              <Ionicons name="sync" size={30} color={chrome.onAccent} />
             </View>
-            <AppText variant="h2" color="#ffffff" style={styles.flex}>
+            <AppText variant="h2" color={chrome.text} style={styles.flex}>
               {offRoute ? 'Recalculando…' : 'Calculando ruta…'}
             </AppText>
           </View>
         ) : (
           <View style={styles.maneuverRow}>
-            <View style={styles.maneuverIcon}>
-              <Ionicons name={upcoming ? instructionIcons[upcoming.icon] : 'arrow-up'} size={40} color="#ffffff" />
+            <View style={[styles.maneuverIcon, { backgroundColor: chrome.accent }]}>
+              <Ionicons name={upcoming ? instructionIcons[upcoming.icon] : 'arrow-up'} size={40} color={chrome.onAccent} />
             </View>
             <View style={styles.flex}>
-              <AppText variant="display" color="#ffffff" style={styles.maneuverDistance}>
+              <AppText variant="display" color={chrome.text} style={styles.maneuverDistance}>
                 {upcoming ? formatInstructionDistance(upcoming.remainingM) : 'Sigue recto'}
               </AppText>
-              <AppText variant="bodyStrong" color="#d1fae5" numberOfLines={2} style={styles.road}>
+              <AppText variant="bodyStrong" color={chrome.textSoft} numberOfLines={2} style={styles.road}>
                 {upcoming
                   ? upcoming.icon !== 'arrive' && upcoming.road
                     ? upcoming.road
@@ -120,11 +118,11 @@ export function NavigationHud({
           </View>
         )}
         {following && !recalculating ? (
-          <View style={styles.thenRow}>
-            <AppText variant="caption" color="#a7f3d0">
+          <View style={[styles.thenRow, { backgroundColor: chrome.chip }]}>
+            <AppText variant="caption" color={chrome.muted}>
               Luego
             </AppText>
-            <Ionicons name={instructionIcons[following.icon]} size={16} color="#ffffff" />
+            <Ionicons name={instructionIcons[following.icon]} size={16} color={chrome.text} />
           </View>
         ) : null}
       </View>
@@ -147,11 +145,11 @@ export function NavigationHud({
             </AppText>
           </View>
         ) : null}
-        <View style={[styles.speedBubble, overLimit && styles.speedBubbleOver]}>
-          <AppText variant="display" color={overLimit ? '#ffffff' : INK} style={styles.speedValue}>
+        <View style={[styles.speedBubble, panel, overLimit && styles.speedBubbleOver]}>
+          <AppText variant="display" color={overLimit ? '#ffffff' : chrome.text} style={styles.speedValue}>
             {speedLabel}
           </AppText>
-          <AppText variant="caption" color={overLimit ? '#ffe4e6' : SOFT} style={styles.speedUnit}>
+          <AppText variant="caption" color={overLimit ? '#ffe4e6' : chrome.muted} style={styles.speedUnit}>
             km/h
           </AppText>
         </View>
@@ -160,73 +158,79 @@ export function NavigationHud({
       <View style={styles.sideButtons}>
         {!mapFollowing ? (
           <Pressable
-            style={styles.recenterButton}
+            style={[styles.recenterButton, panel]}
             onPress={onRecenter}
             accessibilityRole="button"
             accessibilityLabel="Recentrar en tu posición"
           >
-            <Ionicons name="navigate" size={18} color={MANEUVER} />
-            <AppText variant="bodyStrong" color={INK} style={styles.recenterText}>
+            <Ionicons name="navigate" size={18} color={chrome.accent} />
+            <AppText variant="bodyStrong" color={chrome.text} style={styles.recenterText}>
               Centrar
             </AppText>
           </Pressable>
         ) : null}
         <Pressable
-          style={[styles.roundButton, northUp && styles.roundButtonActive]}
+          style={[styles.roundButton, panel, northUp && { backgroundColor: chrome.accent }]}
           onPress={onToggleNorth}
           accessibilityRole="button"
           accessibilityLabel="Orientar el mapa al norte"
         >
-          <Ionicons name="compass-outline" size={22} color={northUp ? '#ffffff' : INK} />
+          <Ionicons name="compass-outline" size={22} color={northUp ? chrome.onAccent : chrome.text} />
         </Pressable>
         <Pressable
-          style={[styles.roundButton, muted && styles.roundButtonActive]}
+          style={[styles.roundButton, panel, muted && { backgroundColor: chrome.accent }]}
           onPress={onToggleMute}
           accessibilityRole="button"
           accessibilityLabel={muted ? 'Activar la voz' : 'Silenciar la voz'}
         >
-          <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={20} color={muted ? '#ffffff' : INK} />
+          <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={20} color={muted ? chrome.onAccent : chrome.text} />
         </Pressable>
       </View>
 
-      <View style={[styles.bottomCard, { paddingBottom: bottomInset + spacing.lg }]}>
-        <View style={styles.handle} />
+      <View
+        style={[
+          styles.bottomCard,
+          { backgroundColor: chrome.bg, borderTopWidth: 1, borderColor: chrome.border },
+          { paddingBottom: bottomInset + spacing.lg },
+        ]}
+      >
+        <View style={[styles.handle, { backgroundColor: chrome.border }]} />
         <View style={styles.bottomRow}>
           <Pressable
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onClose}
             accessibilityRole="button"
             accessibilityLabel="Terminar la navegación"
           >
-            <Ionicons name="close" size={22} color={INK} />
+            <Ionicons name="close" size={22} color={chrome.text} />
           </Pressable>
           <View style={styles.etaBlock}>
-            <AppText variant="display" color={FAST} style={styles.etaTime}>
+            <AppText variant="display" color={chrome.accent} style={styles.etaTime}>
               {remainingTimeLabel}
             </AppText>
-            <AppText variant="body" color={SOFT} numberOfLines={1}>
+            <AppText variant="body" color={chrome.textSoft} numberOfLines={1}>
               {remainingDistanceLabel}
               {arrivalLabel ? ` · ${arrivalLabel}` : ''}
             </AppText>
-            <AppText variant="caption" color={SOFT} numberOfLines={1} style={styles.destination}>
+            <AppText variant="caption" color={chrome.textSoft} numberOfLines={1} style={styles.destination}>
               {destinationLabel}
             </AppText>
           </View>
           <Pressable
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onAddStop}
             accessibilityRole="button"
             accessibilityLabel="Añadir parada"
           >
-            <Ionicons name="add-circle-outline" size={22} color={INK} />
+            <Ionicons name="add-circle-outline" size={22} color={chrome.text} />
           </Pressable>
           <Pressable
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: chrome.chip }]}
             onPress={onChangeRoute}
             accessibilityRole="button"
             accessibilityLabel="Cambiar destino"
           >
-            <Ionicons name="search" size={20} color={INK} />
+            <Ionicons name="search" size={20} color={chrome.text} />
           </Pressable>
         </View>
       </View>
@@ -246,7 +250,6 @@ const styles = StyleSheet.create({
   navLayer: { flex: 1 },
   flex: { flex: 1 },
   maneuverCard: {
-    backgroundColor: MANEUVER,
     borderRadius: radius['2xl'],
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
@@ -258,7 +261,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: MANEUVER_DARK,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -269,7 +271,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: MANEUVER_DARK,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...SHADOW,
   },
-  speedLimitText: { fontSize: 15, color: INK },
+  speedLimitText: { fontSize: 15, color: '#0b1422' },
   sideButtons: { position: 'absolute', right: 0, bottom: 168, gap: spacing.sm, alignItems: 'flex-end' },
   recenterButton: {
     flexDirection: 'row',
@@ -334,7 +335,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     ...SHADOW,
   },
-  roundButtonActive: { backgroundColor: INK },
   bottomCard: {
     position: 'absolute',
     left: -spacing.lg,

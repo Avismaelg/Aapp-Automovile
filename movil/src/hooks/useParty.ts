@@ -18,7 +18,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { filterString, partySubscriptions } from '@/src/lib/realtime-routing';
-import { acquireSubscription } from '@/src/lib/shared-subscription';
+import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 
@@ -284,7 +284,7 @@ export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
       // Solo los cambios de TU party (antes llegaban los de todas las parties
       // del sistema a cada teléfono). Sin party, solo tus propias altas.
       // Reglas en src/lib/realtime-routing.ts (las mismas que la prueba de carga).
-      const channel = client.channel(`party-live-${accountId}-${channelId}`);
+      const channel = client.channel(uniqueTopic(`party-live-${accountId}-${channelId}`));
       for (const subscription of partySubscriptions(accountId, partyId)) {
         channel.on(
           'postgres_changes',
@@ -587,7 +587,7 @@ export function usePartyMessages(partyId: string | undefined) {
   useEffect(() => {
     if (demo || !supabase || !partyId) return;
     const channel = supabase
-      .channel(`party-chat-${partyId}-${channelId}`)
+      .channel(uniqueTopic(`party-chat-${partyId}-${channelId}`))
       .on(
         'postgres_changes',
         {

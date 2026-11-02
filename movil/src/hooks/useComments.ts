@@ -10,6 +10,7 @@ import {
 import { isDemoMode } from '@/src/lib/demo';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { uniqueTopic } from '@/src/lib/shared-subscription';
 
 export type PostComment = {
   id: string;
@@ -89,7 +90,7 @@ export function useComments(postId: string | undefined) {
   useEffect(() => {
     if (demo || !supabase || !postId) return;
     const channel = supabase
-      .channel(`post-comments-${postId}-${channelId}`)
+      .channel(uniqueTopic(`post-comments-${postId}-${channelId}`))
       .on(
         'postgres_changes',
         {

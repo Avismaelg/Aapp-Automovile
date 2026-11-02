@@ -23,6 +23,10 @@ const MIN_KMH = 15;
 // Margen sobre la recomendada antes de pedir levantar el pie o frenar.
 const EASE_OVER_KMH = 4;
 const BRAKE_OVER_KMH = 15;
+// La zona de curva se extiende 40 m a cada lado para fundirse con la ruta.
+const CURVE_FADE_SAMPLES = 4;
+// Tramos a menos de 80 m se unen en una sola curva.
+const CURVE_MERGE_SAMPLES = 8;
 
 const EARTH_M = 6371000;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -98,6 +102,69 @@ export function levelFor(currentKmh: number, recommendedKmh: number): DrivingLev
   return 'go';
 }
 
+export type CurveZone = { start: number; end: number; peak: number; level: DrivingLevel };
+
+// Tramos donde vas más rápido de lo que pide la curva, con su punto más lento.
+// El punto se busca solo dentro del tramo: si se mirara más allá, una curva
+// «robaría» el punto de la siguiente y saldrían dos discos casi juntos.
+export function curveZones(speeds: number[], currentKmh: number): CurveZone[] {
+  const zones: CurveZone[] = [];
+  let index = 0;
+  while (index < speeds.length) {
+    if (levelFor(currentKmh, speeds[index]) === 'go') {
+      index += 1;
+      continue;
+    }
+    let runEnd = index;
+    let level: DrivingLevel = 'ease';
+    let peak = index;
+    while (runEnd < speeds.length && levelFor(currentKmh, speeds[runEnd]) !== 'go') {
+      if (levelFor(currentKmh, speeds[runEnd]) === 'brake') level = 'brake';
+      if (speeds[runEnd] < speeds[peak]) peak = runEnd;
+      runEnd += 1;
+    }
+    runEnd -= 1;
+    // Dos tramos muy juntos (curvas encadenadas) son una sola zona con un
+    // solo disco: el de la velocidad más baja.
+    const previous = zones[zones.length - 1];
+    if (previous && index - previous.end <= CURVE_MERGE_SAMPLES) {
+      previous.end = runEnd;
+      if (speeds[peak] < speeds[previous.peak]) previous.peak = peak;
+      if (level === 'brake') previous.level = 'brake';
+    } else {
+      zones.push({ start: index, end: runEnd, peak, level });
+    }
+    index = runEnd + 1;
+  }
+  return zones;
+}
+
+// Próxima curva que pide bajar de la velocidad actual: a qué distancia está
+// su punto más lento y a qué velocidad hay que tomarla.
+export function nextCurveAhead(
+  speeds: number[],
+  currentKmh: number,
+  maxKmh: number,
+): DrivingLine['nextCurve'] {
+  const reference = Math.min(maxKmh, Math.max(currentKmh, 30));
+  for (let index = 1; index < speeds.length; index += 1) {
+    if (speeds[index] < reference - 10) {
+      // El punto más lento de toda esa curva (mientras siga por debajo), el
+      // mismo que lleva el disco del mapa: antes se miraban solo 100 m y, si
+      // la frenada empezaba antes, el aviso decía 60 y el disco 25.
+      let slowestIndex = index;
+      for (let k = index; k < speeds.length && speeds[k] < reference - 10; k += 1) {
+        if (speeds[k] < speeds[slowestIndex]) slowestIndex = k;
+      }
+      return {
+        distanceM: slowestIndex * STEP_M,
+        speedKmh: Math.round(speeds[slowestIndex] / 5) * 5,
+      };
+    }
+  }
+  return null;
+}
+
 export function buildDrivingLine(
   points: LatLng[],
   fromIndex: number,
@@ -109,44 +176,33 @@ export function buildDrivingLine(
   const maxKmh = limitKmh && limitKmh > 0 ? limitKmh : DEFAULT_MAX_KMH;
   const speeds = recommendedSpeeds(samples, maxKmh);
 
-  // Une los tramos consecutivos del mismo color en una sola línea.
+  // Zonas de curva: donde vas más rápido de lo que pide la curva. Cada zona se
+  // dibuja del ancho de la ruta con un degradado azul → ámbar → rojo → ámbar →
+  // azul, centrado en el punto más lento (Mapbox no deja que el degradado
+  // cambie por curva, así que la zona se hace simétrica alrededor de él), y
+  // lleva un disco con la velocidad recomendada en ese punto.
+  const toLngLat = ([lat, lng]: LatLng) => [lng, lat];
+  const zones = curveZones(speeds, currentKmh);
+
   const features: GeoJSON.Feature[] = [];
-  let start = 0;
-  let level = levelFor(currentKmh, speeds[0]);
-  for (let index = 1; index <= samples.length; index += 1) {
-    const next = index < samples.length ? levelFor(currentKmh, speeds[index]) : null;
-    if (next === level) continue;
-    const end = Math.min(index, samples.length - 1);
-    if (end > start) {
-      features.push({
-        type: 'Feature',
-        properties: { level },
-        geometry: {
-          type: 'LineString',
-          coordinates: samples.slice(start, end + 1).map(([lat, lng]) => [lng, lat]),
-        },
-      });
-    }
-    start = end;
-    if (next) level = next;
+  for (const zone of zones) {
+    const half = Math.max(zone.peak - zone.start, zone.end - zone.peak) + CURVE_FADE_SAMPLES;
+    const from = Math.max(0, zone.peak - half);
+    const to = Math.min(samples.length - 1, zone.peak + half);
+    if (to <= from) continue;
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'curve', level: zone.level },
+      geometry: { type: 'LineString', coordinates: samples.slice(from, to + 1).map(toLngLat) },
+    });
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'badge', level: zone.level, speed: String(Math.round(speeds[zone.peak] / 5) * 5) },
+      geometry: { type: 'Point', coordinates: toLngLat(samples[zone.peak]) },
+    });
   }
 
-  let nextCurve: DrivingLine['nextCurve'] = null;
-  const reference = Math.min(maxKmh, Math.max(currentKmh, 30));
-  for (let index = 1; index < speeds.length; index += 1) {
-    if (speeds[index] < reference - 10) {
-      // El punto más lento de esa curva (en los 100 m siguientes).
-      let slowestIndex = index;
-      for (let k = index; k < Math.min(speeds.length, index + 10); k += 1) {
-        if (speeds[k] < speeds[slowestIndex]) slowestIndex = k;
-      }
-      nextCurve = {
-        distanceM: slowestIndex * STEP_M,
-        speedKmh: Math.round(speeds[slowestIndex] / 5) * 5,
-      };
-      break;
-    }
-  }
+  const nextCurve = nextCurveAhead(speeds, currentKmh, maxKmh);
 
   return { data: { type: 'FeatureCollection', features }, nextCurve };
 }

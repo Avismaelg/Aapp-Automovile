@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { buildDrivingLine, levelFor, recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
+import { buildDrivingLine, curveZones, levelFor, nextCurveAhead, recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
 
 type LatLng = [number, number];
 
@@ -41,20 +41,66 @@ describe('línea de conducción', () => {
     expect(Math.min(...speeds)).toBeLessThan(30);
   });
 
-  it('pide frenar si vas rápido hacia la curva y avisa de ella', () => {
+  it('pide frenar si vas rápido: la curva se pinta centrada en su punto más lento', () => {
     const line = buildDrivingLine(straightThenTurn(), 0, 80, 80);
-    const levels = line.data.features.map((feature) => feature.properties?.level);
-    expect(levels[0]).toBe('go');
-    expect(levels).toContain('brake');
+    const curves = line.data.features.filter((feature) => feature.properties?.kind === 'curve');
+    const badges = line.data.features.filter((feature) => feature.properties?.kind === 'badge');
+    expect(curves).toHaveLength(1);
+    expect(curves[0].properties?.level).toBe('brake');
+    expect(badges).toHaveLength(1);
+    expect(Number(badges[0].properties?.speed)).toBeLessThan(35);
+    // El disco está en el centro de la zona (ahí el degradado es rojo).
+    const coords = (curves[0].geometry as GeoJSON.LineString).coordinates;
+    const middle = coords[Math.floor(coords.length / 2)];
+    const badge = (badges[0].geometry as GeoJSON.Point).coordinates;
+    expect(Math.abs(middle[0] - badge[0])).toBeLessThan(0.0002);
+    expect(Math.abs(middle[1] - badge[1])).toBeLessThan(0.0002);
     expect(line.nextCurve).not.toBeNull();
     expect(line.nextCurve!.distanceM).toBeGreaterThan(300);
     expect(line.nextCurve!.distanceM).toBeLessThan(460);
     expect(line.nextCurve!.speedKmh).toBeLessThan(35);
   });
 
-  it('despacio todo va en azul', () => {
+  it('el resto de la ruta no se pinta: solo las curvas', () => {
+    const line = buildDrivingLine(straightThenTurn(), 0, 80, 80);
+    const curve = line.data.features.find((feature) => feature.properties?.kind === 'curve')!;
+    // Unos 130 m alrededor de la curva, no los 700 m por delante.
+    expect((curve.geometry as GeoJSON.LineString).coordinates.length).toBeLessThan(35);
+  });
+
+  it('dos curvas encadenadas muestran un solo disco, el más lento', () => {
+    // A 80 km/h: curva a 40, 60 m de recta (6 muestras) y curva a 30.
+    const speeds = [...Array(10).fill(80), ...Array(5).fill(40), ...Array(6).fill(80), ...Array(5).fill(30), ...Array(10).fill(80)];
+    const zones = curveZones(speeds, 80);
+    expect(zones).toHaveLength(1);
+    expect(speeds[zones[0].peak]).toBe(30);
+  });
+
+  it('curvas separadas: cada una con su disco y su propia velocidad', () => {
+    // La segunda curva (30) ya no le roba el disco a la primera (40).
+    const speeds = [...Array(10).fill(80), ...Array(5).fill(40), ...Array(9).fill(80), ...Array(5).fill(30), ...Array(10).fill(80)];
+    const zones = curveZones(speeds, 80);
+    expect(zones.map((zone) => speeds[zone.peak])).toEqual([40, 30]);
+  });
+
+  it('el aviso de arriba y el disco del mapa dicen la misma velocidad', () => {
+    const line = buildDrivingLine(straightThenTurn(), 0, 80, 80);
+    const badge = line.data.features.find((feature) => feature.properties?.kind === 'badge')!;
+    expect(String(line.nextCurve?.speedKmh)).toBe(badge.properties?.speed);
+  });
+
+  it('con una frenada larga, el aviso dice la velocidad de la curva, no la de la rampa', () => {
+    // 80 km/h, frenada de 200 m hasta 25 km/h en la curva y vuelta a 80.
+    const ramp = Array.from({ length: 20 }, (_, i) => 69 - i * 2.2);
+    const speeds = [...Array(10).fill(80), ...ramp, 25, 25, 25, ...[...ramp].reverse(), ...Array(10).fill(80)];
+    const curve = nextCurveAhead(speeds, 80, 80);
+    expect(curve?.speedKmh).toBe(25);
+    expect(curve?.distanceM).toBe(300);
+  });
+
+  it('despacio no hay aviso de curva', () => {
     const line = buildDrivingLine(straightThenTurn(), 0, 15, 80);
-    expect(line.data.features.every((feature) => feature.properties?.level === 'go')).toBe(true);
+    expect(line.data.features).toHaveLength(0);
   });
 
   it('clasifica por exceso sobre la recomendada', () => {
