@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
 import { checkBackgroundAlerts } from '@/src/lib/background-alerts';
+import { askLocationConsent } from '@/src/lib/location-consent';
 import { pushLivePosition } from '@/src/lib/live-share';
 import { t } from '@/src/i18n';
 
@@ -120,6 +121,7 @@ async function hasTrackingPermissions() {
 
 export async function requestTrackingPermissions() {
   if (Platform.OS === 'web') return false;
+  if (!(await askLocationConsent())) return false;
   const foreground = await Location.requestForegroundPermissionsAsync();
   if (foreground.status !== 'granted') return false;
   const background = await Location.requestBackgroundPermissionsAsync();

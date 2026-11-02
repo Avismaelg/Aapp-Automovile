@@ -32,9 +32,8 @@ function saveConsent() {
 export function askLocationConsent(): Promise<boolean> {
   if (hasLocationConsent()) return Promise.resolve(true);
   if (pending) return pending;
-  pending = new Promise<boolean>((resolve) => {
+  const asking = new Promise<boolean>((resolve) => {
     const finish = (granted: boolean) => {
-      pending = null;
       if (granted) saveConsent();
       resolve(granted);
     };
@@ -57,5 +56,10 @@ export function askLocationConsent(): Promise<boolean> {
       { cancelable: true, onDismiss: () => finish(false) },
     );
   });
-  return pending;
+  // Mientras el aviso está abierto, otras peticiones esperan la misma respuesta.
+  pending = asking;
+  void asking.then(() => {
+    if (pending === asking) pending = null;
+  });
+  return asking;
 }

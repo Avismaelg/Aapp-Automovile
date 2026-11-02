@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -196,7 +196,15 @@ export default function WelcomeScreen() {
 
         <View style={styles.legal}>
           <AppText variant="caption" color={colors.dim} align="center">
-            {t('Al continuar aceptas las reglas de conducción responsable de Caravana. Los retos miden llegada, nunca velocidad.')}
+            {t('Al continuar aceptas las reglas de conducción responsable de Caravana. Los retos miden llegada, nunca velocidad.')}{' '}
+            <AppText
+              variant="caption"
+              color={colors.accent}
+              onPress={() => router.push('/privacidad' as Href)}
+              accessibilityRole="link"
+            >
+              {t('Política de privacidad')}
+            </AppText>
           </AppText>
           <Pressable
             onPress={() => router.push('/sign-in')}

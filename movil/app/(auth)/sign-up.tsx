@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
@@ -301,7 +301,15 @@ export default function SignUpScreen() {
       <View style={styles.legal}>
         <Ionicons name="shield-checkmark-outline" size={15} color={colors.lime} />
         <AppText variant="caption" color={colors.muted} style={{ flex: 1 }}>
-          {t('Al crear tu cuenta aceptas las reglas de conducción responsable. Caravana nunca premia el exceso de velocidad.')}
+          {t('Al crear tu cuenta aceptas las reglas de conducción responsable. Caravana nunca premia el exceso de velocidad.')}{' '}
+          <AppText
+            variant="caption"
+            color={colors.accent}
+            onPress={() => router.push('/privacidad' as Href)}
+            accessibilityRole="link"
+          >
+            {t('Política de privacidad')}
+          </AppText>
         </AppText>
       </View>
     </AuthFormLayout>

@@ -86,3 +86,9 @@
 =En {0} · a los {1}|In {0} · at {1}
 =Toca revisar en {0}|Check due in {0}
 =Próximo servicio en {0}|Next service in {0}
+=Política de privacidad|Privacy policy
+=Tu ubicación en Caravana|Your location on Caravana
+=Usamos tu ubicación para mostrarte en el mapa, guiarte, registrar tus viajes y, solo dentro de una party activa, compartir tu posición con sus miembros. No la vendemos ni la publicamos en tu perfil.|We use your location to show you on the map, guide you, record your trips and, only inside an active party, share your position with its members. We never sell it or publish it on your profile.
+=Ver política|View policy
+=Acepto|I agree
+=Sin permiso de ubicación · usando ubicación de demo|No location permission · using demo location

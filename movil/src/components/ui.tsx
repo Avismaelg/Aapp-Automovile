@@ -65,6 +65,8 @@ export function AppText({
   style,
   numberOfLines,
   align,
+  onPress,
+  accessibilityRole,
 }: {
   children: ReactNode;
   variant?: TextVariant;
@@ -72,10 +74,15 @@ export function AppText({
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   align?: TextStyle['textAlign'];
+  // Para enlaces dentro de un párrafo.
+  onPress?: () => void;
+  accessibilityRole?: 'link' | 'text';
 }) {
   return (
     <Text
       numberOfLines={numberOfLines}
+      onPress={onPress}
+      accessibilityRole={accessibilityRole}
       style={[styles[variant], { color, textAlign: align }, style]}
     >
       {children}

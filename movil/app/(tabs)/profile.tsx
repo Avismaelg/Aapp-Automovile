@@ -55,6 +55,7 @@ const settings = [
   { icon: 'notifications-outline' as const, label: t('Notificaciones'), value: t('Activadas') },
   { icon: 'shield-checkmark-outline' as const, label: t('Seguridad'), value: '' },
   { icon: 'help-circle-outline' as const, label: t('Ayuda y soporte'), value: '' },
+  { icon: 'document-text-outline' as const, label: t('Política de privacidad'), value: '' },
 ];
 
 export default function ProfileScreen() {
@@ -333,6 +334,8 @@ export default function ProfileScreen() {
             onPress={() => {
               if (index === 0) {
                 router.push('/profile/edit');
+              } else if (setting.icon === 'document-text-outline') {
+                router.push('/privacidad' as Href);
               } else {
                 Alert.alert(
                   setting.label,

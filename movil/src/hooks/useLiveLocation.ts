@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
+import { askLocationConsent } from '@/src/lib/location-consent';
 import { t } from '@/src/i18n';
 
 export type LiveLocation = {
@@ -154,6 +155,12 @@ async function beginSession(id: number) {
     // Pedir el permiso abre (y cierra) una pantalla del sistema aunque ya esté
     // concedido; eso pausa la app y dispara AppState. Solo se pide si falta.
     const current = await Location.getForegroundPermissionsAsync();
+    // OTR-01: antes del aviso del sistema, la app explica el uso y pide el
+    // consentimiento; sin él se usa la posición de demostración.
+    if (!current.granted && !(await askLocationConsent())) {
+      if (id === session) fallBackToDemo('denied', t('Sin permiso de ubicación · usando ubicación de demo'));
+      return;
+    }
     const permission = current.granted ? current : await Location.requestForegroundPermissionsAsync();
     if (id !== session) return;
 
