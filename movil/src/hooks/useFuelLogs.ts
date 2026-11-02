@@ -10,16 +10,24 @@ import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 import { getCurrency, t } from '@/src/i18n';
 
-// Registros añadidos en modo demo durante la sesión (no hay backend).
-const useDemoFuelLogs = create<{ logs: FuelLog[]; add: (log: FuelLog) => void }>((set) => ({
+// Registros añadidos o editados en modo demo durante la sesión (no hay backend).
+const useDemoFuelLogs = create<{
+  logs: FuelLog[];
+  edits: Record<string, FuelLog>;
+  add: (log: FuelLog) => void;
+  replace: (log: FuelLog) => void;
+}>((set) => ({
   logs: [],
+  edits: {},
   add: (log) => set((state) => ({ logs: [log, ...state.logs] })),
+  replace: (log) => set((state) => ({ edits: { ...state.edits, [log.id]: log } })),
 }));
 
 export function useFuelLogs(availableVehicles: Vehicle[]) {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
   const demoAdded = useDemoFuelLogs((state) => state.logs);
+  const demoEdits = useDemoFuelLogs((state) => state.edits);
 
   const vehicleKey = availableVehicles
     .map((vehicle) => vehicle.id)
@@ -49,7 +57,7 @@ export function useFuelLogs(availableVehicles: Vehicle[]) {
   });
 
   return {
-    logs: demo ? [...demoAdded, ...mockFuelLogs] : query.data ?? [],
+    logs: demo ? [...demoAdded, ...mockFuelLogs].map((log) => demoEdits[log.id] ?? log) : query.data ?? [],
     isDemo: demo,
     isLoading: demo ? false : query.isLoading,
     isError: demo ? false : query.isError,
@@ -66,6 +74,8 @@ export type NewFuelLogInput = {
   odometer: number;
   station?: string;
   fullTank?: boolean;
+  /** Fecha del registro (ISO); por defecto, ahora. */
+  filledAt?: string;
 };
 
 export function useAddFuelLog() {
@@ -92,6 +102,7 @@ export function useAddFuelLog() {
           total: Number(input.total.toFixed(0)),
           odometer: input.odometer,
           fullTank: input.fullTank ?? true,
+          filledAt: input.filledAt ?? new Date().toISOString(),
         };
         useDemoFuelLogs.getState().add(log);
         return log;
@@ -113,7 +124,7 @@ export function useAddFuelLog() {
           currency_code: getCurrency(),
           station: input.station,
           is_full_tank: input.fullTank ?? true,
-          filled_at: new Date().toISOString(),
+          filled_at: input.filledAt ?? new Date().toISOString(),
         })
         .select('*')
         .single();
@@ -136,6 +147,55 @@ export function useAddFuelLog() {
         void queryClient.invalidateQueries({ queryKey: ['fuel-logs'] });
         void queryClient.invalidateQueries({ queryKey: ['garage'] });
       }
+    },
+  });
+}
+
+// RF-09: editar un repostaje o carga ya guardado.
+export function useUpdateFuelLog() {
+  const queryClient = useQueryClient();
+  const account = useAuth((state) => state.account);
+  const demo = isDemoMode(account?.mode);
+
+  return useMutation({
+    mutationFn: async ({ log, input }: { log: FuelLog; input: NewFuelLogInput }): Promise<void> => {
+      const electric = input.vehicle.fuel === 'electric';
+      if (demo) {
+        useDemoFuelLogs.getState().replace({
+          ...log,
+          station: input.station || log.station,
+          liters: electric ? 0 : Number(input.volume.toFixed(2)),
+          kwh: electric ? Number(input.volume.toFixed(2)) : undefined,
+          pricePerLiter: input.pricePerUnit,
+          total: Number(input.total.toFixed(0)),
+          odometer: input.odometer,
+          fullTank: input.fullTank ?? true,
+          filledAt: input.filledAt ?? log.filledAt,
+        });
+        return;
+      }
+      if (!supabase || !account) {
+        throw new Error(t('Inicia sesión para guardar el repostaje.'));
+      }
+      const { error } = await supabase
+        .from('fuel_logs')
+        .update({
+          odometer_km: input.odometer,
+          volume_l: input.volume,
+          price_per_l: input.pricePerUnit,
+          total_cost: input.total,
+          station: input.station ?? null,
+          is_full_tank: input.fullTank ?? true,
+          ...(input.filledAt ? { filled_at: input.filledAt } : {}),
+        })
+        .eq('id', log.id)
+        .eq('user_id', account.id);
+      if (error) {
+        throw new Error(t('No pudimos guardar los cambios.'));
+      }
+    },
+    onSuccess: () => {
+      if (!demo) void queryClient.invalidateQueries({ queryKey: ['fuel-logs'] });
     },
   });
 }

@@ -63,6 +63,7 @@ export function mapFuelLogRow(row: FuelLogRow, vehicle: Vehicle): FuelLog {
     total: Number(row.total_cost ?? 0),
     odometer: Number(row.odometer_km ?? 0),
     fullTank: row.is_full_tank,
+    filledAt: row.filled_at,
   };
 }
 

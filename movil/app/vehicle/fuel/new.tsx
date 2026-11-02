@@ -14,14 +14,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthNotice } from '@/src/components/auth';
 import { AppText, Button, Card, IconButton, Input } from '@/src/components/ui';
-import { useAddFuelLog, useFuelLogs } from '@/src/hooks/useFuelLogs';
+import { useAddFuelLog, useFuelLogs, useUpdateFuelLog } from '@/src/hooks/useFuelLogs';
+import { fromLiters, localDateInput, toLiters, validateFuelEntry, type VolumeUnit } from '@/src/lib/fuel-entry';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { errorMessage } from '@/src/lib/alerts';
 import { formatMoney } from '@/src/lib/format';
 import { isElectric } from '@/src/lib/vehicles';
-import type { Vehicle } from '@/src/types/models';
+import type { FuelLog, Vehicle } from '@/src/types/models';
 import { colors, radius, spacing } from '@/src/theme';
-import { displayToKm, distanceUnit, formatKmValue, getCurrency, t } from '@/src/i18n';
+import { displayToKm, distanceUnit, formatKmValue, getCurrency, kmToDisplay, t } from '@/src/i18n';
 
 function parseNumber(value: string) {
   const number = Number(value.replace(',', '.'));
@@ -30,9 +31,12 @@ function parseNumber(value: string) {
 
 export default function NewFuelLogScreen() {
   const router = useRouter();
-  const { vehicleId } = useLocalSearchParams<{ vehicleId: string }>();
+  const { vehicleId, logId } = useLocalSearchParams<{ vehicleId: string; logId?: string }>();
   const { vehicles, isLoading } = useGarageVehicles();
-  const vehicle = vehicles.find((item) => item.id === vehicleId) ?? vehicles[0];
+  const { logs } = useFuelLogs(vehicles);
+  const existing = logId ? logs.find((log) => log.id === logId) : undefined;
+  const vehicle =
+    vehicles.find((item) => item.id === (existing?.vehicleId ?? vehicleId)) ?? vehicles[0];
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -59,70 +63,101 @@ export default function NewFuelLogScreen() {
     );
   }
 
-  return <FuelLogForm key={vehicle.id} vehicle={vehicle} vehicles={vehicles} onDone={goBack} />;
+  return (
+    <FuelLogForm
+      key={`${vehicle.id}-${existing?.id ?? 'new'}`}
+      vehicle={vehicle}
+      logs={logs}
+      existing={existing}
+      onDone={goBack}
+    />
+  );
 }
 
-// Repostaje o carga real: odómetro, cantidad e importe tal como aparecen en el
-// surtidor o el cargador. Con el tanque lleno sirve para calcular el consumo.
+// Repostaje o carga real: fecha, odómetro, cantidad e importe tal como
+// aparecen en el surtidor o el cargador. Con el tanque lleno sirve para
+// calcular el consumo. Con `existing` se edita un registro ya guardado (RF-09).
 function FuelLogForm({
   vehicle,
-  vehicles,
+  logs,
+  existing,
   onDone,
 }: {
   vehicle: Vehicle;
-  vehicles: Vehicle[];
+  logs: FuelLog[];
+  existing?: FuelLog;
   onDone: () => void;
 }) {
   const electric = isElectric(vehicle);
-  const unit = electric ? 'kWh' : 'L';
   const addFuelLog = useAddFuelLog();
-  const { logs } = useFuelLogs(vehicles);
-  const lastOdometer = Math.max(
-    vehicle.odometerKm,
-    ...logs.filter((log) => log.vehicleId === vehicle.id).map((log) => log.odometer),
-  );
+  const updateFuelLog = useUpdateFuelLog();
+  const saving = addFuelLog.isPending || updateFuelLog.isPending;
+  const others = logs.filter((log) => log.vehicleId === vehicle.id && log.id !== existing?.id);
+  const lastOdometer = Math.max(existing ? 0 : vehicle.odometerKm, ...others.map((log) => log.odometer), 0);
 
-  const [odometer, setOdometer] = useState('');
-  const [amount, setAmount] = useState('');
-  const [total, setTotal] = useState('');
-  const [fullTank, setFullTank] = useState(true);
-  const [station, setStation] = useState('');
+  const [volumeUnit, setVolumeUnit] = useState<VolumeUnit>('L');
+  const unit = electric ? 'kWh' : volumeUnit;
+  const [date, setDate] = useState(() =>
+    localDateInput(existing?.filledAt ? new Date(existing.filledAt) : new Date()),
+  );
+  const [odometer, setOdometer] = useState(() =>
+    existing ? String(Math.round(kmToDisplay(existing.odometer))) : '',
+  );
+  const [amount, setAmount] = useState(() =>
+    existing ? String(electric ? existing.kwh ?? 0 : Number(existing.liters.toFixed(2))) : '',
+  );
+  const [total, setTotal] = useState(() => (existing ? String(existing.total) : ''));
+  const [fullTank, setFullTank] = useState(existing?.fullTank ?? true);
+  const [station, setStation] = useState(existing?.station ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const amountNumber = parseNumber(amount);
   const totalNumber = parseNumber(total);
   const pricePerUnit = amountNumber > 0 && totalNumber > 0 ? totalNumber / amountNumber : null;
 
+  const changeUnit = (next: VolumeUnit) => {
+    if (next === volumeUnit) return;
+    const liters = toLiters(parseNumber(amount), volumeUnit);
+    if (Number.isFinite(liters) && liters > 0) setAmount(String(Number(fromLiters(liters, next).toFixed(2))));
+    setVolumeUnit(next);
+  };
+
   const save = async () => {
     setError(null);
     const odometerNumber = Math.round(displayToKm(parseNumber(odometer)));
-    if (!(odometerNumber > 0)) {
-      setError(t('Escribe los kilómetros que marca el odómetro.'));
+    // Registros vecinos por fecha (o por odómetro si no hay fecha).
+    const when = (log: FuelLog) => (log.filledAt ? Date.parse(log.filledAt) : log.odometer);
+    const target = existing?.filledAt ? Date.parse(existing.filledAt) : Number.POSITIVE_INFINITY;
+    const before = others.filter((log) => when(log) <= target).map((log) => log.odometer);
+    const after = existing ? others.filter((log) => when(log) > target).map((log) => log.odometer) : [];
+    const check = validateFuelEntry({
+      odometerKm: odometerNumber,
+      amount: amountNumber,
+      total: totalNumber,
+      date,
+      previousOdometerKm: existing ? (before.length ? Math.max(...before) : null) : lastOdometer || null,
+      nextOdometerKm: after.length ? Math.min(...after) : null,
+      electric,
+    });
+    if (!check.ok) {
+      setError(check.error);
       return;
     }
-    if (odometerNumber < lastOdometer) {
-      setError(t('El odómetro no puede ser menor que el último registro ({0}).', formatKmValue(lastOdometer)));
-      return;
-    }
-    if (!(amountNumber > 0)) {
-      setError(electric ? t('Escribe los kWh cargados.') : t('Escribe los litros repostados.'));
-      return;
-    }
-    if (!(totalNumber > 0) || pricePerUnit == null) {
-      setError(t('Escribe el importe total pagado.'));
-      return;
-    }
+    const volume = electric ? amountNumber : toLiters(amountNumber, volumeUnit);
+    const input = {
+      vehicle,
+      volume,
+      pricePerUnit: totalNumber / volume,
+      total: totalNumber,
+      odometer: odometerNumber,
+      station: station.trim() || undefined,
+      fullTank,
+      filledAt: check.filledAt,
+    };
 
     try {
-      await addFuelLog.mutateAsync({
-        vehicle,
-        volume: amountNumber,
-        pricePerUnit,
-        total: totalNumber,
-        odometer: odometerNumber,
-        station: station.trim() || undefined,
-        fullTank,
-      });
+      if (existing) await updateFuelLog.mutateAsync({ log: existing, input });
+      else await addFuelLog.mutateAsync(input);
       onDone();
     } catch (saveError) {
       setError(errorMessage(saveError, t('No pudimos guardar el registro.')));
@@ -149,13 +184,27 @@ function FuelLogForm({
           </View>
 
           <View style={styles.heading}>
-            <AppText variant="h1">{electric ? t('Registra la carga.') : t('Registra el repostaje.')}</AppText>
+            <AppText variant="h1">
+              {existing
+                ? t('Editar registro')
+                : electric
+                  ? t('Registra la carga.')
+                  : t('Registra el repostaje.')}
+            </AppText>
             <AppText variant="body" color={colors.muted} style={{ marginTop: 6 }}>
               {vehicle.make} {vehicle.model}{' '}{t('· último registro')}{' '}{formatKmValue(lastOdometer)}
             </AppText>
           </View>
 
           <Card style={styles.section}>
+            <Input
+              label={t('Fecha')}
+              value={date}
+              onChangeText={setDate}
+              placeholder="AAAA-MM-DD"
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
             <Input
               label={t('Odómetro')}
               value={odometer}
@@ -184,6 +233,23 @@ function FuelLogForm({
                 style={styles.flex}
               />
             </View>
+            {!electric ? (
+              <View style={styles.row}>
+                {(['L', 'gal'] as const).map((option) => (
+                  <Pressable
+                    key={option}
+                    onPress={() => changeUnit(option)}
+                    style={[styles.unitChip, volumeUnit === option && styles.unitChipActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: volumeUnit === option }}
+                  >
+                    <AppText variant="bodyStrong" color={volumeUnit === option ? colors.text : colors.muted}>
+                      {option === 'L' ? t('Litros') : t('Galones')}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             <AppText variant="caption" color={colors.muted}>
               {pricePerUnit != null
                 ? t('Precio: {0} por {1}', formatMoney(pricePerUnit), unit)
@@ -221,10 +287,18 @@ function FuelLogForm({
           {error ? <AuthNotice message={error} /> : null}
 
           <Button
-            label={addFuelLog.isPending ? 'Guardando…' : electric ? t('Guardar carga') : t('Guardar repostaje')}
+            label={
+              saving
+                ? t('Guardando…')
+                : existing
+                  ? t('Guardar cambios')
+                  : electric
+                    ? t('Guardar carga')
+                    : t('Guardar repostaje')
+            }
             icon="checkmark-circle-outline"
             size="lg"
-            loading={addFuelLog.isPending}
+            loading={saving}
             onPress={save}
             style={{ marginTop: spacing.lg }}
           />
@@ -271,4 +345,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   toggleActive: { borderColor: colors.lime, backgroundColor: colors.limeSoft },
+  unitChip: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+  },
+  unitChipActive: { borderColor: colors.accent, backgroundColor: colors.surfaceHigh },
 });

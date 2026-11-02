@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Card } from '@/src/components/ui';
 import { logEnergy, logUnit } from '@/src/lib/fuel';
@@ -8,7 +8,16 @@ import { formatMoney, formatNumber } from '@/src/lib/format';
 import { colors, spacing } from '@/src/theme';
 import { formatKmValue, t } from '@/src/i18n';
 
-export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boolean }) {
+// Tocar un registro lo abre para editarlo (RF-09).
+export function FuelLogList({
+  logs,
+  electric,
+  onEdit,
+}: {
+  logs: FuelLog[];
+  electric: boolean;
+  onEdit?: (log: FuelLog) => void;
+}) {
   return logs.length === 0 ? (
     <Card style={styles.emptyCard}>
       <Ionicons name="battery-half-outline" size={24} color={colors.dim} />
@@ -21,7 +30,13 @@ export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boo
     </Card>
   ) : (
     logs.map((log) => (
-      <Card key={log.id} style={styles.logCard}>
+      <Pressable
+        key={log.id}
+        onPress={onEdit ? () => onEdit(log) : undefined}
+        accessibilityRole={onEdit ? 'button' : undefined}
+        accessibilityHint={onEdit ? t('Editar registro') : undefined}
+      >
+      <Card style={styles.logCard}>
         <View
           style={[
             styles.logIcon,
@@ -53,7 +68,9 @@ export function FuelLogList({ logs, electric }: { logs: FuelLog[]; electric: boo
             </AppText>
           </View>
         </View>
+        {onEdit ? <Ionicons name="create-outline" size={18} color={colors.dim} /> : null}
       </Card>
+      </Pressable>
     ))
   );
 }

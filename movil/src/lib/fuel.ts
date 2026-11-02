@@ -103,6 +103,15 @@ export function logPriceUnit(log: FuelLog) {
 }
 
 /**
+ * RF-09: el mismo rendimiento en las tres unidades (km/L, L/100 km y MPG de
+ * EE. UU.).
+ */
+export function efficiencyEquivalents(kmPerL: number) {
+  if (!(kmPerL > 0)) return { kmPerL: 0, lPer100km: 0, mpg: 0 };
+  return { kmPerL, lPer100km: 100 / kmPerL, mpg: kmPerL / MPG_TO_KM_PER_L };
+}
+
+/**
  * Consumo real entre registros consecutivos (método de tanque lleno): la
  * energía de cada repostaje cubre los km recorridos desde el anterior.
  * Devuelve, del más antiguo al más reciente, km/L para combustible y

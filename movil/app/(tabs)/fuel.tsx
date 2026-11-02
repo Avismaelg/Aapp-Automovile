@@ -400,7 +400,11 @@ function FuelDashboard({ availableVehicles }: { availableVehicles: Vehicle[] }) 
         onPress={openNewLog}
         style={{ marginBottom: spacing.md }}
       />
-      <FuelLogList logs={vehicleLogs} electric={electric} />
+      <FuelLogList
+        logs={vehicleLogs}
+        electric={electric}
+        onEdit={(log) => router.push(`/vehicle/fuel/new?vehicleId=${vehicle.id}&logId=${log.id}` as Href)}
+      />
 
       <NextMaintenanceCard vehicle={vehicle} />
 

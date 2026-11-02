@@ -149,6 +149,8 @@ export type FuelLog = {
   total: number;
   odometer: number;
   fullTank: boolean;
+  /** Fecha real del registro (ISO), para ordenar y editar. */
+  filledAt?: string;
 };
 
 export type MaintenanceKind =

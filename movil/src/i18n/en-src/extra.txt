@@ -99,3 +99,10 @@
 =La fecha del evento ya pasó. Elige una fecha futura.|The event date has passed. Pick a future date.
 =Fecha|Date
 =Hora|Time
+=La fecha no puede ser futura.|The date can't be in the future.
+=El odómetro no puede ser menor que el registro anterior.|The odometer can't be lower than the previous record.
+=El odómetro no puede ser mayor que el del registro siguiente.|The odometer can't be higher than the next record.
+=Editar registro|Edit record
+=Galones|Gallons
+=cargados|filled
+=Guardando…|Saving…

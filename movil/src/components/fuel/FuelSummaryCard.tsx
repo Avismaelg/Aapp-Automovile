@@ -4,12 +4,12 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText, Pill, Stat } from '@/src/components/ui';
 import { Trend } from '@/src/components/fuel/Trend';
-import { efficiencyChangePercent } from '@/src/lib/fuel';
+import { efficiencyChangePercent, efficiencyEquivalents } from '@/src/lib/fuel';
 import type { Vehicle } from '@/src/types/models';
 import { formatMoney, formatNumber } from '@/src/lib/format';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
-import { distanceUnit, getCurrency, t } from '@/src/i18n';
+import { displayToKm, distanceUnit, getCurrency, t } from '@/src/i18n';
 
 type Props = {
   vehicle: Vehicle;
@@ -65,6 +65,14 @@ export function FuelSummaryCard({
           <AppText variant="caption" color={colors.textSoft} style={{ marginTop: -2 }}>
             {electric ? t('kWh/100 km') : 'km/L'}
           </AppText>
+          {!electric && (latest ?? vehicle.efficiency) > 0 ? (
+            <AppText variant="caption" color={colors.muted}>
+              {(() => {
+                const figures = efficiencyEquivalents(latest ?? vehicle.efficiency);
+                return `${formatNumber(figures.lPer100km, 1)} L/100 km · ${formatNumber(figures.mpg, 1)} MPG`;
+              })()}
+            </AppText>
+          ) : null}
           {change != null ? (
             <View style={styles.summaryTrendLabel}>
               <Pill
@@ -98,11 +106,15 @@ export function FuelSummaryCard({
       </View>
 
       <View style={styles.summaryStats}>
-        <Stat value={formatNumber(costPerKm, 2)} label={`${getCurrency()} / ${distanceUnit()}`} accent={meta.color} />
+        <Stat
+          value={formatNumber(costPerKm * displayToKm(1), 2)}
+          label={`${getCurrency()} / ${distanceUnit()}`}
+          accent={meta.color}
+        />
         <View style={styles.summaryDivider} />
         <Stat value={formatMoney(totalSpent)} label={t('gastado')} />
         <View style={styles.summaryDivider} />
-        <Stat value={`${formatNumber(totalEnergy, 0)} ${electric ? 'kWh' : 'L'}`} label="cargados" />
+        <Stat value={`${formatNumber(totalEnergy, 0)} ${electric ? 'kWh' : 'L'}`} label={t('cargados')} />
       </View>
     </LinearGradient>
   );
