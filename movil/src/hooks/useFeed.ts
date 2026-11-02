@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useId } from 'react';
 
 import {
   mapProfileRow,
@@ -7,6 +8,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
+import { uniqueTopic } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
@@ -155,6 +157,35 @@ export function useFeed() {
       });
     },
   });
+
+  // RF-05 / SW-03: el feed se actualiza en vivo. Realtime aplica las mismas
+  // políticas RLS, así que cada usuario solo recibe lo que puede ver.
+  const queryClient = useQueryClient();
+  const channelId = useId().replace(/:/g, '');
+  const accountId = account?.id;
+  useEffect(() => {
+    if (demo || !supabase || !accountId) return;
+    const client = supabase;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Varias filas cambian a la vez (post y su foto llegan seguidos): una sola
+    // recarga, con margen para que la foto ya esté guardada.
+    const refresh = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void queryClient.invalidateQueries({ queryKey: ['feed'] });
+      }, 1_500);
+    };
+    let channel = client.channel(uniqueTopic(`feed-${accountId}-${channelId}`));
+    for (const table of ['posts', 'likes', 'comments']) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, refresh);
+    }
+    channel.subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void client.removeChannel(channel);
+    };
+  }, [accountId, channelId, demo, queryClient]);
 
   return {
     posts: demo ? [] : query.data ?? [],
