@@ -10,6 +10,7 @@ import {
 } from '@/src/lib/party-patch';
 import { isDemoMode } from '@/src/lib/demo';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
+import { PARTY_FREE_MEMBERS } from '@/src/lib/party-invites';
 import {
   mapProfileRow,
   PROFILE_COLUMNS,
@@ -358,7 +359,7 @@ export function useCreateParty() {
           destination_label: input.destinationLabel || null,
           destination_lat: input.destinationLat ?? null,
           destination_lng: input.destinationLng ?? null,
-          max_members: 50,
+          max_members: PARTY_FREE_MEMBERS,
           is_private: true,
         })
         .select('id, invite_code')

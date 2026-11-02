@@ -6,6 +6,7 @@ import {
   defaultPartyName,
   INVITE_FRESH_MS,
   inviteErrorMessage,
+  PARTY_FREE_MEMBERS,
   type SentInvite,
 } from '@/src/lib/party-invites';
 import { mapProfileRow, PROFILE_COLUMNS, type ProfileRow, type UserProfile } from '@/src/lib/profile-db';
@@ -151,7 +152,7 @@ async function createQuickParty(accountId: string, name: string) {
       name,
       status: 'live',
       starts_at: now,
-      max_members: 50,
+      max_members: PARTY_FREE_MEMBERS,
       is_private: true,
     })
     .select('id, invite_code')
