@@ -176,6 +176,8 @@ type WorldMapProps = {
   travelMode?: WorldMapTravelMode;
   northUp?: boolean;
   fitRoute?: [number, number][] | null;
+  // Alto de lo que tapa el mapa por abajo (tarjetas), para encuadrar la ruta.
+  fitBottom?: number;
   autoFollow?: boolean;
   route?: WorldMapRoute | null;
   alternatives?: WorldMapAlternative[];
@@ -270,6 +272,7 @@ export const WorldMap = memo(function WorldMap({
   travelMode = "car",
   northUp = false,
   fitRoute = null,
+  fitBottom = 280,
   autoFollow = true,
   route = null,
   alternatives = NO_ALTERNATIVES,
@@ -333,9 +336,13 @@ export const WorldMap = memo(function WorldMap({
     const timer = setTimeout(() => {
       const { ne, sw } = cornersOf(fitRoute);
       // Relleno [arriba, derecha, abajo, izquierda]: deja sitio a las tarjetas.
-      cameraRef.current?.fitBounds(ne, sw, [140, 48, 280, 48], 900);
+      // Laterales amplios: el velocímetro y los botones tapan los bordes.
+      cameraRef.current?.fitBounds(ne, sw, [160, 90, fitBottom, 90], 900);
     }, 50);
     return () => clearTimeout(timer);
+    // El alto de las tarjetas cambia mientras cargan: solo se encuadra con
+    // cada ruta nueva.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitRoute, changeFollowing]);
 
   useEffect(() => {

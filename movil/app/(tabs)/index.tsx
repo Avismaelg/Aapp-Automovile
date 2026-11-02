@@ -839,6 +839,9 @@ export default function NavigationScreen() {
         northUp={northUp}
         route={route.route}
         alternatives={mapAlternatives}
+        // Antes de «Iniciar», vista de la ruta entera; al iniciar te sigue.
+        fitRoute={!navigating && route.route ? route.route.coordinates : null}
+        fitBottom={bottomHeight + 40}
         onAlternativePress={selectRoute}
         vehicleColor={primaryVehicle?.color}
         vehicleKind={primaryVehicle?.kind}
