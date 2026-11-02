@@ -1041,6 +1041,7 @@
   "RÉCORDS PÚBLICOS": "PUBLIC RECORDS",
   "Récords": "Records",
   "Récords de velocidad en tramos de autopista, públicos para toda la comunidad. Conduce con precaución y respeta los límites.": "Speed records on highway stretches, public for the whole community. Drive carefully and respect the limits.",
+  "Récords por tramo de autopista, públicos para toda la comunidad. Solo cuentan las pasadas que respetan el límite de velocidad: nunca se premia ir más rápido.": "Highway stretch records, public for the whole community. Only passes that respect the speed limit count: going faster is never rewarded.",
   "SALIDA": "START",
   "SIMULACIÓN · {0} · {1} km/h{2}": "SIMULATION · {0} · {1} km/h{2}",
   "SIMULACIÓN · {0} · {1} {2}{3}": "SIMULATION · {0} · {1} {2}{3}",

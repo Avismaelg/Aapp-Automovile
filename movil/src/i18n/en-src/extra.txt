@@ -106,3 +106,4 @@
 =Galones|Gallons
 =cargados|filled
 =Guardando…|Saving…
+=Récords por tramo de autopista, públicos para toda la comunidad. Solo cuentan las pasadas que respetan el límite de velocidad: nunca se premia ir más rápido.|Highway stretch records, public for the whole community. Only passes that respect the speed limit count: going faster is never rewarded.

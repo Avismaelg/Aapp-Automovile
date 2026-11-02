@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { isDeleteConfirmed } from '@/src/lib/delete-account';
+import { countsAsRecord } from '@/src/lib/record-rules';
 import { PARTY_FREE_MEMBERS, PARTY_MAX_MEMBERS, SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
 
 // Comprobaciones del SRS sobre el backend y los secretos, leyendo el propio
@@ -93,5 +94,15 @@ describe('SRS — eliminación de cuenta (RF-03, UI-06, RNF-12)', () => {
 describe('SRS — privacidad de la ubicación (RNF-10)', () => {
   it('no se comparte la ubicación fuera de una party activa', () => {
     expect(SHARE_OUTSIDE_PARTY).toBe(false);
+  });
+});
+
+describe('SRS — récords sin premiar la velocidad (R-06, OTR-02, RF-16)', () => {
+  it('solo cuentan las pasadas dentro del límite del tramo', () => {
+    expect(countsAsRecord(95, 100)).toBe(true);
+    expect(countsAsRecord(100, 100)).toBe(true);
+    expect(countsAsRecord(101, 100)).toBe(false);
+    expect(countsAsRecord(null, 100)).toBe(false);
+    expect(countsAsRecord(90, null)).toBe(false);
   });
 });

@@ -5,6 +5,9 @@ import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import type { Trip } from '@/src/store/trips';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { countsAsRecord } from '@/src/lib/record-rules';
+
+export { countsAsRecord };
 
 export type HighwaySegment = {
   id: string;
@@ -213,13 +216,14 @@ export async function submitTripSpeedRecords(
 
   const { data, error } = await supabase
     .from('highway_segments')
-    .select('id, polyline');
+    .select('id, polyline, speed_limit_kmh');
   if (error || !data) return false;
 
   const rows = [];
-  for (const segment of data as { id: string; polyline: [number, number][] }[]) {
+  for (const segment of data as { id: string; polyline: [number, number][]; speed_limit_kmh: number }[]) {
     const maxSpeed = maxSpeedNearSegment(trip, segment.polyline ?? []);
-    if (maxSpeed == null) continue;
+    // R-06 / OTR-02: una pasada por encima del límite nunca cuenta como récord.
+    if (!countsAsRecord(maxSpeed, segment.speed_limit_kmh)) continue;
     rows.push({
       segment_id: segment.id,
       user_id: account.id,

@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AppText, Card, EmptyState, IconButton, Pill, Screen } from '@/src/components/ui';
 import {
+  countsAsRecord,
   maxSpeedNearSegment,
   useHighwaySegments,
   useSpeedRecords,
@@ -38,7 +39,10 @@ export default function RecordsScreen() {
 
   const bySegment = useMemo(() => {
     const map = new Map<string, SpeedRecord[]>();
+    const limits = new Map(segments.map((segment) => [segment.id, segment.speedLimitKmh]));
     for (const record of records) {
+      // Registros antiguos por encima del límite no se muestran (D-05).
+      if (!countsAsRecord(record.maxSpeedKmh, limits.get(record.segmentId))) continue;
       const list = map.get(record.segmentId) ?? [];
       list.push(record);
       map.set(record.segmentId, list);
@@ -47,7 +51,7 @@ export default function RecordsScreen() {
       list.sort((a, b) => b.maxSpeedKmh - a.maxSpeedKmh);
     }
     return map;
-  }, [records]);
+  }, [records, segments]);
 
   const localBest = useMemo(() => {
     const map = new Map<string, number>();
@@ -57,7 +61,7 @@ export default function RecordsScreen() {
       let best: number | null = null;
       for (const trip of recent) {
         const value = maxSpeedNearSegment(trip, segment.polyline);
-        if (value != null) best = Math.max(best ?? 0, value);
+        if (countsAsRecord(value, segment.speedLimitKmh)) best = Math.max(best ?? 0, value);
       }
       if (best != null) map.set(segment.slug, best);
     }
@@ -78,7 +82,7 @@ export default function RecordsScreen() {
       <Card style={styles.notice}>
         <Ionicons name="warning-outline" size={16} color={colors.accent} />
         <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
-          {t('Récords de velocidad en tramos de autopista, públicos para toda la comunidad. Conduce con precaución y respeta los límites.')}
+          {t('Récords por tramo de autopista, públicos para toda la comunidad. Solo cuentan las pasadas que respetan el límite de velocidad: nunca se premia ir más rápido.')}
         </AppText>
       </Card>
 
