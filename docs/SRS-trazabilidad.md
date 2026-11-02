@@ -11,16 +11,18 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
   SW-07 (MapLibre con edificios y relieve) y la parte «3D / vista 2D-3D» de RF-11 y UI-03 quedan ⏭.
   El mapa actual usa `@rnmapbox/maps` con estilos Mapbox; no se migra a MapLibre.
 - **D-02 Idioma.** El SRS pide la interfaz «primero en español» (R-07) y «en español» (OTR-03). El español es el
-  texto base del código y el idioma por defecto. El inglés es un idioma adicional que se puede elegir. Para no
-  contradecir OTR-03, el modo automático solo pasa a inglés si el teléfono está en inglés; cualquier otro idioma usa español.
+  texto base del código y el idioma por defecto. El inglés es un idioma adicional que se puede elegir en Perfil. Para
+  no contradecir OTR-03, el modo automático solo pasa a inglés si el teléfono está en inglés; cualquier otro idioma usa
+  español.
 - **D-03 Monedas.** OTR-03 limita las monedas a DOP (por defecto), USD, EUR y MXN: la moneda del teléfono solo se
   usa si es una de esas cuatro; si no, DOP.
 - **D-04 Ubicación con amigos fuera de la party.** RNF-10 dice que la ubicación solo se comparte dentro de una party
   activa. La función opcional «Mi ubicación para amigos» (tabla `friend_locations`) lo contradice: manda el SRS y
   se desactiva (no se borra el código ni la tabla).
 - **D-05 Récords por tramo.** RF-16 pide «top 3 del tramo y mejor marca propia», pero R-06 y OTR-02 prohíben premiar
-  la velocidad. La clasificación por velocidad máxima se sustituye por el **tiempo medio del tramo respetando el
-  límite** (no se cuentan pasadas por encima del límite). Es la opción más fiel a ambos requisitos. ❓ AMBIGUO.
+  la velocidad. Se mantiene el top 3 y la marca propia, pero **solo cuentan las pasadas que no superan el límite del
+  tramo**: las que lo superan no se envían ni se muestran. Así nadie gana por ir más rápido de lo permitido. ❓ AMBIGUO:
+  si el docente prefiere otra métrica (p. ej. regularidad), cambia solo `src/lib/record-rules.ts`.
 - **D-06 Modo demo sin variables de entorno.** RF-01 dice que sin variables de entorno la app entra en modo demo. En
   compilaciones de producción la app muestra un error de configuración (protección para no publicar una app «vacía»).
   Se mantiene así en producción y se cumple en desarrollo y vista previa. ❓ AMBIGUO.
@@ -37,8 +39,8 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | R-02 | Supabase con RLS en toda tabla | ✅ | 32 tablas en `supabase/migrations/*.sql`, todas con `enable row level security` | — | — |
 | R-03 | service_role nunca en la app | ✅ | Solo en `supabase/functions/delete-account/index.ts:47`; `.env` sin claves secretas e ignorado por git | — | — |
 | R-04 | Voz/cámara/2.º plano en development build; degradar en Expo Go | 🟡 | `src/lib/livekit.ts`, `livekit.web.ts`; avisos en `useVoiceRoom.ts:80` | Probar en Expo Go | 4 |
-| R-05 | Políticas de tiendas: textos de permisos y justificación previa | 🟡 | Textos en `app.json:18,59-89` | Explicación propia antes de pedir la ubicación (ver OTR-01) | 1 |
-| R-06 | Retos por llegada, nunca velocidad máxima | 🟡 | Retos: `src/lib/challenge-db.ts` (clasificación por llegada) | Récords por tramo clasifican por velocidad máxima (`app/records.tsx`, `src/lib/highway-records.ts:196`) → D-05 | 3 |
+| R-05 | Políticas de tiendas: textos de permisos y justificación previa | ✅ | Textos en `app.json`; aviso propio antes del permiso: `src/lib/location-consent.ts` (usado en `useLiveLocation.ts` y `tracking.ts`) | — | — |
+| R-06 | Retos por llegada, nunca velocidad máxima | ✅ | Retos: `src/lib/challenge-db.ts`; récords solo con pasadas dentro del límite: `src/lib/record-rules.ts` (D-05) | — | — |
 | R-07 | Español, negro OLED con naranja | ✅ | `src/theme/index.ts`; D-02 | — | — |
 | R-08 | Batería y datos moderados | ❓ | `src/lib/tracking.ts:16-41` (15 s/25 m en reposo, 3 s/8 m en party) | Medir en dispositivo (perfil de batería de Android) | — |
 
@@ -47,11 +49,11 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | ID | Requisito | Estado | Evidencia | Qué falta | Prio |
 |---|---|---|---|---|---|
 | UI-01 | OLED + naranja; Inter, Space Grotesk, Barlow Condensed en tokens | ✅ | `src/theme/index.ts` (colors, fonts); carga en `app/_layout.tsx` | — | — |
-| UI-02 | Pestañas Inicio, Actividad, Party, Retos, Garaje, Perfil | ❌ | `app/(tabs)/_layout.tsx`: Inicio, Party, Retos, Garaje, **Consumo**, Perfil | Actividad como pestaña; Consumo pasa a pantalla accesible desde Garaje | 5 |
+| UI-02 | Pestañas Inicio, Actividad, Party, Retos, Garaje, Perfil | ✅ | `app/(tabs)/_layout.tsx`; `app/(tabs)/actividad.tsx`; Consumo oculto como pestaña (`href: null`) y accesible desde Garaje | — | — |
 | UI-03 | Pantallas listadas | ✅ | `app/`: welcome, sign-up, sign-in, (tabs)/index, actividad, post/new, friends, party, challenges, garage, fuel, profile, scan, drive, party/[code], challenge/[code], u/[username], v/[slug], v/[slug]/sale (3D ⏭ D-01) | — | — |
-| UI-04 | Modo conducción grande, vertical y horizontal | 🟡 | `app/drive.tsx:85` detecta horizontal | `app.json:6` fija `"orientation": "portrait"` → nunca gira | 3 |
+| UI-04 | Modo conducción grande, vertical y horizontal | ✅ | `src/hooks/useFreeOrientation.ts` en `app/drive.tsx` y al navegar en `app/(tabs)/index.tsx`; `app.json` `"orientation": "default"` con bloqueo vertical en `app/_layout.tsx` | Probar en dispositivo | — |
 | UI-05 | Mensajes en español claro | ✅ | `src/i18n` (español base), `src/lib/alerts.ts` | — | — |
-| UI-06 | Eliminar cuenta escribiendo exactamente ELIMINAR | 🟡 | `app/account/delete.tsx:42` | Acepta «eliminar» o con espacios (`trim().toUpperCase()`); debe ser exacto | 1 |
+| UI-06 | Eliminar cuenta escribiendo exactamente ELIMINAR | ✅ | `src/lib/delete-account.ts` (`isDeleteConfirmed`), `app/account/delete.tsx`; prueba en `srs-backend.test.ts` | — | — |
 
 ### Interfaces de hardware (3.1.2)
 
@@ -67,14 +69,14 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 
 | ID | Requisito | Estado | Evidencia | Qué falta | Prio |
 |---|---|---|---|---|---|
-| SW-01 | Sesión JWT en almacenamiento seguro | ❌ | `src/lib/supabase.ts:15` usa `AsyncStorage` | Adaptador cifrado con clave en `expo-secure-store` | 1 |
+| SW-01 | Sesión JWT en almacenamiento seguro | ✅ | `src/lib/secure-session-storage.ts` (SecureStore en trozos; migra la sesión de AsyncStorage) usado en `src/lib/supabase.ts`; prueba `secure-session-storage.test.ts` | — | — |
 | SW-02 | PostgreSQL + RLS en todas las entidades | ✅ | migraciones; 32/32 tablas con RLS | — | — |
-| SW-03 | Realtime en convoy, chat, retos y feed | 🟡 | Canales en `useParty.ts`, `useChallenges.ts`, `useComments.ts`, `usePartyInvites.ts` | El feed (`useFeed.ts`) no escucha cambios | 3 |
-| SW-04 | Buckets avatars, vehicles, posts, receipts | ✅ | migraciones (`storage.buckets`) | — | — |
+| SW-03 | Realtime en convoy, chat, retos y feed | ✅ | Canales en `useParty.ts`, `useChallenges.ts`, `useComments.ts`, `usePartyInvites.ts` y `useFeed.ts` (posts, likes, comentarios) | — | — |
+| SW-04 | Buckets avatars, vehicles, posts, receipts | ✅ | `vehicles` y `posts` en migraciones previas; `avatars` y `receipts` con políticas en `20261102061000_avatars_receipts_buckets.sql` | Aplicar la migración | — |
 | SW-05 | Edge Functions livekit-token y borrado con JWT | ✅ | `supabase/functions/*/index.ts` (`getUser` con el JWT) | — | — |
 | SW-06 | 3 canales Convoy, Ruta, Charla con token firmado | ✅ | `src/lib/party.ts:17-34`, `livekit-token/index.ts:61,101` | — | — |
 | SW-07 | MapLibre GL 3D con edificios y relieve | ⏭ | D-01 | — | — |
-| SW-08 | GraphHopper → OSRM → línea directa | 🟡 | `src/lib/graphhopper.ts:230-262` | Falta el 3.er escalón: hoy lanza error en vez de línea directa con aviso | 2 |
+| SW-08 | GraphHopper → OSRM → línea directa | ✅ | `src/lib/graphhopper.ts` (`fetchStreetRoutes` devuelve `source: fallback`), aviso en `DestinationCard`; prueba `route-fallback.test.ts` | — | — |
 | SW-09 | Photon tolerante a faltas | ✅ | `src/lib/place-search.ts` (Photon + respaldo Nominatim + búsqueda difusa) | — | — |
 | SW-10 | notifications, print, sharing | ✅ | `src/lib/background-alerts.ts`, `src/lib/pdf.ts` | — | — |
 
@@ -94,21 +96,21 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 |---|---|---|---|---|---|
 | RF-01 | Registro, login, demo | 🟡 | `app/(auth)/sign-up.tsx:22-85` (correo, contraseña ≥ 8, nombre, @usuario; el formulario conserva los datos), `src/store/auth.ts:179,212` | D-06 (producción sin env) | — |
 | RF-02 | Perfil y privacidad | ✅ | `app/profile/edit.tsx`, `app/u/[username].tsx:282,338` (tarjeta mínima) | — | — |
-| RF-03 | Eliminación de cuenta | 🟡 | `app/account/delete.tsx`, `supabase/functions/delete-account/index.ts` | (a) ELIMINAR exacto (UI-06); (b) no borra el bucket `receipts`; (c) borra archivos **antes** de borrar el usuario: si falla Auth, ya se perdieron archivos (el SRS pide «no se borra nada») | 1 |
-| RF-04 | Amigos | 🟡 | `src/hooks/useFriends.ts:135,194`; BD `friendships_no_self`, `friendships_unique_pair` | Validación en cliente de «a uno mismo» antes de insertar | 2 |
-| RF-05 | Feed | 🟡 | `src/hooks/useFeed.ts:255-330` (si la foto falla, borra el post y avisa) | Realtime del feed (SW-03) | 3 |
+| RF-03 | Eliminación de cuenta | ✅ | `supabase/functions/delete-account/index.ts`: borra primero el usuario de Auth (si falla, no se toca nada) y luego los archivos de posts, vehicles, avatars y receipts con reintentos; ELIMINAR exacto | Desplegar la función | — |
+| RF-04 | Amigos | ✅ | `src/hooks/useFriends.ts` (rechaza solicitud a uno mismo y duplicados); BD `friendships_no_self`, `friendships_unique_pair` | — | — |
+| RF-05 | Feed | ✅ | `src/hooks/useFeed.ts` (si la foto falla, borra el post y avisa; Realtime con RLS) | — | — |
 | RF-06 | Garaje multi-vehículo | ✅ | `app/vehicle/new.tsx:116` (año 1900–2100), `useGarage.ts:117-118` (4:3), bucket `vehicles`, slug + QR | — | — |
 | RF-07 | QR de identidad y perfil público | ✅ | `src/components/QRCard.tsx`, `app/v/[slug].tsx`, `app/u/[username].tsx` | — | — |
 | RF-08 | Escáner QR | ✅ | `app/scan.tsx:23-122` (permiso, alternativa web, validación de enlace Caravana) | — | — |
-| RF-09 | Combustible y energía | 🟡 | `src/lib/fuel.ts:27-131`, `app/vehicle/fuel/new.tsx:99-111` (odómetro y negativos), `src/lib/pdf.ts` | Falta: campo **fecha**, **galones**, **MPG** del historial real, **edición** de registros | 2–3 |
+| RF-09 | Combustible y energía | ✅ | `app/vehicle/fuel/new.tsx` (fecha, L o galones, edición con `logId`), `src/lib/fuel-entry.ts` (validaciones), `src/lib/fuel.ts` (`efficiencyEquivalents`: km/L, L/100 km, MPG), `FuelSummaryCard`, `src/lib/pdf.ts`; prueba `fuel-entry.test.ts` | — | — |
 | RF-10 | Mantenimiento y ficha de venta | ✅ | `app/vehicle/maintenance/new.tsx`, `app/v/[slug]/sale.tsx`, `src/lib/pdf.ts` («Sin mantenimientos registrados.») | — | — |
-| RF-11 | Mapa y navegación | 🟡 | Búsqueda Photon, ruta completa antes de iniciar (`fitRoute`), paradas, recentrar, recientes, compartir; demo en Santo Domingo (`useLiveLocation.ts:20`) | Sin motor de rutas → ruta directa con aviso (SW-08). 3D ⏭ | 2 |
+| RF-11 | Mapa y navegación | ✅ | Búsqueda Photon, ruta completa antes de iniciar, paradas, recentrar, recientes, compartir; demo en Santo Domingo; línea directa con aviso. 3D ⏭ (D-01) | — | — |
 | RF-12 | Party / convoy | ✅ | `src/lib/live-share.ts` (también en segundo plano), `set_party_destination`, `src/store/follow.ts`, chat, código de 6 (`init_caravana.sql:353`), refetch 15 s | — | — |
 | RF-13 | PTT | ⛔ | `PTTButton.tsx:97-98` (pulsar/soltar), `useVoiceRoom.ts:171` | Secretos LiveKit y prueba en dispositivo | — |
 | RF-14 | Retos A → B | ✅ | `src/hooks/useChallenges.ts`, `report_challenge_progress`, avisos de conducción responsable | — | — |
-| RF-15 | Modo conducción | 🟡 | `app/drive.tsx` | Orientación horizontal bloqueada (UI-04) | 3 |
-| RF-16 | Viajes y récords | 🟡 | `src/store/trips.ts:78,364` (descarta precisión > 50 m), viajes en el dispositivo, `app/records.tsx:99` (top 3) | Clasificación por velocidad máxima → D-05 | 3 |
-| RF-17 | Eventos con ruta | 🟡 | `app/event/new.tsx:26,136` (máx. 5 puntos), `src/lib/event-routes.ts` (OSRM) | **No hay campo de fecha** ni validación de fecha pasada | 2 |
+| RF-15 | Modo conducción | 🟡 | `app/drive.tsx` (demo) y navegación en Inicio, ahora en vertical y horizontal | Con cuenta real el modo conducción es la navegación del mapa: el acceso al PTT y al reto desde ahí queda pendiente de revisar en dispositivo | 3 |
+| RF-16 | Viajes y récords | ✅ | `src/store/trips.ts` (descarta precisión > 50 m), viajes en el dispositivo, `app/records.tsx` (top 3 y marca propia solo con pasadas dentro del límite, D-05) | — | — |
+| RF-17 | Eventos con ruta | ✅ | `app/event/new.tsx` (fecha y hora, máx. 5 puntos), `src/lib/events.ts` (`parseEventStart` rechaza fechas pasadas), `src/lib/event-routes.ts` (OSRM); prueba `event-date.test.ts` | — | — |
 | RF-18 | Coche aparcado y notificaciones | ✅ | `src/lib/parking-logic.ts`, modo caminando en `WorldMap`, `src/lib/background-alerts.ts:155,186` (sin permiso solo avisos en la app) | — | — |
 
 ### Requisitos no funcionales
@@ -118,35 +120,35 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | RNF-01 | Primera pantalla < 3 s | ❓ | splash en `app/_layout.tsx` | Medir: `adb shell am start -W` (TotalTime) en gama media | — |
 | RNF-02 | Posición < 5 s (p95) | ❓ | envío cada 3 s + Realtime | Medir con dos dispositivos (marca de tiempo `last_seen_at` vs recepción) | — |
 | RNF-03 | PTT < 500 ms | ⛔ | — | Requiere LiveKit configurado | — |
-| RNF-04 | Ruta urbana < 3 s | 🟡 | `fetchWithTimeout` en `graphhopper.ts:130,211` | Ajustar los tiempos de espera por proveedor para que la cadena completa no pase de ~3 s | 4 |
-| RNF-05 | Party de hasta 10 (5 en el plan gratuito), límite en BD | ❌ | `20261031120000_…sql:171-173` pone `max_members` = 50 | Migración nueva: 5 por defecto, máximo 10, `check` en BD | 1 |
+| RNF-04 | Ruta urbana < 3 s | 🟡 | `src/lib/providers.ts`: 3 s para GraphHopper y 4 s para OSRM; luego línea directa | Medir en 4G (en el peor caso, la línea directa aparece a los 7 s) | — |
+| RNF-05 | Party de hasta 10 (5 en el plan gratuito), límite en BD | ✅ | `20261102060000_party_member_limit.sql` (`check` 2–10, por defecto 5), `PARTY_FREE_MEMBERS` en el cliente; prueba en `srs-backend.test.ts` | Aplicar la migración | — |
 | RNF-06 | ≤ 8 % batería/h | ❓ | `tracking.ts` | Medir con Battery Historian | — |
 | RNF-07 | RLS en todas las tablas | ✅ | 32/32 | — | — |
-| RNF-08 | TLS/WSS y sesión segura | ❌ | ver SW-01 | Adaptador seguro | 1 |
+| RNF-08 | TLS/WSS y sesión segura | ✅ | ver SW-01 y COM-01 | — | — |
 | RNF-09 | service_role solo en Edge Functions | ✅ | R-03 | — | — |
-| RNF-10 | Ubicación solo dentro de party activa; QR sin datos | ❌ | `src/lib/live-share.ts:90` (`friend_locations`) | Desactivar compartir con amigos fuera de la party (D-04) | 1 |
+| RNF-10 | Ubicación solo dentro de party activa; QR sin datos | ✅ | `SHARE_OUTSIDE_PARTY = false` (`src/lib/party-invites.ts`), sin lectura de `friend_locations` y se borra la última posición; prueba en `srs-backend.test.ts` | — | — |
 | RNF-11 | Token LiveKit solo a miembros y con caducidad | ✅ | `livekit-token/index.ts:90` (membresía), `:121` (`ttl: '2h'`) | — | — |
-| RNF-12 | Borrado irreversible de todo | 🟡 | ver RF-03 | Bucket `receipts` | 1 |
+| RNF-12 | Borrado irreversible de todo | ✅ | ver RF-03 | — | — |
 | RNF-13 | Reconexión sin perder chat ni ruta | ✅ | chat y destino en BD; `refetchInterval` 15 s (`useParty.ts:195`); Realtime se reconecta | — | — |
-| RNF-14 | Respaldo de rutas sin bloquear | 🟡 | ver SW-08 | Línea directa | 2 |
-| RNF-15 | Cierres < 1 % | 🟡 | `src/components/AppErrorBoundary.tsx` | Captura de promesas rechazadas sin manejar y registro de errores | 4 |
+| RNF-14 | Respaldo de rutas sin bloquear | ✅ | ver SW-08; se reintenta la ruta por calles cada 15 s | — | — |
+| RNF-15 | Cierres < 1 % | 🟡 | `AppErrorBoundary` + `src/lib/error-log.ts` (errores globales y promesas sin manejar) | Medir la tasa con un servicio de errores (p. ej. Sentry) | — |
 | RNF-16 | Backend 99,5 % | ❓ | SLA de Supabase; reintentos de React Query | — | — |
 | RNF-17 | Demo, garaje local y viajes sin conexión | ✅ | `src/lib/demo.ts`, `src/store/trips.ts` (AsyncStorage) | — | — |
 | RNF-18 | tsc, ESLint y Jest en CI | ✅ | `.github/workflows/quality.yml` | — | — |
 | RNF-19 | Migraciones versionadas | ✅ | `supabase/migrations/` | — | — |
-| RNF-20 | Marca en un único archivo | 🟡 | colores en `src/theme/index.ts` | Nombre, enlaces y textos de marca repartidos | 5 |
-| RNF-21 | Revisión semanal de errores | ❌ | — | No hay captura de errores: se añade un registro local y se recomienda Sentry (cuenta del propietario) | 4 |
+| RNF-20 | Marca en un único archivo | ✅ | `src/brand.ts` (nombre, logotipo, colores, enlaces y correo) usado por el tema, el QR, los logotipos y la política | — | — |
+| RNF-21 | Revisión semanal de errores | 🟡 | Registro local de los últimos 50 errores (`src/lib/error-log.ts`) | Proceso: revisarlo cada semana; recomendado conectar Sentry (necesita cuenta del propietario) | — |
 | RNF-22 | Android, iOS y web | ✅ | CI hace `expo export --platform web` | — | — |
 | RNF-23 | Nativo limitado a módulos de Expo | ✅ | `modules/motion` es un Expo Module (API `expo-modules-core`) | — | — |
-| RNF-24 | Proveedores por variables de entorno | 🟡 | GraphHopper y Mapbox por `EXPO_PUBLIC_*` | OSRM fijo en `graphhopper.ts:175` y `event-routes.ts:28`; Photon fijo | 4 |
+| RNF-24 | Proveedores por variables de entorno | ✅ | `src/lib/providers.ts` (`EXPO_PUBLIC_OSRM_URL`, `EXPO_PUBLIC_PHOTON_URL`, `EXPO_PUBLIC_NOMINATIM_URL`), GraphHopper y Mapbox por `EXPO_PUBLIC_*`; `.env.example` | — | — |
 
 ### Otros requisitos (3.4)
 
 | ID | Requisito | Estado | Evidencia | Qué falta | Prio |
 |---|---|---|---|---|---|
-| OTR-01 | Ley 172-13: política enlazada en la app y consentimiento para la ubicación | ❌ | `docs/politica-privacidad-borrador.md` existe | No hay enlace en la app ni pantalla de consentimiento antes de pedir la ubicación (`useLiveLocation.ts:157`) | 1 |
-| OTR-02 | Seguridad vial | 🟡 | avisos en retos | Récords por velocidad (D-05) | 3 |
-| OTR-03 | Español; DOP/USD/EUR/MXN; métrico e imperial | 🟡 | `src/i18n/index.ts` | Limitar monedas (D-03); idioma (D-02) | 5 |
+| OTR-01 | Ley 172-13: política enlazada en la app y consentimiento para la ubicación | 🟡 | `app/privacidad.tsx` (sin cuenta), enlaces en Bienvenida, Registro y Perfil; consentimiento en `src/lib/location-consent.ts` | Revisión legal del texto y publicarlo en una URL HTTPS para las tiendas | — |
+| OTR-02 | Seguridad vial | ✅ | avisos en retos; récords limitados al límite de velocidad (D-05) | — | — |
+| OTR-03 | Español; DOP/USD/EUR/MXN; métrico e imperial | ✅ | `src/i18n/index.ts` (`resolveCurrency`, `resolveLanguage`, km/mi) | — | — |
 | OTR-04 | Sin «Wheelz» en la app | ✅ | búsqueda sin resultados en `movil/` | — | — |
 
 ### Usuarios (2.3) y suposiciones (2.5)
@@ -167,6 +169,50 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | ⛔ BLOQUEADO | 5 |
 | ❓ NO VERIFICABLE | 6 |
 | ⏭ OMITIDO | 1 |
+
+## Resumen final (fase 4)
+
+| Estado | Fase 1 | Final |
+|---|---|---|
+| ✅ CUMPLE | 40 | 64 |
+| 🟡 PARCIAL | 25 | 8 |
+| ❌ NO CUMPLE | 7 | 0 |
+| ⛔ BLOQUEADO | 5 | 5 |
+| ❓ NO VERIFICABLE | 5 | 5 |
+| ⏭ OMITIDO | 1 | 1 |
+
+(Conteo automático de las filas de la matriz; corrige el conteo manual de la fase 1.)
+
+Verificación (02/11/2026):
+- `npx tsc --noEmit`, `npx eslint .` y `npx jest` en verde (31 suites, 192 pruebas).
+- `npx expo-doctor` 20/20 y `npx expo export --platform web` correctos.
+- El workflow `.github/workflows/quality.yml` corre lo mismo en cada push a `main` y en cada PR.
+- Sin `service_role` ni secretos en `app/`, `src/`, `app.json` ni `.env*`: lo comprueba `src/__tests__/srs-backend.test.ts`.
+- Las 32 tablas tienen RLS: también lo comprueba esa prueba.
+
+### Pasos manuales del propietario
+
+1. **Aplicar las migraciones nuevas** en Supabase (`supabase db push` o el SQL Editor), en este orden:
+   - `20261102060000_party_member_limit.sql` (RNF-05): reduce a 5 miembros las parties abiertas.
+   - `20261102061000_avatars_receipts_buckets.sql` (SW-04).
+2. **Volver a desplegar la Edge Function** `delete-account` (RF-03): `supabase functions deploy delete-account`.
+3. **LiveKit** (RF-13, HW-03, COM-03, RNF-03): crear los secretos con
+   `supabase secrets set LIVEKIT_URL=… LIVEKIT_API_KEY=… LIVEKIT_API_SECRET=…`, desplegar `livekit-token` y probar el PTT
+   con dos teléfonos.
+4. **Página de invitación** (COM-04): publicar la carpeta de GitHub Pages con el script `publicar-invitacion.sh`.
+5. **Política de privacidad** (OTR-01): revisión legal y publicación en una URL HTTPS para las fichas de las tiendas.
+6. **Mediciones en dispositivo** (❓):
+   - RNF-01: `adb shell am start -W app.caravana.mobile/.MainActivity` → TotalTime < 3000 ms.
+   - RNF-02: dos teléfonos en la misma party; comparar `last_seen_at` con el momento en que se ve el cambio.
+   - RNF-06 y R-08: Battery Historian durante una hora de tracking.
+   - RNF-16: SLA de Supabase.
+   - RNF-04: tiempo de ruta en 4G.
+7. **Errores** (RNF-21): revisar cada semana el registro local o conectar Sentry con una cuenta propia.
+8. **Pruebas en el teléfono** de lo nuevo:
+   - giro a horizontal en el modo conducción;
+   - consentimiento de ubicación la primera vez;
+   - edición de repostajes;
+   - pestaña Actividad.
 
 ## Plan de corrección (fase 2)
 
@@ -198,3 +244,18 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 ## Progreso
 
 - 02/11/2026 04:40 — Fase 1 terminada. El propietario autoriza seguir con las fases 2 a 4 sin esperar confirmación.
+- 02/11/2026 — Fase 3. Commits, uno por requisito o grupo:
+  - RNF-05.
+  - SW-01 y RNF-08.
+  - RF-03, RNF-12, UI-06 y SW-04.
+  - RNF-10.
+  - OTR-01 y R-05.
+  - SW-08, RNF-14, RF-11 y RF-04.
+  - RF-17.
+  - RF-09.
+  - UI-04 y RF-15.
+  - RF-05 y SW-03.
+  - RF-16, R-06 y OTR-02.
+  - RNF-24, RNF-04, RNF-15 y RNF-21.
+  - UI-02, RNF-20 y OTR-03.
+- 02/11/2026 — Fase 4: verificación completa (ver «Resumen final»).

@@ -1,3 +1,4 @@
+/* global __dirname */
 // Lista los textos t('…') del código que no tienen traducción en en.json.
 const fs = require('fs');
 const path = require('path');

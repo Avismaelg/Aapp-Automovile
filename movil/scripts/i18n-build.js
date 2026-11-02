@@ -1,3 +1,4 @@
+/* global __dirname */
 // Genera src/i18n/en.json a partir de keys.json y las traducciones en en-src/*.txt
 // (una por línea: «índice|traducción», o «=texto en español|traducción» para
 // textos nuevos; \n para saltos de línea).
