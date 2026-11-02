@@ -66,7 +66,7 @@ import {
   sameDestination,
   shouldShareMyDestination,
 } from "@/src/lib/convoy";
-import { useCreateChallenge } from "@/src/hooks/useChallenges";
+import { useChallenges, useCreateChallenge } from "@/src/hooks/useChallenges";
 import { useTripRecorder } from "@/src/hooks/useTripRecorder";
 import { useFreeOrientation } from "@/src/hooks/useFreeOrientation";
 import { useVoiceGuidance } from "@/src/hooks/useVoiceGuidance";
@@ -288,6 +288,7 @@ export default function NavigationScreen() {
   // Tu posición en vivo para la party y tus amigos (solo GPS real: nunca la
   // de demo ni la simulada).
   // Reto por llegada en curso: avance y puesto automáticos.
+  const { racing: racingChallenge } = useChallenges();
   useChallengeRace(
     live.location,
     !isDemo && live.isLive && live.location.source === "gps",
@@ -989,6 +990,12 @@ export default function NavigationScreen() {
               onChangeRoute={() => router.push("/destino" as Href)}
               onAddStop={addStopHere}
               onClose={clearDestination}
+              onOpenParty={party ? () => router.navigate("/(tabs)/party") : undefined}
+              onOpenChallenge={
+                racingChallenge
+                  ? () => router.push(`/challenge/${racingChallenge.code}` as Href)
+                  : undefined
+              }
             />
             {/* Avisos navegando: arriba, bajo la tarjeta de giro (abajo
                 tapaban el velocímetro y tu posición). */}

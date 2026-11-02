@@ -54,6 +54,9 @@ type Props = {
   onChangeRoute: () => void;
   onAddStop: () => void;
   onClose: () => void;
+  // RF-15: acceso directo a la party (mapa, chat y PTT) y al reto en curso.
+  onOpenParty?: () => void;
+  onOpenChallenge?: () => void;
 };
 
 // Navegación activa: la maniobra manda arriba (flecha y distancia grandes,
@@ -80,6 +83,8 @@ export function NavigationHud({
   onChangeRoute,
   onAddStop,
   onClose,
+  onOpenParty,
+  onOpenChallenge,
 }: Props) {
   const speedNow = Number(speedLabel);
   const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > displaySpeed(limitKmh + 5);
@@ -158,6 +163,26 @@ export function NavigationHud({
       </View>
 
       <View style={styles.sideButtons}>
+        {onOpenChallenge ? (
+          <Pressable
+            style={[styles.roundButton, panel]}
+            onPress={onOpenChallenge}
+            accessibilityRole="button"
+            accessibilityLabel={t('Ver reto')}
+          >
+            <Ionicons name="flag" size={20} color={chrome.accent} />
+          </Pressable>
+        ) : null}
+        {onOpenParty ? (
+          <Pressable
+            style={[styles.roundButton, panel]}
+            onPress={onOpenParty}
+            accessibilityRole="button"
+            accessibilityLabel={t('Party y walkie-talkie')}
+          >
+            <Ionicons name="radio" size={20} color={chrome.accent} />
+          </Pressable>
+        ) : null}
         {!mapFollowing ? (
           <Pressable
             style={[styles.recenterButton, panel]}

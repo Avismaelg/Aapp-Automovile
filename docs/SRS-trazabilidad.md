@@ -108,7 +108,7 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | RF-12 | Party / convoy | ✅ | `src/lib/live-share.ts` (también en segundo plano), `set_party_destination`, `src/store/follow.ts`, chat, código de 6 (`init_caravana.sql:353`), refetch 15 s | — | — |
 | RF-13 | PTT | ⛔ | `PTTButton.tsx:97-98` (pulsar/soltar), `useVoiceRoom.ts:171` | Secretos LiveKit y prueba en dispositivo | — |
 | RF-14 | Retos A → B | ✅ | `src/hooks/useChallenges.ts`, `report_challenge_progress`, avisos de conducción responsable | — | — |
-| RF-15 | Modo conducción | 🟡 | `app/drive.tsx` (demo) y navegación en Inicio, ahora en vertical y horizontal | Con cuenta real el modo conducción es la navegación del mapa: el acceso al PTT y al reto desde ahí queda pendiente de revisar en dispositivo | 3 |
+| RF-15 | Modo conducción | ✅ | `app/drive.tsx` (demo) y navegación en Inicio, en vertical y horizontal; botones de acceso a la party con PTT y al reto en curso en `NavigationHud` (`onOpenParty`, `onOpenChallenge`) | Probar en dispositivo | — |
 | RF-16 | Viajes y récords | ✅ | `src/store/trips.ts` (descarta precisión > 50 m), viajes en el dispositivo, `app/records.tsx` (top 3 y marca propia solo con pasadas dentro del límite, D-05) | — | — |
 | RF-17 | Eventos con ruta | ✅ | `app/event/new.tsx` (fecha y hora, máx. 5 puntos), `src/lib/events.ts` (`parseEventStart` rechaza fechas pasadas), `src/lib/event-routes.ts` (OSRM); prueba `event-date.test.ts` | — | — |
 | RF-18 | Coche aparcado y notificaciones | ✅ | `src/lib/parking-logic.ts`, modo caminando en `WorldMap`, `src/lib/background-alerts.ts:155,186` (sin permiso solo avisos en la app) | — | — |
@@ -174,8 +174,8 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 
 | Estado | Fase 1 | Final |
 |---|---|---|
-| ✅ CUMPLE | 40 | 64 |
-| 🟡 PARCIAL | 25 | 8 |
+| ✅ CUMPLE | 40 | 65 |
+| 🟡 PARCIAL | 25 | 7 |
 | ❌ NO CUMPLE | 7 | 0 |
 | ⛔ BLOQUEADO | 5 | 5 |
 | ❓ NO VERIFICABLE | 5 | 5 |
