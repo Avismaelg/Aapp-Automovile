@@ -11,7 +11,7 @@ export function formatKm(meters: number) {
   return `${displayKm(km, km < 10 ? 1 : 0)} ${distanceUnit()}`;
 }
 
-export function formatMoney(value: number, currency = getCurrency()) {
+export function formatMoney(value: number, currency: string = getCurrency()) {
   try {
     return new Intl.NumberFormat(getLocale(), {
       style: 'currency',

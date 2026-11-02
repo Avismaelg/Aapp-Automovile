@@ -51,11 +51,11 @@ function readPreference(): LanguagePreference {
   }
 }
 
-// Español para quien tiene el teléfono en español; inglés para el resto del
-// mundo (es el idioma internacional de la app).
+// R-07 / OTR-03 (D-02): la interfaz es en español. En automático solo pasa a
+// inglés si el teléfono está en inglés; cualquier otro idioma usa el español.
 export function resolveLanguage(preference: LanguagePreference, deviceLanguage: string | null): Language {
   if (preference !== 'auto') return preference;
-  return deviceLanguage === 'es' ? 'es' : 'en';
+  return deviceLanguage === 'en' ? 'en' : 'es';
 }
 
 const device = readDevice();
@@ -184,8 +184,17 @@ export function formatManeuverDistance(meters: number) {
   return `${formatDecimal(meters / 1000, 1)} km`;
 }
 
-export function getCurrency() {
-  return device.currencyCode ?? (device.regionCode === 'DO' ? 'DOP' : 'USD');
+// OTR-03 (D-03): monedas admitidas; DOP por defecto.
+export const SUPPORTED_CURRENCIES = ['DOP', 'USD', 'EUR', 'MXN'] as const;
+export type Currency = (typeof SUPPORTED_CURRENCIES)[number];
+
+export function resolveCurrency(deviceCurrency: string | null): Currency {
+  const code = deviceCurrency?.toUpperCase();
+  return (SUPPORTED_CURRENCIES as readonly string[]).includes(code ?? '') ? (code as Currency) : 'DOP';
+}
+
+export function getCurrency(): Currency {
+  return resolveCurrency(device.currencyCode);
 }
 
 // Idioma de la voz de navegación.

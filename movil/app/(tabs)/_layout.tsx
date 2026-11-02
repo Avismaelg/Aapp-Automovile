@@ -36,6 +36,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="actividad"
+        options={{
+          title: t('Actividad'),
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={22} color={color as string} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="party"
         options={{
           title: 'Party',
@@ -68,6 +77,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="fuel"
         options={{
+          // UI-02: Consumo no es pestaña; se abre desde Garaje y Actividad.
+          href: null,
           title: t('Consumo'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'speedometer' : 'speedometer-outline'} size={23} color={color as string} />

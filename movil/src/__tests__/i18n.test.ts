@@ -8,6 +8,7 @@ import {
   kmToDisplay,
   formatDistance,
   formatManeuverDistance,
+  resolveCurrency,
   resolveLanguage,
   setLanguageForTests,
   setMilesForTests,
@@ -31,11 +32,20 @@ describe('idiomas', () => {
     expect(broken).toEqual([]);
   });
 
-  it('elige español solo si el teléfono está en español', () => {
+  it('D-02: español salvo que el teléfono esté en inglés', () => {
     expect(resolveLanguage('auto', 'es')).toBe('es');
-    expect(resolveLanguage('auto', 'fr')).toBe('en');
-    expect(resolveLanguage('auto', null)).toBe('en');
+    expect(resolveLanguage('auto', 'en')).toBe('en');
+    expect(resolveLanguage('auto', 'fr')).toBe('es');
+    expect(resolveLanguage('auto', null)).toBe('es');
     expect(resolveLanguage('es', 'en')).toBe('es');
+  });
+
+  it('OTR-03: solo DOP, USD, EUR y MXN; DOP por defecto', () => {
+    expect(resolveCurrency('USD')).toBe('USD');
+    expect(resolveCurrency('eur')).toBe('EUR');
+    expect(resolveCurrency('MXN')).toBe('MXN');
+    expect(resolveCurrency('COP')).toBe('DOP');
+    expect(resolveCurrency(null)).toBe('DOP');
   });
 
   it('traduce al inglés y rellena los huecos', () => {

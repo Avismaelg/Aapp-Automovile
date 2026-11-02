@@ -1,4 +1,5 @@
 import { getLanguage } from '@/src/i18n';
+import { BRAND } from '@/src/brand';
 
 // OTR-01 / REF-06: texto de la política de privacidad que se muestra en la app
 // (basado en docs/politica-privacidad-borrador.md). El texto largo va por
@@ -45,7 +46,7 @@ const ES: Policy = {
       items: [
         'Puedes acceder a tus datos, corregirlos y cambiar la privacidad desde Perfil.',
         'Puedes eliminar tu cuenta y todos tus datos y archivos de forma definitiva desde Perfil › Eliminar cuenta.',
-        'Para cualquier otra solicitud escribe a avismael.eg@gmail.com.',
+        `Para cualquier otra solicitud escribe a ${BRAND.supportEmail}.`,
       ],
     },
   ],
@@ -86,7 +87,7 @@ const EN: Policy = {
       items: [
         'You can access and correct your data and change your privacy from Profile.',
         'You can permanently delete your account and all your data and files from Profile › Delete account.',
-        'For any other request write to avismael.eg@gmail.com.',
+        `For any other request write to ${BRAND.supportEmail}.`,
       ],
     },
   ],

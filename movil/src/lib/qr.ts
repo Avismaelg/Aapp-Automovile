@@ -1,4 +1,6 @@
-export const WEB_BASE = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://caravana.app';
+import { BRAND } from '@/src/brand';
+
+export const WEB_BASE = process.env.EXPO_PUBLIC_WEB_URL || BRAND.webUrl;
 
 export function profileUrl(username: string) {
   return `${WEB_BASE}/u/${encodeURIComponent(username)}`;
@@ -10,7 +12,7 @@ export function vehicleUrl(slug: string) {
 
 // Página de invitación (GitHub Pages): muestra el código y abre la app.
 export const INVITE_BASE =
-  process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://avismaelg.github.io/Aapp-Automovile';
+  process.env.EXPO_PUBLIC_INVITE_URL || BRAND.inviteUrl;
 
 export function partyUrl(code: string) {
   return `${INVITE_BASE}/p/?c=${encodeURIComponent(code.toUpperCase())}`;

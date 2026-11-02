@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { ViewStyle } from 'react-native';
 
 import { colors } from '@/src/theme';
+import { BRAND } from '@/src/brand';
 
 // Colores de los controles sobre el mapa: paneles blancos de día y negros
 // OLED de noche, con el naranja Caravana como acento.
@@ -38,7 +39,7 @@ function chrome(day: boolean): MapChrome {
     textSoft: day ? '#3F3F46' : colors.textSoft,
     muted: day ? '#5F5F6A' : colors.muted,
     chip: day ? '#F2F2F5' : '#17171A',
-    accent: day ? '#C2410C' : colors.accent,
+    accent: day ? BRAND.colors.accentDay : colors.accent,
     onAccent: day ? '#FFFFFF' : '#000000',
     surface: { backgroundColor: bg, borderColor: border, borderWidth: 1, ...SHADOW },
   };

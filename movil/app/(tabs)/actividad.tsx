@@ -92,11 +92,6 @@ export default function ActividadScreen() {
         status: entry.profile.city || t('Amigo'),
       }));
 
-  const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
-  };
-
   const toggleTracking = async (next: boolean) => {
     if (Platform.OS === 'web') {
       setTrackingEnabled(next);
@@ -137,8 +132,8 @@ export default function ActividadScreen() {
 
   return (
     <Screen contentStyle={{ paddingTop: spacing.sm }}>
-      <View style={styles.backRow}>
-        <IconButton icon="chevron-back" size={40} onPress={goBack} />
+      {/* UI-02: Actividad es una pestaña, sin botón de volver. */}
+      <View style={[styles.backRow, { justifyContent: 'flex-end' }]}>
         <IconButton icon="notifications-outline" size={40} badge />
       </View>
       <View style={styles.header}>

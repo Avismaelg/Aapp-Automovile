@@ -1,10 +1,12 @@
 import { Platform } from 'react-native';
 
+import { BRAND } from '@/src/brand';
+
 // Negro OLED con naranja Caravana. Todo el texto pasa 4,5:1 sobre los fondos
 // (el antiguo «dim» se quedaba en 3,2). Sin verdes: lo que antes era lima o
 // verde (acción, en vivo) va en naranja.
 export const colors = {
-  bg: '#000000',
+  bg: BRAND.colors.background,
   bgElevated: '#0A0A0B',
   surface: '#0D0D0F',
   surfaceAlt: '#121215',
@@ -15,13 +17,13 @@ export const colors = {
   textSoft: '#BDBDC6',
   muted: '#9A9AA5',
   dim: '#85858F',
-  accent: '#FF6A33',
+  accent: BRAND.colors.accent,
   accentSoft: 'rgba(255,106,51,0.14)',
   accentGlow: 'rgba(255,106,51,0.35)',
-  lime: '#FF6A33',
+  lime: BRAND.colors.accent,
   limeSoft: 'rgba(255,106,51,0.14)',
   cyan: '#3D8BFF',
-  green: '#FF6A33',
+  green: BRAND.colors.accent,
   danger: '#FF4D6A',
   white: '#FFFFFF',
   black: '#000000',

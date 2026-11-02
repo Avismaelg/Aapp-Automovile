@@ -30,6 +30,7 @@ import { useAuth } from '@/src/store/auth';
 import { formatClock } from '@/src/lib/format';
 import { colors, radius, spacing } from '@/src/theme';
 import { formatKmValue, t } from '@/src/i18n';
+import { BRAND } from '@/src/brand';
 
 function DriveRoute({ compact }: { compact?: boolean }) {
   return (
@@ -136,7 +137,7 @@ function DemoDriveScreen() {
               <View style={styles.brandRow}>
                 <View style={styles.brandDot} />
                 <AppText variant="label" color={colors.accent} style={{ letterSpacing: 2 }}>
-                  {t('CARAVANA')}
+                  {BRAND.wordmark}
                 </AppText>
               </View>
               <AppText variant={landscape ? 'h2' : 'h1'} style={{ marginTop: 4 }}>

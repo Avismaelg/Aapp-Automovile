@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, IconButton } from '@/src/components/ui';
 import { colors, radius, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
+import { BRAND } from '@/src/brand';
 
 export function AuthBrand({ compact = false }: { compact?: boolean }) {
   return (
@@ -30,7 +31,7 @@ export function AuthBrand({ compact = false }: { compact?: boolean }) {
           color={colors.text}
           style={{ letterSpacing: 2.4, fontSize: compact ? 10 : 12 }}
         >
-          {t('CARAVANA')}
+          {BRAND.wordmark}
         </AppText>
         {!compact ? (
           <AppText variant="caption" color={colors.muted} style={{ fontSize: 10 }}>

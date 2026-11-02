@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/src/components/ui';
 import { colors, radius, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
+import { BRAND } from '@/src/brand';
 
 export function QRCard({
   value,
@@ -30,7 +31,7 @@ export function QRCard({
             color={dark ? colors.text : '#0A0D12'}
             style={{ letterSpacing: 1.5 }}
           >
-            {t('CARAVANA')}
+            {BRAND.wordmark}
           </AppText>
         </View>
         <AppText
