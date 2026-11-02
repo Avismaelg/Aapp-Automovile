@@ -23,6 +23,7 @@ export function DestinationCard({
   arrivalLabel,
   loading,
   error,
+  notice = null,
   options,
   selected,
   canConfirm,
@@ -42,6 +43,8 @@ export function DestinationCard({
   arrivalLabel: string | null;
   loading: boolean;
   error: string | null;
+  // Aviso sobre la ruta mostrada (p. ej. línea directa sin motor de rutas).
+  notice?: string | null;
   options: RouteOption[];
   selected: number;
   canConfirm: boolean;
@@ -113,6 +116,15 @@ export function DestinationCard({
           <AppText variant="body" color={chrome.muted} style={styles.summaryDetail}>
             {distanceLabel}
             {arrivalLabel ? t(' · llegas {0}', arrivalLabel) : ''}
+          </AppText>
+        </View>
+      ) : null}
+
+      {notice && !loading ? (
+        <View style={styles.stateRow}>
+          <Ionicons name="warning-outline" size={18} color={chrome.accent} />
+          <AppText variant="caption" color={chrome.textSoft} numberOfLines={3} style={styles.flex}>
+            {notice}
           </AppText>
         </View>
       ) : null}

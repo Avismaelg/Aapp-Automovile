@@ -1372,6 +1372,11 @@ export default function NavigationScreen() {
                     arrivalLabel={arrivalLabel}
                     loading={route.isLoading}
                     error={route.error}
+                    notice={
+                      route.route?.source === "fallback"
+                        ? t('Sin motor de rutas disponible: es una línea directa, no una ruta por calles. Sigue las señales de tránsito.')
+                        : null
+                    }
                     options={routeOptions}
                     selected={route.selected}
                     canConfirm={!route.isLoading && Boolean(route.route)}

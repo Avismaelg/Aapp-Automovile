@@ -92,3 +92,5 @@
 =Ver política|View policy
 =Acepto|I agree
 =Sin permiso de ubicación · usando ubicación de demo|No location permission · using demo location
+=Sin motor de rutas disponible: es una línea directa, no una ruta por calles. Sigue las señales de tránsito.|No routing engine available: this is a straight line, not a street route. Follow the traffic signs.
+=No puedes enviarte una solicitud a ti mismo.|You can't send a request to yourself.

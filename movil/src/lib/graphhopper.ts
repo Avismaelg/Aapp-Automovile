@@ -3,7 +3,7 @@ import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
-import { getLanguage, t } from '@/src/i18n';
+import { formatDistance, getLanguage, t } from '@/src/i18n';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -17,17 +17,16 @@ type GeoPoint = {
   longitude: number;
 };
 
-export function fallbackRoute(origin: GeoPoint, destination: GeoPoint): WorldMapRoute {
-  const direct = haversineMeters(origin, destination);
+export function fallbackRoute(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []): WorldMapRoute {
+  const points = [origin, ...stops, destination];
+  let direct = 0;
+  for (let index = 1; index < points.length; index += 1) direct += haversineMeters(points[index - 1], points[index]);
   // Aproximación conservadora para una ruta por carretera sin motor de ruteo.
   const distanceM = direct * 1.25;
   const averageSpeedMps = 50_000 / 3600;
 
   return {
-    coordinates: [
-      [origin.latitude, origin.longitude],
-      [destination.latitude, destination.longitude],
-    ],
+    coordinates: points.map((point) => [point.latitude, point.longitude] as [number, number]),
     distanceM,
     timeMs: distanceM > 0 ? (distanceM / averageSpeedMps) * 1000 : 0,
     source: 'fallback',
@@ -226,9 +225,9 @@ export async function fetchOsrmRoutes({
   return routes;
 }
 
-// Rutas posibles ordenadas de la más rápida a la más lenta. GraphHopper
-// primero y OSRM público como respaldo. Nunca se devuelve una línea directa
-// como si fuera una ruta segura para conducir.
+// Rutas posibles ordenadas de la más rápida a la más lenta (SW-08 / RNF-14):
+// GraphHopper, luego OSRM y, si ninguno responde, la línea directa marcada
+// como source «fallback» para que la app avise de que no es una ruta por calles.
 export async function fetchStreetRoutes({
   origin,
   destination,
@@ -242,29 +241,23 @@ export async function fetchStreetRoutes({
 }): Promise<WorldMapRoute[]> {
   const byTime = (routes: WorldMapRoute[]) =>
     [...routes].sort((a, b) => a.timeMs - b.timeMs).slice(0, MAX_ROUTES);
-  let lastError: unknown = null;
   if (isGraphHopperConfigured) {
     try {
       return byTime(await fetchGraphHopperRoutes({ origin, destination, stops, signal }));
     } catch (error) {
       if (signal?.aborted) throw error;
-      lastError = error;
     }
   }
   try {
     return byTime(await fetchOsrmRoutes({ origin, destination, stops, signal }));
   } catch (error) {
     if (signal?.aborted) throw error;
-    lastError = error;
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(t('No encontramos una calle transitable entre esos puntos.'));
+  return [fallbackRoute(origin, destination, stops)];
 }
 
 export function formatRouteDistance(distanceM: number) {
-  if (distanceM < 1000) return `${Math.round(distanceM)} m`;
-  return `${(distanceM / 1000).toFixed(1)} km`;
+  return formatDistance(distanceM);
 }
 
 export function formatRouteTime(timeMs: number) {

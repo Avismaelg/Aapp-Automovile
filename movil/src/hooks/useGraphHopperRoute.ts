@@ -104,6 +104,14 @@ function requestRoute(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[]
         isLoading: false,
         error: null,
       });
+      // Línea directa (sin motor de rutas): se sigue intentando la ruta por calles.
+      if (routes[0]?.source === 'fallback') {
+        const pending = requested;
+        offlineRetryTimer = setTimeout(() => {
+          offlineRetryTimer = null;
+          if (requested === pending) retryRoute();
+        }, 15_000);
+      }
     } catch (error) {
       if (controller.signal.aborted) return;
       const offline = isNetworkError(error);

@@ -154,6 +154,10 @@ export function useSendFriendRequest() {
       if (!supabase || !account) {
         throw new Error(t('Inicia sesión para añadir amigos.'));
       }
+      // RF-04: no se permite una solicitud a uno mismo (la BD también lo impide).
+      if (targetId === account.id) {
+        throw new Error(t('No puedes enviarte una solicitud a ti mismo.'));
+      }
 
       const { error } = await supabase.from('friendships').insert({
         requester_id: account.id,
