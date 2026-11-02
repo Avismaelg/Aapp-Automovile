@@ -31,7 +31,7 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
                 : voice.status === 'connecting'
                   ? 'Conectando'
                   : voice.status === 'error'
-                    ? 'Sin configurar'
+                    ? 'Sin voz'
                     : 'Inactivo'
           }
           tone={
@@ -82,7 +82,7 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
         })}
       </ScrollView>
       {voice.error && !isDemo ? (
-        <AppText variant="caption" color={colors.accent} numberOfLines={2}>
+        <AppText variant="caption" color={colors.muted} numberOfLines={2}>
           {voice.error}
         </AppText>
       ) : (

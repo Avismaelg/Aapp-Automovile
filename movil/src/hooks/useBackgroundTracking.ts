@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
 
+import { setupAlerts } from '@/src/lib/background-alerts';
 import {
   hasMotionPermission,
   isIgnoringBatteryOptimizations,
@@ -81,6 +82,7 @@ export function useBackgroundTracking(enabled: boolean) {
       if (result !== 'running' || cancelled) return;
       await ensureMotion().catch(() => undefined);
       if (!cancelled) await ensureBatteryExemption().catch(() => undefined);
+      if (!cancelled) await setupAlerts().catch(() => undefined);
     };
 
     void sync();

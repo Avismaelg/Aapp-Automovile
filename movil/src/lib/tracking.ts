@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { saveBackgroundBatch, type BackgroundPoint } from '@/src/lib/background-points';
+import { checkBackgroundAlerts } from '@/src/lib/background-alerts';
 import { pushLivePosition } from '@/src/lib/live-share';
 
 const TASK_NAME = 'caravana-background-location';
@@ -97,6 +98,8 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(TASK_NAME)) {
           heading: heading != null && heading >= 0 ? heading : null,
         });
       }
+      // Invitaciones, retos y cambios de destino con la app cerrada.
+      void checkBackgroundAlerts();
       try {
         await saveBackgroundBatch(points);
       } catch {

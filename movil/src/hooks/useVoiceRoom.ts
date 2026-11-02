@@ -129,10 +129,14 @@ export function useVoiceRoom({
           connectError instanceof Error
             ? connectError.message
             : 'No pudimos conectar la voz.';
+        // El usuario no necesita saber de LiveKit ni de secretos del servidor.
+        const notConfigured = /livekit|secret|not found|configurad/i.test(message);
         setError(
-          message.includes('Failed to fetch') || message.includes('not found')
-            ? 'LiveKit no está configurado. Despliega la función livekit-token y sus secretos.'
-            : message,
+          notConfigured
+            ? 'La voz del convoy aún no está activada. El mapa y el chat funcionan igual.'
+            : /failed to fetch|network|timeout/i.test(message)
+              ? 'No pudimos conectar la voz. Revisa tu conexión.'
+              : 'No pudimos conectar la voz ahora. Inténtalo en un momento.',
         );
         setStatus('error');
         setTalkingState(false);

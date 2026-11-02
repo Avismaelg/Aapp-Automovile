@@ -13,6 +13,7 @@ import {
   type IncomingPartyInvite,
 } from '@/src/hooks/usePartyInvites';
 import { errorMessage } from '@/src/lib/alerts';
+import { markAlertsSeen } from '@/src/lib/background-alerts';
 import { profileColor } from '@/src/lib/profile-db';
 import { answerSimInvite, useSimulator } from '@/src/lib/simulator';
 import { useChallenges, useRespondChallenge } from '@/src/hooks/useChallenges';
@@ -54,6 +55,7 @@ export function PartyInviteBanner() {
   useEffect(() => {
     if (!invite || seenRef.current === invite.id) return;
     seenRef.current = invite.id;
+    void markAlertsSeen([`invite:${invite.id}:${invite.createdAt}`]);
     setError(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   }, [invite]);
@@ -165,6 +167,10 @@ function ChallengeInviteBanner() {
   const [hidden, setHidden] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const challenge = invitations.find((item) => item.id !== hidden);
+  const challengeId = challenge?.id;
+  useEffect(() => {
+    if (challengeId) void markAlertsSeen([`challenge:${challengeId}`]);
+  }, [challengeId]);
   if (!challenge) return null;
   const host = challenge.participants.find((participant) => participant.isHost);
   const hostName = host?.profile.displayName ?? 'Un piloto';

@@ -45,6 +45,11 @@ export async function setLiveShareConfig(next: Partial<Config>) {
   }
 }
 
+// Cuenta con sesión (para los avisos en segundo plano).
+export async function getLiveShareAccount() {
+  return (await getConfig()).accountId;
+}
+
 export async function pushLivePosition(fix: LiveFix) {
   const client = supabase;
   if (!client || busy) return;

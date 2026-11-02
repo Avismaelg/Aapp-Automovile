@@ -28,6 +28,7 @@ import {
   useSimulator,
   waitForRoute,
 } from '@/src/lib/simulator';
+import { showTestAlert } from '@/src/lib/background-alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useParking } from '@/src/store/parking';
 import { colors, radius, spacing } from '@/src/theme';
@@ -233,6 +234,12 @@ export default function SimulatorScreen() {
           title="Convoy de 5 con reto"
           detail="4 amigos salen de sitios distintos hacia tu meta (a 2,6 km). Tú vas por calles. Arriba ves la clasificación en vivo y en la pestaña Party su velocidad."
           onPress={rallyTest}
+        />
+        <Test
+          icon="notifications-outline"
+          title="Aviso con la app cerrada"
+          detail="A los 8 s llega una notificación «Laura te invita a su convoy». Sal de la app para verla; al tocarla se abre la party."
+          onPress={() => void showTestAlert()}
         />
         <Test
           icon="mail-unread-outline"

@@ -33,6 +33,7 @@ import { lastSeenLabel } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
 import { useFollow } from "@/src/store/follow";
 import { reachedNextStop } from "@/src/lib/stops";
+import { markAlertsSeen } from "@/src/lib/background-alerts";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
 import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
 import {
@@ -808,6 +809,14 @@ export default function NavigationScreen() {
   }, [isDemo, me.id, partyDestination, destination, isNavigating, setterName]);
 
   const offerConvoyDestination = convoyAction === "offer" && partyDestination != null;
+  // Lo que ya ves en pantalla no te llega luego como notificación.
+  const partyIdForAlerts = party?.id;
+  const destinationSetAt = partyDestination?.setAt;
+  useEffect(() => {
+    if (partyIdForAlerts && destinationSetAt) {
+      void markAlertsSeen([`destination:${partyIdForAlerts}:${destinationSetAt}`]);
+    }
+  }, [partyIdForAlerts, destinationSetAt]);
   const followConvoyDestination = () => {
     if (!partyDestination) return;
     useChosenDestination.getState().setDestination({
@@ -999,6 +1008,19 @@ export default function NavigationScreen() {
             </>
           ) : (
             <>
+              {followTarget ? (
+                <View style={[styles.convoyNotice, chrome.surface, styles.followWaiting]}>
+                  <Ionicons name="navigate-circle" size={20} color={chrome.text} />
+                  <AppText variant="bodyStrong" color={chrome.text} numberOfLines={2} style={{ flex: 1 }}>
+                    Siguiendo a {followTarget.name.split(" ")[0]} · esperando su posición
+                  </AppText>
+                  <Pressable onPress={stopFollowing} hitSlop={10} accessibilityRole="button">
+                    <AppText variant="bodyStrong" color={chrome.muted} style={{ fontSize: 13 }}>
+                      Dejar
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
               {/* Inicio minimalista: un solo buscador con tu avatar. El vehículo se
                 elige en Garaje y la actividad está en el icono del buscador. */}
               {destination == null ? (
@@ -1373,6 +1395,7 @@ export default function NavigationScreen() {
 
 const styles = StyleSheet.create({
   convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm },
+  followWaiting: { marginBottom: spacing.sm },
   convoyNotice: {
     flexDirection: "row",
     alignItems: "center",

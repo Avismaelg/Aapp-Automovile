@@ -304,6 +304,14 @@ export default function PartyScreen() {
       {
         text: `Seguir a ${first}`,
         onPress: () => {
+          const real = party?.members.find((item) => item.userId === member.id);
+          if (real && (real.lastLat == null || real.lastLng == null)) {
+            Alert.alert(
+              `${first} no comparte su ubicación ahora`,
+              'Cuando abra la app y se mueva, podrás seguirle.',
+            );
+            return;
+          }
           useFollow.getState().follow({ id: member.id, name: member.name });
           router.replace('/');
         },
@@ -634,7 +642,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 3 },
   codeText: { fontWeight: '700', letterSpacing: 1.5 },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.dim },
   inviteButton: {

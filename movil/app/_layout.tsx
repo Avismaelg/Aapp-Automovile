@@ -6,10 +6,12 @@ import {
 } from '@expo-google-fonts/space-grotesk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { router, Stack, type Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
@@ -35,6 +37,20 @@ const queryClient = new QueryClient({
   },
 });
 
+// Tocar un aviso (invitación, reto, cambio de destino) abre su pantalla.
+function useAlertTaps(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || Platform.OS === 'web') return;
+    const open = (response: Notifications.NotificationResponse | null) => {
+      const url = response?.notification.request.content.data?.url;
+      if (typeof url === 'string') router.navigate(url as Href);
+    };
+    void Notifications.getLastNotificationResponseAsync().then(open);
+    const subscription = Notifications.addNotificationResponseReceivedListener(open);
+    return () => subscription.remove();
+  }, [enabled]);
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceGrotesk_500Medium,
@@ -53,6 +69,7 @@ export default function RootLayout() {
   const ready = authStatus !== 'loading' && (loaded || Boolean(error));
   const isAuthenticated = authStatus === 'authenticated';
   useBackgroundTracking(isAuthenticated);
+  useAlertTaps(isAuthenticated);
 
   useEffect(() => {
     if (error) void SplashScreen.hideAsync();
