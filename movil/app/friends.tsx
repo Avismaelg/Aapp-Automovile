@@ -198,7 +198,7 @@ export default function FriendsScreen() {
           <AppText variant="h1">{t('Amigos')}</AppText>
         </View>
         <Pill
-          label={isDemo ? t('Demo') : `${friends.length} amigos`}
+          label={isDemo ? t('Demo') : t('{0} amigos', friends.length)}
           tone={isDemo ? 'neutral' : 'lime'}
           icon="people-outline"
         />

@@ -176,7 +176,7 @@ export default function PublicVehicleScreen() {
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
-              <Stat value={String(records.length)} label="servicios" align="center" />
+              <Stat value={String(records.length)} label={t('servicios')} align="center" />
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>

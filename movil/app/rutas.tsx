@@ -92,7 +92,7 @@ export default function TripsScreen() {
       />
 
       <View style={styles.summary}>
-        <Stat value={String(totals.count)} label="rutas" align="center" />
+        <Stat value={String(totals.count)} label={t('rutas')} align="center" />
         <Stat value={formatKm(totals.distanceM)} label={t('en total')} align="center" />
         <Stat
           value={totals.bestSpeed > 0 ? formatSpeed(totals.bestSpeed) : '--'}

@@ -158,7 +158,7 @@ export default function ActividadScreen() {
           </AppText>
         </View>
         <AppText variant="body" color={colors.muted}>
-          {stats.drives} {stats.drives === 1 ? 'ruta' : 'rutas'} · {stats.hours}{' '}{t('h al volante')}
+          {stats.drives === 1 ? t('1 ruta') : t('{0} rutas', stats.drives)} · {stats.hours}{' '}{t('h al volante')}
         </AppText>
 
         <Pressable style={styles.trackingRow} onPress={openTrackingOptions}>
@@ -223,7 +223,7 @@ export default function ActividadScreen() {
             </AppText>
             <AppText variant="caption" color={colors.muted} style={{ marginTop: 1 }}>
               {bannerChallenge.fromLabel} → {bannerChallenge.toLabel} ·{' '}
-              {bannerLeader ? `${bannerLeader.isMe ? t('Tú') : bannerLeader.name.split(' ')[0]} lidera` : ''}
+              {bannerLeader ? (bannerLeader.isMe ? t('Vas en cabeza') : t('{0} lidera', bannerLeader.name.split(' ')[0])) : ''}
             </AppText>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.dim} />

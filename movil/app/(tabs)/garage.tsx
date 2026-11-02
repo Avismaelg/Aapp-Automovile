@@ -184,7 +184,7 @@ export default function GarageScreen() {
               label={electric ? t('kWh/100 km') : 'km/L'}
             />
             <Stat value={displayKm(vehicle.odometerKm)} label={t('{0} recorridos', distanceUnit())} />
-            <Stat value={meta.shortLabel} label="tipo" />
+            <Stat value={meta.shortLabel} label={t('tipo')} />
           </View>
 
           <View style={styles.carActions}>

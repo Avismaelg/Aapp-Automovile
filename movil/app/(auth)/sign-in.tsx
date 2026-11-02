@@ -82,7 +82,7 @@ export default function SignInScreen() {
             setEmail(value);
             setError(null);
           }}
-          placeholder="tu@correo.com"
+          placeholder={t('tu@correo.com')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}

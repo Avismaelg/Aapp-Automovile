@@ -1,8 +1,7 @@
 import type { Ionicons } from '@expo/vector-icons';
 
-import { formatNumber } from '@/src/lib/format';
 import type { Trip, TripTotals } from '@/src/store/trips';
-import { t } from '@/src/i18n';
+import { formatKmValue, t } from '@/src/i18n';
 
 export type Achievement = {
   id: string;
@@ -35,14 +34,14 @@ export function tripAchievements(
   const list: Achievement[] = [
     {
       id: 'distance',
-      title: t('{0} km grabados', formatNumber(totalKm, 0)),
-      detail: t('{0} {1} en total', totals.drives, totals.drives === 1 ? 'viaje' : 'viajes'),
+      title: t('{0} grabados', formatKmValue(totalKm)),
+      detail: totals.drives === 1 ? t('1 viaje en total') : t('{0} viajes en total', totals.drives),
       icon: 'map',
     },
     {
       id: 'longest',
       title: t('Viaje más largo'),
-      detail: `${formatNumber(longest.distanceM / 1000, 1)} km`,
+      detail: formatKmValue(longest.distanceM / 1000, 1),
       icon: 'navigate',
     },
   ];

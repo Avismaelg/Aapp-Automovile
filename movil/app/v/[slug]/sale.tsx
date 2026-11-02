@@ -205,7 +205,7 @@ export default function VehicleSaleScreen() {
             <Stat value={`${(kmToDisplay(vehicle.odometerKm) / 1000).toFixed(1)}k`} label={t('{0} actuales', distanceUnit())} />
           </Card>
           <Card style={styles.statCard}>
-            <Stat value={String(records.length)} label="mantenimientos" />
+            <Stat value={String(records.length)} label={t('mantenimientos')} />
           </Card>
           <Card style={styles.statCard}>
             <Stat value={String(usage.fillups)} label={usage.electric ? 'cargas' : 'repostajes'} />

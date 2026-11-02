@@ -179,7 +179,7 @@ export default function SignUpScreen() {
             setUsername(value.toLowerCase().replace(/\s/g, ''));
             setErrors((current) => ({ ...current, username: undefined }));
           }}
-          placeholder="tunombre"
+          placeholder={t('tunombre')}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="username"
@@ -202,7 +202,7 @@ export default function SignUpScreen() {
             setEmail(value);
             setErrors((current) => ({ ...current, email: undefined }));
           }}
-          placeholder="tu@correo.com"
+          placeholder={t('tu@correo.com')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}

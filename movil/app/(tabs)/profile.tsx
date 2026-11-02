@@ -33,6 +33,7 @@ import {
   distanceUnit,
   getCurrency,
   getLanguagePreference,
+  kmToDisplay,
   saveLanguagePreference,
   t,
   type LanguagePreference,
@@ -198,16 +199,18 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.stats}>
-        <Stat value={String(stats.drives)} label="rutas" align="center" />
+        <Stat value={String(stats.drives)} label={t('rutas')} align="center" />
         <Stat
           value={
-            stats.km >= 1000 ? `${(stats.km / 1000).toFixed(1)}k` : String(Math.round(stats.km))
+            kmToDisplay(stats.km) >= 1000
+              ? `${(kmToDisplay(stats.km) / 1000).toFixed(1)}k`
+              : String(Math.round(kmToDisplay(stats.km)))
           }
-          label="km"
+          label={distanceUnit()}
           align="center"
         />
         <Stat value={`${stats.hours} h`} label={t('al volante')} align="center" />
-        <Stat value={String(friendEntries.length)} label="amigos" align="center" />
+        <Stat value={String(friendEntries.length)} label={t('amigos')} align="center" />
       </View>
 
       <SectionHeader

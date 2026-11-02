@@ -264,7 +264,7 @@ export default function PublicProfileScreen() {
           <View style={styles.statItem}>
             <Stat
               value={privacyLabel(profile.privacy)}
-              label="privacidad"
+              label={t('privacidad')}
               accent={colors.lime}
               align="center"
             />
