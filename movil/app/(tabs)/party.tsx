@@ -223,7 +223,7 @@ export default function PartyScreen() {
       ? t('Calculando ruta por calles…')
       : graphHopper.error
         ? t('No encontramos una calle transitable')
-        : graphHopper.source === 'mapbox'
+        : graphHopper.source === 'mapbox' || graphHopper.source === 'google'
           ? t('Con tráfico · {0} · {1}', routeDistance, routeDuration)
           : graphHopper.source === 'graphhopper'
           ? t('GraphHopper · {0} · {1}', routeDistance, routeDuration)
@@ -559,7 +559,7 @@ export default function PartyScreen() {
           destination={partyDestination}
           duration={routeDuration}
           routeStatus={routeStatus}
-          streetRouting={graphHopper.source === 'graphhopper' || graphHopper.source === 'mapbox'}
+          streetRouting={graphHopper.source !== 'osrm' && graphHopper.source !== 'fallback'}
           routeError={Boolean(graphHopper.error)}
           live={live}
         />

@@ -60,6 +60,7 @@ function isNetworkError(error: unknown) {
 
 type Channel = {
   store: UseBoundStore<StoreApi<RouteState>>;
+  adopt: (routes: WorldMapRoute[]) => void;
   request: (origin: GeoPoint, destination: GeoPoint, stops?: GeoPoint[]) => void;
   clear: () => void;
   select: (index: number) => void;
@@ -180,6 +181,13 @@ function createChannel(): Channel {
 
   return {
     store,
+    // Ruta mejor encontrada en segundo plano (p. ej. por tráfico): se cambia
+    // sin volver a pedirla.
+    adopt: (routes) => {
+      if (routes.length === 0 || !requested) return;
+      requested = { ...requested, origin: latestOrigin ?? requested.origin, at: Date.now() };
+      store.setState({ routes, selected: 0, isLoading: false, error: null });
+    },
     request,
     clear: () => {
       cancelPending();
@@ -258,5 +266,6 @@ export function useGraphHopperRoute({
     configured: isGraphHopperConfigured,
     source: route?.source ?? 'fallback',
     retry: channel.retry,
+    adopt: channel.adopt,
   };
 }

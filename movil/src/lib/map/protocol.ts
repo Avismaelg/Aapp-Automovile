@@ -52,7 +52,7 @@ export type WorldMapRoute = {
   coordinates: [number, number][];
   distanceM: number;
   timeMs: number;
-  source: 'mapbox' | 'graphhopper' | 'osrm' | 'fallback';
+  source: 'google' | 'mapbox' | 'graphhopper' | 'osrm' | 'fallback';
   instructions?: RouteInstruction[];
 };
 

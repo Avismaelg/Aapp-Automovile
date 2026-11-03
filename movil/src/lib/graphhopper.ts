@@ -181,7 +181,7 @@ type OsrmResponse = {
 // Servidor público de demostración de OSRM: rutas reales por calle sin API key.
 // Para producción conviene GraphHopper propio o un OSRM hospedado.
 
-function routeFromOsrm(route: OsrmRoute, source: 'osrm' | 'mapbox' = 'osrm'): WorldMapRoute | null {
+function routeFromOsrm(route: OsrmRoute, source: 'osrm' | 'mapbox' | 'google' = 'osrm'): WorldMapRoute | null {
   const coordinates = validLatLng(route.geometry?.coordinates);
   if (coordinates.length < 2) return null;
   return {
@@ -236,6 +236,54 @@ export async function fetchOsrmRoutes({
 
 export const isMapboxDirectionsConfigured = MAPBOX_TOKEN.startsWith('pk.');
 
+// MAPA-12: rutas con el tráfico de Google por la Edge Function «routes» (la
+// clave no está en la app). Sin función, sin clave o pasado el tope del día,
+// se deja de usar 10 min y valen Mapbox y los demás.
+const GOOGLE_ROUTES_PAUSE_MS = 10 * 60_000;
+const GOOGLE_ROUTES_TIMEOUT_MS = 4_000;
+let googleRoutesPausedUntil = 0;
+
+export async function fetchGoogleRoutes({
+  origin,
+  destination,
+  stops = [],
+  signal,
+}: {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  stops?: GeoPoint[];
+  signal?: AbortSignal;
+}): Promise<WorldMapRoute[]> {
+  if (Date.now() < googleRoutesPausedUntil) throw new Error('google_paused');
+  // Import diferido: el resto del motor se prueba sin el cliente de Supabase.
+  const { supabase } = await import('@/src/lib/supabase');
+  if (!supabase) throw new Error('supabase_not_configured');
+  const point = (p: GeoPoint) => ({ lat: p.latitude, lng: p.longitude });
+  const call = supabase.functions.invoke('routes', {
+    body: { origin: point(origin), destination: point(destination), stops: stops.map(point), language: getLanguage() },
+  });
+  const timeout = new Promise<never>((_, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), GOOGLE_ROUTES_TIMEOUT_MS);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    });
+  });
+  const { data, error } = await Promise.race([call, timeout]);
+  if (error) {
+    const status = (error as { context?: Response }).context?.status;
+    if (status === 404 || status === 429 || status === 503) {
+      googleRoutesPausedUntil = Date.now() + GOOGLE_ROUTES_PAUSE_MS;
+    }
+    throw new Error(error.message);
+  }
+  const routes = ((data as OsrmResponse | null)?.routes ?? [])
+    .map((route) => routeFromOsrm(route, 'google'))
+    .filter((route): route is WorldMapRoute => route !== null);
+  if (routes.length === 0) throw new Error(t('Google no devolvió una ruta válida.'));
+  return routes;
+}
+
 // Mapbox con tráfico en vivo. Responde en el mismo formato que OSRM (pasos con
 // maniobra y nombre de calle), así que se reutiliza su conversión.
 export function mapboxDirectionsUrl(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
@@ -283,7 +331,7 @@ export async function fetchMapboxRoutes({
 }
 
 // Rutas posibles ordenadas de la más rápida a la más lenta (SW-08 / RNF-14):
-// Mapbox con tráfico, luego GraphHopper, luego OSRM y, si ninguno responde, la línea directa marcada
+// Google con tráfico, Mapbox con tráfico, luego GraphHopper, luego OSRM y, si ninguno responde, la línea directa marcada
 // como source «fallback» para que la app avise de que no es una ruta por calles.
 export async function fetchStreetRoutes({
   origin,
@@ -298,6 +346,11 @@ export async function fetchStreetRoutes({
 }): Promise<WorldMapRoute[]> {
   const byTime = (routes: WorldMapRoute[]) =>
     [...routes].sort((a, b) => a.timeMs - b.timeMs).slice(0, MAX_ROUTES);
+  try {
+    return byTime(await fetchGoogleRoutes({ origin, destination, stops, signal }));
+  } catch (error) {
+    if (signal?.aborted) throw error;
+  }
   if (isMapboxDirectionsConfigured) {
     try {
       return byTime(await fetchMapboxRoutes({ origin, destination, stops, signal }));

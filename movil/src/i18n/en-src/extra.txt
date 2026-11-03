@@ -260,3 +260,16 @@
 =¿Abandonar el reto?|Give up the challenge?
 =🏁 Reto por llegada: {0}|🏁 Arrival challenge: {0}
 =La ruta tarda demasiado. Revisa tu conexión y reintenta.|The route is taking too long. Check your connection and retry.
+=Google no devolvió una ruta válida.|Google didn't return a valid route.
+=Encontré una ruta más rápida: ahorras {0} minutos.|Found a faster route: you save {0} minutes.
+=Búscalo y mantén pulsado el resultado para guardarlo.|Search for it and long-press the result to save it.
+=Casa|Home
+=Como Casa|As Home
+=Como Trabajo|As Work
+=Guarda tu casa|Save your home
+=Guarda tu trabajo|Save your work
+=Guardar lugar|Save place
+=No pudimos guardar ese lugar. Prueba otra vez.|We couldn't save that place. Try again.
+=Resultados de Google|Results from Google
+=Toca para saber cómo guardarlo|Tap to see how to save it
+=Trabajo|Work

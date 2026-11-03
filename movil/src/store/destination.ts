@@ -17,8 +17,13 @@ export type ChosenDestination = {
 
 export type RouteStop = { latitude: number; longitude: number; label: string };
 
+export type FavoriteKind = 'home' | 'work';
+
 type DestinationState = {
   destination: ChosenDestination | null;
+  // MAPA-03: Casa y Trabajo, a un toque desde el buscador.
+  favorites: Partial<Record<FavoriteKind, ChosenDestination>>;
+  setFavorite: (kind: FavoriteKind, place: ChosenDestination | null) => void;
   // Paradas en orden antes del destino.
   stops: RouteStop[];
   recents: ChosenDestination[];
@@ -38,6 +43,14 @@ export const useChosenDestination = create<DestinationState>()(
   persist(
     (set) => ({
       destination: null,
+      favorites: {},
+      setFavorite: (kind, place) =>
+        set((state) => {
+          const favorites = { ...state.favorites };
+          if (place) favorites[kind] = { latitude: place.latitude, longitude: place.longitude, label: place.label };
+          else delete favorites[kind];
+          return { favorites };
+        }),
       stops: [],
       recents: [],
       isNavigating: false,
@@ -80,6 +93,7 @@ export const useChosenDestination = create<DestinationState>()(
         destination: state.destination?.followId ? null : state.destination,
         stops: state.destination?.followId ? [] : state.stops,
         recents: state.recents,
+        favorites: state.favorites,
       }),
     },
   ),

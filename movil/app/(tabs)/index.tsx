@@ -90,7 +90,8 @@ import {
   useSimulator,
 } from "@/src/lib/simulator";
 import { haversineMeters } from "@/src/lib/geo";
-import { formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
+import { fasterRouteSaving } from "@/src/lib/route-geometry";
+import { fetchStreetRoutes, formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
 import type { WorldMapAlternative, WorldMapMember } from "@/src/lib/map-html";
 import {
   cumulativeDistances,
@@ -111,6 +112,9 @@ import { displaySpeed, formatDistance, getLocale, speechLanguage, speedUnit, t }
 // La intro (galaxia → globo → tu calle) solo al abrir la app, no cada vez que
 // se vuelve a esta pestaña.
 let introPlayed = false;
+// MAPA-12: cada cuánto se busca una ruta más rápida navegando.
+const FASTER_ROUTE_EVERY_MS = 3 * 60_000;
+
 // MAPA-16: desvío y recálculo automático.
 const OFF_ROUTE_M = 40;
 const OFF_ROUTE_HOLD_MS = 5_000;
@@ -966,6 +970,47 @@ export default function NavigationScreen() {
     setRecenterToken((value) => value + 1);
     startNavigation();
   };
+
+  // MAPA-12 (como Waze): navegando, cada 3 min se busca una ruta más rápida
+  // por el tráfico desde donde estás. Si ahorra de verdad (2 min y un 8 %),
+  // se cambia sola y se avisa por voz.
+  const fasterCheckRef = useRef({ remainingS: 0, origin: live.location, destination, stops });
+  useEffect(() => {
+    fasterCheckRef.current = {
+      remainingS: (remainingTimeMs ?? 0) / 1000,
+      origin: live.location,
+      destination,
+      stops,
+    };
+  }, [remainingTimeMs, live.location, destination, stops]);
+  const adoptRoutes = route.adopt;
+  useEffect(() => {
+    if (!navigating) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = setInterval(() => {
+      const { remainingS, origin, destination: goal, stops: waypoints } = fasterCheckRef.current;
+      if (!goal || remainingS < 300) return;
+      void fetchStreetRoutes({ origin, destination: goal, stops: waypoints, signal: controller.signal })
+        .then((candidates) => {
+          if (cancelled || candidates[0]?.source === 'fallback') return;
+          const saving = fasterRouteSaving(remainingS, candidates[0].timeMs / 1000);
+          if (saving == null) return;
+          adoptRoutes(candidates);
+          if (!voiceMuted) {
+            Speech.speak(t('Encontré una ruta más rápida: ahorras {0} minutos.', Math.round(saving / 60)), {
+              language: speechLanguage(),
+            });
+          }
+        })
+        .catch(() => undefined);
+    }, FASTER_ROUTE_EVERY_MS);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [navigating, adoptRoutes, voiceMuted]);
 
   useEffect(() => {
     if (!navigating || !offRoute || route.isLoading) return;

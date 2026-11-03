@@ -53,3 +53,17 @@ export function compactRouteCoordinates(points: RouteCoordinate[]): RouteCoordin
   }
   return points;
 }
+
+// Cambio a una ruta más rápida durante la navegación (como Waze): solo si
+// ahorra al menos 2 min y un 8 % del tiempo que queda, para no cambiar por
+// diferencias de segundos.
+export const FASTER_ROUTE_MIN_SAVING_S = 120;
+export const FASTER_ROUTE_MIN_SAVING_RATIO = 0.08;
+
+export function fasterRouteSaving(currentRemainingS: number, candidateS: number): number | null {
+  if (!Number.isFinite(currentRemainingS) || !Number.isFinite(candidateS) || candidateS <= 0) return null;
+  const saving = currentRemainingS - candidateS;
+  if (saving < FASTER_ROUTE_MIN_SAVING_S) return null;
+  if (saving < currentRemainingS * FASTER_ROUTE_MIN_SAVING_RATIO) return null;
+  return saving;
+}

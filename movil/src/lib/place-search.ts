@@ -3,7 +3,7 @@ import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { getLanguage, t } from '@/src/i18n';
 import { NOMINATIM_URL, PHOTON_URL } from '@/src/lib/providers';
-import { googleAutocomplete, googlePlaceLocation, type GooglePlace } from '@/src/lib/google-places';
+import { googleAutocomplete, googleNearby, googlePlaceLocation, type GooglePlace } from '@/src/lib/google-places';
 
 export type SearchPlace = {
   id: string;
@@ -630,11 +630,20 @@ export async function searchPlaces(
 // lugar (osm_tag) con las marcas habituales de RD.
 export const STOP_CATEGORIES = {
   // Las marcas más comunes primero: casi siempre bastan las dos primeras.
-  fuel: { tags: ['amenity:fuel'], terms: ['shell', 'texaco', 'sunix', 'isla'] },
-  food: { tags: ['amenity:fast_food', 'amenity:restaurant'], terms: ['restaurante', 'pollo', 'pizza'] },
-  pharmacy: { tags: ['amenity:pharmacy'], terms: ['farmacia', 'carol', 'gbc'] },
-  atm: { tags: ['amenity:atm', 'amenity:bank'], terms: ['banreservas', 'popular', 'bhd'] },
-  supermarket: { tags: ['shop:supermarket'], terms: ['supermercado', 'jumbo', 'nacional', 'bravo'] },
+  // google: tipos de Google Places para la búsqueda por cercanía.
+  fuel: { tags: ['amenity:fuel'], terms: ['shell', 'texaco', 'sunix', 'isla'], google: ['gas_station'] },
+  food: {
+    tags: ['amenity:fast_food', 'amenity:restaurant'],
+    terms: ['restaurante', 'pollo', 'pizza'],
+    google: ['restaurant', 'fast_food_restaurant'],
+  },
+  pharmacy: { tags: ['amenity:pharmacy'], terms: ['farmacia', 'carol', 'gbc'], google: ['pharmacy'] },
+  atm: { tags: ['amenity:atm', 'amenity:bank'], terms: ['banreservas', 'popular', 'bhd'], google: ['atm', 'bank'] },
+  supermarket: {
+    tags: ['shop:supermarket'],
+    terms: ['supermercado', 'jumbo', 'nacional', 'bravo'],
+    google: ['supermarket', 'grocery_store'],
+  },
 } as const;
 
 export type StopCategory = keyof typeof STOP_CATEGORIES;
@@ -650,6 +659,28 @@ export async function searchCategory(
   const cacheKey = `cat:${category}@${near.latitude.toFixed(2)},${near.longitude.toFixed(2)}`;
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.places;
+
+  // Google primero: todas las de ese tipo cerca de ti, por distancia real.
+  try {
+    const nearby = await googleNearby([...STOP_CATEGORIES[category].google], near);
+    if (signal.aborted) throw new Error('aborted');
+    if (nearby.length > 0) {
+      const places = nearby.map<SearchPlace>((place) => ({
+        id: `google:${place.placeId}`,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        name: place.name,
+        detail: place.detail,
+        distanceM: haversineMeters(near, place),
+      }));
+      if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+      cache.set(cacheKey, { at: Date.now(), places });
+      return places;
+    }
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // Sin Google (o pasado el tope del día): OpenStreetMap.
+  }
 
   const { tags, terms } = STOP_CATEGORIES[category];
   const queries = terms.map((term) => {

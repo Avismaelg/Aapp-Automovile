@@ -124,6 +124,59 @@ Deno.serve(async (request) => {
     return json({ places });
   }
 
+  // Paradas por tipo cerca de ti (gasolinera, comida, farmacia…), por distancia.
+  if (body.action === 'nearby') {
+    const types = Array.isArray((body as { types?: unknown }).types)
+      ? ((body as { types: unknown[] }).types.filter((type) => typeof type === 'string' && /^[a-z_]{3,40}$/.test(type)) as string[]).slice(0, 5)
+      : [];
+    if (types.length === 0 || !Number.isFinite(body.lat) || !Number.isFinite(body.lng)) {
+      return json({ error: 'Búsqueda inválida.' }, 400);
+    }
+    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googleKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress',
+      },
+      body: JSON.stringify({
+        includedTypes: types,
+        maxResultCount: 15,
+        rankPreference: 'DISTANCE',
+        languageCode: language,
+        regionCode: 'do',
+        locationRestriction: {
+          circle: { center: { latitude: body.lat, longitude: body.lng }, radius: 15_000 },
+        },
+      }),
+    });
+    const data = (await response.json()) as {
+      places?: {
+        id?: string;
+        displayName?: { text?: string };
+        location?: { latitude?: number; longitude?: number };
+        formattedAddress?: string;
+      }[];
+      error?: { message?: string };
+    };
+    if (!response.ok) return json({ error: data.error?.message ?? 'google_error' }, 502);
+    return json({
+      places: (data.places ?? []).flatMap((place) =>
+        place.id && place.location?.latitude != null && place.location?.longitude != null
+          ? [
+              {
+                placeId: place.id,
+                name: place.displayName?.text ?? '',
+                detail: place.formattedAddress ?? '',
+                latitude: place.location.latitude,
+                longitude: place.location.longitude,
+              },
+            ]
+          : [],
+      ),
+    });
+  }
+
   if (body.action === 'details') {
     const placeId = (body.placeId ?? '').trim();
     if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: 'Lugar inválido.' }, 400);

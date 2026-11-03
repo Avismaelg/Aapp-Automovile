@@ -80,3 +80,24 @@ export async function googlePlaceLocation(placeId: string): Promise<LatLng & { a
   session = null;
   return invoke({ action: 'details', placeId, sessionToken: token, language: getLanguage() });
 }
+
+export type GoogleNearbyPlace = {
+  placeId: string;
+  name: string;
+  detail: string;
+  latitude: number;
+  longitude: number;
+};
+
+// Paradas por tipo cerca de ti, de la más cercana a la más lejana.
+export async function googleNearby(types: string[], near: LatLng): Promise<GoogleNearbyPlace[]> {
+  if (isGooglePlacesPaused()) throw new Error('google_paused');
+  const { places } = await invoke<{ places?: GoogleNearbyPlace[] }>({
+    action: 'nearby',
+    types,
+    lat: near.latitude,
+    lng: near.longitude,
+    language: getLanguage(),
+  });
+  return places ?? [];
+}

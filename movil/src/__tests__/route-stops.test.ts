@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { metersBetween, type Point } from '@/src/lib/convoy';
 import { graphHopperParams, mapboxDirectionsUrl, osrmUrl } from '@/src/lib/graphhopper';
+import { fasterRouteSaving } from '@/src/lib/route-geometry';
 import { instructionsFromOsrm, STOP_TEXT } from '@/src/lib/route-instructions';
 import { bestStopIndex, insertStop, MAX_STOPS, reachedNextStop, STOP_REACHED_M } from '@/src/lib/stops';
 
@@ -129,5 +130,15 @@ describe('MAPA-12: rutas con tráfico de Mapbox', () => {
     const withStop = mapboxDirectionsUrl(HOME, LA_ROMANA, [BOCA_CHICA]);
     expect(withStop).toContain('alternatives=false');
     expect(withStop.split('driving-traffic/')[1].split('?')[0].split(';')).toHaveLength(3);
+  });
+});
+
+describe('MAPA-12: cambio a una ruta más rápida navegando (como Waze)', () => {
+  it('solo cambia si ahorra 2 min y un 8 % del tiempo que queda', () => {
+    expect(fasterRouteSaving(1_800, 1_500)).toBe(300);
+    expect(fasterRouteSaving(1_800, 1_700)).toBeNull(); // 100 s: poco
+    expect(fasterRouteSaving(3_600, 3_420)).toBeNull(); // 3 min pero solo un 5 %
+    expect(fasterRouteSaving(600, 450)).toBe(150);
+    expect(fasterRouteSaving(600, 0)).toBeNull();
   });
 });
