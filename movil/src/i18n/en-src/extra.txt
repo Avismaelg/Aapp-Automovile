@@ -273,3 +273,5 @@
 =Resultados de Google|Results from Google
 =Toca para saber cómo guardarlo|Tap to see how to save it
 =Trabajo|Work
+=Caravana · voz del convoy activa|Caravana · convoy voice on
+=Oyes a tu party con la pantalla bloqueada. Toca para abrir.|You can hear your party with the screen locked. Tap to open.

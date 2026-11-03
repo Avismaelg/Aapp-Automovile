@@ -25,7 +25,7 @@ type MotionNative = {
   isDriving(): boolean;
 };
 
-export type DrivingReason = 'vehicle' | 'convoy';
+export type DrivingReason = 'vehicle' | 'convoy' | 'voice';
 
 // Solo existe en Android; en iOS y web no hay sensor de actividad y la
 // detección de aparcamiento usa solo el GPS.
@@ -104,6 +104,8 @@ export function setDrivingTexts(texts: {
   drivingBody: string;
   convoyTitle: string;
   convoyBody: string;
+  voiceTitle?: string;
+  voiceBody?: string;
 }) {
   try {
     native?.setDrivingTexts(texts);

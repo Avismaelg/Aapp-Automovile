@@ -11,6 +11,7 @@ import {
   RoomEvent,
   Track,
 } from '@/src/lib/livekit';
+import { startDriving, stopDriving } from '@/modules/motion';
 import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 
@@ -184,6 +185,9 @@ export function useVoiceRoom({
         await room.localParticipant.setMicrophoneEnabled(false);
         updateParticipants();
         setStatus('connected');
+        // CONV-15: la voz sigue con la pantalla bloqueada (servicio en primer
+        // plano de tipo micrófono, con su notificación).
+        startDriving('voice');
         // Se pide ya, para que el primer PTT no se pierda en el aviso.
         void ensureMicrophone();
       } catch (connectError) {
@@ -219,6 +223,7 @@ export function useVoiceRoom({
         room.disconnect();
       }
       roomRef.current = null;
+      stopDriving('voice');
     };
   }, [channelSlug, enabled, partyId]);
 

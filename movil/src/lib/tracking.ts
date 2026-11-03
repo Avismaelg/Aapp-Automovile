@@ -56,6 +56,8 @@ function shareDrivingTexts() {
       : t('Tu viaje se guarda automáticamente. Toca para abrir.'),
     convoyTitle: t('Caravana · convoy en vivo'),
     convoyBody: t('Tu party ve tu posición. Toca para abrir.'),
+    voiceTitle: t('Caravana · voz del convoy activa'),
+    voiceBody: t('Oyes a tu party con la pantalla bloqueada. Toca para abrir.'),
   });
 }
 

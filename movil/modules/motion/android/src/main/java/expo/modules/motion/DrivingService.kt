@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -32,12 +33,7 @@ class DrivingService : Service() {
     // servicio se apague enseguida (si no, cierra la app).
     val notification = buildNotification(this)
     try {
-      ServiceCompat.startForeground(
-        this,
-        NOTIFICATION_ID,
-        notification,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
-      )
+      ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, serviceTypes(this))
       running = true
       if (activeReasons(this).isEmpty()) {
         stopSelfSafely()
@@ -71,6 +67,22 @@ class DrivingService : Service() {
     private const val NOTIFICATION_ID = 7302
     const val REASON_VEHICLE = "vehicle"
     const val REASON_CONVOY = "convoy"
+    // Voz del convoy conectada: el servicio añade el tipo micrófono para que
+    // se oiga y se pueda hablar (manos libres) con la pantalla bloqueada.
+    const val REASON_VOICE = "voice"
+
+    // Tipos del servicio: ubicación siempre; micrófono solo con la voz activa
+    // y el permiso concedido (si no, Android cerraría la app).
+    fun serviceTypes(context: Context): Int {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+      var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+      val micGranted = context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+        PackageManager.PERMISSION_GRANTED
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && REASON_VOICE in activeReasons(context) && micGranted) {
+        types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+      }
+      return types
+    }
 
     @Volatile
     var running = false
@@ -121,11 +133,19 @@ class DrivingService : Service() {
         context.stopService(Intent(context, DrivingService::class.java))
         running = false
       } else if (running) {
-        // Cambia el texto (p. ej. deja la party pero sigue conduciendo).
+        // Sigue por otro motivo (p. ej. cuelga la voz pero sigue conduciendo):
+        // se vuelve a declarar el servicio para quitar el tipo micrófono y
+        // cambiar el texto.
         try {
-          val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-          manager.notify(NOTIFICATION_ID, buildNotification(context))
+          val intent = Intent(context, DrivingService::class.java)
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
+          else context.startService(intent)
         } catch (_: Exception) {
+          try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(NOTIFICATION_ID, buildNotification(context))
+          } catch (_: Exception) {
+          }
         }
       }
     }
@@ -141,16 +161,18 @@ class DrivingService : Service() {
           ),
         )
       }
-      val convoy = REASON_CONVOY in activeReasons(context)
-      val title = if (convoy) {
-        text(context, "convoyTitle", "Caravana · convoy en vivo")
-      } else {
-        text(context, "drivingTitle", "Caravana está registrando tu ruta")
+      val reasons = activeReasons(context)
+      val voice = REASON_VOICE in reasons
+      val convoy = REASON_CONVOY in reasons
+      val title = when {
+        voice -> text(context, "voiceTitle", "Caravana · voz del convoy activa")
+        convoy -> text(context, "convoyTitle", "Caravana · convoy en vivo")
+        else -> text(context, "drivingTitle", "Caravana está registrando tu ruta")
       }
-      val body = if (convoy) {
-        text(context, "convoyBody", "Tu party ve tu posición. Toca para abrir.")
-      } else {
-        text(context, "drivingBody", "Tu viaje se guarda automáticamente. Toca para abrir.")
+      val body = when {
+        voice -> text(context, "voiceBody", "Oyes a tu party con la pantalla bloqueada. Toca para abrir.")
+        convoy -> text(context, "convoyBody", "Tu party ve tu posición. Toca para abrir.")
+        else -> text(context, "drivingBody", "Tu viaje se guarda automáticamente. Toca para abrir.")
       }
       val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
       val contentIntent = launch?.let {
