@@ -4,7 +4,13 @@ import fs from 'fs';
 import path from 'path';
 
 import { shouldPauseGoogle } from '@/src/lib/google-places';
-import { mergeGoogleResults, resolvePlace, type SearchPlace } from '@/src/lib/place-search';
+import {
+  branchesOnStreet,
+  mergeGoogleResults,
+  resolvePlace,
+  splitBrandStreet,
+  type SearchPlace,
+} from '@/src/lib/place-search';
 
 const known = (name: string, match: number): SearchPlace => ({
   id: `known:${name}`,
@@ -62,5 +68,39 @@ describe('MAPA-02: búsqueda con Google Places', () => {
     expect(sql).toContain('return v_count <= greatest(1, p_limit)');
     const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
     expect(env).not.toMatch(/GOOGLE/i);
+  });
+});
+
+describe('MAPA-02 sin Google: una marca en una calle', () => {
+  it('separa la marca de la calle', () => {
+    expect(splitBrandStreet('Shell Av. Independencia')).toEqual({ brand: 'shell', street: 'independencia' });
+    expect(splitBrandStreet('Banco Popular Avenida Winston Churchill')).toEqual({
+      brand: 'banco popular',
+      street: 'winston churchill',
+    });
+    expect(splitBrandStreet('Blue Mall')).toBeNull();
+    expect(splitBrandStreet('Avenida Independencia')).toBeNull();
+  });
+
+  it('se queda con las sucursales de esa calle (no de la provincia), la más cercana primero', () => {
+    const place = (name: string, street: string, detail: string, distanceM: number) => ({
+      id: name + distanceM,
+      latitude: 18.47,
+      longitude: -69.93,
+      name,
+      detail,
+      street,
+      distanceM,
+    });
+    const branches = branchesOnStreet(
+      [
+        place('Shell', 'Avenida Duarte', 'Duvergé, Independencia', 150_000),
+        place('Shell', 'Avenida Independencia', 'Santo Domingo', 4_000),
+        place('Shell Las Antillas', 'Av. Independencia', 'Santo Domingo', 2_000),
+      ],
+      'independencia',
+    );
+    expect(branches.map((item) => item.name)).toEqual(['Shell Las Antillas', 'Shell']);
+    expect(branches.every((item) => item.detail === 'Santo Domingo')).toBe(true);
   });
 });

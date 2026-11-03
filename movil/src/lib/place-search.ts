@@ -282,8 +282,8 @@ function parsePhoton(
   features: PhotonFeature[],
   query: string,
   near: LatLng | null,
-): SearchPlace[] {
-  const results: SearchPlace[] = [];
+): (SearchPlace & { street?: string })[] {
+  const results: (SearchPlace & { street?: string })[] = [];
   for (const feature of features) {
     const coordinates = feature.geometry?.coordinates;
     if (!Array.isArray(coordinates) || coordinates.length !== 2) continue;
@@ -315,6 +315,7 @@ function parsePhoton(
       longitude,
       name: label,
       detail: name ? detail : '',
+      street: properties.street,
       distanceM,
       importance:
         photonImportance(properties.osm_key, properties.osm_value) +
@@ -447,10 +448,12 @@ async function nominatim(
   });
 }
 
-// Si Photon falla, se deja de preguntarle 2 min y se va directo al respaldo
-// (antes cada búsqueda esperaba sus 15 s de tiempo agotado).
-const PHOTON_PAUSE_MS = 2 * 60_000;
+// Si Photon falla dos veces seguidas (sin red o nos limita), se deja de
+// preguntarle 20 s y se va al respaldo. Antes eran 2 min tras un solo fallo:
+// con mala cobertura la búsqueda se quedaba sin comercios.
+const PHOTON_PAUSE_MS = 20_000;
 let photonDownUntil = 0;
+let photonFailures = 0;
 
 async function photon(params: URLSearchParams, signal: AbortSignal) {
   if (Date.now() < photonDownUntil) throw new Error(t('Photon en pausa.'));
@@ -458,14 +461,42 @@ async function photon(params: URLSearchParams, signal: AbortSignal) {
     const response = await fetchWithTimeout(
       `${PHOTON_URL}/api/?${params.toString()}`,
       { signal },
-      5_000,
+      6_000,
     );
+    if (response.status === 429) throw new Error('rate_limited');
     const data = (await response.json()) as { features?: PhotonFeature[] };
+    photonFailures = 0;
     return data.features ?? [];
   } catch (error) {
-    if (!signal.aborted) photonDownUntil = Date.now() + PHOTON_PAUSE_MS;
+    if (!signal.aborted) {
+      photonFailures += 1;
+      if (photonFailures >= 2) photonDownUntil = Date.now() + PHOTON_PAUSE_MS;
+    }
     throw error;
   }
+}
+
+// «Shell Av. Independencia», «Banco Popular Churchill»: una marca en una
+// calle. Se separa la marca de la calle para buscar la marca y quedarse con
+// las sucursales de esa calle.
+const STREET_WORDS = new Set(['avenida', 'calle', 'autopista', 'carretera', 'prolongacion', 'av', 'c']);
+
+export function splitBrandStreet(query: string): { brand: string; street: string } | null {
+  const words = expandAbbreviations(normalizeText(query)).split(' ').filter(Boolean);
+  const at = words.findIndex((word, index) => index > 0 && STREET_WORDS.has(word));
+  if (at <= 0 || at >= words.length - 1) return null;
+  const brand = words.slice(0, at).join(' ');
+  const street = words.slice(at + 1).join(' ');
+  return brand.length >= 2 && street.length >= 3 ? { brand, street } : null;
+}
+
+// Sucursales de la marca cuya calle (no la provincia ni la ciudad) es esa,
+// de la más cercana a la más lejana.
+export function branchesOnStreet(places: (SearchPlace & { street?: string })[], street: string) {
+  const target = normalizeText(street);
+  return places
+    .filter((place) => place.street && expandAbbreviations(normalizeText(place.street)).includes(target))
+    .sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
 }
 
 // Búsqueda de lugares, todo a la vez: el listado de RD (instantáneo), Photon
@@ -540,12 +571,35 @@ export async function searchPlaces(
   }
   const country = new URLSearchParams({ q, limit: '10', bbox: DO_BBOX });
 
+  const brandStreet = splitBrandStreet(q);
+  // Hay cientos de sucursales en el país: se piden las más cercanas a ti.
+  const brandSearch = brandStreet
+    ? new URLSearchParams({ q: brandStreet.brand, limit: '50', bbox: DO_BBOX })
+    : null;
+  if (brandSearch && near) {
+    brandSearch.set('lat', near.latitude.toFixed(5));
+    brandSearch.set('lon', near.longitude.toFixed(5));
+    brandSearch.set('zoom', '12');
+    brandSearch.set('location_bias_scale', '0.1');
+  }
   const settled = await Promise.allSettled([
     photon(nearby, signal).then((features) => parsePhoton(features, q, near)),
     photon(country, signal).then((features) => parsePhoton(features, q, near)),
     mapbox(q, near, signal),
   ]);
   const remote = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  if (brandStreet && brandSearch) {
+    try {
+      const branches = branchesOnStreet(
+        parsePhoton(await photon(brandSearch, signal), brandStreet.brand, near),
+        brandStreet.street,
+      );
+      // La sucursal en esa calle es justo lo buscado: va arriba.
+      remote.unshift(...branches.map((place) => ({ ...place, match: 1, importance: 1.2 })));
+    } catch {
+      // Sin la búsqueda de la marca valen los demás resultados.
+    }
+  }
   // Photon sin respuesta (las dos consultas): se pregunta a Nominatim.
   if (settled[0].status === 'rejected' && settled[1].status === 'rejected') {
     try {
