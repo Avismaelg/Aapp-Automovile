@@ -73,6 +73,10 @@ export default function ChallengesScreen() {
     standings,
     startChallenge,
     startRealChallenge,
+    abandonChallenge,
+    abandonPending,
+    publishResult,
+    publishPending,
   } = useChallengeScreen();
 
   return (
@@ -164,6 +168,10 @@ export default function ChallengesScreen() {
           onStart={() => void startChallenge()}
           onFinish={() => void finishChallenge()}
           onShare={() => void shareChallenge()}
+          onAbandon={isDemo ? undefined : abandonChallenge}
+          onPublish={isDemo ? undefined : () => void publishResult()}
+          abandonPending={abandonPending}
+          publishPending={publishPending}
         />
       ) : (
         <Card style={styles.emptyActive}>

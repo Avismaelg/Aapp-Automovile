@@ -1,9 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Pill } from '@/src/components/ui';
 import { RouteMini } from '@/src/components/challenges/RouteMini';
 import type { Challenge, ChallengeParticipant } from '@/src/types/models';
+import { countdownSeconds } from '@/src/lib/challenge-db';
 import { formatClock } from '@/src/lib/format';
 import { vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
@@ -25,7 +27,24 @@ type Props = {
   onStart: () => void;
   onFinish: () => void;
   onShare: () => void;
+  // RETO-07 / RETO-08.
+  onAbandon?: () => void;
+  onPublish?: () => void;
+  abandonPending?: boolean;
+  publishPending?: boolean;
 };
+
+// RETO-04: cuenta atrás hasta la salida (se repinta cada 250 ms).
+function useCountdown(startsAt: string | null | undefined) {
+  const [now, setNow] = useState(() => Date.now());
+  const left = countdownSeconds(startsAt ?? null, now);
+  useEffect(() => {
+    if (left <= 0) return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [left]);
+  return left;
+}
 
 // Reto en curso, pendiente o terminado con sus acciones según tu papel.
 export function ActiveChallengeCard({
@@ -44,7 +63,13 @@ export function ActiveChallengeCard({
   onStart,
   onFinish,
   onShare,
+  onAbandon,
+  onPublish,
+  abandonPending,
+  publishPending,
 }: Props) {
+  const countdown = useCountdown(active.startsAt);
+  const myState = standings.find((participant) => participant.isMe)?.state;
   return (
     <LinearGradient
       colors={['#2A170F', '#17181D', '#0E1217']}
@@ -149,6 +174,16 @@ export function ActiveChallengeCard({
         </View>
       </View>
 
+      {countdown > 0 ? (
+        <View style={styles.countdown} accessibilityLiveRegion="assertive">
+          <AppText variant="label" color={colors.muted}>{t('SALIDA EN')}</AppText>
+          <AppText variant="h1" color={colors.accent} style={styles.countdownNumber}>
+            {String(countdown)}
+          </AppText>
+          <AppText variant="caption" color={colors.muted}>{t('Respeta las leyes de tránsito.')}</AppText>
+        </View>
+      ) : null}
+
       <View style={styles.liveActions}>
         {activeIsInvite ? (
           <>
@@ -204,6 +239,24 @@ export function ActiveChallengeCard({
               style={{ paddingHorizontal: 16 }}
             />
           </>
+        ) : active.status === 'live' && onAbandon && myState === 'racing' && !activeIsHost ? (
+          <>
+            <Button
+              label={t('Compartir reto')}
+              icon="share-social-outline"
+              onPress={onShare}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label={t('Abandonar')}
+              icon="exit-outline"
+              variant="secondary"
+              full={false}
+              loading={abandonPending}
+              onPress={onAbandon}
+              style={{ paddingHorizontal: 16 }}
+            />
+          </>
         ) : active.status === 'live' ? (
           <>
             <Button
@@ -225,12 +278,25 @@ export function ActiveChallengeCard({
             ) : null}
           </>
         ) : (
-          <Button
-            label={t('Compartir resultado')}
-            icon="share-outline"
-            onPress={onShare}
-            style={{ flex: 1 }}
-          />
+          <>
+            <Button
+              label={t('Compartir resultado')}
+              icon="share-outline"
+              onPress={onShare}
+              style={{ flex: 1 }}
+            />
+            {onPublish ? (
+              <Button
+                label={t('Al feed')}
+                icon="newspaper-outline"
+                variant="secondary"
+                full={false}
+                loading={publishPending}
+                onPress={onPublish}
+                style={{ paddingHorizontal: 16 }}
+              />
+            ) : null}
+          </>
         )}
       </View>
     </LinearGradient>
@@ -238,6 +304,8 @@ export function ActiveChallengeCard({
 }
 
 const styles = StyleSheet.create({
+  countdown: { alignItems: 'center', paddingVertical: spacing.lg, gap: 2 },
+  countdownNumber: { fontSize: 64, lineHeight: 70 },
   liveCard: {
     marginTop: spacing.lg,
     borderRadius: radius['2xl'],

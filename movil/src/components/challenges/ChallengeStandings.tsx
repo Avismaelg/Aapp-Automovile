@@ -62,8 +62,17 @@ export function ChallengeStandings({
                 <AppText variant="bodyStrong" color={participant.isMe ? colors.accent : colors.text}>
                   {participant.progress}%
                 </AppText>
-                <AppText variant="caption" color={colors.muted}>
-                  {status === 'finished' ? 'llegada' : t('ETA {0} m', participant.etaMin)}
+                <AppText
+                  variant="caption"
+                  color={participant.state === 'abandoned' || participant.state === 'offline' ? colors.danger : colors.muted}
+                >
+                  {participant.state === 'abandoned'
+                    ? t('Abandonó')
+                    : participant.state === 'offline'
+                      ? t('Sin conexión')
+                      : participant.state === 'finished' || status === 'finished'
+                        ? t('llegada')
+                        : t('ETA {0} m', participant.etaMin)}
                 </AppText>
               </View>
             </View>

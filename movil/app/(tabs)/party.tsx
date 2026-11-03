@@ -37,6 +37,9 @@ import { useChatRead } from '@/src/store/chat-read';
 import { showError } from '@/src/lib/alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { confirmResponsibleDriving } from '@/src/hooks/useChallengeScreen';
+import { useChallengeDraft } from '@/src/store/challenge-draft';
+import type { ChallengeCategory } from '@/src/types/models';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
@@ -285,45 +288,48 @@ export default function PartyScreen() {
       Alert.alert(t('Retos'), t('Todavía no hay pilotos a quienes retar.'));
       return;
     }
-    if (!destination) {
-      Alert.alert(
-        t('Elige la meta'),
-        t('Fija primero el destino del convoy (búscalo en el mapa y pulsa Ir): gana quien llegue primero ahí.'),
-      );
-      return;
-    }
-    Alert.alert(
-      title,
-      t('Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.'),
-      [
+    const draft = {
+      title: title.replace('Reto a ', 'Reto: '),
+      category: (primaryVehicle?.kind ?? 'mixed') as ChallengeCategory,
+      hostVehicleId: primaryVehicle?.id,
+      hostVehicleKind: primaryVehicle?.kind ?? ('car' as const),
+      invitees,
+    };
+    // RETO-06: aviso de conducción responsable antes de cada reto.
+    void confirmResponsibleDriving().then((accepted) => {
+      if (!accepted) return;
+      // RETO-01: meta del convoy u otra elegida en el mapa.
+      const pickOther = () => {
+        useChallengeDraft.getState().start(draft);
+        router.push({ pathname: '/destino', params: { mode: 'challenge' } });
+      };
+      if (!destination) {
+        pickOther();
+        return;
+      }
+      Alert.alert(t('Meta del reto'), t('Gana quien llegue primero. ¿A dónde?'), [
         { text: t('Cancelar'), style: 'cancel' },
+        { text: t('Otra meta'), onPress: pickOther },
         {
-          text: t('Reto'),
-          style: 'destructive',
-          onPress: () => {
+          text: t('Meta del convoy'),
+          onPress: () =>
             void createChallenge
               .mutateAsync({
-                title: title.replace('Reto a ', 'Reto: '),
-                category: 'mixed',
+                ...draft,
                 mode: 'instant',
+                waitForRivals: true,
                 fromLabel: t('Salida del convoy'),
                 toLabel: destination.label,
                 endLat: destination.latitude,
                 endLng: destination.longitude,
                 distanceKm: (graphHopper.route?.distanceM ?? 0) / 1000,
                 rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
-                hostVehicleId: primaryVehicle?.id,
-                hostVehicleKind: primaryVehicle?.kind ?? 'car',
-                invitees,
               })
-              .then(() => Alert.alert(t('Reto enviado'), t('Verás la respuesta en la pestaña Retos.')))
-              .catch((error: unknown) =>
-                showError(t('Reto'), error, t('No pudimos crear el reto.')),
-              );
-          },
+              .then(() => Alert.alert(t('Reto enviado'), t('Cuando acepten, da la salida desde la pestaña Retos.')))
+              .catch((error: unknown) => showError(t('Reto'), error, t('No pudimos crear el reto.'))),
         },
-      ],
-    );
+      ]);
+    });
   };
 
   // Tocar a un piloto: seguirle (la ruta va a donde está y se mueve con él)

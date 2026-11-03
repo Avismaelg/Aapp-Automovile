@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, IconButton } from '@/src/components/ui';
@@ -16,6 +16,10 @@ import {
   type SearchPlace,
   type StopCategory,
 } from '@/src/lib/place-search';
+import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { errorMessage } from '@/src/lib/alerts';
+import { haversineMeters } from '@/src/lib/geo';
+import { useChallengeDraft } from '@/src/store/challenge-draft';
 import { useChosenDestination, type ChosenDestination } from '@/src/store/destination';
 import { colors, fonts, radius, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
@@ -36,6 +40,9 @@ export default function DestinationScreen() {
   const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string; mode?: string }>();
   // «Añadir parada»: lo que elijas se mete en la ruta en vez de cambiar el destino.
   const isStop = params.mode === 'stop';
+  // RETO-01: elegir la meta de un reto (lo crea al elegirla).
+  const isChallengeGoal = params.mode === 'challenge';
+  const createChallenge = useCreateChallenge();
   const addStop = useChosenDestination((state) => state.addStop);
 
   const [query, setQuery] = useState('');
@@ -120,6 +127,33 @@ export default function DestinationScreen() {
   }, [query, category]);
 
   const choose = (place: ChosenDestination) => {
+    if (isChallengeGoal) {
+      const draft = useChallengeDraft.getState().draft;
+      if (!draft) {
+        router.back();
+        return;
+      }
+      void createChallenge
+        .mutateAsync({
+          ...draft,
+          mode: 'instant',
+          waitForRivals: true,
+          fromLabel: t('Mi ubicación'),
+          toLabel: place.label,
+          endLat: place.latitude,
+          endLng: place.longitude,
+          distanceKm: haversineMeters(liveLocationRef.current, place) / 1000,
+          rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
+        })
+        .then(() => {
+          useChallengeDraft.getState().clear();
+          Alert.alert(t('Reto enviado'), t('Cuando acepten, da la salida desde la pestaña Retos.'));
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
+        })
+        .catch((error: unknown) => setSearchError(errorMessage(error, t('No pudimos crear el reto.'))));
+      return;
+    }
     if (isStop) {
       addStop(
         { latitude: place.latitude, longitude: place.longitude, label: place.label },

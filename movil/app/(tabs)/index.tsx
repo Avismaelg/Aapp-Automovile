@@ -46,6 +46,9 @@ import { useInviteToParty } from "@/src/hooks/usePartyInvites";
 import { lastSeenLabel, SHARE_OUTSIDE_PARTY } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
 import { useFollow } from "@/src/store/follow";
+import { useChallengeDraft } from "@/src/store/challenge-draft";
+import { confirmResponsibleDriving } from "@/src/hooks/useChallengeScreen";
+import type { ChallengeCategory } from "@/src/types/models";
 import { reachedNextStop } from "@/src/lib/stops";
 import { markAlertsSeen } from "@/src/lib/background-alerts";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
@@ -665,53 +668,52 @@ export default function NavigationScreen() {
       Alert.alert(t('Retos'), t('Los retos reales requieren una cuenta conectada.'));
       return;
     }
-    // El reto es llegar primero a una meta: sin destino no hay meta.
-    const goal = destination ?? partyDestination;
-    if (!goal) {
-      Alert.alert(
-        t('Elige la meta'),
-        t('Busca un destino en el mapa y vuelve a retar: gana quien llegue primero ahí.'),
-      );
-      return;
-    }
-    Alert.alert(
-      t('Reto a {0}', friend.name.split(" ")[0]),
-      t('Reto por llegada: gana quien llegue primero al destino, respetando las leyes.'),
-      [
+    const first = friend.name.split(" ")[0];
+    const draft = {
+      title: `Reto: ${first}`,
+      category: (primaryVehicle?.kind ?? "mixed") as ChallengeCategory,
+      hostVehicleId: primaryVehicle?.id,
+      hostVehicleKind: primaryVehicle?.kind ?? ("car" as const),
+      invitees: [{ userId: friend.id, vehicleKind: "car" as const }],
+    };
+    setSelectedFriend(null);
+    // RETO-06 / RETO-01: aviso responsable y meta (la tuya u otra en el mapa).
+    void confirmResponsibleDriving().then((accepted) => {
+      if (!accepted) return;
+      const goal = destination ?? partyDestination;
+      const pickOther = () => {
+        useChallengeDraft.getState().start(draft);
+        router.push({ pathname: "/destino", params: { mode: "challenge" } });
+      };
+      if (!goal) {
+        pickOther();
+        return;
+      }
+      Alert.alert(t('Reto a {0}', first), t('Gana quien llegue primero. ¿A dónde?'), [
         { text: t('Cancelar'), style: "cancel" },
+        { text: t('Otra meta'), onPress: pickOther },
         {
-          text: t('Reto'),
-          style: "destructive",
-          onPress: () => {
+          text: goal.label.length > 18 ? t('Mi destino') : goal.label,
+          onPress: () =>
             void createChallenge
               .mutateAsync({
-                title: `Reto: ${friend.name.split(" ")[0]}`,
-                category: "mixed",
+                ...draft,
                 mode: "instant",
+                waitForRivals: true,
                 fromLabel: t('Mi ubicación'),
                 toLabel: goal.label,
                 endLat: goal.latitude,
                 endLng: goal.longitude,
                 distanceKm: (route.route?.distanceM ?? 0) / 1000,
-                rules:
-                  t('Por llegada: gana quien llegue primero respetando las leyes.'),
-                hostVehicleId: primaryVehicle?.id,
-                hostVehicleKind: primaryVehicle?.kind ?? "car",
-                invitees: [{ userId: friend.id, vehicleKind: "car" }],
+                rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
               })
               .then(() =>
-                Alert.alert(
-                  t('Reto enviado'),
-                  t('Verás la respuesta en la pestaña Retos.'),
-                ),
+                Alert.alert(t('Reto enviado'), t('Cuando acepten, da la salida desde la pestaña Retos.')),
               )
-              .catch((error: unknown) =>
-                showError(t('Reto'), error, t('No pudimos crear el reto.')),
-              );
-          },
+              .catch((error: unknown) => showError(t('Reto'), error, t('No pudimos crear el reto.'))),
         },
-      ],
-    );
+      ]);
+    });
   };
 
   const handleFriendPress = useCallback(

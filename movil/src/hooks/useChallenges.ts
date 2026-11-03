@@ -25,6 +25,9 @@ import { useFriends } from '@/src/hooks/useFriends';
 import { t } from '@/src/i18n';
 import { useLivePoll } from '@/src/hooks/useLivePoll';
 
+// RETO-04: cuenta atrás antes de la salida.
+export const CHALLENGE_COUNTDOWN_S = 5;
+
 type ChallengeRow = {
   id: string;
   code: string;
@@ -53,6 +56,7 @@ type ParticipantRow = {
   progress_pct: number | string;
   elapsed_s: number;
   finish_rank: number | null;
+  last_progress_at?: string | null;
 };
 
 type VehicleRow = {
@@ -258,6 +262,7 @@ export function useChallenges() {
               progressPct: Number(participant.progress_pct),
               elapsedSeconds: participant.elapsed_s,
               finishRank: participant.finish_rank,
+              lastProgressAt: participant.last_progress_at ?? null,
               isMe: participant.user_id === account.id,
               isHost: participant.user_id === challenge.host_id,
             };
@@ -367,6 +372,8 @@ export type CreateChallengeInput = {
   rules: string;
   hostVehicleId?: string;
   hostVehicleKind: VehicleKind;
+  // RETO-03/04: los rivales aceptan y luego el anfitrión da la salida.
+  waitForRivals?: boolean;
   // Meta del reto por llegada.
   endLat?: number;
   endLng?: number;
@@ -400,12 +407,12 @@ export function useCreateChallenge() {
           host_id: account.id,
           title: input.title,
           category: input.category,
-          status: input.mode === 'instant' ? 'live' : 'pending',
+          status: input.mode === 'instant' && !input.waitForRivals ? 'live' : 'pending',
           mode: input.mode,
           from_label: input.fromLabel,
           to_label: input.toLabel,
           distance_m: Math.round(input.distanceKm * 1000),
-          starts_at: input.mode === 'instant' ? new Date().toISOString() : null,
+          starts_at: input.mode === 'instant' && !input.waitForRivals ? new Date().toISOString() : null,
           rules: input.rules,
           end_lat: input.endLat ?? null,
           end_lng: input.endLng ?? null,
@@ -494,11 +501,26 @@ export function useStartChallenge() {
 
       const { error } = await supabase
         .from('challenges')
-        .update({ status: 'live', starts_at: new Date().toISOString() })
+        .update({ status: 'live', starts_at: new Date(Date.now() + CHALLENGE_COUNTDOWN_S * 1000).toISOString() })
         .eq('id', challengeId)
         .eq('host_id', account.id);
 
       if (error) throw new Error(t('No pudimos iniciar el reto.'));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+    },
+  });
+}
+
+// RETO-07: abandonar el reto (sigue para los demás).
+export function useAbandonChallenge() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (challengeId: string) => {
+      if (!supabase) throw new Error(t('Inicia sesión para abandonar el reto.'));
+      const { error } = await supabase.rpc('abandon_challenge', { p_challenge_id: challengeId });
+      if (error) throw new Error(t('No pudimos abandonar el reto.'));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['challenges'] });

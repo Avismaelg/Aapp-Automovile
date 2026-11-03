@@ -15,7 +15,8 @@ export type ParticipantStatus =
   | 'accepted'
   | 'declined'
   | 'finished'
-  | 'cancelled';
+  | 'cancelled'
+  | 'abandoned';
 
 export type ChallengeFriend = Friend & {
   vehicleId?: string;
@@ -33,6 +34,8 @@ export type RealChallengeParticipant = {
   finishRank: number | null;
   isMe: boolean;
   isHost: boolean;
+  // RETO-07: último avance recibido (para «sin conexión»).
+  lastProgressAt?: string | null;
 };
 
 export type RealChallenge = {
@@ -56,6 +59,30 @@ export type RealChallenge = {
   myStatus: ParticipantStatus;
   isHost: boolean;
 };
+
+// RETO-07: sin avances en este tiempo durante el reto → «sin conexión».
+export const CHALLENGE_OFFLINE_MS = 2 * 60_000;
+
+// RETO-04: segundos que faltan para la salida (cuenta atrás); 0 si ya salió.
+export function countdownSeconds(startsAt: string | null, now: number) {
+  if (!startsAt) return 0;
+  const at = Date.parse(startsAt);
+  return Number.isFinite(at) && at > now ? Math.ceil((at - now) / 1000) : 0;
+}
+
+export function participantState(
+  challenge: Pick<RealChallenge, 'status' | 'startsAt'>,
+  participant: Pick<RealChallengeParticipant, 'status' | 'isMe' | 'lastProgressAt'>,
+  now: number,
+): 'racing' | 'finished' | 'abandoned' | 'offline' | 'waiting' {
+  if (participant.status === 'abandoned') return 'abandoned';
+  if (participant.status === 'finished') return 'finished';
+  if (challenge.status !== 'live' || participant.status !== 'accepted') return 'waiting';
+  if (participant.isMe) return 'racing';
+  const started = challenge.startsAt ? Date.parse(challenge.startsAt) : now;
+  const last = participant.lastProgressAt ? Date.parse(participant.lastProgressAt) : started;
+  return now - Math.max(last, started) > CHALLENGE_OFFLINE_MS ? 'offline' : 'racing';
+}
 
 export function normalizeChallengeStatus(
   status: RealChallenge['status'],
@@ -100,6 +127,7 @@ export function realChallengeToChallenge(
       etaMin: Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
       isMe: participant.isMe,
       rank: participant.finishRank ?? undefined,
+      state: participantState(challenge, participant, now),
     }));
 
   return {
@@ -115,6 +143,7 @@ export function realChallengeToChallenge(
     elapsedSeconds,
     participants,
     note: challenge.rules ?? undefined,
+    startsAt: challenge.status === 'live' ? challenge.startsAt : null,
   };
 }
 

@@ -62,6 +62,8 @@ export type ChallengeParticipant = {
   etaMin: number;
   isMe?: boolean;
   rank?: number;
+  // RETO-07: en carrera, llegó, abandonó o sin conexión.
+  state?: 'racing' | 'finished' | 'abandoned' | 'offline' | 'waiting';
 };
 
 export type Challenge = {
@@ -77,6 +79,8 @@ export type Challenge = {
   elapsedSeconds: number;
   participants: ChallengeParticipant[];
   note?: string;
+  // RETO-04: hora de salida (la cuenta atrás se calcula en pantalla).
+  startsAt?: string | null;
 };
 
 export type ChallengeRoute = {
