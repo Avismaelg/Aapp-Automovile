@@ -18,6 +18,10 @@ const corsHeaders = {
 
 // Consultas a Google por usuario y día (autocompletar + detalles).
 const DAILY_LIMIT = 300;
+// Tope de gasto (US$1): consultas al día para toda la app. ~9.000 al mes,
+// dentro de lo gratuito de Google; pasado el tope, la app usa el buscador
+// gratuito hasta el día siguiente.
+const GLOBAL_DAILY_LIMIT = 300;
 const BIAS_RADIUS_M = 50_000;
 
 function json(body: unknown, status = 200) {
@@ -73,6 +77,7 @@ Deno.serve(async (request) => {
 
   const { data: allowed, error: limitError } = await supabase.rpc('bump_place_search', {
     p_limit: DAILY_LIMIT,
+    p_global_limit: GLOBAL_DAILY_LIMIT,
   });
   if (limitError) return json({ error: 'No pudimos comprobar tu cupo de búsquedas.' }, 500);
   if (allowed === false) return json({ error: 'daily_limit' }, 429);

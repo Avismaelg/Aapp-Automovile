@@ -66,6 +66,13 @@ describe('MAPA-02: búsqueda con Google Places', () => {
       'utf8',
     );
     expect(sql).toContain('return v_count <= greatest(1, p_limit)');
+    // Tope de gasto: además del de cada usuario, uno diario para toda la app.
+    const cap = fs.readFileSync(
+      path.join(root, 'supabase/migrations/20261103160000_place_search_global_cap.sql'),
+      'utf8',
+    );
+    expect(cap).toContain('if v_global > greatest(1, p_global_limit) then return false');
+    expect(fn).toContain('p_global_limit: GLOBAL_DAILY_LIMIT');
     const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
     expect(env).not.toMatch(/GOOGLE/i);
   });
