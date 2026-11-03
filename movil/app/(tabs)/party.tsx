@@ -77,8 +77,10 @@ export default function PartyScreen() {
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<PartyVoiceChannelSlug | null>(null);
-  const myMember = party?.members.find((member) => member.isMe);
-  const voiceChannel = selectedChannel ?? myMember?.voiceChannelSlug ?? 'convoy';
+  // Todos empiezan en «Convoy»: antes se recuperaba el último canal tocado
+  // (aunque fuera de otro día) y cada uno quedaba solo en una sala distinta,
+  // sin oírse. Cambiar de canal es una elección de esta sesión.
+  const voiceChannel = selectedChannel ?? 'convoy';
   const voice = useVoiceRoom({
     partyId: party?.id,
     channelSlug: voiceChannel,

@@ -4,6 +4,7 @@ import { PermissionsAndroid, Platform } from 'react-native';
 
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
+  AndroidAudioTypePresets,
   AudioSession,
   initializeLiveKit,
   Room,
@@ -14,6 +15,9 @@ import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 
 type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
+
+// Fila de aperturas y cierres de la sesión de audio (nunca se cruzan).
+let audioChain: Promise<void> = Promise.resolve();
 
 // Android no da el micrófono sin pedirlo: antes nunca se pedía y el PTT no
 // transmitía nada.
@@ -57,6 +61,33 @@ export function useVoiceRoom({
   const [activeSpeakerIds, setActiveSpeakerIds] = useState<string[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
 
+  // Sesión de audio: una vez por convoy, no por canal. Antes se cerraba y se
+  // abría al cambiar de canal; si el cierre llegaba después de la apertura,
+  // el audio quedaba en «modo normal» y lo recibido no sonaba (tableta en
+  // Convoy oyendo silencio). Aperturas y cierres van en fila (audioChain) y
+  // la sala espera a que la sesión esté lista. Salida por el altavoz.
+  useEffect(() => {
+    if (!enabled || !partyId || !AudioSession) return;
+    const session = AudioSession;
+    audioChain = audioChain.then(async () => {
+      try {
+        await session.configureAudio({
+          android: {
+            preferredOutputList: ['bluetooth', 'headset', 'speaker'],
+            audioTypeOptions: AndroidAudioTypePresets.communication,
+          },
+          ios: { defaultOutput: 'speaker' },
+        });
+      } catch {
+        // Sin configuración vale la de por defecto.
+      }
+      await session.startAudioSession().catch(() => {});
+    });
+    return () => {
+      audioChain = audioChain.then(() => session.stopAudioSession().catch(() => {}));
+    };
+  }, [enabled, partyId]);
+
   useEffect(() => {
     const client = supabase;
     if (!enabled || !partyId || !client) return;
@@ -72,9 +103,8 @@ export function useVoiceRoom({
 
       try {
         initializeLiveKit();
-        if (AudioSession) {
-          await AudioSession.startAudioSession();
-        }
+        // La sesión de audio la abre el efecto de abajo, una vez por convoy.
+        await audioChain;
 
         const { data, error: functionError } = await client.functions.invoke(
           'livekit-token',
@@ -177,9 +207,6 @@ export function useVoiceRoom({
         setTalkingState(false);
         room?.disconnect();
         roomRef.current = null;
-        if (AudioSession) {
-          await AudioSession.stopAudioSession().catch(() => {});
-        }
       }
     };
 
@@ -192,11 +219,10 @@ export function useVoiceRoom({
         room.disconnect();
       }
       roomRef.current = null;
-      if (AudioSession) {
-        void AudioSession.stopAudioSession().catch(() => {});
-      }
     };
   }, [channelSlug, enabled, partyId]);
+
+
 
   const setTalking = useCallback(async (next: boolean) => {
     const room = roomRef.current;
