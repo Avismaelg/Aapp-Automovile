@@ -691,6 +691,7 @@
   "La posición de {0} es de hace {1} min": "{0}'s position is {1} min old",
   "La red social del coche": "The social network for drivers",
   "La ruta del evento salió vacía.": "The event route came back empty.",
+  "La ruta tarda demasiado. Revisa tu conexión y reintenta.": "The route is taking too long. Check your connection and retry.",
   "La sala empieza al confirmar. Gana quien llega primero a la meta respetando las normas.": "The room starts when you confirm. Whoever reaches the finish first while following the rules wins.",
   "La salida está en marcha. Comparte el código con los pilotos.": "The race is on. Share the code with the drivers.",
   "La subida de foto de perfil llegará en la siguiente fase.": "Profile photo upload is coming in the next phase.",

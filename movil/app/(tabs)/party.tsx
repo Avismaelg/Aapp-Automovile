@@ -201,6 +201,8 @@ export default function PartyScreen() {
         label: t('Sin destino'),
       },
     enabled: Boolean(destination),
+    // Su propio cálculo: no pisa la ruta que estás navegando en Inicio.
+    channel: 'party',
   });
   const routeDistance = graphHopper.route
     ? formatRouteDistance(graphHopper.route.distanceM)

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 
 import {
   fetchStreetRoutes,
@@ -21,23 +21,11 @@ type RouteState = {
   error: string | null;
 };
 
-// Compartida entre el mapa y la party: una sola petición a GraphHopper por cambio.
-const useRouteState = create<RouteState>(() => ({
-  routes: [],
-  selected: 0,
-  isLoading: false,
-  error: null,
-}));
-
 const NO_STOPS: GeoPoint[] = [];
 
-let requested: { origin: GeoPoint; destination: GeoPoint; stops: GeoPoint[]; at: number } | null = null;
-// Última posición conocida: al recalcular (p. ej. por salirte de la ruta) se
-// parte de donde estás ahora, no de donde se pidió la ruta anterior.
-let latestOrigin: GeoPoint | null = null;
-let pendingTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingController: AbortController | null = null;
-let offlineRetryTimer: ReturnType<typeof setTimeout> | null = null;
+// Si el cálculo se alarga más que esto, se deja de mostrar «Calculando» y se
+// puede reintentar (nunca se queda colgado).
+const ROUTE_GIVE_UP_MS = 15_000;
 
 function distanceMeters(a: GeoPoint, b: GeoPoint) {
   const R = 6371000;
@@ -60,81 +48,6 @@ function sameStops(a: GeoPoint[], b: GeoPoint[]) {
   return a.length === b.length && a.every((point, index) => samePoint(point, b[index]));
 }
 
-function cancelPending() {
-  if (pendingTimer) clearTimeout(pendingTimer);
-  pendingTimer = null;
-  if (offlineRetryTimer) clearTimeout(offlineRetryTimer);
-  offlineRetryTimer = null;
-  pendingController?.abort();
-  pendingController = null;
-}
-
-function requestRoute(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
-  latestOrigin = origin;
-  const previous = requested;
-  const unchanged =
-    previous !== null &&
-    samePoint(previous.destination, destination) &&
-    sameStops(previous.stops, stops) &&
-    distanceMeters(previous.origin, origin) < 250 &&
-    Date.now() - previous.at < 120_000;
-  if (unchanged) return;
-
-  cancelPending();
-  requested = { origin, destination, stops, at: Date.now() };
-
-  const controller = new AbortController();
-  pendingController = controller;
-  pendingTimer = setTimeout(async () => {
-    pendingTimer = null;
-    useRouteState.setState({ isLoading: true, error: null });
-
-    try {
-      const routes = await fetchStreetRoutes({
-        origin,
-        destination,
-        stops,
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      // Al recalcular se vuelve a la más rápida desde la posición actual.
-      useRouteState.setState({
-        routes,
-        selected: 0,
-        isLoading: false,
-        error: null,
-      });
-      // Línea directa (sin motor de rutas): se sigue intentando la ruta por calles.
-      if (routes[0]?.source === 'fallback') {
-        const pending = requested;
-        offlineRetryTimer = setTimeout(() => {
-          offlineRetryTimer = null;
-          if (requested === pending) retryRoute();
-        }, 15_000);
-      }
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      const offline = isNetworkError(error);
-      useRouteState.setState({
-        routes: [],
-        selected: 0,
-        isLoading: false,
-        error: offline
-          ? t('Sin conexión: no pudimos calcular la ruta. Reintentando…')
-          : t('No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.'),
-      });
-      // Sin conexión se reintenta solo hasta que vuelva la red.
-      if (offline) {
-        const pending = requested;
-        offlineRetryTimer = setTimeout(() => {
-          offlineRetryTimer = null;
-          if (requested === pending) retryRoute();
-        }, 8_000);
-      }
-    }
-  }, 700);
-}
-
 // Fallo de red (sin datos, sin wifi, tiempo agotado), no «no hay calle».
 function isNetworkError(error: unknown) {
   if (!(error instanceof Error)) return false;
@@ -145,24 +58,150 @@ function isNetworkError(error: unknown) {
   );
 }
 
-function clearRoute() {
-  cancelPending();
-  requested = null;
-  useRouteState.setState({ routes: [], selected: 0, isLoading: false, error: null });
+type Channel = {
+  store: UseBoundStore<StoreApi<RouteState>>;
+  request: (origin: GeoPoint, destination: GeoPoint, stops?: GeoPoint[]) => void;
+  clear: () => void;
+  select: (index: number) => void;
+  retry: () => void;
+};
+
+// Cada pantalla calcula su ruta por su cuenta («canal»). Antes Inicio y la
+// pestaña del convoy compartían la misma petición: con destinos distintos se
+// cancelaban la una a la otra en cada lectura del GPS y la ruta se quedaba
+// «Calculando…» sin dejar iniciar la navegación.
+function createChannel(): Channel {
+  const store = create<RouteState>(() => ({
+    routes: [],
+    selected: 0,
+    isLoading: false,
+    error: null,
+  }));
+
+  let requested: { origin: GeoPoint; destination: GeoPoint; stops: GeoPoint[]; at: number } | null = null;
+  // Última posición conocida: al recalcular (p. ej. por salirte de la ruta) se
+  // parte de donde estás ahora, no de donde se pidió la ruta anterior.
+  let latestOrigin: GeoPoint | null = null;
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingController: AbortController | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let giveUpTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelPending = () => {
+    if (pendingTimer) clearTimeout(pendingTimer);
+    pendingTimer = null;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    if (giveUpTimer) clearTimeout(giveUpTimer);
+    giveUpTimer = null;
+    pendingController?.abort();
+    pendingController = null;
+  };
+
+  const retry = () => {
+    if (!requested) return;
+    const { destination, stops } = requested;
+    const origin = latestOrigin ?? requested.origin;
+    cancelPending();
+    requested = null;
+    request(origin, destination, stops);
+  };
+
+  const scheduleRetry = (ms: number) => {
+    const pending = requested;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (requested === pending) retry();
+    }, ms);
+  };
+
+  function request(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
+    latestOrigin = origin;
+    const previous = requested;
+    const unchanged =
+      previous !== null &&
+      samePoint(previous.destination, destination) &&
+      sameStops(previous.stops, stops) &&
+      distanceMeters(previous.origin, origin) < 250 &&
+      Date.now() - previous.at < 120_000;
+    if (unchanged) return;
+
+    cancelPending();
+    requested = { origin, destination, stops, at: Date.now() };
+
+    const controller = new AbortController();
+    pendingController = controller;
+    pendingTimer = setTimeout(async () => {
+      pendingTimer = null;
+      store.setState({ isLoading: true, error: null });
+      giveUpTimer = setTimeout(() => {
+        giveUpTimer = null;
+        if (controller.signal.aborted) return;
+        controller.abort();
+        store.setState({
+          isLoading: false,
+          error: t('La ruta tarda demasiado. Revisa tu conexión y reintenta.'),
+        });
+        scheduleRetry(5_000);
+      }, ROUTE_GIVE_UP_MS);
+
+      try {
+        const routes = await fetchStreetRoutes({
+          origin,
+          destination,
+          stops,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        if (giveUpTimer) clearTimeout(giveUpTimer);
+        giveUpTimer = null;
+        // Al recalcular se vuelve a la más rápida desde la posición actual.
+        store.setState({ routes, selected: 0, isLoading: false, error: null });
+        // Línea directa (sin motor de rutas): se sigue intentando la ruta por calles.
+        if (routes[0]?.source === 'fallback') scheduleRetry(15_000);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (giveUpTimer) clearTimeout(giveUpTimer);
+        giveUpTimer = null;
+        const offline = isNetworkError(error);
+        store.setState({
+          routes: [],
+          selected: 0,
+          isLoading: false,
+          error: offline
+            ? t('Sin conexión: no pudimos calcular la ruta. Reintentando…')
+            : t('No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.'),
+        });
+        // Sin conexión se reintenta solo hasta que vuelva la red.
+        if (offline) scheduleRetry(8_000);
+      }
+    }, 700);
+  }
+
+  return {
+    store,
+    request,
+    clear: () => {
+      cancelPending();
+      requested = null;
+      store.setState({ routes: [], selected: 0, isLoading: false, error: null });
+    },
+    select: (index) => {
+      const { routes } = store.getState();
+      if (index >= 0 && index < routes.length) store.setState({ selected: index });
+    },
+    retry,
+  };
 }
 
-function selectRoute(index: number) {
-  const { routes } = useRouteState.getState();
-  if (index >= 0 && index < routes.length) useRouteState.setState({ selected: index });
-}
-
-function retryRoute() {
-  if (!requested) return;
-  const { destination, stops } = requested;
-  const origin = latestOrigin ?? requested.origin;
-  cancelPending();
-  requested = null;
-  requestRoute(origin, destination, stops);
+const channels = new Map<string, Channel>();
+function channelFor(name: string) {
+  let channel = channels.get(name);
+  if (!channel) {
+    channel = createChannel();
+    channels.set(name, channel);
+  }
+  return channel;
 }
 
 export function useGraphHopperRoute({
@@ -170,25 +209,29 @@ export function useGraphHopperRoute({
   destination,
   stops = NO_STOPS,
   enabled = true,
+  channel: channelName = 'main',
 }: {
   origin: GeoPoint;
   destination: GeoPoint;
   // Paradas en orden, entre la salida y el destino.
   stops?: GeoPoint[];
   enabled?: boolean;
+  // Pantalla que pide la ruta: cada una tiene su propio cálculo.
+  channel?: string;
 }) {
+  const channel = channelFor(channelName);
   const originLatitude = origin.latitude;
   const originLongitude = origin.longitude;
   const destinationLatitude = destination.latitude;
   const destinationLongitude = destination.longitude;
-  const { routes, selected, isLoading, error } = useRouteState();
+  const { routes, selected, isLoading, error } = channel.store();
   // Clave estable para el efecto (las paradas llegan como array nuevo).
   const stopsKey = stops.map((stop) => `${stop.latitude},${stop.longitude}`).join(';');
   const route = routes[selected] ?? null;
 
   useEffect(() => {
     if (!enabled) {
-      clearRoute();
+      channel.clear();
       return;
     }
 
@@ -198,22 +241,22 @@ export function useGraphHopperRoute({
           return { latitude, longitude };
         })
       : [];
-    requestRoute(
+    channel.request(
       { latitude: originLatitude, longitude: originLongitude },
       { latitude: destinationLatitude, longitude: destinationLongitude },
       stopPoints,
     );
-  }, [destinationLatitude, destinationLongitude, enabled, originLatitude, originLongitude, stopsKey]);
+  }, [channel, destinationLatitude, destinationLongitude, enabled, originLatitude, originLongitude, stopsKey]);
 
   return {
     route,
     routes,
     selected,
-    select: selectRoute,
+    select: channel.select,
     isLoading,
     error,
     configured: isGraphHopperConfigured,
     source: route?.source ?? 'fallback',
-    retry: retryRoute,
+    retry: channel.retry,
   };
 }

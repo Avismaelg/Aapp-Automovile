@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
 import { askLocationConsent } from '@/src/lib/location-consent';
+import { nextSpeed, type SpeedState } from '@/src/lib/speed-filter';
 import { t } from '@/src/i18n';
 
 export type LiveLocation = {
@@ -75,20 +76,26 @@ function validHeading(value: number | null | undefined) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function validSpeedKmh(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value * 3.6 : null;
-}
-
 function clearFallbackTimer() {
   if (fallbackTimer) clearTimeout(fallbackTimer);
   fallbackTimer = null;
 }
 
+// Velocímetro filtrado (ver src/lib/speed-filter.ts).
+let speedState: SpeedState | null = null;
+
 function applyPosition(position: Location.LocationObject) {
   if (isSimulating()) return;
   clearFallbackTimer();
   lastFixAt = Date.now();
-  const speedKmh = validSpeedKmh(position.coords.speed);
+  speedState = nextSpeed(speedState, {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+    speedMps: position.coords.speed,
+    accuracyM: position.coords.accuracy,
+    at: position.timestamp || Date.now(),
+  });
+  const speedKmh = speedState.speedKmh;
   const previousHeading = useLiveLocationState.getState().location.heading;
   const gpsHeading = validHeading(position.coords.heading);
   // Parado o a poca velocidad se conserva el rumbo de la brújula.

@@ -259,3 +259,4 @@
 =llegada|arrival
 =¿Abandonar el reto?|Give up the challenge?
 =🏁 Reto por llegada: {0}|🏁 Arrival challenge: {0}
+=La ruta tarda demasiado. Revisa tu conexión y reintenta.|The route is taking too long. Check your connection and retry.
