@@ -36,18 +36,16 @@ class MotionReceiver : BroadcastReceiver() {
     }
     if (events.isEmpty()) return
 
-    // La notificación de conducción solo mientras vas en un vehículo.
+    // La notificación de conducción solo mientras vas en un vehículo. Se
+    // apaga al empezar a andar: en un tapón el sensor dice «quieto» y «fuera
+    // del vehículo» sin que hayas bajado, y apagarla ahí dejaba la ruta sin
+    // puntos. Si aparcas sin andar, la app la apaga tras 10 min parado.
     if (DrivingService.autoEnabled(context)) {
       val latest = result.transitionEvents.maxByOrNull { it.elapsedRealTimeNanos }
-      if (latest != null) {
-        val entering = latest.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
-        when {
-          latest.activityType == DetectedActivity.IN_VEHICLE && entering ->
-            DrivingService.start(context, DrivingService.REASON_VEHICLE)
-          latest.activityType == DetectedActivity.IN_VEHICLE ||
-            latest.activityType == DetectedActivity.STILL ||
-            latest.activityType == DetectedActivity.WALKING ||
-            latest.activityType == DetectedActivity.RUNNING ->
+      if (latest != null && latest.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
+        when (latest.activityType) {
+          DetectedActivity.IN_VEHICLE -> DrivingService.start(context, DrivingService.REASON_VEHICLE)
+          DetectedActivity.WALKING, DetectedActivity.RUNNING ->
             DrivingService.stop(context, DrivingService.REASON_VEHICLE)
         }
       }

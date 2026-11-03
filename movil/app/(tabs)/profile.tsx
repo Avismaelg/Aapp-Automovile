@@ -19,6 +19,7 @@ import { useFriends } from '@/src/hooks/useFriends';
 import { useMyProfile } from '@/src/hooks/useProfile';
 import { tripAchievements, tripStats } from '@/src/lib/achievements';
 import { showError } from '@/src/lib/alerts';
+import { shareDiagnostic } from '@/src/lib/diagnostics';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
@@ -347,6 +348,22 @@ export default function ProfileScreen() {
                 router.push('/profile/edit');
               } else if (setting.icon === 'document-text-outline') {
                 router.push('/privacidad' as Href);
+              } else if (setting.icon === 'help-circle-outline') {
+                Alert.alert(
+                  setting.label,
+                  t('Envía tus rutas, aparcamientos y errores de hoy para revisar qué falló. Solo se envían si eliges dónde compartirlos.'),
+                  [
+                    { text: t('Cancelar'), style: 'cancel' },
+                    {
+                      text: t('Enviar diagnóstico'),
+                      onPress: () => {
+                        shareDiagnostic().catch((error) =>
+                          Alert.alert(t('No pudimos preparar el diagnóstico'), String(error)),
+                        );
+                      },
+                    },
+                  ],
+                );
               } else {
                 Alert.alert(
                   setting.label,

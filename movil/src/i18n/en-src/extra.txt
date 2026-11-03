@@ -135,3 +135,6 @@
 =Caravana usa el micrófono solo mientras mantienes pulsado el botón para hablar.|Caravana only uses the microphone while you hold the talk button.
 =Sin permiso de micrófono no puedes hablar. Actívalo en Ajustes › Apps › Caravana.|Without microphone permission you can't talk. Turn it on in Settings › Apps › Caravana.
 =Ver perfil de {0}|View {0}'s profile
+=Envía tus rutas, aparcamientos y errores de hoy para revisar qué falló. Solo se envían si eliges dónde compartirlos.|Send today's routes, parking spots and errors so we can see what went wrong. They're only sent if you choose where to share them.
+=Enviar diagnóstico|Send diagnostics
+=No pudimos preparar el diagnóstico|We couldn't prepare the diagnostics

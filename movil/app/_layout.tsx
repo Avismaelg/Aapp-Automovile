@@ -9,7 +9,7 @@ import {
   BarlowCondensed_700Bold,
   BarlowCondensed_800ExtraBold,
 } from '@expo-google-fonts/barlow-condensed';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, type Href } from 'expo-router';
@@ -17,7 +17,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
@@ -39,12 +39,21 @@ if (Platform.OS !== 'web') {
 }
 installWebAlert();
 
+// Al volver a la app se recargan los datos viejos (amigos, party, perfil,
+// actividad). Antes había que cerrarla y abrirla para verlos al día.
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
+    return () => subscription.remove();
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
       gcTime: 10 * 60_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       retry: 1,
     },
   },

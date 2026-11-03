@@ -165,6 +165,20 @@ const EXIT_MATCH_AFTER_MS = 10 * 60_000;
 const EXIT_MAX_ACCURACY_M = 50;
 const EXIT_MAX_SHIFT_M = 250;
 
+// Tras el final del viaje, ¿el primer aviso decisivo del sensor es volver a
+// ir en vehículo (sin haber andado antes)? Sin avisos, no se sabe: false.
+export function continuedDriving(endedAt: number, motion: MotionFix[]) {
+  const next = [...motion]
+    .sort((a, b) => a.at - b.at)
+    .find(
+      (event) =>
+        event.at > endedAt &&
+        ((event.type === "vehicle" && event.transition === "enter") ||
+          (event.type === "foot" && event.transition === "enter")),
+    );
+  return next?.type === "vehicle";
+}
+
 export function refineWithExit(spot: Spot, motion: MotionFix[]): Spot {
   const exit = motion.find(
     (event) =>
@@ -215,6 +229,9 @@ export function spotFromTripEnd(
   if (spot && start && haversineMeters(start, spot) > OWN_CAR_RADIUS_M) {
     return { spot: null, seen: trip.id };
   }
+  // El viaje se cortó (p. ej. sin GPS en un tapón) pero el sensor dice que
+  // seguiste en el vehículo sin echar a andar: ahí no aparcaste.
+  if (continuedDriving(trip.endedAt, motion)) return { spot: null, seen: trip.id };
   return {
     spot: refineWithExit(
       { latitude: end.latitude, longitude: end.longitude, at: trip.endedAt },

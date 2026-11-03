@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
 import { secureSessionStorage } from '@/src/lib/secure-session-storage';
@@ -23,3 +23,15 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null;
+
+// En React Native los temporizadores se paran en segundo plano: sin esto la
+// sesión caducaba (1 h) y, al volver, todo fallaba en silencio (amigos,
+// party, posiciones) hasta cerrar y abrir la app.
+if (supabase && Platform.OS !== 'web') {
+  const client = supabase;
+  if (AppState.currentState === 'active') void client.auth.startAutoRefresh();
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') void client.auth.startAutoRefresh();
+    else void client.auth.stopAutoRefresh();
+  });
+}

@@ -63,6 +63,10 @@ export async function pushLivePosition(fix: LiveFix) {
   busy = true;
   const seenAt = new Date(fix.at).toISOString();
   try {
+    // Con la pantalla bloqueada no corre la renovación automática de la
+    // sesión: caducaba a la hora y las posiciones dejaban de subirse (los
+    // demás te veían congelado). getSession la renueva si hace falta.
+    await client.auth.getSession();
     const writes: PromiseLike<unknown>[] = [];
     if (toParty && partyId) {
       lastParty = fix;

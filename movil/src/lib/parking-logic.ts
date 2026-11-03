@@ -49,15 +49,24 @@ const IN_VEHICLE_STOP_MS = 30 * 60_000;
 const MOTION_SLACK_MS = 60_000;
 
 // Estado según el sensor en un instante: el último aviso relevante manda.
-export function motionStateAt(events: MotionHint[], at: number): 'vehicle' | 'foot' | 'unknown' {
-  let state: 'vehicle' | 'foot' | 'unknown' = 'unknown';
+// «Fuera del vehículo» sin echar a andar NO es bajarse: en un tapón el sensor
+// lo dice con el coche parado y tú dentro. Solo andar cuenta como «a pie».
+export function motionStateAt(
+  events: MotionHint[],
+  at: number,
+): 'vehicle' | 'vehicle-exit' | 'foot' | 'unknown' {
+  let state: 'vehicle' | 'vehicle-exit' | 'foot' | 'unknown' = 'unknown';
   for (const event of [...events].sort((a, b) => a.at - b.at)) {
     if (event.at > at) break;
-    if (event.type === 'vehicle') state = event.transition === 'enter' ? 'vehicle' : 'foot';
+    if (event.type === 'vehicle') state = event.transition === 'enter' ? 'vehicle' : 'vehicle-exit';
     else if (event.type === 'foot' && event.transition === 'enter') state = 'foot';
   }
   return state;
 }
+
+// Tras bajar del vehículo hay que echar a andar en este tiempo; si no, era
+// un tapón o un semáforo largo.
+export const WALK_AFTER_EXIT_MS = 10 * 60_000;
 
 // Actividad más reciente según el sensor, incluido «quieto». Ojo: en un
 // semáforo el sensor también puede decir «quieto» yendo en coche, así que
@@ -69,10 +78,27 @@ export function motionActivityAt(
   let state: 'vehicle' | 'foot' | 'still' | 'unknown' = 'unknown';
   for (const event of [...events].sort((a, b) => a.at - b.at)) {
     if (event.at > at) break;
-    if (event.type === 'vehicle') state = event.transition === 'enter' ? 'vehicle' : 'foot';
+    // Salir del vehículo sin echar a andar es quedarse quieto (un tapón).
+    if (event.type === 'vehicle') state = event.transition === 'enter' ? 'vehicle' : 'still';
     else if (event.transition === 'enter') state = event.type;
   }
   return state;
+}
+
+// Tras ir en un vehículo, «quieto» durante este tiempo suele ser tráfico:
+// no impide retomar la grabación al volver a moverse.
+export const STILL_IN_TRAFFIC_MS = 30 * 60_000;
+
+// ¿Impide el sensor empezar un viaje ahora? A pie, siempre. Quieto, solo si
+// hace rato que no vas en un vehículo (dentro de casa el GPS da velocidades
+// falsas); justo después de un tapón no.
+export function motionBlocksStart(events: MotionHint[], at: number): boolean {
+  const state = motionActivityAt(events, at);
+  if (state === 'foot') return true;
+  if (state !== 'still') return false;
+  return !events.some(
+    (event) => event.type === 'vehicle' && event.at <= at && at - event.at <= STILL_IN_TRAFFIC_MS,
+  );
 }
 
 export function evaluateStop({
@@ -95,11 +121,10 @@ export function evaluateStop({
   const after = samples.filter((sample) => sample.at > stop.at);
   if (after.some((sample) => (sample.speedKmh ?? 0) >= RESUME_KMH)) return { kind: 'driving' };
 
+  // Bajarse = echar a andar. «Fuera del vehículo» solo no basta (tapones).
   const left = motion.some(
     (event) =>
-      event.at >= stop.at - MOTION_SLACK_MS &&
-      ((event.type === 'vehicle' && event.transition === 'exit') ||
-        (event.type === 'foot' && event.transition === 'enter')),
+      event.at >= stop.at - MOTION_SLACK_MS && event.type === 'foot' && event.transition === 'enter',
   );
   if (left) return { kind: 'parked', reason: 'motion' };
 
@@ -112,8 +137,10 @@ export function evaluateStop({
     return { kind: 'parked', reason: 'destination' };
   }
 
-  // El sensor sigue diciendo que vas en el coche: es un atasco.
-  if (motionStateAt(motion, now) === 'vehicle') {
+  // El sensor sigue diciendo que vas en el coche (o salió del vehículo sin
+  // que echaras a andar): es un atasco.
+  const state = motionStateAt(motion, now);
+  if (state === 'vehicle' || state === 'vehicle-exit') {
     return stoppedMs >= IN_VEHICLE_STOP_MS ? { kind: 'parked', reason: 'long-stop' } : { kind: 'pending' };
   }
 
@@ -197,6 +224,37 @@ export type SpotReconcile =
 // donde bajaste. Si subiste y no consta dónde bajaste, el punto viejo ya no
 // es fiable y se quita (mejor sin aparcamiento que uno falso). Subir a otro
 // vehículo (taxi, autobús, de copiloto) no mueve tu coche.
+const hasGoodFix = (event: MotionFix) =>
+  event.latitude != null &&
+  event.longitude != null &&
+  (event.accuracy ?? 0) <= FIX_MAX_ACCURACY_M &&
+  Math.abs(event.at - (event.fixAt ?? event.at)) <= FIX_MAX_AGE_MS;
+
+// Dónde bajaste del coche tras subir en `after`: una salida del vehículo que
+// va seguida de echar a andar (sin volver a subir antes). Una salida sin
+// andar después es un tapón y no mueve el coche. El punto es el de la salida
+// si es bueno; si no, el del primer paso a pie.
+function findParkingExit(sorted: MotionFix[], after: number): MotionFix | undefined {
+  const events = sorted.filter((event) => event.at > after);
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i];
+    if (event.type === 'foot' && event.transition === 'enter') {
+      if (hasGoodFix(event)) return event;
+      continue;
+    }
+    if (event.type !== 'vehicle' || event.transition !== 'exit') continue;
+    const walk = events.slice(i + 1).find(
+      (next) =>
+        (next.type === 'vehicle' && next.transition === 'enter') ||
+        (next.type === 'foot' && next.transition === 'enter'),
+    );
+    if (!walk || walk.type !== 'foot' || walk.at - event.at > WALK_AFTER_EXIT_MS) continue;
+    if (hasGoodFix(event)) return event;
+    if (hasGoodFix(walk)) return walk;
+  }
+  return undefined;
+}
+
 export function reconcileSpotWithMotion(
   spot: (GeoPoint & { at: number }) | null,
   events: MotionFix[],
@@ -214,16 +272,7 @@ export function reconcileSpotWithMotion(
   );
   if (!enter) return { kind: 'keep' };
 
-  const exit = sorted.find(
-    (event) =>
-      event.at > enter.at &&
-      ((event.type === 'vehicle' && event.transition === 'exit') ||
-        (event.type === 'foot' && event.transition === 'enter')) &&
-      event.latitude != null &&
-      event.longitude != null &&
-      (event.accuracy ?? 0) <= FIX_MAX_ACCURACY_M &&
-      Math.abs(event.at - (event.fixAt ?? event.at)) <= FIX_MAX_AGE_MS,
-  );
+  const exit = findParkingExit(sorted, enter.at);
   // ¿Volvió a subir después de esa bajada? Entonces se sigue buscando.
   if (exit) {
     const later = reconcileSpotWithMotion(

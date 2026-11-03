@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 
 import { getMotionEvents } from '@/modules/motion';
 import { submitTripSpeedRecords } from '@/src/lib/highway-records';
-import { motionActivityAt } from '@/src/lib/parking-logic';
+import { motionActivityAt, motionBlocksStart } from '@/src/lib/parking-logic';
 import { setMotionGates, useTrips } from '@/src/store/trips';
 import { useSession } from '@/src/store/session';
 
@@ -16,10 +16,7 @@ const MOTION_LOOKBACK_MS = 12 * 3_600_000;
 // Quieto o a pie según el sensor: no se empieza un viaje (el GPS de dentro de
 // casa da velocidades falsas). Sin sensor no bloquea nada.
 setMotionGates({
-  blocksStart: (at) => {
-    const state = motionActivityAt(getMotionEvents(at - MOTION_LOOKBACK_MS), at);
-    return state === 'still' || state === 'foot';
-  },
+  blocksStart: (at) => motionBlocksStart(getMotionEvents(at - MOTION_LOOKBACK_MS), at),
   // Solo opina si el sensor tiene historial antes del viaje; si no, no sabe.
   hadVehicle: (from, to) => {
     const events = getMotionEvents(from - MOTION_LOOKBACK_MS);

@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   evaluateStop,
+  motionBlocksStart,
   motionStateAt,
   reconcileSpotWithMotion,
   type MotionFix,
@@ -114,16 +115,29 @@ describe('evaluateStop: atascos', () => {
 });
 
 describe('evaluateStop: aparcamientos reales', () => {
-  it('el sensor detecta que bajas del coche', () => {
+  it('el sensor detecta que bajas del coche y echas a andar', () => {
     const samples = track([[0, 30]]);
     const motion: MotionHint[] = [
       { type: 'vehicle', transition: 'enter', at: T0 - 900_000 },
-      { type: 'vehicle', transition: 'exit', at: T0 + 25_000 },
+      { type: 'vehicle', transition: 'exit', at: T0 + 15_000 },
+      { type: 'foot', transition: 'enter', at: T0 + 25_000 },
     ];
     expect(evaluateStop({ stop, samples, motion, now: lastAt(samples) })).toEqual({
       kind: 'parked',
       reason: 'motion',
     });
+  });
+
+  it('en un tapón el sensor dice «fuera del vehículo» sin andar: no es aparcar', () => {
+    // Máximo Gómez, 2026-11-02: parado 6 min en un atasco, el sensor dio
+    // «fuera del vehículo» y «quieto» y la app marcó el coche aparcado.
+    const samples = track([[0, 360]]);
+    const motion: MotionHint[] = [
+      { type: 'vehicle', transition: 'enter', at: T0 - 900_000 },
+      { type: 'vehicle', transition: 'exit', at: T0 + 60_000 },
+      { type: 'still', transition: 'enter', at: T0 + 61_000 },
+    ];
+    expect(evaluateStop({ stop, samples, motion, now: lastAt(samples) }).kind).toBe('pending');
   });
 
   it('el sensor dice «a pie» poco antes de que el GPS vea la parada', () => {
@@ -194,7 +208,7 @@ describe('motionStateAt', () => {
     expect(motionStateAt(events, 5)).toBe('vehicle');
     expect(
       motionStateAt([...events, { type: 'vehicle', transition: 'exit', at: 6 }], 7),
-    ).toBe('foot');
+    ).toBe('vehicle-exit');
   });
 });
 
@@ -222,6 +236,8 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     fixAt: at - 10_000,
   });
 
+  const walkAt = (at: number): MotionFix => ({ type: 'foot', transition: 'enter', at });
+
   it('sin avisos, se mantiene', () => {
     expect(reconcileSpotWithMotion(oldSpot, [], T0 + 3_600_000).kind).toBe('keep');
   });
@@ -230,6 +246,7 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     const events: MotionFix[] = [
       enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000),
+      walkAt(T0 + 1_860_000),
     ];
     expect(reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000)).toEqual({
       kind: 'move',
@@ -241,8 +258,10 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     const events: MotionFix[] = [
       enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000),
+      walkAt(T0 + 1_860_000),
       enterAt(T0 + 2_400_000, LAT + 5_000 * M),
       exitFix(T0 + 3_000_000, { latitude: LAT + 9_000 * M }),
+      walkAt(T0 + 3_060_000),
     ];
     const result = reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000);
     expect(result).toEqual({
@@ -281,6 +300,7 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     const events: MotionFix[] = [
       enterAt(T0 + 600_000),
       exitFix(T0 + 1_800_000),
+      walkAt(T0 + 1_860_000),
     ];
     expect(reconcileSpotWithMotion(null, events, T0 + 3_600_000).kind).toBe('keep');
     const drives = [{ startedAt: T0 + 610_000, start: { latitude: LAT, longitude: LNG } }];
@@ -295,10 +315,29 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     expect(reconcileSpotWithMotion(oldSpot, events, T0 + 3_600_000).kind).toBe('keep');
   });
 
+  it('una bajada en un tapón (sin andar después) no mueve el coche', () => {
+    const jam: MotionFix[] = [
+      enterAt(T0 + 600_000),
+      exitFix(T0 + 1_200_000, { latitude: LAT + 2_000 * M }),
+      { type: 'still', transition: 'enter', at: T0 + 1_201_000 },
+      enterAt(T0 + 1_500_000, LAT + 2_050 * M),
+      exitFix(T0 + 1_800_000),
+      walkAt(T0 + 1_860_000),
+    ];
+    expect(reconcileSpotWithMotion(oldSpot, jam, T0 + 3_600_000)).toEqual({
+      kind: 'move',
+      spot: { latitude: LAT + 5_000 * M, longitude: LNG, at: T0 + 1_800_000 },
+    });
+    // Tapón y luego la app no vio más avisos: no se marca aparcado en el tapón.
+    const onlyJam = jam.slice(0, 3);
+    expect(reconcileSpotWithMotion(oldSpot, onlyJam, T0 + 3_600_000).kind).toBe('clear');
+  });
+
   it('sin ubicación en la subida, decide el viaje grabado: empezó junto al coche o no', () => {
     const noFix: MotionFix[] = [
       { type: 'vehicle', transition: 'enter', at: T0 + 600_000 },
       exitFix(T0 + 1_800_000),
+      walkAt(T0 + 1_860_000),
     ];
     expect(reconcileSpotWithMotion(oldSpot, noFix, T0 + 3_600_000).kind).toBe('keep');
     const fromCar = [{ startedAt: T0 + 620_000, start: { latitude: LAT + 50 * M, longitude: LNG } }];
@@ -307,5 +346,27 @@ describe('reconcileSpotWithMotion: app cerrada', () => {
     expect(reconcileSpotWithMotion(oldSpot, noFix, T0 + 3_600_000, elsewhere).kind).toBe('keep');
     const test = [{ startedAt: T0 + 620_000, start: { latitude: LAT, longitude: LNG }, test: true }];
     expect(reconcileSpotWithMotion(null, noFix, T0 + 3_600_000, test).kind).toBe('keep');
+  });
+});
+
+describe('motionBlocksStart: retomar la grabación tras un tapón', () => {
+  const at = 10 * 60_000 * 6;
+  it('a pie no se empieza un viaje', () => {
+    expect(motionBlocksStart([{ type: 'foot', transition: 'enter', at: at - 60_000 }], at)).toBe(true);
+  });
+  it('quieto justo después de ir en coche (tapón) no bloquea', () => {
+    const events: MotionHint[] = [
+      { type: 'vehicle', transition: 'enter', at: at - 20 * 60_000 },
+      { type: 'vehicle', transition: 'exit', at: at - 5 * 60_000 },
+      { type: 'still', transition: 'enter', at: at - 5 * 60_000 + 1_000 },
+    ];
+    expect(motionBlocksStart(events, at)).toBe(false);
+  });
+  it('quieto hace horas (en casa) sí bloquea', () => {
+    const events: MotionHint[] = [
+      { type: 'vehicle', transition: 'exit', at: at - 50 * 60_000 },
+      { type: 'still', transition: 'enter', at: at - 49 * 60_000 },
+    ];
+    expect(motionBlocksStart(events, at)).toBe(true);
   });
 });

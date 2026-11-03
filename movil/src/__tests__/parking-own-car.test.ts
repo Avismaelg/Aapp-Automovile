@@ -34,6 +34,19 @@ describe('el coche aparcado solo se mueve con viajes en tu coche', () => {
     expect(result).toEqual({ spot: null, seen: 'c' });
   });
 
+  it('un viaje cortado en un tapón (sigue en el vehículo sin andar) no aparca ahí', () => {
+    const motion = [
+      { type: 'vehicle' as const, transition: 'exit' as const, at: T0 + 1_700_000 },
+      { type: 'still' as const, transition: 'enter' as const, at: T0 + 1_701_000 },
+      { type: 'vehicle' as const, transition: 'enter' as const, at: T0 + 2_400_000 },
+    ];
+    const result = spotFromTripEnd(trip('e', LAT + 30 * M), spot, null, T0 + 2_500_000, motion);
+    expect(result).toEqual({ spot: null, seen: 'e' });
+    // Si después echó a andar, sí aparcó al final del viaje.
+    const walked = [...motion.slice(0, 2), { type: 'foot' as const, transition: 'enter' as const, at: T0 + 1_900_000 }];
+    expect(spotFromTripEnd(trip('f', LAT + 30 * M), spot, null, T0 + 2_500_000, walked).spot).not.toBeNull();
+  });
+
   it('sin aparcamiento guardado, el final del viaje lo crea', () => {
     const result = spotFromTripEnd(trip('d', LAT + 3_000 * M), null, null, T0 + 2_000_000);
     expect(result.spot).not.toBeNull();

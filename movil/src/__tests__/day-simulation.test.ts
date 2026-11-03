@@ -12,7 +12,7 @@ import {
   spotFromTripEnd,
   type Spot,
 } from "@/src/lib/parking-detector";
-import { motionActivityAt, type MotionFix } from "@/src/lib/parking-logic";
+import { motionActivityAt, motionBlocksStart, type MotionFix } from "@/src/lib/parking-logic";
 import {
   resetTripDetection,
   setMotionGates,
@@ -341,10 +341,7 @@ describe("un día completo de uso", () => {
     });
     // Mismas reglas que useTripRecorder con el sensor real.
     setMotionGates({
-      blocksStart: (at) => {
-        const state = motionActivityAt(motion, at);
-        return state === "still" || state === "foot";
-      },
+      blocksStart: (at) => motionBlocksStart(motion, at),
       hadVehicle: (from, to) => {
         if (!motion.some((event) => event.at < from)) return null;
         if (motionActivityAt(motion, from) === "vehicle") return true;

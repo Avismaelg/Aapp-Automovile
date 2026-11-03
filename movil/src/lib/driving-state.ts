@@ -6,8 +6,9 @@
 export const DRIVING_START_KMH = 15;
 // Por debajo de esta velocidad cuenta como parado.
 export const DRIVING_STOP_KMH = 5;
-// Parado durante este tiempo (semáforos y atascos no cuentan) se apaga.
-export const DRIVING_IDLE_MS = 4 * 60 * 1000;
+// Parado durante este tiempo se apaga. Un tapón en la Máximo Gómez pasa
+// de 4 min sin moverse: con 4 min se apagaba y la ruta se quedaba sin puntos.
+export const DRIVING_IDLE_MS = 10 * 60 * 1000;
 
 export type DrivingTracker = { active: boolean; lastMovingAt: number | null };
 

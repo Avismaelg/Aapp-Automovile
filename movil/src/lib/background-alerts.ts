@@ -154,6 +154,8 @@ export async function checkBackgroundAlerts(now = Date.now()) {
     if (!accountId) return;
     const permission = await Notifications.getPermissionsAsync();
     if (!permission.granted) return;
+    // En segundo plano la sesión no se renueva sola (ver src/lib/supabase.ts).
+    await supabase?.auth.getSession();
     const candidates = await collect(accountId);
     const { show, seen } = alertsToShow(candidates, await seenIds());
     if (show.length === 0) return;

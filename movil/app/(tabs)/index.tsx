@@ -468,6 +468,15 @@ export default function NavigationScreen() {
     return () => subscription.remove();
   }, [ensureFollowing]);
 
+  // Con la app abierta Android también puede pausar el GPS sin avisar: si la
+  // posición se queda vieja, se pide otra sin tener que reabrir la app.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active") refreshStaleLocation(30_000);
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Al elegir una ruta (o cambiar de destino) la cámara se centra en el coche.
   const destinationKey = destination
     ? `${destination.latitude.toFixed(5)},${destination.longitude.toFixed(5)}`
