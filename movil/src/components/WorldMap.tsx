@@ -1218,6 +1218,7 @@ const MembersSource = memo(function MembersSource({
           initials: initials(member.name),
           name: member.name.split(" ")[0],
           talking: Boolean(member.isTalking),
+          stale: Boolean(member.stale),
         },
         geometry: {
           type: "Point",
@@ -1276,7 +1277,13 @@ const MembersSource = memo(function MembersSource({
         id="caravana-member-dots"
         filter={["!", ["has", "point_count"]]}
         style={{
-          circleColor: ["to-color", ["get", "color"]],
+          circleColor: [
+            "case",
+            ["==", ["get", "stale"], true],
+            "#5c5c66",
+            ["to-color", ["get", "color"]],
+          ],
+          circleOpacity: ["case", ["==", ["get", "stale"], true], 0.75, 1],
           circleRadius: 14,
           circleStrokeColor: [
             "case",

@@ -31,6 +31,13 @@ export const MEMBER_HIDE_MS = 30 * 60_000;
 // Posiciones con más error que esto no se comparten con la app abierta.
 export const LIVE_SHARE_MAX_ACCURACY_M = 100;
 
+// Con noticias en el último minuto y medio: en vivo (si no, en gris).
+export function isMemberLive(lastSeenAt: string | null, now: number) {
+  if (!lastSeenAt) return false;
+  const at = Date.parse(lastSeenAt);
+  return Number.isFinite(at) && now - at <= MEMBER_STALE_MS;
+}
+
 export function isMemberOnMap(lastSeenAt: string | null, now: number) {
   if (!lastSeenAt) return false;
   const at = Date.parse(lastSeenAt);

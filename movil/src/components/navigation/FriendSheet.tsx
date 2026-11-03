@@ -16,9 +16,12 @@ export function FriendSheet({
   onFollow,
   onProfile,
   onClose,
+  details,
 }: {
   friend: WorldMapMember;
   status?: string;
+  // MAPA-22: @apodo, vehículo principal y distancia.
+  details?: string;
   inviteLabel?: string;
   inviting?: boolean;
   onInvite: () => void;
@@ -51,6 +54,11 @@ export function FriendSheet({
             <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
               {friend.name}
             </AppText>
+            {details ? (
+              <AppText variant="caption" color={chrome.textSoft} numberOfLines={1}>
+                {details}
+              </AppText>
+            ) : null}
             <AppText variant="caption" color={chrome.muted}>
               {onProfile ? `${status} · ${t('Ver perfil')}` : status}
             </AppText>

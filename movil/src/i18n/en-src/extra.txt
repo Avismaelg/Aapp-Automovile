@@ -192,3 +192,6 @@
 =el modelo|the model
 =la marca|the make
 =Necesitamos permiso para usar la cámara.|We need permission to use the camera.
+=AJUSTES|SETTINGS
+=Modo fantasma activado: tus amigos no te ven|Ghost mode on: your friends can't see you
+=Activar modo fantasma|Turn on ghost mode

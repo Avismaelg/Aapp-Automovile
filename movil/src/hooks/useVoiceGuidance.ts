@@ -7,12 +7,14 @@ import type { RouteInstruction } from '@/src/lib/map-html';
 
 type Upcoming = (RouteInstruction & { remainingM: number }) | null;
 
-// Avisos a ~800 m (solo en vías rápidas), ~300 m y en el punto de la maniobra.
-// Cada aviso se dice una sola vez por maniobra.
-function stageFor(remainingM: number, speedKmh: number) {
-  if (remainingM <= 60) return 3;
-  if (remainingM <= 300) return 2;
-  if (remainingM <= 800 && speedKmh >= 60) return 1;
+// MAPA-15: avisos a 500 m, 200 m y «ahora» (en el punto de la maniobra). En
+// vías rápidas el «ahora» se adelanta un poco para que dé tiempo. Cada aviso
+// se dice una sola vez por maniobra.
+export function stageFor(remainingM: number, speedKmh: number) {
+  const nowM = speedKmh >= 70 ? 80 : 40;
+  if (remainingM <= nowM) return 3;
+  if (remainingM <= 200) return 2;
+  if (remainingM <= 500) return 1;
   return 0;
 }
 

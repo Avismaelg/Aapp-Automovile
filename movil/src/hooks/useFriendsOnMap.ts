@@ -6,6 +6,7 @@ import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriends } from '@/src/hooks/useFriends';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import {
+  FRIEND_LIVE_MS,
   latestFriendPositions,
   SHARE_OUTSIDE_PARTY,
   type FriendLocationRow,
@@ -109,10 +110,11 @@ export function useFriendsOnMap() {
           longitude: position.longitude,
           updatedAt: position.updatedAt,
           isTalking: false,
+          stale: now - position.updatedAt > FRIEND_LIVE_MS,
         },
       ];
     });
-  }, [isDemo, me.username, friends, positionsQuery.data]);
+  }, [isDemo, me.username, friends, positionsQuery.data, now]);
 
   return {
     members,

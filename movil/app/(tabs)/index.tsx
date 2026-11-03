@@ -6,6 +6,7 @@ import {
   AccessibilityInfo,
   Alert,
   AppState,
+  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -37,6 +38,7 @@ import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
+import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
@@ -64,6 +66,7 @@ import {
   followDestination,
   followStatus,
   destinationKey as convoyDestinationKey,
+  isMemberLive,
   isMemberOnMap,
   LIVE_SHARE_MAX_ACCURACY_M,
   sameDestination,
@@ -103,6 +106,11 @@ import { displaySpeed, formatDistance, getLocale, speechLanguage, speedUnit, t }
 // La intro (galaxia → globo → tu calle) solo al abrir la app, no cada vez que
 // se vuelve a esta pestaña.
 let introPlayed = false;
+// MAPA-16: desvío y recálculo automático.
+const OFF_ROUTE_M = 40;
+const OFF_ROUTE_HOLD_MS = 5_000;
+const REROUTE_EVERY_MS = 8_000;
+
 const INTRO_PLAN = {
   earthAtMs: EARTH_START_MS,
   earthMs: EARTH_MS,
@@ -155,6 +163,7 @@ export default function NavigationScreen() {
               latitude: member.lastLat as number,
               longitude: member.lastLng as number,
               isTalking: false,
+              stale: !isMemberLive(member.lastSeenAt, mapNow),
             }))
         : [],
     [party, isDemo, mapNow],
@@ -242,6 +251,20 @@ export default function NavigationScreen() {
       party?.members.find((member) => member.userId === selectedFriend.id)?.profile.username ??
       null)
     : null;
+  const { vehicles: selectedFriendVehicles } = usePublicProfileVehicles(
+    selectedFriend && !isDemo ? selectedFriend.id : undefined,
+  );
+  const selectedFriendDetails = selectedFriend
+    ? [
+        selectedFriendUsername ? `@${selectedFriendUsername}` : null,
+        selectedFriendVehicles[0]
+          ? `${selectedFriendVehicles[0].make} ${selectedFriendVehicles[0].model}`
+          : null,
+        formatDistance(haversineMeters(live.location, selectedFriend)),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [northUp, setNorthUp] = useState(false);
@@ -403,11 +426,23 @@ export default function NavigationScreen() {
   );
   const progressM = progressState?.progressM ?? null;
   const routeDistanceFromPathM = progressState?.distanceM ?? null;
-  const offRoute = Boolean(
+  // MAPA-16: fuera de la ruta = a más de 40 m durante 5 s (un salto suelto
+  // del GPS no cuenta).
+  const awayFromRoute = Boolean(
     route.route &&
     routeDistanceFromPathM != null &&
-    routeDistanceFromPathM > 80,
+    routeDistanceFromPathM > OFF_ROUTE_M,
   );
+  const [offRouteHeld, setOffRouteHeld] = useState(false);
+  useEffect(() => {
+    if (!awayFromRoute) return;
+    const timer = setTimeout(() => setOffRouteHeld(true), OFF_ROUTE_HOLD_MS);
+    return () => {
+      clearTimeout(timer);
+      setOffRouteHeld(false);
+    };
+  }, [awayFromRoute]);
+  const offRoute = awayFromRoute && offRouteHeld;
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),
     [route.route, progressM],
@@ -910,7 +945,7 @@ export default function NavigationScreen() {
   useEffect(() => {
     if (!navigating || !offRoute || route.isLoading) return;
     const now = Date.now();
-    if (now - lastRerouteAtRef.current < 15_000) return;
+    if (now - lastRerouteAtRef.current < REROUTE_EVERY_MS) return;
     lastRerouteAtRef.current = now;
     retryRoute();
   }, [navigating, offRoute, retryRoute, route.isLoading]);
@@ -1327,7 +1362,17 @@ export default function NavigationScreen() {
                   >
                     {live.message}
                   </AppText>
-                  {live.status !== "locating" ? (
+                  {live.status === "denied" ? (
+                    <Pressable onPress={() => void Linking.openSettings()} hitSlop={8}>
+                      <AppText
+                        variant="label"
+                        color={chrome.accent}
+                        style={styles.retryText}
+                      >
+                        {t('AJUSTES')}
+                      </AppText>
+                    </Pressable>
+                  ) : live.status !== "locating" ? (
                     <Pressable onPress={live.retry} hitSlop={8}>
                       <AppText
                         variant="label"
@@ -1392,6 +1437,12 @@ export default function NavigationScreen() {
                     following={following}
                     onToggleNorth={toggleNorthUp}
                     onRecenter={recenter}
+                    ghost={
+                      SHARE_OUTSIDE_PARTY && !isDemo && friendCount > 0
+                        ? shareWithFriends !== true
+                        : undefined
+                    }
+                    onToggleGhost={() => setShareWithFriends(shareWithFriends !== true)}
                   />
                 </View>
 
@@ -1457,17 +1508,14 @@ export default function NavigationScreen() {
                     }
                     onInvite={() => void inviteToConvoy(selectedFriend)}
                     onChallenge={() => challengeFriend(selectedFriend)}
-                    onFollow={
-                      party?.members.some((member) => member.userId === selectedFriend.id) ||
-                      simMembers.some((member) => member.id === selectedFriend.id)
-                        ? () => {
-                            useFollow
-                              .getState()
-                              .follow({ id: selectedFriend.id, name: selectedFriend.name });
-                            setSelectedFriend(null);
-                          }
-                        : undefined
-                    }
+                    details={selectedFriendDetails}
+                    onFollow={() => {
+                      // MAPA-23: seguir a cualquier amigo visible en el mapa.
+                      useFollow
+                        .getState()
+                        .follow({ id: selectedFriend.id, name: selectedFriend.name });
+                      setSelectedFriend(null);
+                    }}
                     onProfile={
                       selectedFriendUsername
                         ? () => {

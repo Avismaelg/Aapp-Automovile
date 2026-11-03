@@ -8,6 +8,8 @@ export type WorldMapMember = {
   longitude: number;
   isTalking?: boolean;
   battery?: number;
+  // MAPA-21 / CONV-07: sin noticias recientes → en gris («visto hace X»).
+  stale?: boolean;
 };
 
 export type WorldMapDestination = {
