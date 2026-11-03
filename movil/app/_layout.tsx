@@ -27,6 +27,7 @@ import { installErrorLogging } from '@/src/lib/error-log';
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
 import { ConnectionBanner } from '@/src/components/ConnectionBanner';
 import { SignupFollowUp } from '@/src/components/SignupFollowUp';
+import { ConvoyArrivals } from '@/src/components/party/ConvoyArrivals';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { installWebAlert } from '@/src/lib/web-alert';
@@ -191,6 +192,7 @@ export default function RootLayout() {
             </Stack>
             {isAuthenticated ? <PartyInviteBanner /> : null}
             {isAuthenticated ? <SignupFollowUp /> : null}
+            {isAuthenticated ? <ConvoyArrivals /> : null}
             <ConnectionBanner />
           </AppErrorBoundary>
       </SafeAreaProvider>

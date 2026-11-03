@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar } from '@/src/components/ui';
-import { memberLiveLabel } from '@/src/lib/convoy';
+import { convoyMemberLabel } from '@/src/lib/convoy';
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import { colors, radius, spacing } from '@/src/theme';
-import { t } from '@/src/i18n';
+import { formatDistance, t } from '@/src/i18n';
 
 export type DisplayMember = {
   id: string;
@@ -19,6 +19,12 @@ export type DisplayMember = {
   lastSeenAt?: string | null;
   speedKmh?: number | null;
   voiceChannelSlug?: PartyVoiceChannelSlug;
+  role?: 'host' | 'member' | 'sweeper';
+  // CONV-05: ETA y distancia a la meta común.
+  etaS?: number | null;
+  remainingM?: number | null;
+  progressAt?: string | null;
+  arrivedAt?: string | null;
 };
 
 export function PartyMembersRow({
@@ -75,13 +81,18 @@ export function PartyMembersRow({
                 : member.battery != null
                   ? `${member.battery}%`
                   : member.lastSeenAt !== undefined
-                    ? memberLiveLabel(
+                    ? convoyMemberLabel(
                         {
                           lastSeenAt: member.lastSeenAt ?? null,
                           speedKmh: member.speedKmh ?? null,
-                          isMe: member.isMe,
+                          isMe: member.isMe && !member.arrivedAt && member.etaS == null,
+                          etaS: member.etaS ?? null,
+                          remainingM: member.remainingM ?? null,
+                          progressAt: member.progressAt ?? null,
+                          arrivedAt: member.arrivedAt ?? null,
                         },
                         now,
+                        formatDistance,
                       )
                     : t('EN VIVO')}
             </AppText>

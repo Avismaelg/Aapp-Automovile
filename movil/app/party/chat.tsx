@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,7 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthNotice } from '@/src/components/auth';
 import { AppText, Avatar, Button, Card, IconButton, Input } from '@/src/components/ui';
 import { useActiveParty, usePartyMessages, useSendPartyMessage } from '@/src/hooks/useParty';
+import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { errorMessage } from '@/src/lib/alerts';
+import { quickMessages, typingBlocked } from '@/src/lib/party-chat';
+import { useChatRead } from '@/src/store/chat-read';
 import { timeAgo } from '@/src/lib/format';
 import { profileColor } from '@/src/lib/profile-db';
 import { colors, radius, spacing } from '@/src/theme';
@@ -28,6 +32,39 @@ export default function PartyChatScreen() {
   const sendMessage = useSendPartyMessage();
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // CONV-11: lo enviado aparece al momento; si falla, se puede reintentar.
+  const [outbox, setOutbox] = useState<{ key: string; body: string; failed: boolean }[]>([]);
+  // CONV-12: conduciendo no se escribe; de pasajero, sí.
+  const live = useLiveLocation();
+  const [passenger, setPassenger] = useState(false);
+  const blocked = typingBlocked(live.location.speedKmh, passenger);
+  const myEta = party?.members.find((member) => member.isMe)?.etaS ?? null;
+  const quick = quickMessages(myEta != null ? Math.max(1, Math.round(myEta / 60)) : null);
+
+  // CONV-10: al abrir el chat, todo queda leído.
+  const markRead = useChatRead((state) => state.markRead);
+  const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
+  useEffect(() => {
+    if (party && lastId > 0) markRead(party.id, lastId);
+  }, [party, lastId, markRead]);
+
+  const deliver = async (text: string, key: string) => {
+    if (!party) return;
+    setOutbox((list) => [...list.filter((item) => item.key !== key), { key, body: text, failed: false }]);
+    try {
+      await sendMessage.mutateAsync({ partyId: party.id, body: text });
+      setOutbox((list) => list.filter((item) => item.key !== key));
+    } catch (sendError) {
+      setOutbox((list) => list.map((item) => (item.key === key ? { ...item, failed: true } : item)));
+      setError(errorMessage(sendError, t('No pudimos enviar el mensaje.')));
+    }
+  };
+
+  const confirmPassenger = () =>
+    Alert.alert(t('¿Vas de pasajero?'), t('Escribir conduciendo es peligroso. Confírmalo solo si no vas al volante.'), [
+      { text: t('Cancelar'), style: 'cancel' },
+      { text: t('Voy de pasajero'), onPress: () => setPassenger(true) },
+    ]);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -35,16 +72,11 @@ export default function PartyChatScreen() {
   };
 
   const send = async () => {
-    if (!party || !body.trim()) return;
+    if (!party || !body.trim() || blocked) return;
     setError(null);
-    try {
-      await sendMessage.mutateAsync({ partyId: party.id, body });
-      setBody('');
-    } catch (sendError) {
-      setError(
-        errorMessage(sendError, t('No pudimos enviar el mensaje.')),
-      );
-    }
+    const text = body.trim();
+    setBody('');
+    await deliver(text, `${Date.now()}`);
   };
 
   return (
@@ -148,8 +180,51 @@ export default function PartyChatScreen() {
                 </View>
               ))
             )}
+            {outbox.map((item) => (
+              <Pressable
+                key={item.key}
+                style={[styles.messageRow, styles.messageRowMe]}
+                disabled={!item.failed}
+                onPress={() => void deliver(item.body, item.key)}
+                accessibilityRole="button"
+                accessibilityLabel={item.failed ? t('Reintentar envío') : t('Enviando')}
+              >
+                <View style={{ maxWidth: '82%' }}>
+                  <View style={[styles.bubble, styles.bubbleMe, { opacity: item.failed ? 1 : 0.6 }]}>
+                    <AppText variant="body" color={colors.text}>{item.body}</AppText>
+                    <AppText variant="caption" color={item.failed ? colors.danger : 'rgba(255,255,255,0.55)'} style={{ fontSize: 9, marginTop: 3 }}>
+                      {item.failed ? t('No se envió · toca para reintentar') : t('Enviando…')}
+                    </AppText>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
           </ScrollView>
         )}
+
+        {!isDemo && party ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
+            {quick.map((text) => (
+              <Pressable
+                key={text}
+                style={styles.quickChip}
+                onPress={() => void deliver(text, `${Date.now()}-${text}`)}
+                accessibilityRole="button"
+              >
+                <AppText variant="caption" color={colors.text}>{text}</AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+        {blocked ? (
+          <Pressable style={styles.drivingNotice} onPress={confirmPassenger} accessibilityRole="button">
+            <Ionicons name="car-outline" size={16} color={colors.accent} />
+            <AppText variant="caption" color={colors.textSoft} style={{ flex: 1 }}>
+              {t('Conduciendo: usa los mensajes rápidos o la voz.')}
+            </AppText>
+            <AppText variant="caption" color={colors.accent}>{t('Soy pasajero')}</AppText>
+          </Pressable>
+        ) : null}
 
         <View style={styles.composer}>
           <Input
@@ -161,23 +236,19 @@ export default function PartyChatScreen() {
             placeholder={isDemo ? t('El chat real requiere cuenta') : t('Mensaje para la caravana…')}
             multiline
             maxLength={500}
-            editable={!isDemo && Boolean(party)}
+            editable={!isDemo && Boolean(party) && !blocked}
             style={styles.composerInput}
             rightSlot={
               <Pressable
                 onPress={() => void send()}
-                disabled={isDemo || !party || !body.trim() || sendMessage.isPending}
+                disabled={isDemo || !party || !body.trim() || blocked}
                 hitSlop={8}
                 style={[
                   styles.sendButton,
                   (isDemo || !party || !body.trim()) && styles.sendButtonDisabled,
                 ]}
               >
-                {sendMessage.isPending ? (
-                  <ActivityIndicator size="small" color="#120802" />
-                ) : (
-                  <Ionicons name="send" size={16} color="#120802" />
-                )}
+                <Ionicons name="send" size={16} color="#120802" />
               </Pressable>
             }
           />
@@ -188,6 +259,25 @@ export default function PartyChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  quickRow: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  drivingNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   header: {

@@ -39,6 +39,7 @@ import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
 import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
+import { setConvoyProgress } from "@/src/lib/live-share";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
@@ -68,6 +69,7 @@ import {
   destinationKey as convoyDestinationKey,
   isMemberLive,
   isMemberOnMap,
+  reachedConvoyGoal,
   LIVE_SHARE_MAX_ACCURACY_M,
   sameDestination,
   shouldShareMyDestination,
@@ -460,6 +462,24 @@ export default function NavigationScreen() {
       ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
       : null;
 
+  // CONV-04: tu ETA y lo que te queda hasta la meta común viajan con tu
+  // posición (también con la pantalla bloqueada). Solo si vas hacia la meta.
+  const headingToConvoyGoal =
+    Boolean(party) && !isDemo && isNavigating && Boolean(destination) && sameDestination(destination, partyDestination);
+  const convoyArrived =
+    headingToConvoyGoal && reachedConvoyGoal(live.location, partyDestination, remainingRouteM);
+  useEffect(() => {
+    if (!headingToConvoyGoal || remainingRouteM == null || remainingTimeMs == null) {
+      setConvoyProgress(null);
+      return;
+    }
+    setConvoyProgress({
+      etaS: remainingTimeMs / 1000,
+      remainingM: remainingRouteM,
+      arrived: convoyArrived,
+    });
+  }, [headingToConvoyGoal, remainingRouteM, remainingTimeMs, convoyArrived]);
+
   // Calle actual: la del tramo de la ruta o, sin ruta, la que reporta OSM.
   const currentStreet = useMemo(() => {
     const list = route.route?.instructions;
@@ -834,7 +854,10 @@ export default function NavigationScreen() {
   // la app se toma el destino actual como ya compartido: así un destino viejo
   // no pisa el que haya puesto otro piloto mientras tanto.
   const sharedKeyRef = useRef<string | null | undefined>(undefined);
-  const partyIdForShare = party && !isDemo ? party.id : null;
+  // CONV-02: solo el anfitrión o un copiloto cambian el destino del convoy.
+  const canSetConvoyDestination =
+    Boolean(party?.isHost) || party?.members.find((member) => member.isMe)?.role === 'sweeper';
+  const partyIdForShare = party && !isDemo && canSetConvoyDestination ? party.id : null;
   useEffect(() => {
     if (!partyIdForShare) {
       sharedKeyRef.current = undefined;

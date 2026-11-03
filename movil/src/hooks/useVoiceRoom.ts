@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useConvoyVoiceActivity } from '@/src/lib/voice-activity';
 import { PermissionsAndroid, Platform } from 'react-native';
 
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
@@ -7,6 +8,7 @@ import {
   initializeLiveKit,
   Room,
   RoomEvent,
+  Track,
 } from '@/src/lib/livekit';
 import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
@@ -45,6 +47,10 @@ export function useVoiceRoom({
   enabled: boolean;
 }) {
   const roomRef = useRef<Room | null>(null);
+  // CONV-14: manos libres (micrófono abierto) y CONV-15: silenciar a todos.
+  const [handsFree, setHandsFreeState] = useState(false);
+  const [mutedAll, setMutedAll] = useState(false);
+  const mutedAllRef = useRef(false);
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [talking, setTalkingState] = useState(false);
@@ -121,6 +127,14 @@ export function useVoiceRoom({
           .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
             if (!active) return;
             setActiveSpeakerIds(speakers.map((speaker) => speaker.identity));
+            const localId = room?.localParticipant.identity;
+            useConvoyVoiceActivity.setState({
+              othersSpeaking: speakers.some((speaker) => speaker.identity !== localId),
+            });
+          })
+          .on(RoomEvent.TrackPublished, (publication) => {
+            // Con «silenciar a todos», quien entra tampoco se oye.
+            if (mutedAllRef.current && publication.kind === Track.Kind.Audio) publication.setSubscribed(false);
           })
           .on(RoomEvent.Disconnected, () => {
             if (!active) return;
@@ -204,7 +218,29 @@ export function useVoiceRoom({
     }
   }, []);
 
+  const setHandsFree = useCallback(
+    async (next: boolean) => {
+      setHandsFreeState(next);
+      await setTalking(next);
+    },
+    [setTalking],
+  );
+
+  const setMuteAll = useCallback((next: boolean) => {
+    mutedAllRef.current = next;
+    setMutedAll(next);
+    const room = roomRef.current;
+    if (!room) return;
+    room.remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((publication) => publication.setSubscribed(!next));
+    });
+  }, []);
+
   return {
+    handsFree: enabled && partyId ? handsFree : false,
+    setHandsFree,
+    mutedAll,
+    setMuteAll,
     status: enabled && partyId ? status : 'idle',
     error: enabled && partyId ? error : null,
     talking: enabled && partyId ? talking : false,

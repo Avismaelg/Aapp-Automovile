@@ -234,3 +234,79 @@ export function followStatus(me: Point, target: Point | null, lastSeenAt: string
   if (meters <= FOLLOW_CAUGHT_M) return t('a tu lado');
   return meters < 1000 ? t('a {0} m', Math.round(meters / 10) * 10) : t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
 }
+
+// ---------------------------------------------------------------------------
+// Llegada de cada miembro a la meta común (CONV-04…CONV-06)
+// ---------------------------------------------------------------------------
+
+// A menos de esto de la meta se cuenta como llegado.
+export const CONVOY_ARRIVE_M = 50;
+// La ETA publicada vale este tiempo; más vieja no se muestra.
+export const ETA_FRESH_MS = 2 * 60_000;
+
+export type ConvoyProgress = {
+  etaS: number | null;
+  remainingM: number | null;
+  progressAt: string | null;
+  arrivedAt: string | null;
+};
+
+export function hasFreshEta(member: ConvoyProgress, now: number) {
+  if (member.etaS == null || !member.progressAt) return false;
+  const at = Date.parse(member.progressAt);
+  return Number.isFinite(at) && now - at <= ETA_FRESH_MS;
+}
+
+// Etiqueta del panel: «LLEGÓ», «LLEGA EN 7 MIN · 3,2 KM» o el estado en vivo.
+export function convoyMemberLabel(
+  member: ConvoyProgress & { lastSeenAt: string | null; speedKmh: number | null; isMe?: boolean },
+  now: number,
+  formatRemaining: (meters: number) => string,
+) {
+  if (member.arrivedAt) return t('LLEGÓ');
+  if (hasFreshEta(member, now)) {
+    const minutes = Math.max(1, Math.round((member.etaS as number) / 60));
+    const left = member.remainingM != null ? ` · ${formatRemaining(member.remainingM).toUpperCase()}` : '';
+    return `${t('LLEGA EN {0} MIN', minutes)}${left}`;
+  }
+  return memberLiveLabel(member, now);
+}
+
+// CONV-05: primero quien ya llegó (por orden de llegada), luego por ETA y al
+// final quien no publica ETA (en el orden en que estaba).
+export function sortByArrival<T extends ConvoyProgress>(members: T[], now: number): T[] {
+  return members
+    .map((member, index) => ({ member, index }))
+    .sort((a, b) => {
+      const arrivedA = a.member.arrivedAt ? Date.parse(a.member.arrivedAt) : null;
+      const arrivedB = b.member.arrivedAt ? Date.parse(b.member.arrivedAt) : null;
+      if (arrivedA != null || arrivedB != null) {
+        if (arrivedA == null) return 1;
+        if (arrivedB == null) return -1;
+        return arrivedA - arrivedB;
+      }
+      const etaA = hasFreshEta(a.member, now) ? (a.member.etaS as number) : null;
+      const etaB = hasFreshEta(b.member, now) ? (b.member.etaS as number) : null;
+      if (etaA != null && etaB != null) return etaA - etaB;
+      if (etaA != null) return -1;
+      if (etaB != null) return 1;
+      return a.index - b.index;
+    })
+    .map(({ member }) => member);
+}
+
+// ¿Has llegado a la meta común? Por la ruta restante o, sin ruta, por la
+// distancia en línea recta.
+export function reachedConvoyGoal(position: Point, goal: Point | null, remainingRouteM: number | null) {
+  if (!goal) return false;
+  if (remainingRouteM != null && remainingRouteM <= CONVOY_ARRIVE_M) return true;
+  return metersBetween(position, goal) <= CONVOY_ARRIVE_M;
+}
+
+// Miembros que acaban de llegar (para avisar una sola vez a cada uno).
+export function newArrivals<T extends { userId: string; arrivedAt: string | null; isMe?: boolean }>(
+  previous: Map<string, string | null>,
+  members: T[],
+): T[] {
+  return members.filter((member) => member.arrivedAt && !member.isMe && !previous.get(member.userId));
+}

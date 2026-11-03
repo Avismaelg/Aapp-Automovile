@@ -25,7 +25,15 @@ import { WorldMap } from '@/src/components/WorldMap';
 import { AppText, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
+import {
+  useActiveParty,
+  useLeaveParty,
+  usePartyHostActions,
+  usePartyMessages,
+  useSetVoiceChannel,
+} from '@/src/hooks/useParty';
+import { unreadCount } from '@/src/lib/party-chat';
+import { useChatRead } from '@/src/store/chat-read';
 import { showError } from '@/src/lib/alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
@@ -34,7 +42,7 @@ import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { useNow } from '@/src/hooks/useNow';
-import { isMemberOnMap, MEMBER_STALE_MS } from '@/src/lib/convoy';
+import { isMemberOnMap, MEMBER_STALE_MS, sortByArrival } from '@/src/lib/convoy';
 import { useSimulator } from '@/src/lib/simulator';
 import { useFollow } from '@/src/store/follow';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
@@ -57,6 +65,11 @@ export default function PartyScreen() {
   const simParty = useSimulator((state) => state.party) && !party;
   const isDemo = demoAccount || simParty;
   const leaveParty = useLeaveParty();
+  const hostActions = usePartyHostActions();
+  // CONV-10: mensajes sin leer del chat.
+  const { messages: chatMessages } = usePartyMessages(isDemo ? undefined : party?.id);
+  const lastRead = useChatRead((state) => (party ? state.lastRead[party.id] : undefined));
+  const unread = unreadCount(chatMessages, lastRead);
   const mapNow = useNow();
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
@@ -92,7 +105,7 @@ export default function PartyScreen() {
         voiceChannelSlug: partyVoiceChannels[index % partyVoiceChannels.length].slug,
       }));
     }
-    return (party?.members ?? []).map((member) => ({
+    const list = (party?.members ?? []).map((member) => ({
       id: member.userId,
       name: member.profile.displayName,
       username: member.profile.username,
@@ -104,7 +117,14 @@ export default function PartyScreen() {
       lastSeenAt: member.lastSeenAt,
       speedKmh: member.speedKmh,
       voiceChannelSlug: member.voiceChannelSlug,
+      role: member.role,
+      etaS: member.etaS,
+      remainingM: member.remainingM,
+      progressAt: member.progressAt,
+      arrivedAt: member.arrivedAt,
     }));
+    // CONV-05: quien llega antes, primero.
+    return sortByArrival(list, mapNow);
   }, [
     currentUser.username,
     isDemo,
@@ -113,6 +133,7 @@ export default function PartyScreen() {
     party,
     voice.activeSpeakerIds,
     voice.talking,
+    mapNow,
   ]);
 
   const mapMembers = useMemo(
@@ -348,8 +369,42 @@ export default function PartyScreen() {
       ...(!isDemo && !simParty && member.username
         ? [{ text: t('Ver perfil'), onPress: () => router.push(`/u/${member.username}`) }]
         : []),
+      ...(party?.isHost && !isDemo && !member.isMe ? hostOptions(member) : []),
       { text: t('Cancelar'), style: 'cancel' as const },
     ]);
+  };
+
+  // CONV-08 / CONV-02: el anfitrión expulsa y nombra copilotos (pueden
+  // cambiar el destino del convoy).
+  const hostOptions = (member: DisplayMember) => {
+    if (!party) return [];
+    const first = member.name.split(' ')[0];
+    const copilot = member.role === 'sweeper';
+    return [
+      {
+        text: copilot ? t('Quitar copiloto a {0}', first) : t('Hacer copiloto a {0}', first),
+        onPress: () =>
+          void hostActions.setRole
+            .mutateAsync({ partyId: party.id, userId: member.id, role: copilot ? 'member' : 'sweeper' })
+            .catch((error) => showError(t('No pudimos cambiarlo'), error)),
+      },
+      {
+        text: t('Expulsar a {0}', first),
+        style: 'destructive' as const,
+        onPress: () =>
+          Alert.alert(t('¿Expulsar a {0}?', first), t('Saldrá del convoy y dejará de ver vuestra ubicación.'), [
+            { text: t('Cancelar'), style: 'cancel' },
+            {
+              text: t('Expulsar'),
+              style: 'destructive',
+              onPress: () =>
+                void hostActions.kick
+                  .mutateAsync({ partyId: party.id, userId: member.id })
+                  .catch((error) => showError(t('No pudimos expulsarle'), error)),
+            },
+          ]),
+      },
+    ];
   };
 
   const leave = async () => {
@@ -382,6 +437,19 @@ export default function PartyScreen() {
           : t('Dejarás de compartir tu ubicación y el chat.'),
       [
         { text: t('Cancelar'), style: 'cancel' },
+        ...(party.isHost && othersRemain
+          ? [
+              {
+                text: t('Terminar para todos'),
+                style: 'destructive' as const,
+                onPress: () =>
+                  void hostActions.endForAll
+                    .mutateAsync({ partyId: party.id })
+                    .then(() => router.replace('/'))
+                    .catch((error) => showError(t('No pudimos terminar el convoy'), error)),
+              },
+            ]
+          : []),
         { text: t('Salir'), style: 'destructive', onPress: () => void perform() },
       ],
     );
@@ -441,6 +509,7 @@ export default function PartyScreen() {
 
   const stopTalking = async () => {
     if (!isDemo) {
+      if (voice.handsFree) return;
       await voice.setTalking(false);
     } else {
       setTalking(false);
@@ -555,7 +624,16 @@ export default function PartyScreen() {
 
         <View style={styles.bottomActions}>
           <Pressable style={styles.bottomAction} onPress={() => router.push('/party/chat')}>
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+            <View>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+              {unread > 0 ? (
+                <View style={styles.unreadBadge}>
+                  <AppText variant="label" color={colors.white} style={{ fontSize: 9 }}>
+                    {unread > 9 ? '9+' : String(unread)}
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
             <AppText variant="caption" color={colors.textSoft}>{t('Chat')}</AppText>
           </Pressable>
           <Pressable
@@ -623,6 +701,18 @@ export default function PartyScreen() {
 }
 
 const styles = StyleSheet.create({
+  unreadBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: { flex: 1, backgroundColor: colors.bg },
   state: {
     flex: 1,

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 
 import { speechLanguage } from '@/src/i18n';
 import { spokenInstruction } from '@/src/lib/route-instructions';
+import { useConvoyVoiceActivity } from '@/src/lib/voice-activity';
 import type { RouteInstruction } from '@/src/lib/map-html';
 
 type Upcoming = (RouteInstruction & { remainingM: number }) | null;
@@ -39,11 +40,28 @@ export function useVoiceGuidance({
     if (stage === 0) return;
     // La llegada la anuncia la pantalla del mapa al terminar la ruta.
     if (upcoming.icon === 'arrive' && stage === 3) return;
-    Speech.stop();
-    Speech.speak(spokenInstruction(upcoming.text, upcoming.remainingM), {
-      language: speechLanguage(),
-      rate: 1.02,
-    });
+    const say = () => {
+      Speech.stop();
+      Speech.speak(spokenInstruction(upcoming.text, upcoming.remainingM), {
+        language: speechLanguage(),
+        rate: 1.02,
+      });
+    };
+    // CONV-15: si habla alguien del convoy, se espera (como mucho 4 s) para no
+    // pisarle; el «ahora» de la maniobra no espera.
+    if (stage === 3 || !useConvoyVoiceActivity.getState().othersSpeaking) {
+      say();
+      return;
+    }
+    let waited = 0;
+    const timer = setInterval(() => {
+      waited += 500;
+      if (!useConvoyVoiceActivity.getState().othersSpeaking || waited >= 4_000) {
+        clearInterval(timer);
+        say();
+      }
+    }, 500);
+    return () => clearInterval(timer);
   }, [enabled, upcoming, speedKmh]);
 
   useEffect(() => {

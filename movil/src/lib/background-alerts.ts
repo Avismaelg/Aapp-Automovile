@@ -16,6 +16,7 @@ const CHECK_EVERY_MS = 60_000;
 const SEEN_KEY = 'caravana-alerts-seen';
 const MAX_SEEN = 150;
 const CHANNEL = 'convoy';
+export const ALERTS_CHANNEL = CHANNEL;
 
 let lastCheck = 0;
 let running = false;

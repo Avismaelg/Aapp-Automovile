@@ -11,7 +11,10 @@ type VoiceRoom = ReturnType<typeof useVoiceRoom>;
 
 type Props = {
   isDemo: boolean;
-  voice: Pick<VoiceRoom, 'status' | 'participantCount' | 'error'>;
+  voice: Pick<
+    VoiceRoom,
+    'status' | 'participantCount' | 'error' | 'handsFree' | 'setHandsFree' | 'mutedAll' | 'setMuteAll'
+  >;
   current: PartyVoiceChannelSlug;
   channelCount: (slug: PartyVoiceChannelSlug) => number;
   onSelect: (slug: PartyVoiceChannelSlug) => void;
@@ -82,6 +85,34 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
           );
         })}
       </ScrollView>
+      {!isDemo && voice.status === 'connected' ? (
+        <View style={styles.toggles}>
+          {/* CONV-14: hablar sin tocar la pantalla (micrófono abierto). */}
+          <Pressable
+            style={[styles.toggle, voice.handsFree && styles.toggleOn]}
+            onPress={() => void voice.setHandsFree(!voice.handsFree)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: voice.handsFree }}
+          >
+            <Ionicons name={voice.handsFree ? 'mic' : 'mic-outline'} size={15} color={voice.handsFree ? colors.accent : colors.muted} />
+            <AppText variant="caption" color={voice.handsFree ? colors.text : colors.textSoft}>
+              {voice.handsFree ? t('Manos libres: micro abierto') : t('Manos libres')}
+            </AppText>
+          </Pressable>
+          {/* CONV-15: silenciar el audio del convoy. */}
+          <Pressable
+            style={[styles.toggle, voice.mutedAll && styles.toggleOn]}
+            onPress={() => voice.setMuteAll(!voice.mutedAll)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: voice.mutedAll }}
+          >
+            <Ionicons name={voice.mutedAll ? 'volume-mute' : 'volume-high-outline'} size={15} color={voice.mutedAll ? colors.accent : colors.muted} />
+            <AppText variant="caption" color={voice.mutedAll ? colors.text : colors.textSoft}>
+              {voice.mutedAll ? t('Convoy silenciado') : t('Silenciar convoy')}
+            </AppText>
+          </Pressable>
+        </View>
+      ) : null}
       {voice.error && !isDemo ? (
         <AppText variant="caption" color={colors.muted} numberOfLines={2}>
           {voice.error}
@@ -100,6 +131,20 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
 }
 
 const styles = StyleSheet.create({
+  toggles: { flexDirection: 'row', gap: 7 },
+  toggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  toggleOn: { borderColor: colors.accent },
   voiceSection: {
     marginTop: spacing.sm,
     gap: 7,
