@@ -32,9 +32,11 @@ Deno.serve(async (request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const livekitUrl = Deno.env.get('LIVEKIT_URL');
-  const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY');
-  const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET');
+  // Los secretos se pegan a mano en el panel: se quitan espacios y el punto o
+  // la barra final («wss://…livekit.cloud.» no conecta).
+  const livekitUrl = Deno.env.get('LIVEKIT_URL')?.trim().replace(/[./\s]+$/, '');
+  const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY')?.trim();
+  const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET')?.trim();
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return json({ error: 'Supabase no está configurado en la función.' }, 500);
