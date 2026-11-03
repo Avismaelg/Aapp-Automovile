@@ -412,3 +412,21 @@ Resultado: **11/20 exactos (55 %), 15/20 contando los parciales (75 %)**. Los cr
 | Retos (8) | 2 | 5 | 1 | 0 |
 | Sync (10) | 0 | 5 | 4 | 1 |
 | **Total (75)** | **13** | **44** | **14** | **4** |
+
+
+### Avance de la fase 3 (2026-11-03)
+
+Hecho en código y con prueba Jest. Falta la prueba en dispositivos (guion de la sección 5).
+
+| Área | Criterios | Commit | Pruebas |
+|---|---|---|---|
+| Búsqueda y rutas | MAPA-02 (Google Places por Edge Function `places`, con tope de 300 al día; ⛔ falta tu `GOOGLE_MAPS_API_KEY`), MAPA-12 (Mapbox `driving-traffic`, luego GraphHopper, OSRM y línea directa) | `15cddf7` | `google-places.test.ts`, `route-stops.test.ts` |
+| Actualización automática | SYNC-01…05, SYNC-07, SYNC-09 (sondeo de 5 s en la pantalla visible, `focusManager` y `onlineManager` con NetInfo, deslizar para recargar, aviso de conexión). SYNC-08 ⛔: necesita una cuenta EAS. | `765b9f4` | `sync-refresh.test.ts` |
+| Registro | REG-01…REG-13 (3 pasos; apodo en vivo; aviso de correo ya registrado; fortaleza de la contraseña; vehículo obligatorio creado en el trigger del alta; foto opcional subida al tener sesión; borrador sin contraseña; reenviar el correo; aviso a cuentas sin vehículo) | `ab8de97` | `signup.test.ts` |
+| Navegación | MAPA-15 (500 m, 200 m y «ahora»), MAPA-16 (40 m durante 5 s), MAPA-20 (modo fantasma), MAPA-21 (en gris), MAPA-22/23 (ficha completa; seguir a cualquier amigo), MAPA-27 (Ajustes) | `8ae7703` | `convoy-five.test.ts` |
+| Convoy | CONV-02, CONV-04…CONV-08, CONV-10…CONV-12, CONV-14, CONV-15 | `e346b44` | `convoy-amendment.test.ts` |
+| Retos | RETO-01, RETO-03, RETO-04, RETO-06…RETO-08 | `1457938` | `challenge-amendment.test.ts` |
+
+**Sigue pendiente:**
+- **Sin hacer o a medias:** MAPA-06 (ajuste a la calle), MAPA-10/11/25/26 (rendimiento y batería, que se miden en el dispositivo), MAPA-24 (push con la app cerrada, que necesita FCM), MAPA-28 (aviso sin conexión dentro del mapa) y RETO-05 (clasificación por ETA real: hoy es por avance).
+- **Depende de pasos tuyos:** CONV-13/16 (voz bloqueada hasta corregir el secret de LiveKit), SYNC-08 (cuenta EAS) y el benchmark contra Waze (2.F) en el teléfono.
