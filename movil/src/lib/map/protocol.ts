@@ -50,7 +50,7 @@ export type WorldMapRoute = {
   coordinates: [number, number][];
   distanceM: number;
   timeMs: number;
-  source: 'graphhopper' | 'osrm' | 'fallback';
+  source: 'mapbox' | 'graphhopper' | 'osrm' | 'fallback';
   instructions?: RouteInstruction[];
 };
 

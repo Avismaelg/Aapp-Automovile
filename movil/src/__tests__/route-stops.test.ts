@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { metersBetween, type Point } from '@/src/lib/convoy';
-import { graphHopperParams, osrmUrl } from '@/src/lib/graphhopper';
+import { graphHopperParams, mapboxDirectionsUrl, osrmUrl } from '@/src/lib/graphhopper';
 import { instructionsFromOsrm, STOP_TEXT } from '@/src/lib/route-instructions';
 import { bestStopIndex, insertStop, MAX_STOPS, reachedNextStop, STOP_REACHED_M } from '@/src/lib/stops';
 
@@ -117,5 +117,17 @@ describe('añadir parada en la ruta', () => {
     // Pero no a 400 m (otra calle).
     const farther = { latitude: 18.4537 + 400 / 110_540, longitude: -69.6111 };
     expect(reachedNextStop(farther, [station], 90)).toBe(false);
+  });
+});
+
+describe('MAPA-12: rutas con tráfico de Mapbox', () => {
+  it('usa el perfil con tráfico, pide alternativas sin paradas y no con ellas', () => {
+    const plain = mapboxDirectionsUrl(HOME, LA_ROMANA);
+    expect(plain).toContain('/mapbox/driving-traffic/');
+    expect(plain).toContain('alternatives=true');
+    expect(plain).toContain('steps=true');
+    const withStop = mapboxDirectionsUrl(HOME, LA_ROMANA, [BOCA_CHICA]);
+    expect(withStop).toContain('alternatives=false');
+    expect(withStop.split('driving-traffic/')[1].split('?')[0].split(';')).toHaveLength(3);
   });
 });

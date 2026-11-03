@@ -11,6 +11,7 @@ import {
   rankPlaces,
   searchCategory,
   searchKnownPlaces,
+  resolvePlace,
   searchPlaces,
   type SearchPlace,
   type StopCategory,
@@ -155,8 +156,14 @@ export default function DestinationScreen() {
     }
   };
 
-  const selectPlace = (place: SearchPlace) =>
-    choose({ latitude: place.latitude, longitude: place.longitude, label: place.name });
+  const selectPlace = async (place: SearchPlace) => {
+    try {
+      const resolved = await resolvePlace(place);
+      choose({ latitude: resolved.latitude, longitude: resolved.longitude, label: resolved.name });
+    } catch {
+      setSearchError(t('No pudimos abrir ese lugar. Prueba otra vez.'));
+    }
+  };
 
   if (isSharedRoute) {
     return (
@@ -295,7 +302,7 @@ export default function DestinationScreen() {
           }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => selectPlace(item)}
+              onPress={() => void selectPlace(item)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={t('Ir a {0}', item.name)}

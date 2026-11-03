@@ -17,7 +17,7 @@ import { errorMessage } from '@/src/lib/alerts';
 import { fetchRouteThrough } from '@/src/lib/event-routes';
 import { parseEventStart, type EventRoute } from '@/src/lib/events';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
-import { formatSearchDistance, searchPlaces, type SearchPlace } from '@/src/lib/place-search';
+import { formatSearchDistance, resolvePlace, searchPlaces, type SearchPlace } from '@/src/lib/place-search';
 import { useCreateEvent } from '@/src/hooks/useEvents';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { colors, radius, spacing } from '@/src/theme';
@@ -134,9 +134,16 @@ export default function NewEventScreen() {
     }, 300);
   }, []);
 
-  const addPoint = (place: SearchPlace) => {
+  const addPoint = async (choice: SearchPlace) => {
     if (points.length >= MAX_POINTS) {
       setFormError(t('Máximo {0} puntos por evento.', MAX_POINTS));
+      return;
+    }
+    let place = choice;
+    try {
+      place = await resolvePlace(choice);
+    } catch {
+      setSearchError(t('No pudimos abrir ese lugar. Prueba otra vez.'));
       return;
     }
     const next = [...points, place];
@@ -314,7 +321,7 @@ export default function NewEventScreen() {
                   visibleResults.slice(0, 6).map((place) => (
                     <Pressable
                       key={place.id}
-                      onPress={() => addPoint(place)}
+                      onPress={() => void addPoint(place)}
                       style={({ pressed }) => [styles.resultRow, pressed && { opacity: 0.7 }]}
                     >
                       <Ionicons name="location-outline" size={14} color={colors.accent} />

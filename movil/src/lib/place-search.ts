@@ -3,6 +3,7 @@ import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { getLanguage, t } from '@/src/i18n';
 import { NOMINATIM_URL, PHOTON_URL } from '@/src/lib/providers';
+import { googleAutocomplete, googlePlaceLocation, type GooglePlace } from '@/src/lib/google-places';
 
 export type SearchPlace = {
   id: string;
@@ -15,6 +16,9 @@ export type SearchPlace = {
   // escrito (0–1).
   importance?: number;
   match?: number;
+  // Resultado de Google: las coordenadas se piden al elegirlo
+  // (resolvePlace), latitude/longitude valen NaN hasta entonces.
+  placeId?: string;
 };
 
 type LatLng = { latitude: number; longitude: number };
@@ -473,6 +477,33 @@ const CACHE_TTL_MS = 10 * 60_000;
 const CACHE_SIZE = 40;
 const cache = new Map<string, { at: number; places: SearchPlace[] }>();
 
+// Google primero (la misma fuente que Waze, mucho más completa en RD). Los
+// lugares del listado de RD que coinciden casi exactos van delante; el resto
+// de Google mantiene su orden.
+export function mergeGoogleResults(google: GooglePlace[], known: SearchPlace[], limit = 10): SearchPlace[] {
+  const exact = known.filter((place) => (place.match ?? 0) >= 0.95);
+  const seen = new Set(exact.map((place) => normalizeText(place.name)));
+  const fromGoogle = google
+    .filter((place) => place.name && !seen.has(normalizeText(place.name)))
+    .map<SearchPlace>((place) => ({
+      id: `google:${place.placeId}`,
+      placeId: place.placeId,
+      latitude: Number.NaN,
+      longitude: Number.NaN,
+      name: place.name,
+      detail: place.detail,
+      distanceM: place.distanceM,
+    }));
+  return [...exact, ...fromGoogle].slice(0, limit);
+}
+
+// Coordenadas de un resultado (los de Google se piden al elegirlos).
+export async function resolvePlace(place: SearchPlace): Promise<SearchPlace> {
+  if (!place.placeId) return place;
+  const location = await googlePlaceLocation(place.placeId);
+  return { ...place, latitude: location.latitude, longitude: location.longitude };
+}
+
 export async function searchPlaces(
   query: string,
   near: LatLng | null,
@@ -484,6 +515,20 @@ export async function searchPlaces(
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.places;
   const known = searchKnownPlaces(q, near);
+
+  try {
+    const google = await googleAutocomplete(q, near);
+    if (signal.aborted) throw new Error('aborted');
+    if (google.length > 0) {
+      const places = mergeGoogleResults(google, known);
+      if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+      cache.set(cacheKey, { at: Date.now(), places });
+      return places;
+    }
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // Sin Google (no desplegado, sin clave, tope del día o sin red): Photon.
+  }
 
   const nearby = new URLSearchParams({ q, limit: '15' });
   if (near) {

@@ -4,7 +4,14 @@ import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
 import { formatDistance, getLanguage, t } from '@/src/i18n';
-import { GRAPHHOPPER_TIMEOUT_MS, OSRM_TIMEOUT_MS, OSRM_URL } from '@/src/lib/providers';
+import {
+  GRAPHHOPPER_TIMEOUT_MS,
+  MAPBOX_DIRECTIONS_TIMEOUT_MS,
+  MAPBOX_DIRECTIONS_URL,
+  MAPBOX_TOKEN,
+  OSRM_TIMEOUT_MS,
+  OSRM_URL,
+} from '@/src/lib/providers';
 
 const GRAPHHOPPER_URL = (process.env.EXPO_PUBLIC_GRAPHHOPPER_URL ?? '').replace(/\/+$/, '');
 const GRAPHHOPPER_API_KEY = process.env.EXPO_PUBLIC_GRAPHHOPPER_API_KEY ?? '';
@@ -174,14 +181,14 @@ type OsrmResponse = {
 // Servidor público de demostración de OSRM: rutas reales por calle sin API key.
 // Para producción conviene GraphHopper propio o un OSRM hospedado.
 
-function routeFromOsrm(route: OsrmRoute): WorldMapRoute | null {
+function routeFromOsrm(route: OsrmRoute, source: 'osrm' | 'mapbox' = 'osrm'): WorldMapRoute | null {
   const coordinates = validLatLng(route.geometry?.coordinates);
   if (coordinates.length < 2) return null;
   return {
     coordinates: compactRouteCoordinates(coordinates),
     distanceM: route.distance,
     timeMs: route.duration * 1000,
-    source: 'osrm',
+    source,
     instructions: instructionsFromOsrm(route.legs?.flatMap((leg) => leg.steps ?? []) ?? []),
   };
 }
@@ -219,7 +226,7 @@ export async function fetchOsrmRoutes({
   }
 
   const routes = data.routes
-    .map(routeFromOsrm)
+    .map((route) => routeFromOsrm(route))
     .filter((route): route is WorldMapRoute => route !== null);
   if (routes.length === 0) {
     throw new Error(t('OSRM devolvió una ruta vacía.'));
@@ -227,8 +234,56 @@ export async function fetchOsrmRoutes({
   return routes;
 }
 
+export const isMapboxDirectionsConfigured = MAPBOX_TOKEN.startsWith('pk.');
+
+// Mapbox con tráfico en vivo. Responde en el mismo formato que OSRM (pasos con
+// maniobra y nombre de calle), así que se reutiliza su conversión.
+export function mapboxDirectionsUrl(origin: GeoPoint, destination: GeoPoint, stops: GeoPoint[] = []) {
+  const path = [origin, ...stops, destination]
+    .map((point) => `${point.longitude.toFixed(6)},${point.latitude.toFixed(6)}`)
+    .join(';');
+  const params = [
+    'overview=full',
+    'geometries=geojson',
+    'steps=true',
+    `alternatives=${stops.length === 0 ? 'true' : 'false'}`,
+    'continue_straight=false',
+    `language=${getLanguage()}`,
+    `access_token=${encodeURIComponent(MAPBOX_TOKEN)}`,
+  ];
+  return `${MAPBOX_DIRECTIONS_URL}/mapbox/driving-traffic/${path}?${params.join('&')}`;
+}
+
+export async function fetchMapboxRoutes({
+  origin,
+  destination,
+  stops = [],
+  signal,
+}: {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  stops?: GeoPoint[];
+  signal?: AbortSignal;
+}): Promise<WorldMapRoute[]> {
+  if (!isMapboxDirectionsConfigured) throw new Error(t('Mapbox no está configurado.'));
+  const response = await fetchWithTimeout(
+    mapboxDirectionsUrl(origin, destination, stops),
+    { signal, headers: { Accept: 'application/json' } },
+    MAPBOX_DIRECTIONS_TIMEOUT_MS,
+  );
+  const data = (await response.json()) as OsrmResponse & { message?: string };
+  if (!response.ok || data.code !== 'Ok' || !data.routes?.[0]) {
+    throw new Error(data.message || t('Mapbox no devolvió una ruta válida.'));
+  }
+  const routes = data.routes
+    .map((route) => routeFromOsrm(route, 'mapbox'))
+    .filter((route): route is WorldMapRoute => route !== null);
+  if (routes.length === 0) throw new Error(t('Mapbox no devolvió una ruta válida.'));
+  return routes;
+}
+
 // Rutas posibles ordenadas de la más rápida a la más lenta (SW-08 / RNF-14):
-// GraphHopper, luego OSRM y, si ninguno responde, la línea directa marcada
+// Mapbox con tráfico, luego GraphHopper, luego OSRM y, si ninguno responde, la línea directa marcada
 // como source «fallback» para que la app avise de que no es una ruta por calles.
 export async function fetchStreetRoutes({
   origin,
@@ -243,6 +298,13 @@ export async function fetchStreetRoutes({
 }): Promise<WorldMapRoute[]> {
   const byTime = (routes: WorldMapRoute[]) =>
     [...routes].sort((a, b) => a.timeMs - b.timeMs).slice(0, MAX_ROUTES);
+  if (isMapboxDirectionsConfigured) {
+    try {
+      return byTime(await fetchMapboxRoutes({ origin, destination, stops, signal }));
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+  }
   if (isGraphHopperConfigured) {
     try {
       return byTime(await fetchGraphHopperRoutes({ origin, destination, stops, signal }));

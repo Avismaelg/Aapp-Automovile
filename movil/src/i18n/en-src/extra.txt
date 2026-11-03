@@ -138,3 +138,7 @@
 =Envía tus rutas, aparcamientos y errores de hoy para revisar qué falló. Solo se envían si eliges dónde compartirlos.|Send today's routes, parking spots and errors so we can see what went wrong. They're only sent if you choose where to share them.
 =Enviar diagnóstico|Send diagnostics
 =No pudimos preparar el diagnóstico|We couldn't prepare the diagnostics
+=Mapbox no está configurado.|Mapbox isn't configured.
+=Mapbox no devolvió una ruta válida.|Mapbox didn't return a valid route.
+=Con tráfico · {0} · {1}|With traffic · {0} · {1}
+=No pudimos abrir ese lugar. Prueba otra vez.|We couldn't open that place. Try again.
