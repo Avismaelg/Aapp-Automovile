@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -56,6 +57,8 @@ type Props = {
   onClose: () => void;
   // RF-15: acceso directo a la party (mapa, chat y PTT) y al reto en curso.
   onOpenParty?: () => void;
+  // CONV-14: botón de hablar al convoy (va junto al de Party).
+  voiceButton?: ReactNode;
   onOpenChallenge?: () => void;
 };
 
@@ -84,6 +87,7 @@ export function NavigationHud({
   onAddStop,
   onClose,
   onOpenParty,
+  voiceButton,
   onOpenChallenge,
 }: Props) {
   const speedNow = Number(speedLabel);
@@ -173,6 +177,7 @@ export function NavigationHud({
             <Ionicons name="flag" size={20} color={chrome.accent} />
           </Pressable>
         ) : null}
+        {voiceButton}
         {onOpenParty ? (
           <Pressable
             style={[styles.roundButton, panel]}

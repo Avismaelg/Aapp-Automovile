@@ -41,7 +41,7 @@ import { confirmResponsibleDriving } from '@/src/hooks/useChallengeScreen';
 import { useChallengeDraft } from '@/src/store/challenge-draft';
 import type { ChallengeCategory } from '@/src/types/models';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
-import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
+import { useConvoyVoice } from '@/src/store/voice';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { useNow } from '@/src/hooks/useNow';
@@ -76,16 +76,10 @@ export default function PartyScreen() {
   const mapNow = useNow();
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState<PartyVoiceChannelSlug | null>(null);
-  // Todos empiezan en «Convoy»: antes se recuperaba el último canal tocado
-  // (aunque fuera de otro día) y cada uno quedaba solo en una sala distinta,
-  // sin oírse. Cambiar de canal es una elección de esta sesión.
-  const voiceChannel = selectedChannel ?? 'convoy';
-  const voice = useVoiceRoom({
-    partyId: party?.id,
-    channelSlug: voiceChannel,
-    enabled: Boolean(party) && !isDemo,
-  });
+  // La voz vive en VoiceHost (raíz de la app): la misma sala que el botón
+  // de hablar del mapa. Todos empiezan en «Convoy».
+  const voice = useConvoyVoice();
+  const voiceChannel = voice.channel;
   // En demo el convoy "empezó" hace activeParty.elapsedSeconds.
   const [demoStartedAt] = useState(() => Date.now() - activeParty.elapsedSeconds * 1000);
   const [recenterToken, setRecenterToken] = useState(0);
@@ -244,7 +238,7 @@ export default function PartyScreen() {
 
   const switchChannel = async (slug: PartyVoiceChannelSlug) => {
     if (slug === voiceChannel) return;
-    setSelectedChannel(slug);
+    voice.setChannel(slug);
     if (isDemo || !party) return;
     try {
       await setVoiceChannel.mutateAsync({ partyId: party.id, channelSlug: slug });

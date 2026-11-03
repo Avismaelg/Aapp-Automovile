@@ -11,6 +11,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -38,6 +39,7 @@ import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
+import { VoicePTT } from "@/src/components/party/VoicePTT";
 import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
 import { setConvoyProgress } from "@/src/lib/live-share";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
@@ -139,6 +141,7 @@ export default function NavigationScreen() {
   const insets = useSafeAreaInsets();
   const me = useCurrentUser();
   const live = useLiveLocation();
+  const { width: windowWidth } = useWindowDimensions();
   const { party, isDemo } = useActiveParty({ poll: true });
   const mapNow = useNow();
   const { vehicles } = useGarageVehicles();
@@ -1123,6 +1126,7 @@ export default function NavigationScreen() {
               onAddStop={addStopHere}
               onClose={clearDestination}
               onOpenParty={party ? () => router.navigate("/(tabs)/party") : undefined}
+              voiceButton={party && !isDemo ? <VoicePTT size={50} /> : undefined}
               onOpenChallenge={
                 racingChallenge
                   ? () => router.push(`/challenge/${racingChallenge.code}` as Href)
@@ -1605,6 +1609,19 @@ export default function NavigationScreen() {
         </View>
       </MapChromeContext.Provider>
 
+      {/* CONV-14: hablar al convoy desde el mapa, encima de la pestaña Party. */}
+      {party && !isDemo && !navigating && !introActive ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.mapPtt,
+            { left: (windowWidth * 2.5) / 6 - 29, bottom: bottomHeight + spacing.md },
+          ]}
+        >
+          <VoicePTT />
+        </View>
+      ) : null}
+
       {introActive ? (
         <GalaxyIntro greeting={introGreeting} onDone={endIntro} />
       ) : null}
@@ -1613,6 +1630,7 @@ export default function NavigationScreen() {
 }
 
 const styles = StyleSheet.create({
+  mapPtt: { position: 'absolute', zIndex: 30 },
   hidden: { opacity: 0 },
   convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm },
   followWaiting: { marginBottom: spacing.sm },

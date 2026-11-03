@@ -20,6 +20,11 @@ type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
 // Fila de aperturas y cierres de la sesión de audio (nunca se cruzan).
 let audioChain: Promise<void> = Promise.resolve();
 
+// Tokens de LiveKit ya pedidos (caducan a las 2 h; se reusan 90 min). Pedir
+// el token a la Edge Function era ~1 s de los ~5 s que tardaba la voz.
+const TOKEN_REUSE_MS = 90 * 60_000;
+const tokenCache = new Map<string, { payload: VoiceTokenResponse; at: number }>();
+
 // Android no da el micrófono sin pedirlo: antes nunca se pedía y el PTT no
 // transmitía nada.
 async function ensureMicrophone() {
@@ -104,13 +109,17 @@ export function useVoiceRoom({
 
       try {
         initializeLiveKit();
-        // La sesión de audio la abre el efecto de abajo, una vez por convoy.
-        await audioChain;
-
-        const { data, error: functionError } = await client.functions.invoke(
-          'livekit-token',
-          { body: { partyId, channelSlug } },
-        );
+        // La sesión de audio (efecto de arriba) y el token van a la vez.
+        const cacheKey = `${partyId}:${channelSlug}`;
+        const cached = tokenCache.get(cacheKey);
+        const fresh = cached && Date.now() - cached.at < TOKEN_REUSE_MS;
+        const [, response] = await Promise.all([
+          audioChain,
+          fresh
+            ? Promise.resolve({ data: cached.payload, error: null })
+            : client.functions.invoke('livekit-token', { body: { partyId, channelSlug } }),
+        ]);
+        const { data, error: functionError } = response;
 
         if (functionError) {
           let message = functionError.message;
@@ -133,6 +142,8 @@ export function useVoiceRoom({
             t('LiveKit no está configurado. Despliega la función livekit-token y sus secretos.'),
           );
         }
+        // El token vale 2 h: se reutiliza al reconectar o volver a este canal.
+        tokenCache.set(cacheKey, { payload, at: cached && fresh ? cached.at : Date.now() });
 
         if (!active) return;
 
@@ -191,6 +202,8 @@ export function useVoiceRoom({
         // Se pide ya, para que el primer PTT no se pierda en el aviso.
         void ensureMicrophone();
       } catch (connectError) {
+        // Un token rechazado o caducado no se vuelve a usar.
+        tokenCache.clear();
         if (!active) return;
         const message =
           connectError instanceof Error

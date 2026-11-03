@@ -28,6 +28,7 @@ import { installErrorLogging } from '@/src/lib/error-log';
 import { ConnectionBanner } from '@/src/components/ConnectionBanner';
 import { SignupFollowUp } from '@/src/components/SignupFollowUp';
 import { ConvoyArrivals } from '@/src/components/party/ConvoyArrivals';
+import { VoiceHost } from '@/src/components/party/VoiceHost';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { installWebAlert } from '@/src/lib/web-alert';
@@ -193,6 +194,7 @@ export default function RootLayout() {
             {isAuthenticated ? <PartyInviteBanner /> : null}
             {isAuthenticated ? <SignupFollowUp /> : null}
             {isAuthenticated ? <ConvoyArrivals /> : null}
+            {isAuthenticated ? <VoiceHost /> : null}
             <ConnectionBanner />
           </AppErrorBoundary>
       </SafeAreaProvider>
