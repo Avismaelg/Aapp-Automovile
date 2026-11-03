@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { QueryClientContext } from '@tanstack/react-query';
-import { use, useState, type ReactNode } from 'react';
+import { use, useState, type ReactNode, type Ref } from 'react';
 import {
   Platform,
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
   type StyleProp,
+  type TextInputInstance,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
@@ -499,6 +500,9 @@ export function Input({
   error,
   ...props
 }: TextInputProps & {
+  // React 19: la ref llega como prop y se pasa al TextInput (foco al
+  // siguiente campo con «Siguiente» en el teclado).
+  ref?: Ref<TextInputInstance>;
   label?: string;
   rightSlot?: ReactNode;
   style?: StyleProp<ViewStyle>;

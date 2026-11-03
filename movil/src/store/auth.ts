@@ -27,11 +27,25 @@ export type AuthResult = {
   needsConfirmation?: boolean;
 };
 
+export type SignUpVehicle = {
+  kind: 'car' | 'motorcycle' | 'ev' | 'truck';
+  make: string;
+  model: string;
+  year: number;
+  color?: string;
+  plate?: string;
+};
+
 type SignUpInput = {
   displayName: string;
   username: string;
   email: string;
   password: string;
+  // REG-01/REG-05: el trigger del alta crea el perfil y el vehículo principal
+  // en la misma transacción que el usuario.
+  firstName?: string;
+  lastName?: string;
+  vehicle?: SignUpVehicle;
 };
 
 type AuthState = {
@@ -42,6 +56,7 @@ type AuthState = {
   initialize: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (input: SignUpInput) => Promise<AuthResult>;
+  resendConfirmation: (email: string) => Promise<AuthResult>;
   continueAsDemo: () => Promise<void>;
   signOut: () => Promise<void>;
   signOutLocal: () => Promise<void>;
@@ -100,7 +115,7 @@ function cleanUsername(value: string) {
   const cleaned = value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_]/g, '')
+    .replace(/[^a-z0-9_.]/g, '')
     .slice(0, 24);
 
   return cleaned.length >= 3 ? cleaned : 'driver';
@@ -330,7 +345,7 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
 
-  signUp: async ({ displayName, username, email, password }) => {
+  signUp: async ({ displayName, username, email, password, firstName, lastName, vehicle }) => {
     if (!supabase) {
       const message = missingConfigMessage();
       set({ error: message });
@@ -347,6 +362,9 @@ export const useAuth = create<AuthState>((set) => ({
           data: {
             display_name: displayName.trim().slice(0, 60),
             username: cleanUsername(username),
+            ...(firstName ? { first_name: firstName.trim().slice(0, 40) } : {}),
+            ...(lastName ? { last_name: lastName.trim().slice(0, 40) } : {}),
+            ...(vehicle ? { vehicle } : {}),
           },
           emailRedirectTo: authCallbackUrl(),
         },
@@ -354,6 +372,14 @@ export const useAuth = create<AuthState>((set) => ({
 
       if (error) {
         const message = friendlyAuthError(error.message);
+        set({ busy: false, error: message });
+        return { ok: false, message };
+      }
+
+      // Con confirmación de correo, Supabase no da error si el correo ya
+      // existe (para no revelarlo): devuelve un usuario sin identidades.
+      if (data.user && data.user.identities?.length === 0) {
+        const message = t('Ese correo ya tiene una cuenta. Inicia sesión.');
         set({ busy: false, error: message });
         return { ok: false, message };
       }
@@ -376,6 +402,18 @@ export const useAuth = create<AuthState>((set) => ({
       set({ busy: false, error: message });
       return { ok: false, message };
     }
+  },
+
+  // REG-11: reenviar el correo de confirmación.
+  resendConfirmation: async (email) => {
+    if (!supabase) return { ok: false, message: missingConfigMessage() };
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: authCallbackUrl() },
+    });
+    if (error) return { ok: false, message: friendlyAuthError(error.message) };
+    return { ok: true };
   },
 
   continueAsDemo: async () => {

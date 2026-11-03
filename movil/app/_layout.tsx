@@ -26,6 +26,7 @@ import { installErrorLogging } from '@/src/lib/error-log';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
 import { ConnectionBanner } from '@/src/components/ConnectionBanner';
+import { SignupFollowUp } from '@/src/components/SignupFollowUp';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { installWebAlert } from '@/src/lib/web-alert';
@@ -189,6 +190,7 @@ export default function RootLayout() {
           </Stack.Protected>
             </Stack>
             {isAuthenticated ? <PartyInviteBanner /> : null}
+            {isAuthenticated ? <SignupFollowUp /> : null}
             <ConnectionBanner />
           </AppErrorBoundary>
       </SafeAreaProvider>

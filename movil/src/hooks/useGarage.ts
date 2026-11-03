@@ -134,6 +134,29 @@ export async function pickVehiclePhoto(): Promise<VehiclePhotoSelection | null> 
   };
 }
 
+// REG-06: la misma foto desde la cámara (recorte 4:3 y compresión).
+export async function takeVehiclePhoto(): Promise<VehiclePhotoSelection | null> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error(t('Necesitamos permiso para usar la cámara.'));
+  }
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 0.7,
+  });
+  if (result.canceled || result.assets.length === 0) return null;
+  const asset = result.assets[0];
+  if (asset.fileSize != null && asset.fileSize > MAX_PHOTO_BYTES) {
+    throw new Error(PHOTO_TOO_LARGE);
+  }
+  return {
+    uri: asset.uri,
+    mimeType: asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg',
+  };
+}
+
 export function useSetVehiclePhoto() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
