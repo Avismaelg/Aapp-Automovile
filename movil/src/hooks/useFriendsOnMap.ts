@@ -14,6 +14,7 @@ import {
 import { profileColor } from '@/src/lib/profile-db';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type MapFriend = WorldMapMember & { username: string; updatedAt?: number };
 
@@ -31,10 +32,11 @@ export function useFriendsOnMap() {
     [friends],
   );
 
+  const livePoll = useLivePoll();
   const positionsQuery = useQuery({
     queryKey: ['friend-positions', friendIds.join(','), account?.id ?? 'guest'],
     enabled: !isDemo && isSupabaseConfigured && friendIds.length > 0,
-    refetchInterval: 15_000,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<Map<string, PositionedFriend>> => {
       if (!supabase) return new Map();
       const [shared, party] = await Promise.all([

@@ -23,6 +23,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 type ChallengeRow = {
   id: string;
@@ -148,9 +149,11 @@ export function useChallenges() {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['challenges', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<RealChallenge[]> => {
       if (!account || !supabase) return [];
 

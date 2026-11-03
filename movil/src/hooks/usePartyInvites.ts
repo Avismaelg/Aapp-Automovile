@@ -14,6 +14,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { uniqueTopic } from '@/src/lib/shared-subscription';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type IncomingPartyInvite = {
   id: string;
@@ -45,9 +46,11 @@ export function useIncomingPartyInvites() {
   const channelId = useId().replace(/:/g, '');
   const enabled = Boolean(account) && !demo && Boolean(supabase);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party-invites', 'incoming', account?.id ?? 'guest'],
     enabled,
+    refetchInterval: livePoll,
     // Sin migración aplicada la tabla no existe: no insistir.
     retry: false,
     queryFn: async (): Promise<IncomingPartyInvite[]> => {
@@ -113,11 +116,12 @@ export function useSentPartyInvites(partyId: string | undefined) {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party-invites', 'sent', partyId ?? 'none'],
     enabled: Boolean(partyId) && Boolean(account) && !demo,
     retry: false,
-    refetchInterval: 15_000,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<SentInvite[]> => {
       if (!partyId || !supabase) return [];
       const { data, error } = await supabase

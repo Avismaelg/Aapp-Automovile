@@ -17,6 +17,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth, type Account } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TOO_LARGE = t('La foto es demasiado grande. Usa una imagen de 8 MB o menos.');
@@ -60,9 +61,11 @@ export function useGarageVehicles() {
     if (demo) void hydrateDemo();
   }, [demo, hydrateDemo]);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['garage', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async () => {
       if (!account || !supabase) return [];
 

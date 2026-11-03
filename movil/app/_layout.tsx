@@ -9,7 +9,8 @@ import {
   BarlowCondensed_700Bold,
   BarlowCondensed_800ExtraBold,
 } from '@expo-google-fonts/barlow-condensed';
-import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import NetInfo from '@react-native-community/netinfo';
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, type Href } from 'expo-router';
@@ -24,6 +25,7 @@ import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
 import { installErrorLogging } from '@/src/lib/error-log';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
+import { ConnectionBanner } from '@/src/components/ConnectionBanner';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
 import { installWebAlert } from '@/src/lib/web-alert';
@@ -41,7 +43,13 @@ installWebAlert();
 
 // Al volver a la app se recargan los datos viejos (amigos, party, perfil,
 // actividad). Antes había que cerrarla y abrirla para verlos al día.
+// SYNC-04: lo mismo al recuperar la conexión (NetInfo → onlineManager).
 if (Platform.OS !== 'web') {
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => {
+      setOnline(state.isConnected !== false && state.isInternetReachable !== false);
+    }),
+  );
   focusManager.setEventListener((setFocused) => {
     const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
     return () => subscription.remove();
@@ -181,6 +189,7 @@ export default function RootLayout() {
           </Stack.Protected>
             </Stack>
             {isAuthenticated ? <PartyInviteBanner /> : null}
+            <ConnectionBanner />
           </AppErrorBoundary>
       </SafeAreaProvider>
     </QueryClientProvider>

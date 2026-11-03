@@ -23,6 +23,7 @@ import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription'
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type PartyRole = 'host' | 'member' | 'sweeper';
 
@@ -189,12 +190,13 @@ export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
   const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
     // Respaldo del tiempo real: si se corta (cobertura, segundo plano), el
-    // destino y las posiciones llegan igual como mucho en 15 s.
-    refetchInterval: (current) => (poll && current.state.data ? 15_000 : false),
+    // destino y las posiciones llegan igual como mucho en 5 s (SYNC-03).
+    refetchInterval: (current) => (current.state.data ? livePoll : false),
     queryFn: async (): Promise<PartyView | null> => {
       if (!account || !supabase) return null;
 
@@ -559,9 +561,11 @@ export function usePartyMessages(partyId: string | undefined) {
   const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party-messages', partyId ?? 'none', demo ? 'demo' : 'supabase'],
     enabled: Boolean(partyId) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<PartyMessageView[]> => {
       if (!partyId || !account || !supabase) return [];
 

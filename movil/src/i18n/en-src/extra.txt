@@ -142,3 +142,5 @@
 =Mapbox no devolvió una ruta válida.|Mapbox didn't return a valid route.
 =Con tráfico · {0} · {1}|With traffic · {0} · {1}
 =No pudimos abrir ese lugar. Prueba otra vez.|We couldn't open that place. Try again.
+=Conectado · actualizando|Connected · updating
+=Sin conexión · se actualiza al volver la red|Offline · updates when you're back online
