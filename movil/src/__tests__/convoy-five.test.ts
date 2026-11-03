@@ -13,7 +13,9 @@ import {
   type LiveFix,
   type PartyDestination,
   type Point,
+  isMemberOnMap,
 } from '@/src/lib/convoy';
+import { setMilesForTests } from '@/src/i18n';
 import { applyMemberPatches, queueMemberPatch, type MemberPatch } from '@/src/lib/party-patch';
 import { matchesSubscription, partySubscriptions } from '@/src/lib/realtime-routing';
 
@@ -375,5 +377,22 @@ describe('convoy de 5 pilotos con retos', () => {
     expect(memberLiveLabel({ lastSeenAt: new Date(now - 4_000).toISOString(), speedKmh: 0 }, now)).toBe('PARADO');
     expect(memberLiveLabel({ lastSeenAt: new Date(now - 5 * 60_000).toISOString(), speedKmh: 50 }, now)).toBe('HACE 5 MIN');
     expect(memberLiveLabel({ lastSeenAt: null, speedKmh: null }, now)).toBe('SIN SEÑAL');
+  });
+
+  it('la velocidad de los demás sale en la unidad del usuario', () => {
+    const now = Date.parse('2026-10-31T15:00:00Z');
+    setMilesForTests(true);
+    try {
+      expect(memberLiveLabel({ lastSeenAt: new Date(now - 4_000).toISOString(), speedKmh: 100 }, now)).toBe('62 MPH');
+    } finally {
+      setMilesForTests(false);
+    }
+  });
+
+  it('un piloto sin noticias hace más de 30 min deja de pintarse en el mapa', () => {
+    const now = Date.parse('2026-10-31T15:00:00Z');
+    expect(isMemberOnMap(new Date(now - 5 * 60_000).toISOString(), now)).toBe(true);
+    expect(isMemberOnMap(new Date(now - 31 * 60_000).toISOString(), now)).toBe(false);
+    expect(isMemberOnMap(null, now)).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar, Button, IconButton } from '@/src/components/ui';
 import { useMapChrome } from '@/src/components/navigation/glass';
@@ -14,6 +14,7 @@ export function FriendSheet({
   onInvite,
   onChallenge,
   onFollow,
+  onProfile,
   onClose,
 }: {
   friend: WorldMapMember;
@@ -24,27 +25,37 @@ export function FriendSheet({
   onChallenge: () => void;
   // Solo si es del convoy (con posición en vivo).
   onFollow?: () => void;
+  // Abre su perfil (tocando la foto o el nombre).
+  onProfile?: () => void;
   onClose: () => void;
 }) {
   const chrome = useMapChrome();
   return (
     <View style={[styles.friendSheet, chrome.surface]}>
       <View style={styles.friendRow}>
-        <Avatar
-          name={friend.name}
-          color={friend.color}
-          size={38}
-          online
-          ring={colors.border}
-        />
-        <View style={styles.friendText}>
-          <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
-            {friend.name}
-          </AppText>
-          <AppText variant="caption" color={chrome.muted}>
-            {status}
-          </AppText>
-        </View>
+        <Pressable
+          style={styles.friendLink}
+          onPress={onProfile}
+          disabled={!onProfile}
+          accessibilityRole="button"
+          accessibilityLabel={t('Ver perfil de {0}', friend.name)}
+        >
+          <Avatar
+            name={friend.name}
+            color={friend.color}
+            size={38}
+            online
+            ring={colors.border}
+          />
+          <View style={styles.friendText}>
+            <AppText variant="bodyStrong" color={chrome.text} numberOfLines={1}>
+              {friend.name}
+            </AppText>
+            <AppText variant="caption" color={chrome.muted}>
+              {onProfile ? `${status} · ${t('Ver perfil')}` : status}
+            </AppText>
+          </View>
+        </Pressable>
         <IconButton
           icon="close"
           size={30}
@@ -103,5 +114,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  friendLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   friendText: { flex: 1 },
 });

@@ -431,6 +431,15 @@ export function useLeaveParty() {
       if (demo) throw new Error(t('Salir de una party real requiere una cuenta.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para salir de la party.'));
 
+      // El servidor pasa el mando al siguiente miembro si sale el anfitrión
+      // (la party solo termina si no queda nadie).
+      const { error: rpcError } = await supabase.rpc('leave_party', { p_party_id: partyId });
+      if (!rpcError) return;
+      if (!/leave_party|function|schema cache/i.test(rpcError.message)) {
+        throw new Error(t('No pudimos salir de la party.'));
+      }
+
+      // Servidor sin la migración nueva: salir como antes.
       const now = new Date().toISOString();
       const { error } = await supabase
         .from('party_members')

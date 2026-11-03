@@ -125,3 +125,13 @@
 =1 viaje en total|1 trip in total
 ={0} viajes en total|{0} trips in total
 =Conducción|Driving
+=El convoy sigue sin ti: el miembro que lleva más tiempo pasa a ser el anfitrión.|The convoy goes on without you: the longest-standing member becomes the host.
+=Eres el último: la party terminará.|You're the last one: the party will end.
+=PARADO|STOPPED
+=La posición de {0} es de hace {1} min|{0}'s position is {1} min old
+=Puede que haya cerrado la app o perdido la señal. Irás a su última posición conocida.|They may have closed the app or lost signal. You'll head to their last known position.
+=Seguir igual|Follow anyway
+=Micrófono para el walkie-talkie|Microphone for the walkie-talkie
+=Caravana usa el micrófono solo mientras mantienes pulsado el botón para hablar.|Caravana only uses the microphone while you hold the talk button.
+=Sin permiso de micrófono no puedes hablar. Actívalo en Ajustes › Apps › Caravana.|Without microphone permission you can't talk. Turn it on in Settings › Apps › Caravana.
+=Ver perfil de {0}|View {0}'s profile

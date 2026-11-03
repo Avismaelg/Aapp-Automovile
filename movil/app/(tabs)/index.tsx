@@ -36,6 +36,7 @@ import { SpeedHud } from "@/src/components/navigation/SpeedHud";
 import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
+import { useNow } from "@/src/hooks/useNow";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
@@ -63,6 +64,8 @@ import {
   followDestination,
   followStatus,
   destinationKey as convoyDestinationKey,
+  isMemberOnMap,
+  LIVE_SHARE_MAX_ACCURACY_M,
   sameDestination,
   shouldShareMyDestination,
 } from "@/src/lib/convoy";
@@ -120,6 +123,7 @@ export default function NavigationScreen() {
   const me = useCurrentUser();
   const live = useLiveLocation();
   const { party, isDemo } = useActiveParty({ poll: true });
+  const mapNow = useNow();
   const { vehicles } = useGarageVehicles();
   const {
     members: realFriends,
@@ -139,7 +143,10 @@ export default function NavigationScreen() {
         ? party.members
             .filter(
               (member) =>
-                !member.isMe && member.lastLat != null && member.lastLng != null,
+                !member.isMe &&
+                member.lastLat != null &&
+                member.lastLng != null &&
+                isMemberOnMap(member.lastSeenAt, mapNow),
             )
             .map((member) => ({
               id: member.userId,
@@ -150,7 +157,7 @@ export default function NavigationScreen() {
               isTalking: false,
             }))
         : [],
-    [party, isDemo],
+    [party, isDemo, mapNow],
   );
   const liveMembers = useMemo(() => {
     const inParty = new Set(partyOnMap.map((member) => member.id));
@@ -229,6 +236,12 @@ export default function NavigationScreen() {
   const [selectedFriend, setSelectedFriend] = useState<WorldMapMember | null>(
     null,
   );
+  // Usuario del piloto tocado en el mapa (amigo o compañero de party).
+  const selectedFriendUsername = selectedFriend
+    ? ((selectedFriend as { username?: string }).username ??
+      party?.members.find((member) => member.userId === selectedFriend.id)?.profile.username ??
+      null)
+    : null;
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [northUp, setNorthUp] = useState(false);
@@ -295,7 +308,12 @@ export default function NavigationScreen() {
   );
   useLiveShare(live.location, {
     partyId: party && !isDemo ? party.id : null,
-    enabled: !isDemo && live.isLive && live.location.source === "gps",
+    // Con 200-300 m de error (dentro de casa) los demás te verían saltar.
+    enabled:
+      !isDemo &&
+      live.isLive &&
+      live.location.source === "gps" &&
+      (live.location.accuracy == null || live.location.accuracy <= LIVE_SHARE_MAX_ACCURACY_M),
   });
   // Tus amigos te ven en su mapa (si lo permites; se pregunta una vez).
   useEffect(() => {
@@ -1438,6 +1456,14 @@ export default function NavigationScreen() {
                               .getState()
                               .follow({ id: selectedFriend.id, name: selectedFriend.name });
                             setSelectedFriend(null);
+                          }
+                        : undefined
+                    }
+                    onProfile={
+                      selectedFriendUsername
+                        ? () => {
+                            setSelectedFriend(null);
+                            router.push(`/u/${selectedFriendUsername}`);
                           }
                         : undefined
                     }

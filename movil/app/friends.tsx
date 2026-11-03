@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -149,21 +150,32 @@ export default function FriendsScreen() {
     );
   };
 
+  const openProfile = (profile: UserProfile) => {
+    if (!isDemo) router.push(`/u/${profile.username}`);
+  };
+
   const renderPerson = (profile: UserProfile, entry?: FriendEntry) => (
     <View key={profile.id} style={styles.personRow}>
-      <Avatar
-        name={profile.displayName}
-        color={profileColor(profile.username)}
-        size={44}
-        uri={profile.avatarUrl ?? undefined}
-      />
-      <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong" numberOfLines={1}>{profile.displayName}</AppText>
-        <AppText variant="caption" color={colors.accent}>@{profile.username}</AppText>
-        <AppText variant="caption" color={colors.muted} numberOfLines={1}>
-          {profile.city || t('Caravana')}
-        </AppText>
-      </View>
+      <Pressable
+        style={styles.personLink}
+        onPress={() => openProfile(profile)}
+        accessibilityRole="button"
+        accessibilityLabel={t('Ver perfil de {0}', profile.displayName)}
+      >
+        <Avatar
+          name={profile.displayName}
+          color={profileColor(profile.username)}
+          size={44}
+          uri={profile.avatarUrl ?? undefined}
+        />
+        <View style={{ flex: 1 }}>
+          <AppText variant="bodyStrong" numberOfLines={1}>{profile.displayName}</AppText>
+          <AppText variant="caption" color={colors.accent}>@{profile.username}</AppText>
+          <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+            {profile.city || t('Caravana')}
+          </AppText>
+        </View>
+      </Pressable>
       {entry?.status === 'accepted' && !isDemo ? (
         <Button
           label={invitedIds.includes(profile.id) ? t('Invitado') : t('Party')}
@@ -284,18 +296,25 @@ export default function FriendsScreen() {
           <Card style={styles.listCard}>
             {incoming.map((entry) => (
               <View key={entry.id} style={styles.requestRow}>
-                <Avatar
-                  name={entry.profile.displayName}
-                  color={profileColor(entry.profile.username)}
-                  size={44}
-                  uri={entry.profile.avatarUrl ?? undefined}
-                />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="bodyStrong" numberOfLines={1}>
-                    {entry.profile.displayName}
-                  </AppText>
-                  <AppText variant="caption" color={colors.accent}>@{entry.profile.username}</AppText>
-                </View>
+                <Pressable
+                  style={styles.personLink}
+                  onPress={() => openProfile(entry.profile)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('Ver perfil de {0}', entry.profile.displayName)}
+                >
+                  <Avatar
+                    name={entry.profile.displayName}
+                    color={profileColor(entry.profile.username)}
+                    size={44}
+                    uri={entry.profile.avatarUrl ?? undefined}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {entry.profile.displayName}
+                    </AppText>
+                    <AppText variant="caption" color={colors.accent}>@{entry.profile.username}</AppText>
+                  </View>
+                </Pressable>
                 <Button
                   label={t('Aceptar')}
                   size="sm"
@@ -409,6 +428,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  personLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   requestRow: {
     flexDirection: 'row',
     alignItems: 'center',

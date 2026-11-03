@@ -33,6 +33,8 @@ import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
+import { useNow } from '@/src/hooks/useNow';
+import { isMemberOnMap, MEMBER_STALE_MS } from '@/src/lib/convoy';
 import { useSimulator } from '@/src/lib/simulator';
 import { useFollow } from '@/src/store/follow';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
@@ -55,6 +57,7 @@ export default function PartyScreen() {
   const simParty = useSimulator((state) => state.party) && !party;
   const isDemo = demoAccount || simParty;
   const leaveParty = useLeaveParty();
+  const mapNow = useNow();
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<PartyVoiceChannelSlug | null>(null);
@@ -131,7 +134,10 @@ export default function PartyScreen() {
         : (party?.members ?? [])
             .filter(
               (member) =>
-                !member.isMe && member.lastLat != null && member.lastLng != null,
+                !member.isMe &&
+                member.lastLat != null &&
+                member.lastLng != null &&
+                isMemberOnMap(member.lastSeenAt, mapNow),
             )
             .map((member) => ({
               id: member.userId,
@@ -141,7 +147,7 @@ export default function PartyScreen() {
               longitude: member.lastLng as number,
               isTalking: false,
             })),
-    [currentUser.username, isDemo, party, simParty, simMembers],
+    [currentUser.username, isDemo, party, simParty, simMembers, mapNow],
   );
 
   const destination = useMemo(() => {
@@ -313,12 +319,34 @@ export default function PartyScreen() {
             );
             return;
           }
+          const seenAt = real?.lastSeenAt ? Date.parse(real.lastSeenAt) : NaN;
+          if (real && Number.isFinite(seenAt) && Date.now() - seenAt > MEMBER_STALE_MS) {
+            const minutes = Math.max(1, Math.round((Date.now() - seenAt) / 60_000));
+            Alert.alert(
+              t('La posición de {0} es de hace {1} min', first, minutes),
+              t('Puede que haya cerrado la app o perdido la señal. Irás a su última posición conocida.'),
+              [
+                { text: t('Cancelar'), style: 'cancel' },
+                {
+                  text: t('Seguir igual'),
+                  onPress: () => {
+                    useFollow.getState().follow({ id: member.id, name: member.name });
+                    router.replace('/');
+                  },
+                },
+              ],
+            );
+            return;
+          }
           useFollow.getState().follow({ id: member.id, name: member.name });
           router.replace('/');
         },
       },
       { text: t('Retar a {0}', first), onPress: () => challengePilots(t('Reto a {0}', first), [member]) },
-      { text: t('Cancelar'), style: 'cancel' },
+      ...(!isDemo && !simParty && member.username
+        ? [{ text: t('Ver perfil'), onPress: () => router.push(`/u/${member.username}`) }]
+        : []),
+      { text: t('Cancelar'), style: 'cancel' as const },
     ]);
   };
 
@@ -342,14 +370,17 @@ export default function PartyScreen() {
       return;
     }
 
+    const othersRemain = party.members.some((member) => !member.isMe);
     Alert.alert(
-      party.isHost ? t('Terminar party') : t('Salir de la party'),
-      party.isHost
-        ? t('Como anfitrión, terminarás la caravana para todos.')
-        : t('Dejarás de compartir tu ubicación y el chat.'),
+      t('Salir de la party'),
+      party.isHost && othersRemain
+        ? t('El convoy sigue sin ti: el miembro que lleva más tiempo pasa a ser el anfitrión.')
+        : party.isHost
+          ? t('Eres el último: la party terminará.')
+          : t('Dejarás de compartir tu ubicación y el chat.'),
       [
         { text: t('Cancelar'), style: 'cancel' },
-        { text: party.isHost ? t('Terminar') : t('Salir'), style: 'destructive', onPress: () => void perform() },
+        { text: t('Salir'), style: 'destructive', onPress: () => void perform() },
       ],
     );
   };

@@ -19,6 +19,9 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 - **D-04 Ubicación con amigos fuera de la party.** RNF-10 dice que la ubicación solo se comparte dentro de una party
   activa. La función opcional «Mi ubicación para amigos» (tabla `friend_locations`) lo contradice: manda el SRS y
   se desactiva (no se borra el código ni la tabla).
+  **Actualización 2026-11-02:** el dueño pide que los amigos aparezcan en el mapa sin estar en una party. Se
+  reactiva (`SHARE_OUTSIDE_PARTY = true`), solo si cada uno lo activa y solo entre amigos (RLS de
+  `friend_locations`). Esta decisión sustituye a RNF-10 en ese punto.
 - **D-05 Récords por tramo.** RF-16 pide «top 3 del tramo y mejor marca propia», pero R-06 y OTR-02 prohíben premiar
   la velocidad. Se mantiene el top 3 y la marca propia, pero **solo cuentan las pasadas que no superan el límite del
   tramo**: las que lo superan no se envían ni se muestran. Así nadie gana por ir más rápido de lo permitido. ❓ AMBIGUO:
@@ -126,7 +129,7 @@ Estados: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE · ⛔ BLOQUEADO · ❓ NO 
 | RNF-07 | RLS en todas las tablas | ✅ | 32/32 | — | — |
 | RNF-08 | TLS/WSS y sesión segura | ✅ | ver SW-01 y COM-01 | — | — |
 | RNF-09 | service_role solo en Edge Functions | ✅ | R-03 | — | — |
-| RNF-10 | Ubicación solo dentro de party activa; QR sin datos | ✅ | `SHARE_OUTSIDE_PARTY = false` (`src/lib/party-invites.ts`), sin lectura de `friend_locations` y se borra la última posición; prueba en `srs-backend.test.ts` | — | — |
+| RNF-10 | Ubicación solo dentro de party activa; QR sin datos | ⚠️ D-04 | Cambiado por decisión del dueño: amigos en el mapa si lo activan (`SHARE_OUTSIDE_PARTY = true`, RLS solo amigos); prueba en `srs-backend.test.ts` | — | — |
 | RNF-11 | Token LiveKit solo a miembros y con caducidad | ✅ | `livekit-token/index.ts:90` (membresía), `:121` (`ttl: '2h'`) | — | — |
 | RNF-12 | Borrado irreversible de todo | ✅ | ver RF-03 | — | — |
 | RNF-13 | Reconexión sin perder chat ni ruta | ✅ | chat y destino en BD; `refetchInterval` 15 s (`useParty.ts:195`); Realtime se reconecta | — | — |

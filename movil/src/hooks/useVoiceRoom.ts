@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
@@ -11,6 +12,21 @@ import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 
 type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
+
+// Android no da el micrófono sin pedirlo: antes nunca se pedía y el PTT no
+// transmitía nada.
+async function ensureMicrophone() {
+  if (Platform.OS !== 'android') return true;
+  const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
+  if (await PermissionsAndroid.check(permission)) return true;
+  const result = await PermissionsAndroid.request(permission, {
+    title: t('Micrófono para el walkie-talkie'),
+    message: t('Caravana usa el micrófono solo mientras mantienes pulsado el botón para hablar.'),
+    buttonPositive: t('Permitir'),
+    buttonNegative: t('Ahora no'),
+  });
+  return result === PermissionsAndroid.RESULTS.GRANTED;
+}
 
 type VoiceTokenResponse = {
   token?: string;
@@ -124,6 +140,8 @@ export function useVoiceRoom({
         await room.localParticipant.setMicrophoneEnabled(false);
         updateParticipants();
         setStatus('connected');
+        // Se pide ya, para que el primer PTT no se pierda en el aviso.
+        void ensureMicrophone();
       } catch (connectError) {
         if (!active) return;
         const message =
@@ -131,7 +149,9 @@ export function useVoiceRoom({
             ? connectError.message
             : t('No pudimos conectar la voz.');
         // El usuario no necesita saber de LiveKit ni de secretos del servidor.
-        const notConfigured = /livekit|secret|not found|configurad/i.test(message);
+        // 401 / NotAllowed: el servidor de voz rechaza la clave de LiveKit
+        // (API key o secret mal copiados en los secretos de Supabase).
+        const notConfigured = /livekit|secret|not found|configurad|notallowed|401|unauthorized|invalid token/i.test(message);
         setError(
           notConfigured
             ? t('La voz del convoy aún no está activada. El mapa y el chat funcionan igual.')
@@ -167,6 +187,10 @@ export function useVoiceRoom({
   const setTalking = useCallback(async (next: boolean) => {
     const room = roomRef.current;
     if (!room) return;
+    if (next && !(await ensureMicrophone())) {
+      setError(t('Sin permiso de micrófono no puedes hablar. Actívalo en Ajustes › Apps › Caravana.'));
+      return;
+    }
     try {
       await room.localParticipant.setMicrophoneEnabled(next);
       setTalkingState(next);

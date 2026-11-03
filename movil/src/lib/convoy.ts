@@ -1,4 +1,4 @@
-import { t } from "@/src/i18n";
+import { displaySpeed, speedUnit, t } from "@/src/i18n";
 // Reglas del convoy en tiempo real y de los retos por llegada. Sin React ni
 // Supabase: las usan los hooks, el simulador y las pruebas.
 
@@ -25,6 +25,17 @@ export const LIVE_IDLE_MS = 30_000;
 export const LIVE_MIN_MOVE_M = 8;
 // Sin noticias de un piloto en este tiempo: «sin señal».
 export const MEMBER_STALE_MS = 90_000;
+// Más viejo que esto, su última posición ya no se pinta en el mapa (cerró la
+// app o perdió la señal sin salir de la party).
+export const MEMBER_HIDE_MS = 30 * 60_000;
+// Posiciones con más error que esto no se comparten con la app abierta.
+export const LIVE_SHARE_MAX_ACCURACY_M = 100;
+
+export function isMemberOnMap(lastSeenAt: string | null, now: number) {
+  if (!lastSeenAt) return false;
+  const at = Date.parse(lastSeenAt);
+  return Number.isFinite(at) && now - at <= MEMBER_HIDE_MS;
+}
 
 export type LiveFix = Point & { at: number; speedKmh: number | null; heading: number | null };
 
@@ -47,8 +58,8 @@ export function memberLiveLabel(
     const minutes = Math.max(1, Math.round(age / 60_000));
     return minutes > 59 ? t('SIN SEÑAL') : t('HACE {0} MIN', minutes);
   }
-  if (member.speedKmh != null && member.speedKmh >= 5) return `${Math.round(member.speedKmh)} KM/H`;
-  return 'PARADO';
+  if (member.speedKmh != null && member.speedKmh >= 5) return `${displaySpeed(member.speedKmh)} ${speedUnit().toUpperCase()}`;
+  return t('PARADO');
 }
 
 // Movimiento suave entre dos posiciones recibidas (llegan cada ~3 s): en vez

@@ -230,7 +230,15 @@ export default function ProfileScreen() {
       ) : (
         <View style={styles.friendRow}>
           {friendEntries.slice(0, 5).map((friend) => (
-            <View key={friend.id} style={styles.friend}>
+            <Pressable
+              key={friend.id}
+              style={styles.friend}
+              onPress={() => {
+                if (!isDemo) router.push(`/u/${friend.profile.username}`);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('Ver perfil de {0}', friend.profile.displayName)}
+            >
               <Avatar
                 name={friend.profile.displayName}
                 color={profileColor(friend.profile.username)}
@@ -240,7 +248,7 @@ export default function ProfileScreen() {
               <AppText variant="caption" color={colors.textSoft} numberOfLines={1}>
                 {friend.profile.displayName.split(' ')[0]}
               </AppText>
-            </View>
+            </Pressable>
           ))}
           <Pressable
             onPress={() => router.push('/friends')}

@@ -91,9 +91,14 @@ describe('SRS — eliminación de cuenta (RF-03, UI-06, RNF-12)', () => {
   });
 });
 
-describe('SRS — privacidad de la ubicación (RNF-10)', () => {
-  it('no se comparte la ubicación fuera de una party activa', () => {
-    expect(SHARE_OUTSIDE_PARTY).toBe(false);
+describe('SRS — privacidad de la ubicación (RNF-10, D-04)', () => {
+  it('fuera de la party solo se comparte con amigos y si lo activas', () => {
+    expect(SHARE_OUTSIDE_PARTY).toBe(true);
+    const sql = fs.readFileSync(
+      path.join(__dirname, '../../supabase/migrations/20261031120000_party_invites_friend_locations.sql'),
+      'utf8',
+    );
+    expect(sql).toContain('private.are_friends((select auth.uid()), user_id)');
   });
 });
 

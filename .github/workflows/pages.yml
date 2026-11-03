@@ -1,0 +1,33 @@
+name: Página de invitación
+
+# Publica infra/invite-page en GitHub Pages: los enlaces de WhatsApp
+# (…/Aapp-Automovile/p/?c=ABC123) abren esta página y ella abre la app.
+on:
+  push:
+    branches: [main]
+    paths: [infra/invite-page/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: infra/invite-page
+      - id: deployment
+        uses: actions/deploy-pages@v4
