@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { streetFromInstruction } from './street.ts';
+
 // MAPA-12: rutas con el tráfico de Google (Routes API, el mismo tráfico que
 // alimenta Google Maps y Waze). La clave vive solo en los secretos de
 // Supabase (GOOGLE_MAPS_API_KEY). Devuelve las rutas en el formato de OSRM
@@ -103,13 +105,6 @@ function maneuver(name: string | undefined): { type: string; modifier?: string }
   }
 }
 
-// La calle sale del texto de la instrucción («… hacia Av. Winston Churchill»).
-function streetFrom(text: string | undefined): string | undefined {
-  if (!text) return undefined;
-  const match = text.match(/(?:hacia|por|en|onto|on|toward)\s+(.+?)(?:\s*(?:\n|$|\.|,|Pasa|Destino))/i);
-  return match?.[1]?.trim() || undefined;
-}
-
 type GoogleStep = {
   distanceMeters?: number;
   navigationInstruction?: { maneuver?: string; instructions?: string };
@@ -198,7 +193,7 @@ Deno.serve(async (request) => {
           steps: [
             ...(leg.steps ?? []).map((step) => ({
               distance: step.distanceMeters ?? 0,
-              name: streetFrom(step.navigationInstruction?.instructions),
+              name: streetFromInstruction(step.navigationInstruction?.instructions),
               maneuver: maneuver(step.navigationInstruction?.maneuver),
             })),
             // Fin de cada tramo: parada intermedia o llegada.

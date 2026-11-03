@@ -59,7 +59,7 @@ describe('route instructions', () => {
 
   it('dice la distancia antes de la maniobra y solo la orden al llegar', () => {
     expect(spokenInstruction('Gira a la derecha por Av. Duarte', 300)).toBe(
-      'En 300 metros, gira a la derecha por Av. Duarte',
+      'En 300 metros, gira a la derecha por avenida Duarte',
     );
     expect(spokenInstruction('Gira a la derecha', 40)).toBe('Gira a la derecha');
   });

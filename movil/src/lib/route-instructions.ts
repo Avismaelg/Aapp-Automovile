@@ -254,7 +254,24 @@ function spokenDistance(meters: number) {
   return unit ? `${value} ${words[unit] ?? unit}` : value;
 }
 
+// Abreviaturas de las calles como se dicen («C. Mercedes» → «calle Mercedes»).
+const SPOKEN_ABBREVIATIONS: [RegExp, string][] = [
+  [/\bAv(?:da)?\.\s*/g, 'avenida '],
+  [/\bAutop\.\s*/g, 'autopista '],
+  [/\bCarr\.\s*/g, 'carretera '],
+  [/\bC\/\s*/g, 'calle '],
+  [/(^|[\s(])C\.\s+/g, '$1calle '],
+  [/\bProl\.\s*/g, 'prolongación '],
+  [/\bEsq\.\s*/gi, 'esquina '],
+  [/\bDr\.\s*/g, 'doctor '],
+];
+
+export function speakableStreet(text: string) {
+  return SPOKEN_ABBREVIATIONS.reduce((out, [pattern, word]) => out.replace(pattern, word), text);
+}
+
 export function spokenInstruction(text: string, remainingM: number) {
-  if (remainingM <= 60) return text;
-  return t('En {0}, {1}{2}', spokenDistance(remainingM), text.charAt(0).toLowerCase(), text.slice(1));
+  const spoken = speakableStreet(text);
+  if (remainingM <= 60) return spoken;
+  return t('En {0}, {1}{2}', spokenDistance(remainingM), spoken.charAt(0).toLowerCase(), spoken.slice(1));
 }
