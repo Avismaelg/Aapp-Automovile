@@ -282,3 +282,22 @@ describe('fase 7 · borrado de cuenta', () => {
     expect(allSql).toContain('revoke all on private.storage_cleanup from public, anon, authenticated');
   });
 });
+
+describe('fase 10 · páginas web de las tiendas', () => {
+  const site = path.join(__dirname, '..', '..', '..', 'infra', 'invite-page');
+
+  it('la página de borrado existe y solo lleva la clave pública anon', () => {
+    const page = fs.readFileSync(path.join(site, 'borrar-cuenta', 'index.html'), 'utf8');
+    expect(page).toContain("functions.invoke('delete-account'");
+    const keys = page.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
+    expect(keys.length).toBe(1);
+    const claims = JSON.parse(Buffer.from(keys[0].split('.')[1], 'base64url').toString('utf8'));
+    expect(claims.role).toBe('anon');
+  });
+
+  it('la política de privacidad pública dice lo mismo que la app', () => {
+    const page = fs.readFileSync(path.join(site, 'privacidad', 'index.html'), 'utf8');
+    expect(page).toContain('desactivado por defecto');
+    expect(page).toContain('../borrar-cuenta/');
+  });
+});
