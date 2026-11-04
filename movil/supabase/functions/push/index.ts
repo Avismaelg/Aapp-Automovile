@@ -62,6 +62,28 @@ async function accessToken(account: ServiceAccount) {
   return cachedToken.value;
 }
 
+// iPhone: directo a APNs con la clave .p8 de Apple (JWT ES256, válido 1 h;
+// Apple pide renovarlo entre 20 y 60 min). Secretos APNS_KEY_ID,
+// APNS_TEAM_ID y APNS_PRIVATE_KEY; sin ellos los iPhone no reciben avisos.
+let cachedApns: { value: string; expiresAt: number } | null = null;
+
+async function apnsToken(keyId: string, teamId: string, privateKey: string) {
+  if (cachedApns && cachedApns.expiresAt > Date.now()) return cachedApns.value;
+  const header = base64url(JSON.stringify({ alg: 'ES256', kid: keyId }));
+  const claims = base64url(JSON.stringify({ iss: teamId, iat: Math.floor(Date.now() / 1000) }));
+  const pem = privateKey.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  const der = Uint8Array.from(atob(pem), (char) => char.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  // WebCrypto devuelve la firma ECDSA como r||s, el formato que pide el JWT.
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(`${header}.${claims}`),
+  );
+  cachedApns = { value: `${header}.${claims}.${base64url(signature)}`, expiresAt: Date.now() + 40 * 60_000 };
+  return cachedApns.value;
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   const secret = Deno.env.get('PUSH_WEBHOOK_SECRET');
@@ -129,18 +151,17 @@ Deno.serve(async (request) => {
   }
   if (!message) return json({ sent: 0 });
 
-  // iOS guarda su token de APNs; se enviará cuando haya clave de APNs en
-  // Firebase. Por ahora solo Android (token de FCM).
-  const { data: tokens } = await admin
+  const { data: allTokens } = await admin
     .from('push_tokens')
-    .select('token')
-    .eq('user_id', message.userId)
-    .eq('platform', 'android');
-  if (!tokens?.length) return json({ sent: 0 });
+    .select('token, platform')
+    .eq('user_id', message.userId);
+  if (!allTokens?.length) return json({ sent: 0 });
+  const tokens = allTokens.filter((row) => row.platform === 'android');
+  const iosTokens = allTokens.filter((row) => row.platform === 'ios');
 
-  const bearer = await accessToken(account);
   let sent = 0;
   const stale: string[] = [];
+  const bearer = tokens.length ? await accessToken(account) : '';
   await Promise.all(
     tokens.map(async ({ token }) => {
       const response = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
@@ -164,6 +185,37 @@ Deno.serve(async (request) => {
       else if (response.status === 404 || response.status === 400) stale.push(token);
     }),
   );
+
+  const apnsKeyId = Deno.env.get('APNS_KEY_ID');
+  const apnsTeamId = Deno.env.get('APNS_TEAM_ID');
+  const apnsKey = Deno.env.get('APNS_PRIVATE_KEY');
+  if (iosTokens.length && apnsKeyId && apnsTeamId && apnsKey) {
+    const jwt = await apnsToken(apnsKeyId, apnsTeamId, apnsKey);
+    const topic = Deno.env.get('APNS_BUNDLE_ID') ?? 'app.caravana.mobile';
+    await Promise.all(
+      iosTokens.map(async ({ token }) => {
+        const response = await fetch(`https://api.push.apple.com/3/device/${token}`, {
+          method: 'POST',
+          headers: {
+            authorization: `bearer ${jwt}`,
+            'apns-topic': topic,
+            'apns-push-type': 'alert',
+            'apns-priority': '10',
+            'apns-collapse-id': message.tag.slice(0, 64),
+          },
+          body: JSON.stringify({
+            aps: { alert: { title: message.title, body: message.body }, sound: 'default', 'thread-id': message.tag },
+            // expo-notifications lee los datos de «body»; url también suelto.
+            body: { url: message.url },
+            url: message.url,
+          }),
+        });
+        if (response.ok) sent += 1;
+        // 410 = la app ya no está; 400 BadDeviceToken = token no válido.
+        else if (response.status === 410 || response.status === 400) stale.push(token);
+      }),
+    );
+  }
   if (stale.length) await admin.from('push_tokens').delete().in('token', stale);
   return json({ sent, removed: stale.length });
 });
