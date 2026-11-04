@@ -18,3 +18,10 @@ autorización** y después de probarlas en un entorno separado.
 | 10 | P1-5, P2-3 | Sin navegación sobre línea directa; OSRM público fuera | Jest | — |
 | 11 | P2-4 | Rendimiento del mapa (medido en el dispositivo) | Profiler | Teléfono |
 | 12 | — | CI con las pruebas nuevas; documentos de la fase 11; GO/NO-GO | — | — |
+
+## Avance (2026-11-04)
+
+Pasos 1–10 y 12 hechos en código, con pruebas (ver el estado por hallazgo en
+`AUDITORIA-PRODUCCION.md`). Paso 11 (rendimiento) pendiente de medir en el
+teléfono. Ninguna migración ni función nueva está aplicada o desplegada:
+`Caravana-Seguridad-Aplicar.ps1` lo hace, primero en un proyecto de pruebas.

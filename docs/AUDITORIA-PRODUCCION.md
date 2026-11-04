@@ -2,9 +2,9 @@
 
 Rama `fix/production-readiness`, base `2918796`. Fecha: 2026-11-04.
 
-**Veredicto actual: NO-GO.** Hay 5 hallazgos P0 abiertos (acceso a convoys,
-amistades forzadas, matrículas públicas, récords de velocidad públicos y
-resultados de retos manipulables).
+**Veredicto: NO-GO** (ver `CHECKLIST-LANZAMIENTO.md`). Los 5 P0 están
+corregidos en código con pruebas, pero sus migraciones **no se han aplicado** ni
+probado contra una base real.
 
 ## Método
 
@@ -113,3 +113,25 @@ LiveKit RN 2 / livekit-client 2.23, rnmapbox 10.3.7, React Native Firebase 27.
 - RLS sobre la base real (falta un entorno de Supabase separado).
 - GPS, batería, pantalla bloqueada y reinicio del teléfono (necesitan viaje real).
 - Compilación iOS (necesita cuenta de Apple y EAS).
+
+## Estado tras las correcciones (2026-11-04)
+
+| Hallazgo | Estado | Commit | Prueba | Falta |
+|---|---|---|---|---|
+| P0-1 convoys | Corregido en código | `639e9ba` | `rls-hardening` | Aplicar migración y prueba real |
+| P0-2 amistades | Corregido en código | `639e9ba` | `rls-hardening` | idem |
+| P0-3 / P1-8 matrícula, home_location | Corregido en código | `639e9ba` | `rls-hardening` | idem; instalar la APK nueva antes |
+| P0-4 velocidad pública | Corregido (app + migración) | `5e6d8f9` | `segment-stats`, `rls-hardening` | Aplicar migración |
+| P0-5 retos | Corregido en código | `9caa3c6` | `rls-hardening` | Aplicar migración; prueba en dispositivo |
+| P1-1 compartir con amigos | Corregido (desactivado por defecto) | `7a80043` | `location-consent-states` | Prueba en dispositivo |
+| P1-2 carrera al entrar | Corregido (`for update`) | `639e9ba` | `rls-hardening` | Aplicar migración |
+| P1-3 / P1-7 / P2-1 voz | Corregido (revocación, 15 min, convoy vigente, nombre) | `77d5c95` | `rls-hardening` | Desplegar funciones; prueba de expulsión |
+| P1-4 / P2-2 borrado de cuenta | Corregido (parcial informado, cola, paginación) | `1d0f1f5`, `f2789ce` | `rls-hardening`, `deno check` | Desplegar función |
+| P1-5 / P2-3 línea directa y OSRM | Corregido | `3264dc4` | `route-fallback` | Prueba en dispositivo |
+| P1-6 CI | Corregido (expo-doctor OK, job Deno) | `af0fd47`, `f2789ce` | — | Ver el workflow en GitHub |
+| P2-4 rendimiento del mapa | Abierto | — | — | Medir en el teléfono |
+| P2-5 vuelta tras expulsión | Corregido (con P0-1) | `639e9ba` | `rls-hardening` | — |
+| P2-6 revisión legal | Abierto | — | — | Abogado |
+
+Compatibilidad: la migración `private_columns` rompe el garaje de las APK
+anteriores (piden `select('*')`). Orden: APK nueva → migraciones.

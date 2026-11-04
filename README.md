@@ -23,6 +23,10 @@ una ruta común con tráfico real y un walkie-talkie**, todo en la misma pantall
 
 ## Estado (2026-11-04)
 
+> **Producción: NO-GO.** Auditoría y correcciones de seguridad en la rama
+> `fix/production-readiness`: ver [`docs/AUDITORIA-PRODUCCION.md`](docs/AUDITORIA-PRODUCCION.md)
+> y [`docs/CHECKLIST-LANZAMIENTO.md`](docs/CHECKLIST-LANZAMIENTO.md).
+
 **Android funciona y está probado con convoys reales de varios usuarios.** iOS
 está preparado y pendiente de la cuenta de Apple Developer. De los 75 criterios
 de la enmienda 1.1 del SRS hay unos 66 hechos.
@@ -35,8 +39,9 @@ de la enmienda 1.1 del SRS hay unos 66 hechos.
 | Rutas y navegación | ✅ Google Routes con tráfico (Edge Function `routes`) → Mapbox → GraphHopper → OSRM; ruta pintada por tráfico, voz a 500/200 m y «ahora», recálculo a 40 m, ruta más rápida, paradas |
 | Convoy | ✅ crear/unirse (toque, código, QR, enlace), destino común del líder, progreso y llegadas, expulsar, terminar para todos, borrado a las 24 h |
 | Voz (LiveKit) | ✅ 3 canales, botón en el mapa, conecta en < 1 s, segundo plano y pantalla bloqueada, manos libres |
-| Amigos en el mapa | ✅ posición cada 5 s al moverte, también en segundo plano; modo fantasma |
-| Retos | ✅ cuenta atrás, abandono, llegada verificada en el servidor, cancelados a las 24 h; 🟡 clasificación por ETA real pendiente |
+| Amigos en el mapa | ✅ posición cada 5 s al moverte, también en segundo plano; **solo si activas «compartir con amigos»** (desactivado por defecto) |
+| Retos | ✅ cuenta atrás, abandono, cancelados a las 24 h; llegada comprobada en el servidor contra la meta («verificada» o «autodeclarada») en `fix/production-readiness`, pendiente de aplicar |
+| Récords | Sin clasificaciones ni récords de velocidad: «Tus autopistas» muestra en privado tus viajes y qué parte fuiste dentro del límite |
 | Avisos (Firebase) | ✅ Android con la app cerrada (invitación, reto, amistad); iOS por APNs listo, falta la clave de Apple |
 | Fallos (Crashlytics) | ✅ cierres nativos y de JavaScript |
 | Sincronización | ✅ cada 5 s en la pantalla visible, al volver a la app y al recuperar la red |
@@ -89,7 +94,7 @@ compilar (`android/` e `ios/` se generan, no se editan a mano).
 ```bash
 npx tsc --noEmit
 npx eslint .
-npx jest                       # 42 suites, 281 pruebas
+npx jest                       # 45 suites, 307 pruebas
 node scripts/i18n-missing.js   # textos sin traducir al inglés
 ```
 
@@ -154,6 +159,9 @@ caravana/
 | [`17-avisos-y-fallos.md`](docs/17-avisos-y-fallos.md) | avisos push (FCM/APNs) y Crashlytics |
 | [`SRS-trazabilidad.md`](docs/SRS-trazabilidad.md) | cada requisito, dónde está y su estado |
 | [`iOS-lanzamiento.md`](docs/iOS-lanzamiento.md) | pasos para iPhone |
+| [`AUDITORIA-PRODUCCION.md`](docs/AUDITORIA-PRODUCCION.md) · [`PLAN-CORRECCIONES.md`](docs/PLAN-CORRECCIONES.md) | hallazgos P0–P3 y su estado |
+| [`SEGURIDAD-Y-PRIVACIDAD.md`](docs/SEGURIDAD-Y-PRIVACIDAD.md) | controles de acceso y estados de la ubicación |
+| [`PRUEBAS-PRODUCCION.md`](docs/PRUEBAS-PRODUCCION.md) · [`CHECKLIST-LANZAMIENTO.md`](docs/CHECKLIST-LANZAMIENTO.md) | pruebas ejecutadas y pendientes; GO/NO-GO |
 | [`politica-privacidad-borrador.md`](docs/politica-privacidad-borrador.md) | privacidad (pendiente de revisión legal) |
 
 ---
@@ -163,9 +171,9 @@ caravana/
 - **La voz y el grupo son el diferenciador:** ni Waze ni WhatsApp juntan mapa,
   ruta común y walkie-talkie.
 - **Retos seguros:** miden la llegada cumpliendo las normas, nunca la velocidad.
-- **Ubicación bajo control:** la ven tus amigos y tu convoy; el modo fantasma te
-  oculta; los convoys se borran a las 24 h. El QR no contiene teléfono ni
-  ubicación.
+- **Ubicación privada por defecto:** la ve tu convoy mientras estás en él y tus
+  amigos solo si lo activas; los convoys se borran a las 24 h. El QR no
+  contiene teléfono ni ubicación.
 - **Costo casi cero al inicio:** Google con tope de gasto diario y Firebase
   gratis; el plan gratuito permite convoys de hasta 5 pilotos (10 de máximo).
 - **Español primero:** RD (km/h, DOP), con inglés completo.
