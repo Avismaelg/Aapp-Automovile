@@ -18,7 +18,10 @@
         ],
         "NSMicrophoneUsageDescription": "Caravana usa el micrófono para el walkie-talkie de voz de las parties."
       },
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.caravana.mobile",
@@ -55,7 +58,12 @@
         }
       ],
       "expo-sharing",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "expo-location",
         {
@@ -65,7 +73,9 @@
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true,
-          "androidForegroundServiceIcon": "./assets/images/notification-icon.png"
+          "androidForegroundServiceIcon": "./assets/images/notification-icon.png",
+          "locationAlwaysPermission": "Caravana usa tu ubicación en segundo plano para que tu convoy y tus amigos te vean y para registrar tus viajes.",
+          "locationFullAccuracyPermission": "Caravana necesita tu ubicación exacta para guiarte giro a giro y mostrarte bien a tu convoy."
         }
       ],
       [
