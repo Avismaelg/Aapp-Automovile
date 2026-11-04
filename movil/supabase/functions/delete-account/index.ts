@@ -28,17 +28,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
-type Admin = ReturnType<typeof createClient>;
+type StorageClient = ReturnType<typeof createClient>['storage'];
 
-async function listFilesDeep(admin: Admin, bucket: string, folder: string): Promise<string[]> {
+async function listFilesDeep(storage: StorageClient, bucket: string, folder: string): Promise<string[]> {
   const paths: string[] = [];
   for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await admin.storage.from(bucket).list(folder, { limit: PAGE, offset });
+    const { data, error } = await storage.from(bucket).list(folder, { limit: PAGE, offset });
     if (error) throw new Error(`list ${bucket}`);
     for (const entry of data ?? []) {
       const path = `${folder}/${entry.name}`;
       if (entry.id) paths.push(path);
-      else paths.push(...(await listFilesDeep(admin, bucket, path)));
+      else paths.push(...(await listFilesDeep(storage, bucket, path)));
     }
     if (!data || data.length < PAGE) break;
   }
@@ -46,13 +46,13 @@ async function listFilesDeep(admin: Admin, bucket: string, folder: string): Prom
 }
 
 // Borra por lotes con reintentos; devuelve lo que no se pudo borrar.
-async function removeAll(admin: Admin, bucket: string, paths: string[]) {
+async function removeAll(storage: StorageClient, bucket: string, paths: string[]) {
   const failed: string[] = [];
   for (let index = 0; index < paths.length; index += PAGE) {
     const batch = paths.slice(index, index + PAGE);
     let ok = false;
     for (let attempt = 0; attempt < RETRIES && !ok; attempt += 1) {
-      const { error } = await admin.storage.from(bucket).remove(batch);
+      const { error } = await storage.from(bucket).remove(batch);
       ok = !error;
     }
     if (!ok) failed.push(...batch);
@@ -104,11 +104,11 @@ Deno.serve(async (request) => {
     if (postsError) throw new Error('posts');
     const postPaths: string[] = [];
     for (const post of posts ?? []) {
-      postPaths.push(...(await listFilesDeep(admin, 'posts', post.id as string)));
+      postPaths.push(...(await listFilesDeep(admin.storage, 'posts', post.id as string)));
     }
     toRemove.push({ bucket: 'posts', paths: postPaths });
     for (const bucket of ['vehicles', 'avatars', 'receipts']) {
-      toRemove.push({ bucket, paths: await listFilesDeep(admin, bucket, user.id) });
+      toRemove.push({ bucket, paths: await listFilesDeep(admin.storage, bucket, user.id) });
     }
   } catch (listError) {
     // Sin la lista no se borra nada: la cuenta sigue intacta y se puede reintentar.
@@ -126,7 +126,7 @@ Deno.serve(async (request) => {
   // 3. Los archivos. Lo que falle queda en la cola (solo bucket y ruta).
   const pending: { bucket: string; path: string }[] = [];
   for (const { bucket, paths } of toRemove) {
-    for (const path of await removeAll(admin, bucket, paths)) pending.push({ bucket, path });
+    for (const path of await removeAll(admin.storage, bucket, paths)) pending.push({ bucket, path });
   }
   if (pending.length > 0) {
     const { error: queueError } = await admin.rpc('queue_storage_cleanup', { p_items: pending });
@@ -141,7 +141,7 @@ Deno.serve(async (request) => {
       byBucket.set(item.bucket, [...(byBucket.get(item.bucket) ?? []), item.path]);
     }
     for (const [bucket, paths] of byBucket) {
-      const failed = new Set(await removeAll(admin, bucket, paths));
+      const failed = new Set(await removeAll(admin.storage, bucket, paths));
       const done = paths.filter((path) => !failed.has(path)).map((path) => ({ bucket, path }));
       if (done.length) await admin.rpc('finish_storage_cleanup', { p_items: done });
     }
