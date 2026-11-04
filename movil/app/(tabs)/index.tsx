@@ -401,8 +401,12 @@ export default function NavigationScreen() {
     live.location.speedKmh == null
       ? "--"
       : String(displaySpeed(live.location.speedKmh));
-  const routeLine = route.route
-    ? `${formatRouteDistance(route.route.distanceM)} · ${formatRouteTime(route.route.timeMs)}`
+  // P1-5 (docs/AUDITORIA-PRODUCCION.md): una línea directa no es una ruta por
+  // carretera. Sin ruta real no se dibuja ni se guía («Calculando ruta…»
+  // mientras se reintenta); la tarjeta lo explica.
+  const streetRoute = route.route?.source === "fallback" ? null : route.route;
+  const routeLine = streetRoute
+    ? `${formatRouteDistance(streetRoute.distanceM)} · ${formatRouteTime(streetRoute.timeMs)}`
     : null;
   const fastestTimeMs = route.routes[0]?.timeMs ?? 0;
   const routeOptions = useMemo<RouteOption[]>(
@@ -1064,7 +1068,7 @@ export default function NavigationScreen() {
         parking={mapParking}
         travelMode={walking ? "walking" : "car"}
         northUp={northUp}
-        route={route.route}
+        route={streetRoute}
         alternatives={mapAlternatives}
         stops={stops}
         // Antes de «Iniciar», vista de la ruta entera; al iniciar te sigue.
@@ -1541,12 +1545,12 @@ export default function NavigationScreen() {
                     error={route.error}
                     notice={
                       route.route?.source === "fallback"
-                        ? t('Sin motor de rutas disponible: es una línea directa, no una ruta por calles. Sigue las señales de tránsito.')
+                        ? t('No encontramos una ruta por carretera ahora mismo. Lo reintentamos solo; también puedes pulsar Reintentar.')
                         : null
                     }
                     options={routeOptions}
                     selected={route.selected}
-                    canConfirm={!route.isLoading && Boolean(route.route)}
+                    canConfirm={!route.isLoading && Boolean(streetRoute)}
                     bottomInset={0}
                     onRetry={retryRoute}
                     onSelect={selectRoute}

@@ -836,6 +836,7 @@
   "No encontramos una calle transitable entre esos puntos.": "We couldn't find a drivable street between those points.",
   "No encontramos una calle transitable entre esos puntos. Elige otro destino o inténtalo de nuevo.": "We couldn't find a drivable street between those points. Choose another destination or try again.",
   "No encontramos una party con ese código.": "We couldn't find a party with that code.",
+  "No encontramos una ruta por carretera ahora mismo. Lo reintentamos solo; también puedes pulsar Reintentar.": "We could not find a road route right now. We will retry automatically; you can also tap Retry.",
   "No encontramos {0} cerca.": "We couldn't find any {0} nearby.",
   "No fomentamos carreras ilegales ni premiamos la velocidad máxima. Gana quien llega primero cumpliendo los límites y las normas de tránsito.": "We don't encourage illegal racing or reward top speed. Whoever arrives first while respecting speed limits and traffic rules wins.",
   "No hay amigos con ese tipo de vehículo. Prueba otra categoría.": "No friends with that type of vehicle. Try another category.",

@@ -7,6 +7,7 @@ import { intervalsFromCongestion, trafficSpans, type TrafficInterval } from '@/s
 import { formatDistance, getLanguage, t } from '@/src/i18n';
 import {
   GRAPHHOPPER_TIMEOUT_MS,
+  isOsrmConfigured,
   MAPBOX_DIRECTIONS_TIMEOUT_MS,
   MAPBOX_DIRECTIONS_URL,
   MAPBOX_TOKEN,
@@ -381,11 +382,15 @@ export async function fetchStreetRoutes({
       if (signal?.aborted) throw error;
     }
   }
-  try {
-    return byTime(await fetchOsrmRoutes({ origin, destination, stops, signal }));
-  } catch (error) {
-    if (signal?.aborted) throw error;
+  if (isOsrmConfigured) {
+    try {
+      return byTime(await fetchOsrmRoutes({ origin, destination, stops, signal }));
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
   }
+  // Cancelado (nuevo destino, saliste): nunca se devuelve una ruta inventada.
+  if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
   return [fallbackRoute(origin, destination, stops)];
 }
 
