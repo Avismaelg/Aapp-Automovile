@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
 import { pushLivePosition, setLiveShareConfig } from '@/src/lib/live-share';
-import { SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
+import { sharesWithFriends } from '@/src/lib/party-invites';
 import { supabase } from '@/src/lib/supabase';
 import { setConvoyMode } from '@/src/lib/tracking';
 import { useAuth } from '@/src/store/auth';
@@ -16,13 +16,12 @@ export function useLiveShare(
   { partyId, enabled, hasFriends }: { partyId: string | null; enabled: boolean; hasFriends: boolean },
 ) {
   const accountId = useAuth((state) => state.account?.id ?? null);
-  // Se comparte salvo que digas que no (modo fantasma): antes hacía falta
-  // aceptar un aviso y, si no salía, tus amigos nunca te veían.
-  const chosen = useSharing((state) => state.shareWithFriends !== false);
+  // Solo si lo aceptaste (P1-1: desactivado por defecto).
+  const chosen = useSharing((state) => sharesWithFriends(state.shareWithFriends));
   // Sin amigos no hay a quién mostrarle tu posición: ni se sube ni se
   // mantiene el GPS rápido en segundo plano (batería).
-  const friends = SHARE_OUTSIDE_PARTY && chosen && hasFriends;
-  const declined = !(SHARE_OUTSIDE_PARTY && chosen);
+  const friends = chosen && hasFriends;
+  const declined = !chosen;
 
   useEffect(() => {
     void setLiveShareConfig({ accountId, partyId, friends });

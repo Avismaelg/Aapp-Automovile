@@ -44,7 +44,7 @@ import { setConvoyProgress } from "@/src/lib/live-share";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
-import { lastSeenLabel, SHARE_OUTSIDE_PARTY } from "@/src/lib/party-invites";
+import { lastSeenLabel, SHARE_OUTSIDE_PARTY, sharesWithFriends } from "@/src/lib/party-invites";
 import { useSharing } from "@/src/store/sharing";
 import { useFollow } from "@/src/store/follow";
 import { useChallengeDraft } from "@/src/store/challenge-draft";
@@ -1517,10 +1517,10 @@ export default function NavigationScreen() {
                     onRecenter={recenter}
                     ghost={
                       SHARE_OUTSIDE_PARTY && !isDemo && friendCount > 0
-                        ? shareWithFriends === false
+                        ? !sharesWithFriends(shareWithFriends)
                         : undefined
                     }
-                    onToggleGhost={() => setShareWithFriends(shareWithFriends === false)}
+                    onToggleGhost={() => setShareWithFriends(!sharesWithFriends(shareWithFriends))}
                   />
                   </View>
                 </View>

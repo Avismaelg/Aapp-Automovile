@@ -21,9 +21,10 @@ del operador antes de publicarse en App Store o Google Play.
 
 ## Finalidad y visibilidad
 
-- La ubicación la ven los amigos del usuario en su mapa y los miembros de su
-  party mientras está activa. El modo fantasma deja de compartirla con los
-  amigos y borra la última posición. Las parties se borran a las 24 horas.
+- La ubicación es privada salvo en dos casos: los miembros de la party la ven
+  mientras el usuario está en ella, y sus amigos la ven solo si activa
+  «compartir con amigos» (desactivado por defecto). Al desactivarlo se borra la
+  última posición. Las parties se borran a las 24 horas.
 - Los eventos públicos, perfiles públicos y récords públicos pueden ser vistos
   por otras personas.
 - La foto y datos del vehículo respetan la configuración de privacidad del

@@ -30,7 +30,7 @@ import { useSharing } from '@/src/store/sharing';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 import { restartApp } from '@/modules/motion';
-import { SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
+import { SHARE_OUTSIDE_PARTY, sharesWithFriends } from '@/src/lib/party-invites';
 import {
   distanceUnit,
   getCurrency,
@@ -331,7 +331,7 @@ export default function ProfileScreen() {
             divider
             right={
               <Switch
-                value={shareWithFriends !== false}
+                value={sharesWithFriends(shareWithFriends)}
                 onValueChange={setShareWithFriends}
                 trackColor={{ false: colors.surfaceHigh, true: colors.green }}
                 thumbColor={colors.white}
