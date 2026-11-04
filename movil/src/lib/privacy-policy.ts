@@ -30,7 +30,7 @@ const ES: Policy = {
     {
       title: 'Para qué y quién lo ve',
       items: [
-        'Tu ubicación es privada salvo en dos casos: los miembros de tu party la ven mientras estás en ella, y tus amigos la ven en su mapa solo si activas «compartir con amigos» (desactivado por defecto). Al desactivarlo (el ojo del mapa o Perfil) se borra tu última posición. Las parties se borran a las 24 horas.',
+        'Tu ubicación es privada salvo en dos casos: los miembros de tu party la ven mientras estás en ella, y tus amigos la ven en su mapa mientras «compartir con amigos» esté activado (lo está por defecto; te lo avisamos la primera vez). Al desactivarlo (el ojo del mapa o Perfil) se borra tu última posición. Las parties se borran a las 24 horas.',
         'Los QR solo contienen un enlace público a tu perfil o a tu vehículo; nunca tu teléfono ni tu ubicación.',
         'Los perfiles, vehículos y eventos públicos pueden verlos otras personas. Tus velocidades nunca se publican. Si tu perfil es privado, solo se ve una tarjeta mínima.',
         'Los retos miden la llegada respetando las normas de tránsito; nunca premian la velocidad.',
@@ -72,7 +72,7 @@ const EN: Policy = {
     {
       title: 'Why and who sees it',
       items: [
-        'Your location is private except in two cases: your party members see it while you are in the party, and your friends see it on their map only if you turn on "share with friends" (off by default). Turning it off (the eye on the map or Profile) deletes your last position. Parties are deleted after 24 hours.',
+        'Your location is private except in two cases: your party members see it while you are in the party, and your friends see it on their map while "share with friends" is on (it is on by default; we tell you the first time). Turning it off (the eye on the map or Profile) deletes your last position. Parties are deleted after 24 hours.',
         'QR codes only contain a public link to your profile or vehicle; never your phone number or location.',
         'Public profiles, vehicles and events can be seen by others. Your speeds are never published. If your profile is private, only a minimal card is shown.',
         'Challenges measure arrival while obeying traffic rules; they never reward speed.',

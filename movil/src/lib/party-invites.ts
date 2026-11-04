@@ -13,10 +13,11 @@ export const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 export const SHARE_OUTSIDE_PARTY = true;
 
 // Tres estados de la ubicación (docs/SEGURIDAD-Y-PRIVACIDAD.md):
-// privada · en el convoy (mientras estás en uno) · con amigos (consentimiento
-// propio). Con amigos solo si lo aceptaste: null (aún no has respondido) = no.
+// privada · en el convoy (mientras estás en uno) · con amigos. Decisión de
+// producto (2026-11-04): con amigos está ACTIVADO por defecto; el aviso de la
+// primera vez lo explica y «Ahora no» o el modo fantasma lo desactivan.
 export function sharesWithFriends(choice: boolean | null | undefined) {
-  return SHARE_OUTSIDE_PARTY && choice === true;
+  return SHARE_OUTSIDE_PARTY && choice !== false;
 }
 
 // RNF-05: miembros por party. 5 en el plan gratuito (el del MVP); 10 es el

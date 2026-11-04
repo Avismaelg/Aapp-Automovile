@@ -39,7 +39,7 @@ de la enmienda 1.1 del SRS hay unos 66 hechos.
 | Rutas y navegación | ✅ Google Routes con tráfico (Edge Function `routes`) → Mapbox → GraphHopper → OSRM; ruta pintada por tráfico, voz a 500/200 m y «ahora», recálculo a 40 m, ruta más rápida, paradas |
 | Convoy | ✅ crear/unirse (toque, código, QR, enlace), destino común del líder, progreso y llegadas, expulsar, terminar para todos, borrado a las 24 h |
 | Voz (LiveKit) | ✅ 3 canales, botón en el mapa, conecta en < 1 s, segundo plano y pantalla bloqueada, manos libres |
-| Amigos en el mapa | ✅ posición cada 5 s al moverte, también en segundo plano; **solo si activas «compartir con amigos»** (desactivado por defecto) |
+| Amigos en el mapa | ✅ posición cada 5 s al moverte, también en segundo plano; activado por defecto; el modo fantasma te oculta |
 | Retos | ✅ cuenta atrás, abandono, cancelados a las 24 h; llegada comprobada en el servidor contra la meta («verificada» o «autodeclarada») en `fix/production-readiness`, pendiente de aplicar |
 | Récords | Sin clasificaciones ni récords de velocidad: «Tus autopistas» muestra en privado tus viajes y qué parte fuiste dentro del límite |
 | Avisos (Firebase) | ✅ Android con la app cerrada (invitación, reto, amistad); iOS por APNs listo, falta la clave de Apple |
@@ -171,8 +171,9 @@ caravana/
 - **La voz y el grupo son el diferenciador:** ni Waze ni WhatsApp juntan mapa,
   ruta común y walkie-talkie.
 - **Retos seguros:** miden la llegada cumpliendo las normas, nunca la velocidad.
-- **Ubicación privada por defecto:** la ve tu convoy mientras estás en él y tus
-  amigos solo si lo activas; los convoys se borran a las 24 h. El QR no
+- **Ubicación bajo control:** la ve tu convoy mientras estás en él y tus amigos
+  (activado por defecto; el modo fantasma te oculta); los convoys se borran a
+  las 24 h. El QR no
   contiene teléfono ni ubicación.
 - **Costo casi cero al inicio:** Google con tope de gasto diario y Firebase
   gratis; el plan gratuito permite convoys de hasta 5 pilotos (10 de máximo).

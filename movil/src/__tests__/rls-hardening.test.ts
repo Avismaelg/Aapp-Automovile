@@ -291,13 +291,13 @@ describe('fase 10 · páginas web de las tiendas', () => {
     expect(page).toContain("functions.invoke('delete-account'");
     const keys = page.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
     expect(keys.length).toBe(1);
-    const claims = JSON.parse(Buffer.from(keys[0].split('.')[1], 'base64url').toString('utf8'));
+    const claims = JSON.parse(Buffer.from((keys[0] ?? '').split('.')[1] ?? '', 'base64url').toString('utf8'));
     expect(claims.role).toBe('anon');
   });
 
   it('la política de privacidad pública dice lo mismo que la app', () => {
     const page = fs.readFileSync(path.join(site, 'privacidad', 'index.html'), 'utf8');
-    expect(page).toContain('desactivado por defecto');
+    expect(page).toContain('lo está por defecto');
     expect(page).toContain('../borrar-cuenta/');
   });
 });

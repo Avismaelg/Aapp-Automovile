@@ -16,7 +16,7 @@ export function useLiveShare(
   { partyId, enabled, hasFriends }: { partyId: string | null; enabled: boolean; hasFriends: boolean },
 ) {
   const accountId = useAuth((state) => state.account?.id ?? null);
-  // Solo si lo aceptaste (P1-1: desactivado por defecto).
+  // Salvo que digas que no (activado por defecto; ver sharesWithFriends).
   const chosen = useSharing((state) => sharesWithFriends(state.shareWithFriends));
   // Sin amigos no hay a quién mostrarle tu posición: ni se sube ni se
   // mantiene el GPS rápido en segundo plano (batería).

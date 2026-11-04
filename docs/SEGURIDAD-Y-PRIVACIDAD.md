@@ -18,9 +18,9 @@ ver `PRUEBAS-PRODUCCION.md` y `CHECKLIST-LANZAMIENTO.md`.
 
 | Estado | Quién te ve | Cómo se activa | Cómo se revoca |
 |---|---|---|---|
-| Privada (por defecto) | Nadie | — | — |
+| Privada | Nadie | Modo fantasma o «Ahora no» en el aviso | — |
 | Convoy | Miembros de tu convoy, mientras sigas en él | Unirte o crear un convoy | Salir; expulsión; el convoy se borra a las 24 h |
-| Amigos | Tus amigos (amistad aceptada por los dos, sin bloqueos) | «Compartir con amigos» (aviso único o Perfil); **desactivado por defecto** | El ojo del mapa o Perfil: se deja de enviar y se **borra tu última posición** |
+| Amigos | Tus amigos (amistad aceptada por los dos, sin bloqueos) | **Activado por defecto** (decisión de producto del 2026-11-04); se avisa la primera vez | El ojo del mapa o Perfil: se deja de enviar y se **borra tu última posición** |
 
 - Al cerrar sesión se borra la configuración de envío y se apaga el servicio
   de segundo plano (`app/_layout.tsx`); el token de avisos se borra antes.
