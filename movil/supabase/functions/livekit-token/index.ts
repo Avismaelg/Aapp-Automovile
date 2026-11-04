@@ -60,7 +60,8 @@ Deno.serve(async (request) => {
 
   const partyId = body.partyId;
   const channelSlug = body.channelSlug;
-  if (!partyId || !channelSlug || !allowedChannels.has(channelSlug)) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!partyId || !uuid.test(partyId) || !channelSlug || !allowedChannels.has(channelSlug)) {
     return json({ error: 'Party o canal inválido.' }, 400);
   }
 
@@ -82,6 +83,8 @@ Deno.serve(async (request) => {
     .select('id, voice_room, status, name')
     .eq('id', partyId)
     .in('status', ['scheduled', 'live'])
+    // P1-7: un convoy caducado (24 h) no da voz.
+    .gt('expires_at', new Date().toISOString())
     .maybeSingle();
 
   if (partyError || !party) {
@@ -112,15 +115,20 @@ Deno.serve(async (request) => {
   }
 
   const roomName = `${party.voice_room}_${channelSlug}`;
-  const displayName =
-    (user.user_metadata?.display_name as string | undefined) ||
-    user.email?.split('@')[0] ||
-    'Piloto';
+  // P2-1: el nombre del perfil, nunca parte del correo.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .maybeSingle();
+  const displayName = (profile?.display_name as string | undefined)?.trim() || 'Piloto';
 
   const token = new AccessToken(livekitApiKey, livekitApiSecret, {
     identity: user.id,
     name: displayName,
-    ttl: '2h',
+    // P1-3: corto; al salir del convoy además se echa de la sala
+    // (livekit-revoke), así que no hay que esperar a que caduque.
+    ttl: '15m',
   });
   token.addGrant({
     roomJoin: true,

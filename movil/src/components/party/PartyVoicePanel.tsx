@@ -13,7 +13,7 @@ type Props = {
   isDemo: boolean;
   voice: Pick<
     VoiceRoom,
-    'status' | 'participantCount' | 'error' | 'handsFree' | 'setHandsFree' | 'mutedAll' | 'setMuteAll'
+    'status' | 'participantCount' | 'error' | 'handsFree' | 'setHandsFree' | 'mutedAll' | 'setMuteAll' | 'micDenied'
   >;
   current: PartyVoiceChannelSlug;
   channelCount: (slug: PartyVoiceChannelSlug) => number;
@@ -34,14 +34,18 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
                 ? t('Voz {0}', voice.participantCount)
                 : voice.status === 'connecting'
                   ? t('Conectando')
-                  : voice.status === 'error'
+                  : voice.status === 'reconnecting'
+                    ? t('Reconectando')
+                    : voice.status === 'offline'
+                      ? t('Sin conexión')
+                      : voice.status === 'error'
                     ? t('Sin voz')
                     : t('Inactivo')
           }
           tone={
             voice.status === 'connected'
               ? 'lime'
-              : voice.status === 'error'
+              : voice.status === 'error' || voice.status === 'offline'
                 ? 'danger'
                 : 'neutral'
           }
@@ -122,8 +126,12 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
           {isDemo
             ? t('Voz de ejemplo en modo demo.')
             : voice.status === 'connected'
-              ? t('Conectado a {0} · {1} en el canal', partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy', voice.participantCount)
-              : t('Conectando el PTT de voz de la party…')}
+              ? voice.micDenied
+                ? t('Oyes al convoy. Para hablar, activa el micrófono en Ajustes.')
+                : t('Conectado a {0} · {1} en el canal', partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy', voice.participantCount)
+              : voice.status === 'reconnecting' || voice.status === 'offline'
+                ? t('Sin conexión con la voz: se reconecta sola en cuanto vuelva la red.')
+                : t('Conectando el PTT de voz de la party…')}
         </AppText>
       )}
     </View>

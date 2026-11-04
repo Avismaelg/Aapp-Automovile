@@ -6,6 +6,7 @@ import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
   AndroidAudioTypePresets,
   AudioSession,
+  DisconnectReason,
   initializeLiveKit,
   Room,
   RoomEvent,
@@ -16,14 +17,18 @@ import { ensureMicrophone as ensureMicrophonePermission } from '@/src/lib/microp
 import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 
-type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
+// Estados visibles (fase 5 del prompt de producción): conectando, conectado,
+// reconectando, sin conexión (se reintenta solo) y error.
+type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'error';
+// Tras caerse la red, se vuelve a intentar a los 5 s.
+const RETRY_MS = 5_000;
 
 // Fila de aperturas y cierres de la sesión de audio (nunca se cruzan).
 let audioChain: Promise<void> = Promise.resolve();
 
-// Tokens de LiveKit ya pedidos (caducan a las 2 h; se reusan 90 min). Pedir
-// el token a la Edge Function era ~1 s de los ~5 s que tardaba la voz.
-const TOKEN_REUSE_MS = 90 * 60_000;
+// Tokens de LiveKit ya pedidos: duran 15 min en el servidor (livekit-token)
+// y se reutilizan 10. Pedirlo cada vez era ~1 s de lo que tardaba la voz.
+const TOKEN_REUSE_MS = 10 * 60_000;
 const tokenCache = new Map<string, { payload: VoiceTokenResponse; at: number }>();
 
 // Android no da el micrófono sin pedirlo: antes nunca se pedía y el PTT no
@@ -60,6 +65,8 @@ export function useVoiceRoom({
   const [talking, setTalkingState] = useState(false);
   const [activeSpeakerIds, setActiveSpeakerIds] = useState<string[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
+  // Sin permiso de micrófono se oye, pero no se puede hablar.
+  const [micDenied, setMicDenied] = useState(false);
 
   // Sesión de audio: una vez por convoy, no por canal. Antes se cerraba y se
   // abría al cambiar de canal; si el cierre llegaba después de la apertura,
@@ -94,6 +101,7 @@ export function useVoiceRoom({
 
     let active = true;
     let room: Room | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = async () => {
       setStatus('connecting');
@@ -172,12 +180,33 @@ export function useVoiceRoom({
             // Con «silenciar a todos», quien entra tampoco se oye.
             if (mutedAllRef.current && publication.kind === Track.Kind.Audio) publication.setSubscribed(false);
           })
-          .on(RoomEvent.Disconnected, () => {
+          .on(RoomEvent.Reconnecting, () => {
+            if (active) setStatus('reconnecting');
+          })
+          .on(RoomEvent.Reconnected, () => {
+            if (active) setStatus('connected');
+          })
+          .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
             if (!active) return;
             setTalkingState(false);
-            setStatus('idle');
             setParticipantCount(0);
             setActiveSpeakerIds([]);
+            roomRef.current = null;
+            // Te sacó el servidor (saliste o te expulsaron del convoy): no se
+            // reintenta. Si fue la red, se vuelve a intentar solo.
+            if (reason === DisconnectReason.PARTICIPANT_REMOVED || reason === DisconnectReason.ROOM_DELETED) {
+              tokenCache.clear();
+              setStatus('idle');
+              return;
+            }
+            if (reason === DisconnectReason.CLIENT_INITIATED) {
+              setStatus('idle');
+              return;
+            }
+            setStatus('offline');
+            retryTimer = setTimeout(() => {
+              if (active) void connect();
+            }, RETRY_MS);
           });
 
         // Con 15 s por intento (lo normal) una red lenta dejaba la voz más de
@@ -200,7 +229,9 @@ export function useVoiceRoom({
         // plano de tipo micrófono, con su notificación).
         startDriving('voice');
         // Se pide ya, para que el primer PTT no se pierda en el aviso.
-        void ensureMicrophone();
+        void ensureMicrophone().then((granted) => {
+          if (active) setMicDenied(!granted);
+        });
       } catch (connectError) {
         // Un token rechazado o caducado no se vuelve a usar.
         tokenCache.clear();
@@ -231,6 +262,7 @@ export function useVoiceRoom({
 
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
       setTalkingState(false);
       if (room) {
         room.disconnect();
@@ -286,6 +318,7 @@ export function useVoiceRoom({
     mutedAll,
     setMuteAll,
     status: enabled && partyId ? status : 'idle',
+    micDenied: enabled && partyId ? micDenied : false,
     error: enabled && partyId ? error : null,
     talking: enabled && partyId ? talking : false,
     activeSpeakerIds: enabled && partyId ? activeSpeakerIds : [],

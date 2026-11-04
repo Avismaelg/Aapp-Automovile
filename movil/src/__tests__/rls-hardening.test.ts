@@ -241,3 +241,21 @@ describe('P0-5 · retos', () => {
     expect(allSql).toContain('drop function if exists private.report_challenge_progress(uuid, numeric, boolean)');
   });
 });
+
+describe('fase 5 · voz', () => {
+  const functionsDir = path.join(__dirname, '..', '..', 'supabase', 'functions');
+  const token = fs.readFileSync(path.join(functionsDir, 'livekit-token', 'index.ts'), 'utf8');
+
+  it('token corto, solo para convoys vigentes y sin datos del correo', () => {
+    expect(token).toContain("ttl: '15m'");
+    expect(token).toContain(".gt('expires_at'");
+    expect(token).not.toMatch(/email\?*\.split/);
+  });
+
+  it('salir o ser expulsado echa de la sala de voz al momento', () => {
+    expect(allSql).toContain('create trigger party_members_voice_revoke');
+    const revoke = fs.readFileSync(path.join(functionsDir, 'livekit-revoke', 'index.ts'), 'utf8');
+    expect(revoke).toContain("request.headers.get('x-push-secret') !== secret");
+    expect(revoke).toContain('removeParticipant');
+  });
+});

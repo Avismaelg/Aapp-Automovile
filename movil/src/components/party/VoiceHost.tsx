@@ -16,7 +16,7 @@ export function VoiceHost() {
     enabled: Boolean(party) && !isDemo,
   });
 
-  const { status, error, talking, activeSpeakerIds, participantCount, handsFree, mutedAll } = voice;
+  const { status, error, talking, activeSpeakerIds, participantCount, handsFree, mutedAll, micDenied } = voice;
   const { setTalking, setHandsFree, setMuteAll } = voice;
   useEffect(() => {
     useConvoyVoice.setState({
@@ -27,11 +27,12 @@ export function VoiceHost() {
       participantCount,
       handsFree,
       mutedAll,
+      micDenied,
       setTalking,
       setHandsFree,
       setMuteAll,
     });
-  }, [status, error, talking, activeSpeakerIds, participantCount, handsFree, mutedAll, setTalking, setHandsFree, setMuteAll]);
+  }, [status, error, talking, activeSpeakerIds, participantCount, handsFree, mutedAll, micDenied, setTalking, setHandsFree, setMuteAll]);
 
   // Al salir del convoy se vuelve a «Convoy» para la próxima vez.
   const partyId = party?.id ?? null;

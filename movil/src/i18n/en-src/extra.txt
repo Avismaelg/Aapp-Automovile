@@ -295,3 +295,10 @@
 =1 viaje|1 trip
 =Tus autopistas|Your highways
 =llegada autodeclarada|self-reported arrival
+=Reconectando|Reconnecting
+=Sin conexión con la voz del convoy. Se reconecta sola en cuanto vuelva la red.|No connection to the convoy voice. It reconnects by itself as soon as the network is back.
+=Sin conexión con la voz: se reconecta sola en cuanto vuelva la red.|No voice connection: it reconnects by itself as soon as the network is back.
+=Micrófono no disponible|Microphone unavailable
+=Oyes al convoy, pero para hablar activa el micrófono de Caravana en Ajustes.|You can hear the convoy, but to talk turn on Caravana's microphone in Settings.
+=Oyes al convoy. Para hablar, activa el micrófono en Ajustes.|You hear the convoy. To talk, turn on the microphone in Settings.
+=Abrir Ajustes|Open Settings

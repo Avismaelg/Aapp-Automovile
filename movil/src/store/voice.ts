@@ -7,7 +7,7 @@ import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 // el mapa y la pestaña Party usan la misma sala, se oye con el mapa abierto y
 // al ir a hablar ya está conectada (antes tardaba ~5 s al abrir Party).
 
-export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'error';
+export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'error';
 
 type VoiceActions = {
   setTalking: (next: boolean) => Promise<void>;
@@ -24,6 +24,8 @@ type VoiceState = VoiceActions & {
   participantCount: number;
   handsFree: boolean;
   mutedAll: boolean;
+  // Sin permiso de micrófono: se oye pero no se puede hablar.
+  micDenied: boolean;
   setChannel: (channel: PartyVoiceChannelSlug) => void;
 };
 
@@ -39,6 +41,7 @@ export const useConvoyVoice = create<VoiceState>((set) => ({
   participantCount: 0,
   handsFree: false,
   mutedAll: false,
+  micDenied: false,
   setChannel: (channel) => set({ channel }),
   // VoiceHost las sustituye por las de la sala conectada.
   setTalking: noop,

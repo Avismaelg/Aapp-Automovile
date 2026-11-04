@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
 import { useConvoyVoice } from '@/src/store/voice';
@@ -15,6 +15,7 @@ export function VoicePTT({ size = 58 }: { size?: number }) {
   const error = useConvoyVoice((state) => state.error);
   const talking = useConvoyVoice((state) => state.talking);
   const handsFree = useConvoyVoice((state) => state.handsFree);
+  const micDenied = useConvoyVoice((state) => state.micDenied);
   const othersTalking = useConvoyVoice((state) => state.activeSpeakerIds.length > 0 && !state.talking);
   const setTalking = useConvoyVoice((state) => state.setTalking);
   const [pressed, setPressed] = useState(false);
@@ -23,8 +24,18 @@ export function VoicePTT({ size = 58 }: { size?: number }) {
     if (status !== 'connected') {
       Alert.alert(
         t('Voz no disponible'),
-        error ?? t('La voz todavía se está conectando. Espera un momento e inténtalo de nuevo.'),
+        error ??
+          (status === 'reconnecting' || status === 'offline'
+            ? t('Sin conexión con la voz del convoy. Se reconecta sola en cuanto vuelva la red.')
+            : t('La voz todavía se está conectando. Espera un momento e inténtalo de nuevo.')),
       );
+      return;
+    }
+    if (micDenied) {
+      Alert.alert(t('Micrófono no disponible'), t('Oyes al convoy, pero para hablar activa el micrófono de Caravana en Ajustes.'), [
+        { text: t('Ahora no'), style: 'cancel' },
+        { text: t('Abrir Ajustes'), onPress: () => void Linking.openSettings() },
+      ]);
       return;
     }
     setPressed(true);
@@ -57,7 +68,7 @@ export function VoicePTT({ size = 58 }: { size?: number }) {
         accessibilityRole="button"
         accessibilityLabel={t('Mantén pulsado para hablar al convoy')}
       >
-        {status === 'connecting' ? (
+        {status === 'connecting' || status === 'reconnecting' ? (
           <ActivityIndicator color={colors.text} />
         ) : (
           <Ionicons name={live ? 'mic' : othersTalking ? 'volume-high' : 'mic-outline'} size={size * 0.42} color={live ? '#120802' : colors.text} />
