@@ -294,3 +294,4 @@
 ={0} viajes|{0} trips
 =1 viaje|1 trip
 =Tus autopistas|Your highways
+=llegada autodeclarada|self-reported arrival

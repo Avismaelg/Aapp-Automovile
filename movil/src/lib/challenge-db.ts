@@ -32,6 +32,7 @@ export type RealChallengeParticipant = {
   progressPct: number;
   elapsedSeconds: number;
   finishRank: number | null;
+  arrivalVerified?: boolean | null;
   isMe: boolean;
   isHost: boolean;
   // RETO-07: último avance recibido (para «sin conexión»).
@@ -127,6 +128,7 @@ export function realChallengeToChallenge(
       etaMin: Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
       isMe: participant.isMe,
       rank: participant.finishRank ?? undefined,
+      arrivalVerified: participant.arrivalVerified ?? null,
       state: participantState(challenge, participant, now),
     }));
 

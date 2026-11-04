@@ -213,3 +213,31 @@ describe('P0-4 · sin velocidad pública', () => {
     expect(users).toEqual([]);
   });
 });
+
+describe('P0-5 · retos', () => {
+  const policies = finalPolicies();
+
+  it('solo el anfitrión inscribe y nadie se pone puesto ni avance a mano', () => {
+    expect(policies.get('challenge_participants.challenge_participants_insert') ?? '').toContain(
+      'private.is_challenge_host(challenge_id)',
+    );
+    const privileges = finalPrivileges('challenge_participants');
+    expect([...privileges.table('update')]).toEqual([]);
+    const columns = privileges.columns('update');
+    for (const forbidden of ['finish_rank', 'progress_pct', 'elapsed_s', 'arrival_verified', 'user_id']) {
+      expect(columns.has(forbidden)).toBe(false);
+    }
+    const guard = functionBody('challenge_participants_guard');
+    expect(guard).toContain("old.status = 'invited' and new.status in ('accepted', 'declined')");
+    expect(guard).toContain("raise exception 'invalid_participant_transition'");
+  });
+
+  it('la llegada se comprueba contra la meta y distingue verificada de autodeclarada', () => {
+    const report = functionBody('report_challenge_progress');
+    expect(report).toContain('p_lat double precision default null');
+    expect(report).toContain("raise exception 'not_at_finish'");
+    expect(report).toContain('arrival_verified = v_verified');
+    // La versión de 3 argumentos (que confiaba en p_arrived) ya no existe.
+    expect(allSql).toContain('drop function if exists private.report_challenge_progress(uuid, numeric, boolean)');
+  });
+});

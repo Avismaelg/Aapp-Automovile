@@ -56,7 +56,11 @@ export function useChallengeRace(location: LiveLocation, enabled: boolean) {
     if (!shouldReportProgress(lastRef.current, { pct: progress.pct, at: now, arrived: progress.arrived })) return;
     lastRef.current = { pct: progress.pct, at: now };
     if (progress.arrived) doneRef.current = challengeId;
-    reportChallengeProgress(challengeId, progress.pct, progress.arrived)
+    reportChallengeProgress(challengeId, progress.pct, progress.arrived, {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy: location.accuracy ?? null,
+    })
       .then((rank) => {
         if (progress.arrived && rank) {
           void AsyncStorage.removeItem(START_KEY(challengeId)).catch(() => {});

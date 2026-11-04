@@ -57,6 +57,7 @@ type ParticipantRow = {
   elapsed_s: number;
   finish_rank: number | null;
   last_progress_at?: string | null;
+  arrival_verified?: boolean | null;
 };
 
 type VehicleRow = {
@@ -270,6 +271,7 @@ export function useChallenges() {
               progressPct: Number(participant.progress_pct),
               elapsedSeconds: participant.elapsed_s,
               finishRank: participant.finish_rank,
+              arrivalVerified: participant.arrival_verified ?? null,
               lastProgressAt: participant.last_progress_at ?? null,
               isMe: participant.user_id === account.id,
               isHost: participant.user_id === challenge.host_id,
@@ -567,17 +569,22 @@ export function useFinishChallenge() {
   });
 }
 
-// Avance en un reto por llegada. Devuelve tu puesto al llegar.
+// Avance en un reto por llegada. Devuelve tu puesto al llegar. La posición
+// viaja con la llegada: el servidor la comprueba contra la meta (P0-5).
 export async function reportChallengeProgress(
   challengeId: string,
   progressPct: number,
   arrived: boolean,
+  position?: { latitude: number; longitude: number; accuracy: number | null },
 ): Promise<number | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('report_challenge_progress', {
     p_challenge_id: challengeId,
     p_progress: progressPct,
     p_arrived: arrived,
+    p_lat: position?.latitude ?? null,
+    p_lng: position?.longitude ?? null,
+    p_accuracy_m: position?.accuracy ?? null,
   });
   if (error) throw new Error(error.message);
   return typeof data === 'number' ? data : null;

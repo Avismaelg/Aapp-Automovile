@@ -71,7 +71,9 @@ export function ChallengeStandings({
                     : participant.state === 'offline'
                       ? t('Sin conexión')
                       : participant.state === 'finished' || status === 'finished'
-                        ? t('llegada')
+                        ? participant.arrivalVerified === false
+                          ? t('llegada autodeclarada')
+                          : t('llegada')
                         : t('ETA {0} m', participant.etaMin)}
                 </AppText>
               </View>

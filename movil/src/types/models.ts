@@ -64,6 +64,9 @@ export type ChallengeParticipant = {
   rank?: number;
   // RETO-07: en carrera, llegó, abandonó o sin conexión.
   state?: 'racing' | 'finished' | 'abandoned' | 'offline' | 'waiting';
+  // P0-5: llegada comprobada en el servidor contra la meta (true) o sin
+  // posición que la respalde (false, «autodeclarada»).
+  arrivalVerified?: boolean | null;
 };
 
 export type Challenge = {
