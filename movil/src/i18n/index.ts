@@ -215,7 +215,10 @@ export function speechLanguage() {
 export function shortMonths() {
   return Array.from({ length: 12 }, (_, month) => {
     try {
-      return new Date(2000, month, 1).toLocaleDateString(getLocale(), { month: 'short' }).replace('.', '');
+      // Día 15 a mediodía: con el día 1 a medianoche, una zona horaria del
+      // formateador una hora por detrás daba el mes anterior («4 oct» el 4 de
+      // noviembre en la tableta).
+      return new Date(2000, month, 15, 12).toLocaleDateString(getLocale(), { month: 'short' }).replace('.', '');
     } catch {
       return String(month + 1);
     }

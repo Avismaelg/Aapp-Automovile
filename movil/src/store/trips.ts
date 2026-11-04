@@ -54,6 +54,9 @@ type TripsState = {
     accuracy?: number | null;
   }) => void;
   stopTrip: () => Promise<void>;
+  // Cierra el viaje si lleva parado STOP_AFTER_MS aunque no llegue ninguna
+  // posición nueva (teléfono quieto o sin GPS al aparcar).
+  closeIfIdle: (now?: number) => void;
   removeTestTrips: () => Promise<void>;
   removeTrip: (tripId: string) => Promise<void>;
   markRecordsSubmitted: (tripId: string) => void;
@@ -118,6 +121,23 @@ export function setMotionGates(gates: MotionGates | null) {
 const VEHICLE_LOOKBACK_MS = 15 * 60_000;
 // Tiempo que se le da a un viaje para alejarse de la salida.
 const REACH_GRACE_MS = 5 * 60_000;
+
+// Velocidad creíble para la máxima: no más de 1,3 veces (+15 km/h) la que sale
+// de dividir lo recorrido entre el tiempo. Sin punto anterior (o con poco
+// tiempo entre los dos) no se puede comprobar y vale la del GPS.
+export function plausibleSpeed(
+  speedKmh: number,
+  previous: TripPoint | undefined,
+  latitude: number,
+  longitude: number,
+  at: number,
+) {
+  if (!previous) return speedKmh;
+  const seconds = (at - previous.at) / 1000;
+  if (seconds < 2 || seconds > 120) return speedKmh;
+  const measuredKmh = (haversineMeters(previous, { latitude, longitude }) / seconds) * 3.6;
+  return Math.min(speedKmh, measuredKmh * 1.3 + 15);
+}
 
 function tripReach(trip: Trip) {
   const origin = trip.points[0];
@@ -494,7 +514,11 @@ export const useTrips = create<TripsState>((set, get) => ({
 
     const hours = (now - active.startedAt) / 3_600_000;
     const distanceM = active.distanceM + (appended ? segmentM : 0);
-    const maxSpeedKmh = Math.max(active.maxSpeedKmh, speed);
+    // La velocidad que da el GPS en segundo plano no pasa por el filtro de la
+    // pantalla y a veces salta (un pico de 123 km/h en un viaje de media 41).
+    // Para la máxima solo cuenta si es coherente con la distancia recorrida
+    // de verdad desde el punto anterior.
+    const maxSpeedKmh = Math.max(active.maxSpeedKmh, plausibleSpeed(speed, previous, latitude, longitude, now));
     const avgSpeedKmh =
       hours > 0
         ? Math.min(200, Math.round((distanceM / 1000 / hours) * 10) / 10)
@@ -529,6 +553,22 @@ export const useTrips = create<TripsState>((set, get) => ({
 
     set({ active: next });
     schedulePersist();
+  },
+
+  // Antes el viaje solo se cerraba al llegar una muestra nueva: aparcado, con
+  // el teléfono quieto o bajo techo a veces no llega ninguna y el viaje quedaba
+  // abierto indefinidamente («el viaje no se ha cerrado»). Lo llama un
+  // temporizador de useTripRecorder y la vuelta a la app.
+  closeIfIdle: (now = Date.now()) => {
+    const active = get().active;
+    if (!active || active.test) return;
+    const lastMoving = Math.max(lastMovingAt, active.startedAt);
+    if (now - lastMoving <= STOP_AFTER_MS) return;
+    fastSamples = 0;
+    pendingStart = null;
+    // Termina cuando dejó de moverse, no cuando nos damos cuenta.
+    set({ active: null, ...archiveTrip(get(), active, Math.min(lastMoving, lastPointAt(active))) });
+    void persistAll();
   },
 
   stopTrip: async () => {

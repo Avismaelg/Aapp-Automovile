@@ -9,6 +9,8 @@ import { useSession } from '@/src/store/session';
 // Con la app abierta el GPS en primer plano ya graba; los lotes de fondo se
 // recogen igualmente para que no se acumulen en el almacenamiento.
 const INGEST_EVERY_MS = 2 * 60_000;
+// Cada cuánto se mira si el viaje lleva parado lo bastante para cerrarlo.
+const IDLE_CHECK_MS = 30_000;
 // Ventana de avisos del sensor para saber qué haces ahora.
 const MOTION_LOOKBACK_MS = 12 * 3_600_000;
 
@@ -61,13 +63,18 @@ export function useTripRecorder(
     const subscription = AppState.addEventListener('change', (state) => {
       // Al salir, los puntos llegan por el servicio de fondo; al volver se
       // recogen antes de aceptar de nuevo el GPS en vivo.
-      if (state === 'active') ingest();
-      else useTrips.getState().blockLive();
+      if (state === 'active') {
+        ingest();
+        useTrips.getState().closeIfIdle();
+      } else useTrips.getState().blockLive();
     });
     const timer = setInterval(ingest, INGEST_EVERY_MS);
+    // Sin posiciones nuevas también hay que poder cerrar el viaje.
+    const idleTimer = setInterval(() => useTrips.getState().closeIfIdle(), IDLE_CHECK_MS);
     return () => {
       subscription.remove();
       clearInterval(timer);
+      clearInterval(idleTimer);
     };
   }, [hydrated, ingestBackground]);
 
