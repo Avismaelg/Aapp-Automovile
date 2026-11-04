@@ -259,3 +259,26 @@ describe('fase 5 · voz', () => {
     expect(revoke).toContain('removeParticipant');
   });
 });
+
+describe('fase 7 · borrado de cuenta', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'supabase', 'functions', 'delete-account', 'index.ts'),
+    'utf8',
+  );
+
+  it('no responde «todo borrado» si quedan archivos', () => {
+    expect(source).not.toMatch(/return json\(\{ ok: true \}\)/);
+    expect(source).toContain("storage: 'partial'");
+    expect(source).toContain("rpc('queue_storage_cleanup'");
+  });
+
+  it('pagina las carpetas y reintenta lo pendiente', () => {
+    expect(source).toMatch(/list\(folder, \{ limit: PAGE, offset \}\)/);
+    expect(source).toContain("rpc('next_storage_cleanup'");
+  });
+
+  it('la cola no la toca la app', () => {
+    expect(allSql).toContain('revoke all on function public.queue_storage_cleanup(jsonb) from public, anon, authenticated');
+    expect(allSql).toContain('revoke all on private.storage_cleanup from public, anon, authenticated');
+  });
+});

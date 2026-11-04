@@ -302,3 +302,5 @@
 =Oyes al convoy, pero para hablar activa el micrófono de Caravana en Ajustes.|You can hear the convoy, but to talk turn on Caravana's microphone in Settings.
 =Oyes al convoy. Para hablar, activa el micrófono en Ajustes.|You hear the convoy. To talk, turn on the microphone in Settings.
 =Abrir Ajustes|Open Settings
+=Cuenta eliminada|Account deleted
+=Tu cuenta y tus datos ya se borraron. Algunas fotos tardarán un poco más: se borran solas en los próximos borrados del servidor.|Your account and data are deleted. A few photos will take a little longer: the server removes them on its next cleanups.
