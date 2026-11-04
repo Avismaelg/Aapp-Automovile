@@ -430,3 +430,20 @@ Hecho en código y con prueba Jest. Falta la prueba en dispositivos (guion de la
 **Sigue pendiente:**
 - **Sin hacer o a medias:** MAPA-06 (ajuste a la calle), MAPA-10/11/25/26 (rendimiento y batería, que se miden en el dispositivo), MAPA-24 (push con la app cerrada, que necesita FCM), MAPA-28 (aviso sin conexión dentro del mapa) y RETO-05 (clasificación por ETA real: hoy es por avance).
 - **Depende de pasos tuyos:** CONV-13/16 (voz bloqueada hasta corregir el secret de LiveKit), SYNC-08 (cuenta EAS) y el benchmark contra Waze (2.F) en el teléfono.
+
+### Avance (2026-11-04)
+
+Probado en el teléfono (SM-G996U1) salvo donde se indica.
+
+| Área | Criterios | Estado |
+|---|---|---|
+| Tráfico | MAPA-04 (capa propia sobre todas las calles, no solo puentes y túneles), MAPA-12 (ruta pintada por tramos con el tráfico de Google `TRAFFIC_ON_POLYLINE` y la congestión de Mapbox) | Hecho; función `routes` desplegada |
+| Avisos | MAPA-24 (FCM con la app cerrada: invitación a convoy, reto y solicitud de amistad; Edge Function `push` llamada por triggers con `pg_net`) | Hecho en Android y probado. iOS ⛔: falta la clave APNs (Apple Developer) |
+| Fallos | Firebase Crashlytics (cierres nativos y de JS, y lo que guarda `error-log`) | Hecho |
+| Voz | CONV-13…16 (sala global en `VoiceHost`, botón en el mapa, conexión en 0,9 s, segundo plano con servicio de tipo micrófono) | Hecho |
+| Amigos | MAPA-19 (cada 5 s al moverte, también en segundo plano y con la app cerrada; compartir por defecto, modo fantasma para ocultarte) | Hecho |
+| Convoy y retos | Convoys borrados y retos cancelados a las 24 h (`purge_expired_parties` cada 15 min con pg_cron) | Hecho |
+| Permisos | Todos al entrar (ubicación «siempre», micrófono, notificaciones, actividad, batería); pantalla siempre encendida con la app abierta | Hecho |
+| Auditoría | `db-permissions.test.ts`: reproduce grants y revokes de todas las migraciones y falla si se quita a los usuarios el uso de `private` (fallo real del 2026-11-04, corregido en `20261104110000_restore_private_usage.sql`) | Hecho |
+
+**Sigue pendiente:** RETO-05 (clasificación por ETA), MAPA-28 (aviso sin conexión en el mapa), MAPA-06 (ajuste a la calle), MAPA-10/11/25/26 (medir en viaje real), SYNC-08 (EAS), la app de iOS y la publicación en las tiendas.

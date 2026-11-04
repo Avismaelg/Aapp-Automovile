@@ -1,7 +1,7 @@
 import { DOMINICAN_PLACES, type KnownPlace } from '@/src/data/do-places';
 import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
-import { getLanguage, t } from '@/src/i18n';
+import { formatDistance, getLanguage, t } from '@/src/i18n';
 import { NOMINATIM_URL, PHOTON_URL } from '@/src/lib/providers';
 import { googleAutocomplete, googleNearby, googlePlaceLocation, type GooglePlace } from '@/src/lib/google-places';
 
@@ -749,6 +749,5 @@ export async function searchCategory(
 
 export function formatSearchDistance(meters: number | null) {
   if (meters == null || !Number.isFinite(meters)) return null;
-  if (meters < 1000) return t('a {0} m', Math.round(meters));
-  return t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
+  return t('a {0}', formatDistance(meters));
 }

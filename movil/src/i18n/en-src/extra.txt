@@ -88,7 +88,7 @@
 =Próximo servicio en {0}|Next service in {0}
 =Política de privacidad|Privacy policy
 =Tu ubicación en Caravana|Your location on Caravana
-=Usamos tu ubicación para mostrarte en el mapa, guiarte, registrar tus viajes y, solo dentro de una party activa, compartir tu posición con sus miembros. No la vendemos ni la publicamos en tu perfil.|We use your location to show you on the map, guide you, record your trips and, only inside an active party, share your position with its members. We never sell it or publish it on your profile.
+=Usamos tu ubicación para mostrarte en el mapa, guiarte, registrar tus viajes y compartir tu posición con tu party y con los amigos que elijas, también con la app en segundo plano. No la vendemos ni la publicamos en tu perfil.|We use your location to show you on the map, guide you, record your trips and share your position with your party and the friends you choose, also while the app is in the background. We never sell it or publish it on your profile.
 =Ver política|View policy
 =Acepto|I agree
 =Sin permiso de ubicación · usando ubicación de demo|No location permission · using demo location
@@ -275,3 +275,9 @@
 =Trabajo|Work
 =Caravana · voz del convoy activa|Caravana · convoy voice on
 =Oyes a tu party con la pantalla bloqueada. Toca para abrir.|You can hear your party with the screen locked. Tap to open.
+=Caravana · compartiendo ubicación|Caravana · sharing location
+=Tus amigos ven tu posición en su mapa. Toca para abrir.|Your friends see your position on their map. Tap to open.
+=1 piloto|1 driver
+={0} pilotos|{0} drivers
+=Conectado a {0} · {1} en el canal|Connected to {0} · {1} in the channel
+=a {0}|{0} away

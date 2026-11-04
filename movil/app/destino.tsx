@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,7 +20,7 @@ import { useCreateChallenge } from '@/src/hooks/useChallenges';
 import { errorMessage } from '@/src/lib/alerts';
 import { haversineMeters } from '@/src/lib/geo';
 import { useChallengeDraft } from '@/src/store/challenge-draft';
-import { useChosenDestination, type ChosenDestination, type FavoriteKind } from '@/src/store/destination';
+import { uniqueRecents, useChosenDestination, type ChosenDestination, type FavoriteKind } from '@/src/store/destination';
 import { colors, fonts, radius, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
 
@@ -36,7 +36,8 @@ export default function DestinationScreen() {
   const live = useLiveLocation();
   const setDestination = useChosenDestination((state) => state.setDestination);
   const startNavigation = useChosenDestination((state) => state.startNavigation);
-  const recents = useChosenDestination((state) => state.recents);
+  const storedRecents = useChosenDestination((state) => state.recents);
+  const recents = useMemo(() => uniqueRecents(storedRecents), [storedRecents]);
   const favorites = useChosenDestination((state) => state.favorites);
   const setFavorite = useChosenDestination((state) => state.setFavorite);
   const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string; mode?: string }>();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConvoyVoiceActivity } from '@/src/lib/voice-activity';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 import {
@@ -12,6 +12,7 @@ import {
   Track,
 } from '@/src/lib/livekit';
 import { startDriving, stopDriving } from '@/modules/motion';
+import { ensureMicrophone as ensureMicrophonePermission } from '@/src/lib/microphone';
 import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 
@@ -27,17 +28,10 @@ const tokenCache = new Map<string, { payload: VoiceTokenResponse; at: number }>(
 
 // Android no da el micrófono sin pedirlo: antes nunca se pedía y el PTT no
 // transmitía nada.
+// En iOS lo pide LiveKit al publicar el micrófono.
 async function ensureMicrophone() {
   if (Platform.OS !== 'android') return true;
-  const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
-  if (await PermissionsAndroid.check(permission)) return true;
-  const result = await PermissionsAndroid.request(permission, {
-    title: t('Micrófono para el walkie-talkie'),
-    message: t('Caravana usa el micrófono solo mientras mantienes pulsado el botón para hablar.'),
-    buttonPositive: t('Permitir'),
-    buttonNegative: t('Ahora no'),
-  });
-  return result === PermissionsAndroid.RESULTS.GRANTED;
+  return ensureMicrophonePermission();
 }
 
 type VoiceTokenResponse = {
@@ -186,7 +180,13 @@ export function useVoiceRoom({
             setActiveSpeakerIds([]);
           });
 
-        await room.connect(payload.url, payload.token, { autoSubscribe: true });
+        // Con 15 s por intento (lo normal) una red lenta dejaba la voz más de
+        // 30 s conectando antes de probar otra región; con 6 s cambia antes.
+        await room.connect(payload.url, payload.token, {
+          autoSubscribe: true,
+          websocketTimeout: 6_000,
+          peerConnectionTimeout: 10_000,
+        });
         if (!active) {
           room.disconnect();
           return;

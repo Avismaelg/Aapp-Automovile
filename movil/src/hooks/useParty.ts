@@ -239,6 +239,8 @@ export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
         .select('*')
         .in('id', partyIds)
         .in('status', ['scheduled', 'live'])
+        // Una party dura 24 h; el servidor la borra poco después.
+        .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1);
 

@@ -11,7 +11,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -101,7 +100,7 @@ import {
   nextInstruction,
   routeProgress,
 } from "@/src/lib/route-instructions";
-import { useChosenDestination } from "@/src/store/destination";
+import { uniqueRecents, useChosenDestination } from "@/src/store/destination";
 import { useParking } from "@/src/store/parking";
 import {
   DAY_CHROME,
@@ -141,7 +140,6 @@ export default function NavigationScreen() {
   const insets = useSafeAreaInsets();
   const me = useCurrentUser();
   const live = useLiveLocation();
-  const { width: windowWidth } = useWindowDimensions();
   const { party, isDemo } = useActiveParty({ poll: true });
   const mapNow = useNow();
   const { vehicles } = useGarageVehicles();
@@ -286,7 +284,8 @@ export default function NavigationScreen() {
   const clearChosenDestination = useChosenDestination(
     (state) => state.clearDestination,
   );
-  const recentDestinations = useChosenDestination((state) => state.recents);
+  const storedRecents = useChosenDestination((state) => state.recents);
+  const recentDestinations = useMemo(() => uniqueRecents(storedRecents), [storedRecents]);
   const isNavigating = useChosenDestination((state) => state.isNavigating);
   const startNavigation = useChosenDestination(
     (state) => state.startNavigation,
@@ -343,6 +342,7 @@ export default function NavigationScreen() {
   );
   useLiveShare(live.location, {
     partyId: party && !isDemo ? party.id : null,
+    hasFriends: friendCount > 0,
     // Con 200-300 m de error (dentro de casa) los demás te verían saltar.
     enabled:
       !isDemo &&
@@ -1506,6 +1506,10 @@ export default function NavigationScreen() {
                     street={currentStreet ?? null}
                   />
 
+                  <View style={styles.rightColumn} pointerEvents="box-none">
+                  {/* CONV-14: hablar al convoy desde el mapa, en la esquina
+                      sobre los controles. */}
+                  {party && !isDemo && !introActive ? <VoicePTT size={52} /> : null}
                   <MapControls
                     northUp={northUp}
                     following={following}
@@ -1513,11 +1517,12 @@ export default function NavigationScreen() {
                     onRecenter={recenter}
                     ghost={
                       SHARE_OUTSIDE_PARTY && !isDemo && friendCount > 0
-                        ? shareWithFriends !== true
+                        ? shareWithFriends === false
                         : undefined
                     }
-                    onToggleGhost={() => setShareWithFriends(shareWithFriends !== true)}
+                    onToggleGhost={() => setShareWithFriends(shareWithFriends === false)}
                   />
+                  </View>
                 </View>
 
                 {destination ? (
@@ -1609,19 +1614,6 @@ export default function NavigationScreen() {
         </View>
       </MapChromeContext.Provider>
 
-      {/* CONV-14: hablar al convoy desde el mapa, encima de la pestaña Party. */}
-      {party && !isDemo && !navigating && !introActive ? (
-        <View
-          pointerEvents="box-none"
-          style={[
-            styles.mapPtt,
-            { left: (windowWidth * 2.5) / 6 - 29, bottom: bottomHeight + spacing.md },
-          ]}
-        >
-          <VoicePTT />
-        </View>
-      ) : null}
-
       {introActive ? (
         <GalaxyIntro greeting={introGreeting} onDone={endIntro} />
       ) : null}
@@ -1630,7 +1622,7 @@ export default function NavigationScreen() {
 }
 
 const styles = StyleSheet.create({
-  mapPtt: { position: 'absolute', zIndex: 30 },
+  rightColumn: { alignItems: "flex-end", gap: spacing.sm },
   hidden: { opacity: 0 },
   convoyOffer: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm },
   followWaiting: { marginBottom: spacing.sm },

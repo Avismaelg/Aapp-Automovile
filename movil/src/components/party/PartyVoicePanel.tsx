@@ -122,7 +122,7 @@ export function PartyVoicePanel({ isDemo, voice, current, channelCount, onSelect
           {isDemo
             ? t('Voz de ejemplo en modo demo.')
             : voice.status === 'connected'
-              ? t('PTT real en {0}.', partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy')
+              ? t('Conectado a {0} · {1} en el canal', partyVoiceChannels.find((item) => item.slug === current)?.name ?? 'Convoy', voice.participantCount)
               : t('Conectando el PTT de voz de la party…')}
         </AppText>
       )}

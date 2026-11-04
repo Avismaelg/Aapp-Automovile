@@ -148,6 +148,9 @@ export function useChallengeFriends() {
   };
 }
 
+const CHALLENGE_TTL_MS = 24 * 3_600_000;
+const UNFINISHED = new Set<string>(['pending', 'accepted', 'live']);
+
 export function useChallenges() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
@@ -231,7 +234,12 @@ export function useChallenges() {
           hostId: challenge.host_id,
           title: challenge.title,
           category: challenge.category,
-          status: challenge.status,
+          // Un reto sin terminar a las 24 h ya no sigue «en vivo» (el servidor
+          // lo cancela; aquí se muestra así aunque aún no haya pasado).
+          status:
+            UNFINISHED.has(challenge.status) && Date.now() - Date.parse(challenge.created_at) > CHALLENGE_TTL_MS
+              ? 'cancelled'
+              : challenge.status,
           mode: challenge.mode,
           fromLabel: challenge.from_label,
           toLabel: challenge.to_label,

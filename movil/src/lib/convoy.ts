@@ -1,4 +1,4 @@
-import { displaySpeed, speedUnit, t } from "@/src/i18n";
+import { displaySpeed, formatDistance, speedUnit, t } from "@/src/i18n";
 // Reglas del convoy en tiempo real y de los retos por llegada. Sin React ni
 // Supabase: las usan los hooks, el simulador y las pruebas.
 
@@ -232,7 +232,7 @@ export function followStatus(me: Point, target: Point | null, lastSeenAt: string
   if (lastSeenAt && now - Date.parse(lastSeenAt) > MEMBER_STALE_MS) return t('sin señal');
   const meters = metersBetween(me, target);
   if (meters <= FOLLOW_CAUGHT_M) return t('a tu lado');
-  return meters < 1000 ? t('a {0} m', Math.round(meters / 10) * 10) : t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
+  return meters < 1000 ? t('a {0} m', Math.round(meters / 10) * 10) : t('a {0}', formatDistance(meters));
 }
 
 // ---------------------------------------------------------------------------

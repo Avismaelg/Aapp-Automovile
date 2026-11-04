@@ -575,7 +575,7 @@ export default function PartyScreen() {
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
-                {memberCount} {memberCount === 1 ? 'piloto' : 'pilotos'}
+                {memberCount === 1 ? t('1 piloto') : t('{0} pilotos', memberCount)}
               </AppText>
               {partyCode ? (
                 <>

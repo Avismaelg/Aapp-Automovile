@@ -13,16 +13,20 @@ import { useSharing } from '@/src/store/sharing';
 // usando la misma configuración.
 export function useLiveShare(
   location: LiveLocation,
-  { partyId, enabled }: { partyId: string | null; enabled: boolean },
+  { partyId, enabled, hasFriends }: { partyId: string | null; enabled: boolean; hasFriends: boolean },
 ) {
   const accountId = useAuth((state) => state.account?.id ?? null);
-  const chosen = useSharing((state) => state.shareWithFriends === true);
-  const friends = SHARE_OUTSIDE_PARTY && chosen;
-  const declined = !friends;
+  // Se comparte salvo que digas que no (modo fantasma): antes hacía falta
+  // aceptar un aviso y, si no salía, tus amigos nunca te veían.
+  const chosen = useSharing((state) => state.shareWithFriends !== false);
+  // Sin amigos no hay a quién mostrarle tu posición: ni se sube ni se
+  // mantiene el GPS rápido en segundo plano (batería).
+  const friends = SHARE_OUTSIDE_PARTY && chosen && hasFriends;
+  const declined = !(SHARE_OUTSIDE_PARTY && chosen);
 
   useEffect(() => {
     void setLiveShareConfig({ accountId, partyId, friends });
-    void setConvoyMode(Boolean(partyId));
+    void setConvoyMode(Boolean(partyId), friends);
   }, [accountId, partyId, friends]);
 
   useEffect(() => {

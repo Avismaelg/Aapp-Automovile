@@ -114,6 +114,9 @@ type GoogleRoute = {
   distanceMeters?: number;
   duration?: string;
   polyline?: { encodedPolyline?: string };
+  travelAdvisory?: {
+    speedReadingIntervals?: { startPolylinePointIndex?: number; endPolylinePointIndex?: number; speed?: string }[];
+  };
   legs?: { steps?: GoogleStep[] }[];
 };
 
@@ -165,6 +168,8 @@ Deno.serve(async (request) => {
     languageCode: body.language === 'en' ? 'en' : 'es',
     regionCode: 'DO',
     units: 'METRIC',
+    // Tráfico tramo a tramo para pintar la ruta de naranja / rojo.
+    extraComputations: ['TRAFFIC_ON_POLYLINE'],
   };
   const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
@@ -173,7 +178,8 @@ Deno.serve(async (request) => {
       'X-Goog-Api-Key': googleKey,
       'X-Goog-FieldMask':
         'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,' +
-        'routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction',
+        'routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction,' +
+        'routes.travelAdvisory.speedReadingIntervals',
     },
     body: JSON.stringify(payload),
   });
@@ -189,6 +195,12 @@ Deno.serve(async (request) => {
         distance: route.distanceMeters ?? 0,
         duration: Number.isFinite(seconds) ? seconds : 0,
         geometry: { coordinates: decodePolyline(encoded) },
+        // Índices de la polilínea: SLOW → naranja, TRAFFIC_JAM → rojo.
+        traffic: (route.travelAdvisory?.speedReadingIntervals ?? []).flatMap((interval) => {
+          const level = interval.speed === 'TRAFFIC_JAM' ? 'heavy' : interval.speed === 'SLOW' ? 'moderate' : null;
+          if (!level) return [];
+          return [{ start: interval.startPolylinePointIndex ?? 0, end: interval.endPolylinePointIndex ?? 0, level }];
+        }),
         legs: (route.legs ?? []).map((leg) => ({
           steps: [
             ...(leg.steps ?? []).map((step) => ({

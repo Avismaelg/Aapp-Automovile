@@ -117,6 +117,15 @@ const MILES =
   device.measurementSystem === 'uk' ||
   (device.regionCode != null && MILE_REGIONS.has(device.regionCode));
 let miles = MILES;
+
+// Las unidades siguen a la carretera, no al teléfono: muchos móviles en RD
+// vienen con región de EE. UU. y marcaban mph con señales en km/h. Dentro de
+// la República Dominicana siempre km/h.
+export function setUnitsFromPosition(latitude: number, longitude: number) {
+  const inDominicanRepublic = latitude > 17.3 && latitude < 20.1 && longitude > -72.1 && longitude < -68.2;
+  miles = inDominicanRepublic ? false : MILES;
+}
+
 export function usesMiles() {
   return miles;
 }

@@ -37,6 +37,30 @@ type DestinationState = {
   stopNavigation: () => void;
 };
 
+// El mismo sitio escrito distinto («Maximo Gomez» / «Máximo Gómez») o el
+// mismo punto con otro nombre cuenta como uno solo en «recientes».
+function sameLabel(a: string, b: string) {
+  const normalize = (text: string) =>
+    text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return normalize(a) === normalize(b);
+}
+
+function meters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
+  return Math.hypot(
+    (a.latitude - b.latitude) * 110_540,
+    (a.longitude - b.longitude) * 111_320 * Math.cos((a.latitude * Math.PI) / 180),
+  );
+}
+
+export function isSamePlace(a: ChosenDestination, b: ChosenDestination) {
+  const distance = meters(a, b);
+  return distance < 50 || (distance < 2_000 && sameLabel(a.label, b.label));
+}
+
+export function uniqueRecents(recents: ChosenDestination[]) {
+  return recents.filter((item, index) => recents.findIndex((other) => isSamePlace(other, item)) === index);
+}
+
 // Destino persistido en el dispositivo: al reabrir la app (incluso sin
 // conexión) sigue apareciendo el último destino elegido.
 export const useChosenDestination = create<DestinationState>()(
@@ -62,14 +86,7 @@ export const useChosenDestination = create<DestinationState>()(
             ? state.recents
             : [
             { latitude: destination.latitude, longitude: destination.longitude, label: destination.label },
-            ...state.recents.filter(
-              (item) =>
-                !(
-                  item.label === destination.label &&
-                  Math.abs(item.latitude - destination.latitude) < 0.00005 &&
-                  Math.abs(item.longitude - destination.longitude) < 0.00005
-                ),
-            ),
+            ...uniqueRecents(state.recents).filter((item) => !isSamePlace(item, destination)),
           ].slice(0, 4),
         })),
       clearDestination: () => set({ destination: null, stops: [], isNavigating: false }),

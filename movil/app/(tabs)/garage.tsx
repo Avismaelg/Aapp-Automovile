@@ -21,7 +21,7 @@ import { useGarageVehicles, pickVehiclePhoto, useSetVehiclePhoto } from '@/src/h
 import { profileUrl, vehicleUrl } from '@/src/lib/qr';
 import { isElectric, vehicleFuelLabel, vehicleKindMeta } from '@/src/lib/vehicles';
 import { colors, radius, spacing } from '@/src/theme';
-import { displayKm, distanceUnit, t } from '@/src/i18n';
+import { displayKm, distanceUnit, formatDecimal, t } from '@/src/i18n';
 
 function CarSilhouette() {
   return (
@@ -180,7 +180,7 @@ export default function GarageScreen() {
 
           <View style={styles.carStats}>
             <Stat
-              value={`${vehicle.efficiency.toFixed(1).replace('.', ',')}`}
+              value={formatDecimal(vehicle.efficiency, 1)}
               label={electric ? t('kWh/100 km') : 'km/L'}
             />
             <Stat value={displayKm(vehicle.odometerKm)} label={t('{0} recorridos', distanceUnit())} />

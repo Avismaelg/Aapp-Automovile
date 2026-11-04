@@ -63,13 +63,21 @@ class DrivingService : Service() {
 
   companion object {
     private const val PREFS = "caravana.driving"
-    private const val CHANNEL_ID = "caravana-driving"
+    // Canal de importancia mínima: sin icono en la barra de estado, sin sonido
+    // y plegado al fondo de las notificaciones. Android exige una notificación
+    // para seguir la ubicación en segundo plano; así casi no se ve. Es un
+    // canal nuevo porque la importancia de uno ya creado no se puede bajar.
+    private const val CHANNEL_ID = "caravana-background"
+    private const val OLD_CHANNEL_ID = "caravana-driving"
     private const val NOTIFICATION_ID = 7302
     const val REASON_VEHICLE = "vehicle"
     const val REASON_CONVOY = "convoy"
     // Voz del convoy conectada: el servicio añade el tipo micrófono para que
     // se oiga y se pueda hablar (manos libres) con la pantalla bloqueada.
     const val REASON_VOICE = "voice"
+    // Compartes tu posición con amigos: el servicio sigue activo con la app en
+    // segundo plano o cerrada para que te vean moverte en su mapa.
+    const val REASON_FRIENDS = "friends"
 
     // Tipos del servicio: ubicación siempre; micrófono solo con la voz activa
     // y el permiso concedido (si no, Android cerraría la app).
@@ -153,25 +161,35 @@ class DrivingService : Service() {
     private fun buildNotification(context: Context): Notification {
       val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL_ID) == null) {
-        manager.createNotificationChannel(
-          NotificationChannel(
-            CHANNEL_ID,
-            text(context, "channel", "Conducción"),
-            NotificationManager.IMPORTANCE_LOW,
-          ),
+        val channel = NotificationChannel(
+          CHANNEL_ID,
+          text(context, "channel", "Conducción"),
+          NotificationManager.IMPORTANCE_MIN,
         )
+        channel.setShowBadge(false)
+        channel.lockscreenVisibility = Notification.VISIBILITY_SECRET
+        manager.createNotificationChannel(channel)
+        // Android no deja borrar un canal con un servicio activo: sin borrar
+        // no pasa nada (el viejo queda sin uso).
+        try {
+          manager.deleteNotificationChannel(OLD_CHANNEL_ID)
+        } catch (_: Exception) {
+        }
       }
       val reasons = activeReasons(context)
       val voice = REASON_VOICE in reasons
       val convoy = REASON_CONVOY in reasons
+      val friends = REASON_FRIENDS in reasons && REASON_VEHICLE !in reasons
       val title = when {
         voice -> text(context, "voiceTitle", "Caravana · voz del convoy activa")
         convoy -> text(context, "convoyTitle", "Caravana · convoy en vivo")
+        friends -> text(context, "friendsTitle", "Caravana · compartiendo ubicación")
         else -> text(context, "drivingTitle", "Caravana está registrando tu ruta")
       }
       val body = when {
         voice -> text(context, "voiceBody", "Oyes a tu party con la pantalla bloqueada. Toca para abrir.")
         convoy -> text(context, "convoyBody", "Tu party ve tu posición. Toca para abrir.")
+        friends -> text(context, "friendsBody", "Tus amigos ven tu posición en su mapa. Toca para abrir.")
         else -> text(context, "drivingBody", "Tu viaje se guarda automáticamente. Toca para abrir.")
       }
       val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
@@ -194,7 +212,11 @@ class DrivingService : Service() {
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setSilent(true)
-        .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+        .setShowWhen(false)
+        .setPriority(NotificationCompat.PRIORITY_MIN)
+        .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+        .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        .setCategory(NotificationCompat.CATEGORY_SERVICE)
         .setContentIntent(contentIntent)
         .build()
     }

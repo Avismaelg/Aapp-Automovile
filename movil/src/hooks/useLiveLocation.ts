@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
 import { askLocationConsent } from '@/src/lib/location-consent';
 import { nextSpeed, type SpeedState } from '@/src/lib/speed-filter';
-import { t } from '@/src/i18n';
+import { setUnitsFromPosition, t } from '@/src/i18n';
 
 export type LiveLocation = {
   latitude: number;
@@ -101,6 +101,7 @@ function applyPosition(position: Location.LocationObject) {
   // Parado o a poca velocidad se conserva el rumbo de la brújula.
   const heading =
     gpsHeading ?? (speedKmh == null || speedKmh < 10 ? previousHeading : null);
+  setUnitsFromPosition(position.coords.latitude, position.coords.longitude);
   useLiveLocationState.setState({
     status: 'live',
     message: t('Ubicación en vivo'),

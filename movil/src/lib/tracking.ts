@@ -31,7 +31,9 @@ const UPDATE_OPTIONS: Location.LocationTaskOptions = {
   deferredUpdatesInterval: 30_000,
   activityType: Location.ActivityType.AutomotiveNavigation,
   pausesUpdatesAutomatically: false,
-  showsBackgroundLocationIndicator: true,
+  // iOS: sin la píldora azul fija en la barra de estado (con permiso «Siempre»
+  // no hace falta).
+  showsBackgroundLocationIndicator: false,
 };
 
 // En una party la posición se comparte en vivo: puntos cada 3 s y sin
@@ -41,6 +43,15 @@ const CONVOY_OPTIONS: Location.LocationTaskOptions = {
   accuracy: Location.Accuracy.BestForNavigation,
   timeInterval: 3_000,
   distanceInterval: 8,
+  deferredUpdatesInterval: 0,
+};
+
+// Compartiendo solo con amigos: casi en vivo (cada 5 s si te mueves) pero
+// con algo menos de precisión que el convoy para gastar menos batería.
+const FRIENDS_OPTIONS: Location.LocationTaskOptions = {
+  ...UPDATE_OPTIONS,
+  timeInterval: 5_000,
+  distanceInterval: 15,
   deferredUpdatesInterval: 0,
 };
 
@@ -58,6 +69,8 @@ function shareDrivingTexts() {
     convoyBody: t('Tu party ve tu posición. Toca para abrir.'),
     voiceTitle: t('Caravana · voz del convoy activa'),
     voiceBody: t('Oyes a tu party con la pantalla bloqueada. Toca para abrir.'),
+    friendsTitle: t('Caravana · compartiendo ubicación'),
+    friendsBody: t('Tus amigos ven tu posición en su mapa. Toca para abrir.'),
   });
 }
 
@@ -72,23 +85,45 @@ function updateDriving(speedKmh: number | null, at: number) {
 }
 
 let convoyMode = false;
-const currentOptions = () => (convoyMode ? CONVOY_OPTIONS : UPDATE_OPTIONS);
+// Compartes tu posición con amigos: ritmo casi en vivo (si no, con la
+// pantalla bloqueada te veían en lotes de 30 s).
+let friendsMode = false;
+const currentOptions = () =>
+  convoyMode ? CONVOY_OPTIONS : friendsMode ? FRIENDS_OPTIONS : UPDATE_OPTIONS;
 
-// Entrar o salir de una party cambia el ritmo del servicio. Debe llamarse con
-// la app en primer plano (Android no deja arrancar el servicio desde fondo).
-export async function setConvoyMode(enabled: boolean) {
-  if (Platform.OS === 'web' || enabled === convoyMode) return;
+// Entrar o salir de una party (o empezar a compartir con amigos) cambia el
+// ritmo del servicio. Debe llamarse con la app en primer plano (Android no
+// deja arrancar el servicio desde fondo).
+export async function setConvoyMode(enabled: boolean, friends = false) {
+  if (Platform.OS === 'web' || (enabled === convoyMode && friends === friendsMode)) return;
+  const textsChanged = enabled !== convoyMode;
   convoyMode = enabled;
-  shareDrivingTexts();
+  friendsMode = friends;
+  if (textsChanged) shareDrivingTexts();
   try {
-    if (!(await hasTrackingPermissions())) return;
+    if (!(await hasTrackingPermissions())) return syncLiveService(false);
     if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
       await Location.stopLocationUpdatesAsync(TASK_NAME);
       await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
+      syncLiveService(true);
+    } else {
+      syncLiveService(false);
     }
   } catch {
     // Se reintenta en el próximo resumeTracking.
   }
+}
+
+// En una party o compartiendo con amigos, el servicio de primer plano sigue
+// activo aunque no conduzcas, con la app en segundo plano o cerrada: sin él,
+// Android entrega la ubicación unas pocas veces por hora y los demás te ven
+// congelado. Solo si el registro en segundo plano está activo (sin él no hay
+// ubicaciones que subir). Debe llamarse con la app en primer plano.
+function syncLiveService(updatesRunning: boolean) {
+  if (updatesRunning && convoyMode) startDriving('convoy');
+  else stopDriving('convoy');
+  if (updatesRunning && friendsMode) startDriving('friends');
+  else stopDriving('friends');
 }
 
 function toBackgroundPoint(location: Location.LocationObject): BackgroundPoint | null {
@@ -182,6 +217,7 @@ export async function stopTracking() {
   if (Platform.OS === 'web') return;
   setAutoDriving(false);
   stopDriving('vehicle');
+  syncLiveService(false);
   if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
     await Location.stopLocationUpdatesAsync(TASK_NAME);
   }
@@ -206,6 +242,7 @@ export async function resumeTracking(): Promise<ResumeResult> {
       await Location.stopLocationUpdatesAsync(TASK_NAME);
     }
     await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
+    syncLiveService(true);
     return 'running';
   } catch {
     return 'error';

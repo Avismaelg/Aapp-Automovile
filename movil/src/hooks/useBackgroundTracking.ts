@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
+import * as Location from 'expo-location';
 import { Alert, AppState, Platform } from 'react-native';
 
 import { setupAlerts } from '@/src/lib/background-alerts';
@@ -12,7 +13,10 @@ import {
   startMotionUpdates,
 } from '@/modules/motion';
 import { whenHydrated } from '@/src/lib/hydration';
-import { resumeTracking, stopTracking } from '@/src/lib/tracking';
+import { ensureMicrophone } from '@/src/lib/microphone';
+import { registerPushToken } from '@/src/lib/push';
+import { requestTrackingPermissions, resumeTracking, stopTracking } from '@/src/lib/tracking';
+import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
 import { t } from '@/src/i18n';
 
@@ -40,6 +44,31 @@ async function ensureMotion() {
     if (!(await requestMotionPermission())) return;
   }
   await startMotionUpdates();
+}
+
+// Al entrar a la app se piden de una vez los permisos que faltan (ubicación
+// «siempre», micrófono; notificaciones, actividad y batería van después en
+// sync): sin ubicación «siempre» no te ven tus amigos ni el convoy con la app
+// cerrada, y sin micrófono el primer «hablar» se perdía en el aviso. Una vez
+// por arranque, y solo los que el sistema aún deja preguntar.
+let startupAsked = false;
+async function askStartupPermissions() {
+  if (startupAsked) return;
+  startupAsked = true;
+  try {
+    const [foreground, background] = await Promise.all([
+      Location.getForegroundPermissionsAsync(),
+      Location.getBackgroundPermissionsAsync(),
+    ]);
+    const askable = foreground.granted ? background.canAskAgain : foreground.canAskAgain;
+    if (!background.granted && askable && (await requestTrackingPermissions())) {
+      // Estaba en pausa por falta de permiso: con él vuelve a registrar.
+      useSession.getState().setTrackingEnabled(true);
+    }
+  } catch {
+    // Sin servicios de ubicación: se vuelve a intentar en el próximo arranque.
+  }
+  await ensureMicrophone().catch(() => false);
 }
 
 // Sin exención de ahorro de batería Android (sobre todo Samsung) mata el
@@ -70,6 +99,15 @@ export function useBackgroundTracking(enabled: boolean) {
       if (AppState.currentState !== 'active') return;
       await whenHydrated(useSession);
       if (cancelled) return;
+      await askStartupPermissions();
+      if (cancelled) return;
+      // Avisos (permiso, canal y token de Firebase) aunque el registro de
+      // viajes esté en pausa: antes solo se preparaban con él activo y quien
+      // lo pausaba no recibía invitaciones ni retos.
+      await setupAlerts().catch(() => undefined);
+      const accountId = useAuth.getState().account?.id;
+      if (!cancelled && accountId && accountId !== 'demo') await registerPushToken(accountId);
+      if (cancelled) return;
 
       const { trackingEnabled, setTrackingEnabled } = useSession.getState();
       if (!trackingEnabled) {
@@ -83,7 +121,6 @@ export function useBackgroundTracking(enabled: boolean) {
       if (result !== 'running' || cancelled) return;
       await ensureMotion().catch(() => undefined);
       if (!cancelled) await ensureBatteryExemption().catch(() => undefined);
-      if (!cancelled) await setupAlerts().catch(() => undefined);
     };
 
     void sync();

@@ -34,10 +34,10 @@ function walk(dir: string, out: string[] = []) {
 describe('SRS — backend y secretos', () => {
   it('RNF-07 / R-02: todas las tablas creadas tienen RLS activado', () => {
     const tables = new Set(
-      [...allSql.matchAll(/create table (?:if not exists )?(?:public\.)?([a-z_]+)/g)].map((m) => m[1]),
+      [...allSql.matchAll(/create table (?:if not exists )?(?:public\.)?((?:private\.)?[a-z_]+)/g)].map((m) => m[1]),
     );
     const withRls = new Set(
-      [...allSql.matchAll(/alter table (?:if exists )?(?:public\.)?([a-z_]+) enable row level security/g)].map(
+      [...allSql.matchAll(/alter table (?:if exists )?(?:public\.)?((?:private\.)?[a-z_]+) enable row level security/g)].map(
         (m) => m[1],
       ),
     );

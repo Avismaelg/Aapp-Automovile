@@ -12,11 +12,23 @@ export type ErrorEntry = { at: string; source: 'render' | 'global' | 'promise'; 
 
 let queue: Promise<void> = Promise.resolve();
 
+// Servicio externo (Crashlytics) que recibe cada error además del registro local.
+type ErrorReporter = (source: ErrorEntry['source'], error: unknown) => void;
+let reporter: ErrorReporter | null = null;
+export function setErrorReporter(next: ErrorReporter | null) {
+  reporter = next;
+}
+
 export function appendError(list: ErrorEntry[], entry: ErrorEntry) {
   return [entry, ...list].slice(0, MAX_ERRORS);
 }
 
 export function recordError(source: ErrorEntry['source'], error: unknown) {
+  try {
+    reporter?.(source, error);
+  } catch {
+    // El servicio externo nunca debe romper el registro local.
+  }
   const entry: ErrorEntry = {
     at: new Date().toISOString(),
     source,

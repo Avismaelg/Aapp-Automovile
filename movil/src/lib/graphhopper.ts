@@ -3,6 +3,7 @@ import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
 import { instructionsFromGraphHopper, instructionsFromOsrm } from '@/src/lib/route-instructions';
 import { compactRouteCoordinates } from '@/src/lib/route-geometry';
+import { intervalsFromCongestion, trafficSpans, type TrafficInterval } from '@/src/lib/route-traffic';
 import { formatDistance, getLanguage, t } from '@/src/i18n';
 import {
   GRAPHHOPPER_TIMEOUT_MS,
@@ -160,7 +161,11 @@ type OsrmRoute = {
   geometry?: {
     coordinates: [number, number][];
   };
+  // Google (función routes): retenciones por índice de punto.
+  traffic?: TrafficInterval[];
   legs?: {
+    // Mapbox (annotations=congestion): un nivel por tramo entre puntos.
+    annotation?: { congestion?: string[] };
     steps?: {
       distance: number;
       name?: string;
@@ -190,7 +195,17 @@ function routeFromOsrm(route: OsrmRoute, source: 'osrm' | 'mapbox' | 'google' = 
     timeMs: route.duration * 1000,
     source,
     instructions: instructionsFromOsrm(route.legs?.flatMap((leg) => leg.steps ?? []) ?? []),
+    traffic: routeTraffic(route),
   };
+}
+
+function routeTraffic(route: OsrmRoute) {
+  const raw = route.geometry?.coordinates ?? [];
+  const intervals =
+    route.traffic ??
+    intervalsFromCongestion(route.legs?.flatMap((leg) => leg.annotation?.congestion ?? []) ?? []);
+  const spans = trafficSpans(raw, intervals);
+  return spans.length > 0 ? spans : undefined;
 }
 
 // URL de OSRM con paradas (alternativas solo sin paradas, como GraphHopper).
@@ -294,6 +309,7 @@ export function mapboxDirectionsUrl(origin: GeoPoint, destination: GeoPoint, sto
     'overview=full',
     'geometries=geojson',
     'steps=true',
+    'annotations=congestion',
     `alternatives=${stops.length === 0 ? 'true' : 'false'}`,
     'continue_straight=false',
     `language=${getLanguage()}`,

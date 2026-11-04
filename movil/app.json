@@ -13,10 +13,12 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "location",
-          "audio"
+          "audio",
+          "remote-notification"
         ],
         "NSMicrophoneUsageDescription": "Caravana usa el micrófono para el walkie-talkie de voz de las parties."
-      }
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "app.caravana.mobile",
@@ -33,7 +35,8 @@
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -56,7 +59,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Caravana necesita tu ubicación para registrar tus rutas automáticamente y compartirla solo dentro de una party.",
+          "locationAlwaysAndWhenInUsePermission": "Caravana necesita tu ubicación para registrar tus rutas automáticamente y compartirla con tu party y con los amigos que elijas, también con la app en segundo plano.",
           "locationWhenInUsePermission": "Caravana usa tu ubicación para mostrar tu posición en el mapa y registrar tus rutas.",
           "motionUsagePermission": "Caravana detecta si estás conduciendo para iniciar el registro de tu viaje automáticamente.",
           "isIosBackgroundLocationEnabled": true,
@@ -93,7 +96,17 @@
       "@config-plugins/react-native-webrtc",
       "expo-web-browser",
       "@rnmapbox/maps",
-      "expo-localization"
+      "expo-localization",
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

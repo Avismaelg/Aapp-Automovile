@@ -112,12 +112,13 @@ export function PartyInviteBanner() {
     setError(null);
     if (simulated) {
       answerSimInvite(true);
-      router.navigate('/(tabs)/party');
+      // Al unirte sigues en el mapa: ahí ves al convoy y hablas con él.
+      router.navigate('/');
       return;
     }
     try {
       await accept.mutateAsync(invite.id);
-      router.navigate('/(tabs)/party');
+      router.navigate('/');
     } catch (joinError) {
       setError(errorMessage(joinError, t('No pudimos unirte.')));
     }
