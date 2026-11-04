@@ -7,7 +7,25 @@ export type RouteProgress = {
   progressM: number;
   nearestIndex: number;
   distanceM: number;
+  // Tu posición proyectada sobre la ruta (para pegar el coche a la calle).
+  snapped: { latitude: number; longitude: number };
 };
+
+// MAPA-06: navegando y cerca de la ruta, el coche se dibuja sobre la calle de
+// la ruta y no donde lo pone un GPS impreciso (en la tableta «se volaba
+// calles»: saltaba entre cuadras). Más lejos de SNAP_MAX_M es que de verdad
+// te saliste: se dibuja tu posición real y entra el «fuera de ruta».
+export const SNAP_MAX_M = 30;
+
+export function snappedPosition(
+  position: { latitude: number; longitude: number; accuracy?: number | null },
+  progress: RouteProgress | null,
+) {
+  if (!progress || progress.distanceM > SNAP_MAX_M) return null;
+  // Con un GPS muy malo tampoco se sabe si sigues en esa calle.
+  if (position.accuracy != null && position.accuracy > 60) return null;
+  return progress.snapped;
+}
 
 function haversineMeters(a: LatLng, b: LatLng) {
   const R = 6371000;
@@ -72,10 +90,16 @@ export function routeProgress(
     }
   }
   const segment = (cumulative[nearestIndex + 1] ?? 0) - (cumulative[nearestIndex] ?? 0);
+  const from = points[nearestIndex];
+  const to = points[nearestIndex + 1] ?? from;
   return {
     progressM: (cumulative[nearestIndex] ?? 0) + along * segment,
     nearestIndex,
     distanceM: Math.sqrt(best),
+    snapped: {
+      latitude: from[0] + (to[0] - from[0]) * along,
+      longitude: from[1] + (to[1] - from[1]) * along,
+    },
   };
 }
 

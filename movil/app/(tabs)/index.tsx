@@ -38,6 +38,8 @@ import { AppText, Avatar } from "@/src/components/ui";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
+import { useStoppedFor } from "@/src/hooks/useStoppedFor";
+import { ARRIVE_STOPPED_MS, arrivedAtDestination } from "@/src/lib/arrival";
 import { VoicePTT } from "@/src/components/party/VoicePTT";
 import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
 import { setConvoyProgress } from "@/src/lib/live-share";
@@ -99,6 +101,7 @@ import {
   followingInstruction,
   nextInstruction,
   routeProgress,
+  snappedPosition,
 } from "@/src/lib/route-instructions";
 import { uniqueRecents, useChosenDestination } from "@/src/store/destination";
 import { useParking } from "@/src/store/parking";
@@ -442,6 +445,19 @@ export default function NavigationScreen() {
   );
   const progressM = progressState?.progressM ?? null;
   const routeDistanceFromPathM = progressState?.distanceM ?? null;
+  // MAPA-06: navegando, el coche va pegado a la calle de la ruta. Solo para
+  // dibujar: avance, fuera de ruta y llegada usan tu posición real.
+  const snapped =
+    isNavigating && destination && streetRoute ? snappedPosition(live.location, progressState) : null;
+  const snappedLat = snapped?.latitude ?? null;
+  const snappedLng = snapped?.longitude ?? null;
+  const mapLocation = useMemo(
+    () =>
+      snappedLat != null && snappedLng != null
+        ? { ...live.location, latitude: snappedLat, longitude: snappedLng }
+        : live.location,
+    [live.location, snappedLat, snappedLng],
+  );
   // MAPA-16: fuera de la ruta = a más de 40 m durante 5 s (un salto suelto
   // del GPS no cuenta).
   const awayFromRoute = Boolean(
@@ -794,19 +810,24 @@ export default function NavigationScreen() {
   const addStopHere = () =>
     router.push({ pathname: "/destino", params: { mode: "stop" } } as Href);
 
-  // Llegada: a menos de 40 m del destino (o al final de la ruta) se termina
-  // la navegación sola y se avisa, como Waze.
+  // Llegada: se termina la navegación sola y se avisa, como Waze. Antes solo
+  // contaba a menos de 40 m del punto exacto: aparcando a 60–100 m (un
+  // parqueo, el otro lado de la calle) nunca decía «Has llegado» (tableta,
+  // 2026-11-04). Ver arrivedAtDestination.
   const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
   const destinationDistanceM = destination
     ? haversineMeters(live.location, destination)
     : null;
+  const stoppedNear = useStoppedFor(live.location.speedKmh, ARRIVE_STOPPED_MS);
   const arrived =
     navigating &&
     destination != null &&
-    ((destinationDistanceM != null && destinationDistanceM < 40) ||
-      (remainingRouteM != null &&
-        remainingRouteM < 20 &&
-        (routeDistanceFromPathM ?? 999) < 40));
+    arrivedAtDestination({
+      distanceM: destinationDistanceM,
+      remainingRouteM,
+      offRouteM: routeDistanceFromPathM,
+      stopped: stoppedNear,
+    });
   useEffect(() => {
     if (!arrived || !destination) return;
     const label = destination.label;
@@ -1064,7 +1085,7 @@ export default function NavigationScreen() {
         key={mapKey}
         members={mapFriends}
         destination={destination}
-        location={live.location}
+        location={mapLocation}
         parking={mapParking}
         travelMode={walking ? "walking" : "car"}
         northUp={northUp}
