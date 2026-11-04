@@ -698,6 +698,8 @@
   "La invitación quedó rechazada. No se notificará a los demás pilotos.": "The invitation was declined. The other drivers won't be notified.",
   "La party está llena.": "The party is full.",
   "La party ya no existe.": "The party no longer exists.",
+  "La placa es privada: solo la ves tú. El odómetro se ve en la ficha de venta si la compartes.": "The plate is private: only you see it. The odometer shows on the sale sheet if you share it.",
+  "La placa es privada: solo la ves tú. Solo el perfil público que tú elijas se comparte por QR.": "The plate is private: only you see it. Only the public profile you choose is shared by QR.",
   "La placa y el odómetro son privados por defecto.": "The plate and odometer are private by default.",
   "La placa y el odómetro son privados. Solo el perfil público que tú elijas se comparte por QR.": "The plate and odometer are private. Only the public profile you choose is shared by QR.",
   "La placa y la ubicación no se muestran en este perfil.": "The plate and location aren't shown on this profile.",

@@ -9,6 +9,7 @@ import {
   demoVehicleId,
   mapVehicleRow,
   vehicleInsertPayload,
+  VEHICLE_COLUMNS,
   type NewVehicleInput,
   type VehicleRow,
 } from '@/src/lib/vehicle-db';
@@ -71,7 +72,7 @@ export function useGarageVehicles() {
 
       const { data, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .eq('owner_id', account.id)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true });
@@ -242,7 +243,7 @@ export function useCreateVehicle() {
       const { data, error } = await supabase
         .from('vehicles')
         .insert(vehicleInsertPayload(account.id, input))
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));
@@ -286,7 +287,7 @@ export function useUpdateVehicle() {
         .update(updates)
         .eq('id', vehicleId)
         .eq('owner_id', account.id)
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));

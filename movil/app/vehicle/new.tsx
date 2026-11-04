@@ -425,7 +425,7 @@ export default function NewVehicleScreen() {
           <View style={styles.footer}>
             <Ionicons name="lock-closed-outline" size={13} color={colors.dim} />
             <AppText variant="caption" color={colors.dim} style={{ flex: 1 }}>
-              {t('La placa y el odómetro son privados. Solo el perfil público que tú elijas se comparte por QR.')}
+              {t('La placa es privada: solo la ves tú. Solo el perfil público que tú elijas se comparte por QR.')}
             </AppText>
           </View>
         </ScrollView>

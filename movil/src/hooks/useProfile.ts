@@ -11,7 +11,7 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
-import { mapVehicleRow, type VehicleRow } from '@/src/lib/vehicle-db';
+import { mapVehicleRow, VEHICLE_COLUMNS, type VehicleRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoProfile } from '@/src/store/demoProfile';
@@ -233,7 +233,7 @@ export function usePublicProfileVehicles(profileId?: string) {
       if (!profileId || !supabase) return [];
       const { data, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .eq('owner_id', profileId)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true });

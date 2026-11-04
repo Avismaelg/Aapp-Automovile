@@ -2,6 +2,11 @@ import type { FuelKind, FuelLog, Vehicle, VehicleKind } from '@/src/types/models
 import { vehicleUrl } from '@/src/lib/qr';
 import { shortMonths, t } from '@/src/i18n';
 
+// Columnas que se leen de vehicles. La matrícula no está: la base de datos
+// no la entrega por la API (migración private_columns); un select('*') falla.
+export const VEHICLE_COLUMNS =
+  'id, owner_id, make, model, year, nickname, color, photo_url, kind, fuel_kind, efficiency, efficiency_unit, battery_kwh, odometer_km, is_primary, privacy, qr_slug, created_at, updated_at';
+
 export type VehicleRow = {
   id: string;
   owner_id: string;

@@ -297,7 +297,7 @@ export default function GarageScreen() {
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={colors.dim} />
         <AppText variant="caption" color={colors.dim}>
-          {t('La placa y el odómetro son privados por defecto.')}
+          {t('La placa es privada: solo la ves tú. El odómetro se ve en la ficha de venta si la compartes.')}
         </AppText>
       </View>
     </Screen>

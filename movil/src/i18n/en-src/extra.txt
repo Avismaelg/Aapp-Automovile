@@ -281,3 +281,5 @@
 ={0} pilotos|{0} drivers
 =Conectado a {0} · {1} en el canal|Connected to {0} · {1} in the channel
 =a {0}|{0} away
+=La placa es privada: solo la ves tú. El odómetro se ve en la ficha de venta si la compartes.|The plate is private: only you see it. The odometer shows on the sale sheet if you share it.
+=La placa es privada: solo la ves tú. Solo el perfil público que tú elijas se comparte por QR.|The plate is private: only you see it. Only the public profile you choose is shared by QR.
