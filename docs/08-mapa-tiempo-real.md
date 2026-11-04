@@ -1,5 +1,13 @@
 # Caravana — Mapa y ubicación en tiempo real
 
+> **Actualización 2026-11-04:** el mapa nativo es **Mapbox** (`@rnmapbox/maps`,
+> estilo de navegación día/noche); MapLibre queda solo para web. Búsqueda con
+> Google Places y rutas con tráfico de Google Routes (Edge Functions `places` y
+> `routes`), con Mapbox, GraphHopper y OSRM de respaldo. Tráfico propio sobre
+> todas las calles y ruta pintada por tramos (`src/lib/route-traffic.ts`).
+> Amigos en el mapa cada 5 s al moverse, también en segundo plano. Lo de abajo
+> describe la primera versión.
+
 > Estado: la pestaña **Inicio** es la pantalla inicial personal de la app: tu
 > coche, tu destino y tus amigos en el mapa. Usa MapLibre GL en **2D plano**
 > (sin inclinación ni edificios 3D) sobre un estilo claro de calles, sigue la

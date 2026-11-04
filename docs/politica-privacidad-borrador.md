@@ -10,15 +10,20 @@ del operador antes de publicarse en App Store o Google Play.
 - Cuenta: correo, nombre, usuario, avatar y ciudad.
 - Garaje: marca, modelo, color, foto, consumo, mantenimiento y QR.
 - Ubicación: posición GPS durante el uso del mapa, parties y tracking opcional
-  en segundo plano. Las rutas locales se guardan en el dispositivo.
+  en segundo plano, también con la app cerrada si el usuario lo permite. Las
+  rutas locales se guardan en el dispositivo.
 - Social: publicaciones, fotos, comentarios, likes, amistades, eventos y
   retos.
-- Voz: audio en tiempo real mediante LiveKit cuando el usuario activa el PTT.
+- Voz: audio en tiempo real mediante LiveKit mientras se pulsa el botón de
+  hablar o con manos libres; no se graba.
+- Avisos y fallos: token del dispositivo para avisos push e informes de cierres
+  (modelo y versión, con el id de la cuenta; sin nombre ni correo).
 
 ## Finalidad y visibilidad
 
-- La ubicación solo se comparte con miembros de una party mientras la party
-  está activa.
+- La ubicación la ven los amigos del usuario en su mapa y los miembros de su
+  party mientras está activa. El modo fantasma deja de compartirla con los
+  amigos y borra la última posición. Las parties se borran a las 24 horas.
 - Los eventos públicos, perfiles públicos y récords públicos pueden ser vistos
   por otras personas.
 - La foto y datos del vehículo respetan la configuración de privacidad del
@@ -28,8 +33,10 @@ del operador antes de publicarse en App Store o Google Play.
 
 ## Proveedores
 
-Supabase (cuenta y datos), LiveKit (voz), OpenStreetMap/OpenFreeMap, Photon,
-OSRM/GraphHopper y proveedores de almacenamiento configurados por el operador.
+Supabase (cuenta y datos), LiveKit (voz), Google Maps Platform (búsqueda y
+rutas con tráfico), Mapbox, OpenStreetMap, Photon, OSRM/GraphHopper (mapas y
+rutas), Google Firebase (avisos y fallos), Apple (avisos en iPhone) y
+proveedores de almacenamiento configurados por el operador.
 Cada proveedor debe figurar con su finalidad, región y base legal en la versión
 final publicada.
 
