@@ -1,7 +1,7 @@
 # Política de privacidad — borrador para revisión legal
 
 **Caravana** usa datos de cuenta, vehículo, ubicación y contenido social para
-proporcionar el mapa, rutas, parties, voz, eventos y récords. Este documento es
+proporcionar el mapa, rutas, parties, voz y eventos. Este documento es
 un borrador técnico y debe revisarse con la jurisdicción y la identidad legal
 del operador antes de publicarse en App Store o Google Play.
 
@@ -25,8 +25,8 @@ del operador antes de publicarse en App Store o Google Play.
   mientras el usuario está en ella, y sus amigos la ven solo si activa
   «compartir con amigos» (desactivado por defecto). Al desactivarlo se borra la
   última posición. Las parties se borran a las 24 horas.
-- Los eventos públicos, perfiles públicos y récords públicos pueden ser vistos
-  por otras personas.
+- Los eventos públicos y los perfiles públicos pueden verlos otras personas.
+  Las velocidades nunca se publican.
 - La foto y datos del vehículo respetan la configuración de privacidad del
   vehículo.
 - El tracking en segundo plano requiere consentimiento explícito del sistema y
@@ -53,5 +53,5 @@ del canal de soporte que se publique en la ficha de la app.
   subencargados.
 - Publicar esta política en una URL HTTPS estable y enlazarla desde la app y las
   fichas de las tiendas.
-- Añadir consentimiento granular para ubicación en segundo plano, voz y récords
-  públicos.
+- Añadir consentimiento granular para ubicación en segundo plano y voz.
+

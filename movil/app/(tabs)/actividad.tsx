@@ -43,7 +43,7 @@ const quickActions = [
   { label: t('Eventos'), icon: 'calendar-outline' as const, href: '/events' },
   { label: t('Retos'), icon: 'flag-outline' as const, href: '/challenges' },
   { label: t('Rutas'), icon: 'map-outline' as const, href: '/rutas' },
-  { label: t('Récords'), icon: 'trophy-outline' as const, href: '/records' },
+  { label: t('Autopistas'), icon: 'navigate-outline' as const, href: '/records' },
   { label: t('Repostaje'), icon: 'water-outline' as const, href: '/fuel' },
   { label: t('Mi QR'), icon: 'qr-code-outline' as const, href: '/scan' },
   { label: t('Garaje'), icon: 'car-sport-outline' as const, href: '/garage' },

@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { getMotionEvents } from '@/modules/motion';
-import { submitTripSpeedRecords } from '@/src/lib/highway-records';
 import { motionActivityAt, motionBlocksStart } from '@/src/lib/parking-logic';
 import { setMotionGates, useTrips } from '@/src/store/trips';
 import { useSession } from '@/src/store/session';
@@ -45,10 +44,8 @@ export function useTripRecorder(
   const hydrate = useTrips((state) => state.hydrate);
   const ingestBackground = useTrips((state) => state.ingestBackground);
   const recordPoint = useTrips((state) => state.recordPoint);
-  const markRecordsSubmitted = useTrips((state) => state.markRecordsSubmitted);
   const stopTrip = useTrips((state) => state.stopTrip);
   const active = useTrips((state) => state.active);
-  const trips = useTrips((state) => state.trips);
   const hydrated = useTrips((state) => state.hydrated);
   const walking = options?.walking ?? false;
   const test = options?.test ?? false;
@@ -86,30 +83,6 @@ export function useTripRecorder(
     if (trackingEnabled && !walking) return;
     if (useTrips.getState().active) void stopTrip();
   }, [trackingEnabled, walking, stopTrip]);
-
-  // Publica los récords de cada viaje terminado sin enviar: el que acaba de
-  // cerrar, los recuperados del segundo plano y los que fallaron sin conexión.
-  const submittingRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (!hydrated) return;
-    for (const trip of trips) {
-      if (
-        !trip.endedAt ||
-        trip.test ||
-        trip.recordsSubmitted ||
-        submittingRef.current.has(trip.id)
-      ) {
-        continue;
-      }
-      submittingRef.current.add(trip.id);
-      void submitTripSpeedRecords(trip, vehicleName)
-        .then((done) => {
-          if (done) markRecordsSubmitted(trip.id);
-        })
-        .catch(() => undefined)
-        .finally(() => submittingRef.current.delete(trip.id));
-    }
-  }, [hydrated, trips, vehicleName, markRecordsSubmitted]);
 
   return { active };
 }

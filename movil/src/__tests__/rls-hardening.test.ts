@@ -187,3 +187,29 @@ describe('P0-3 · datos privados', () => {
     expect(offending).toEqual([]);
   });
 });
+
+describe('P0-4 · sin velocidad pública', () => {
+  const policies = finalPolicies();
+
+  it('nadie lee las velocidades de otros ni añade nuevas', () => {
+    expect(policies.has('speed_records.speed_records_read_public')).toBe(false);
+    expect(policies.get('speed_records.speed_records_read_own') ?? '').toContain('user_id = (select auth.uid())');
+    expect(policies.has('speed_records.speed_records_insert_own')).toBe(false);
+  });
+
+  it('la app ni lee ni envía speed_records', () => {
+    const root = path.join(__dirname, '..', '..');
+    const walk = (dir: string): string[] =>
+      fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+          ? walk(path.join(dir, entry.name))
+          : /\.tsx?$/.test(entry.name)
+            ? [path.join(root, dir, entry.name)]
+            : [],
+      );
+    const users = ['src/hooks', 'src/lib', 'src/components', 'app']
+      .flatMap(walk)
+      .filter((file) => fs.readFileSync(file, 'utf8').includes("'speed_records'"));
+    expect(users).toEqual([]);
+  });
+});

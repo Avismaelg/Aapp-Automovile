@@ -283,3 +283,14 @@
 =a {0}|{0} away
 =La placa es privada: solo la ves tú. El odómetro se ve en la ficha de venta si la compartes.|The plate is private: only you see it. The odometer shows on the sale sheet if you share it.
 =La placa es privada: solo la ves tú. Solo el perfil público que tú elijas se comparte por QR.|The plate is private: only you see it. Only the public profile you choose is shared by QR.
+=Aún no la has recorrido en tus últimos viajes.|You haven't driven it in your recent trips yet.
+=Cuando haya autopistas configuradas verás aquí tus viajes por cada una.|Once highways are set up you'll see your trips on each one here.
+=ESCUCHANDO|LISTENING
+=HABLANDO|TALKING
+=Mantén pulsado para hablar al convoy|Hold to talk to the convoy
+=SOLO PARA TI|ONLY FOR YOU
+=Tus últimos viajes por cada autopista y qué parte fuiste dentro del límite. Se calcula en tu teléfono y nadie más lo ve. Caravana no premia la velocidad.|Your recent trips on each highway and how much of it you drove within the limit. It's worked out on your phone and nobody else sees it. Caravana never rewards speed.
+={0} % del recorrido dentro del límite|{0}% of the drive within the limit
+={0} viajes|{0} trips
+=1 viaje|1 trip
+=Tus autopistas|Your highways
