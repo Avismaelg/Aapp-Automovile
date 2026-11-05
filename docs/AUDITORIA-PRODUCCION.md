@@ -133,7 +133,7 @@ LiveKit RN 2 / livekit-client 2.23, rnmapbox 10.3.7, React Native Firebase 27.
 | Viaje sin cerrar, fecha «4 oct», pico de velocidad (viaje real) | Corregido | `6ea9482` | `trip-close`, `i18n` | Prueba en dispositivo |
 | MAPA-06 coche fuera de la calle / sin «Has llegado» (viaje real) | Corregido | `a0fc905` | `navigation-arrival-snap` | Prueba en dispositivo |
 | RETO-05 clasificación por ETA | Hecho | `bd58deb` | `challenge-eta` | Aplicar migración 127000 |
-| MAPA-28 navegación sin conexión | Hecho | (este) | `offline-navigation` | Prueba en dispositivo |
+| MAPA-28 navegación sin conexión (incluido el recálculo tras varios desvíos) | Hecho | `843834f`, `ff97eaa` | `offline-navigation`, `reroute-deviations` | Prueba en dispositivo |
 | P2-5 vuelta tras expulsión | Corregido (con P0-1) | `639e9ba` | `rls-hardening` | — |
 | P2-6 revisión legal | Abierto | — | — | Abogado |
 

@@ -7,7 +7,7 @@
 | `npm ci` | OK |
 | `npm run typecheck` | OK, 0 errores |
 | `npm run lint` | OK, 0 errores |
-| `npm test` | 45 suites, **307 pruebas OK** (281 al empezar) |
+| `npm test` | 50 suites, **330 pruebas OK** (281 al empezar) |
 | `npx expo-doctor` | 20/20 OK (antes fallaba 1: CI estaba en rojo) |
 | `deno check` de las 6 Edge Functions | OK (añadido a CI, job `functions`) |
 
@@ -20,6 +20,10 @@ Pruebas nuevas:
 | `location-consent-states.test.ts` (2) | Compartir con amigos desactivado por defecto; política coherente |
 | `segment-stats.test.ts` (3) | Estadísticas por tramo sin velocidades |
 | `route-fallback.test.ts` (4) | Sin ruta real no hay guía; sin OSRM público; cancelar no inventa ruta |
+| `trip-close.test.ts` (3) | El viaje se cierra parado sin posiciones nuevas; picos de velocidad del GPS |
+| `navigation-arrival-snap.test.ts` (6) | «Has llegado» aparcando cerca; coche pegado a la ruta (MAPA-06) |
+| `challenge-eta.test.ts` (6) | Clasificación de retos por tiempo de llegada (RETO-05) |
+| `offline-navigation.test.ts` (3), `reroute-deviations.test.ts` (2) | Sin red se conserva la ruta; 5 desvíos seguidos (3 con red, 2 sin red) y vuelta de la red. `reroute-deviations` falla con el código anterior (comprobado) |
 
 **Límite:** las pruebas de políticas son **estáticas** (leen las migraciones).
 No sustituyen a la prueba contra una base real.

@@ -94,7 +94,7 @@ compilar (`android/` e `ios/` se generan, no se editan a mano).
 ```bash
 npx tsc --noEmit
 npx eslint .
-npx jest                       # 45 suites, 307 pruebas
+npx jest                       # 50 suites, 330 pruebas
 node scripts/i18n-missing.js   # textos sin traducir al inglés
 ```
 
