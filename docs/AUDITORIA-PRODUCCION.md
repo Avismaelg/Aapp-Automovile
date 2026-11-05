@@ -130,6 +130,10 @@ LiveKit RN 2 / livekit-client 2.23, rnmapbox 10.3.7, React Native Firebase 27.
 | P1-5 / P2-3 línea directa y OSRM | Corregido | `3264dc4` | `route-fallback` | Prueba en dispositivo |
 | P1-6 CI | Corregido (expo-doctor OK, job Deno) | `af0fd47`, `f2789ce` | — | Ver el workflow en GitHub |
 | P2-4 rendimiento del mapa | Abierto | — | — | Medir en el teléfono |
+| Viaje sin cerrar, fecha «4 oct», pico de velocidad (viaje real) | Corregido | `6ea9482` | `trip-close`, `i18n` | Prueba en dispositivo |
+| MAPA-06 coche fuera de la calle / sin «Has llegado» (viaje real) | Corregido | `a0fc905` | `navigation-arrival-snap` | Prueba en dispositivo |
+| RETO-05 clasificación por ETA | Hecho | `bd58deb` | `challenge-eta` | Aplicar migración 127000 |
+| MAPA-28 navegación sin conexión | Hecho | (este) | `offline-navigation` | Prueba en dispositivo |
 | P2-5 vuelta tras expulsión | Corregido (con P0-1) | `639e9ba` | `rls-hardening` | — |
 | P2-6 revisión legal | Abierto | — | — | Abogado |
 
