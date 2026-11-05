@@ -123,7 +123,7 @@ LiveKit RN 2 / livekit-client 2.23, rnmapbox 10.3.7, React Native Firebase 27.
 | P0-3 / P1-8 matrícula, home_location | Corregido en código | `639e9ba` | `rls-hardening` | idem; instalar la APK nueva antes |
 | P0-4 velocidad pública | Corregido (app + migración) | `5e6d8f9` | `segment-stats`, `rls-hardening` | Aplicar migración |
 | P0-5 retos | Corregido en código | `9caa3c6` | `rls-hardening` | Aplicar migración; prueba en dispositivo |
-| P1-1 compartir con amigos | Corregido (desactivado por defecto) | `7a80043` | `location-consent-states` | Prueba en dispositivo |
+| P1-1 compartir con amigos | Revertido por decisión de producto: activado por defecto con aviso y modo fantasma (`bce1523`) | `7a80043`, `bce1523` | `location-consent-states` | Prueba en dispositivo |
 | P1-2 carrera al entrar | Corregido (`for update`) | `639e9ba` | `rls-hardening` | Aplicar migración |
 | P1-3 / P1-7 / P2-1 voz | Corregido (revocación, 15 min, convoy vigente, nombre) | `77d5c95` | `rls-hardening` | Desplegar funciones; prueba de expulsión |
 | P1-4 / P2-2 borrado de cuenta | Corregido (parcial informado, cola, paginación) | `1d0f1f5`, `f2789ce` | `rls-hardening`, `deno check` | Desplegar función |
