@@ -87,7 +87,8 @@ type Channel = {
 // pestaña del convoy compartían la misma petición: con destinos distintos se
 // cancelaban la una a la otra en cada lectura del GPS y la ruta se quedaba
 // «Calculando…» sin dejar iniciar la navegación.
-function createChannel(): Channel {
+// Exportada para las pruebas (desvíos seguidos, sin conexión).
+export function createChannel(): Channel {
   const store = create<RouteState>(() => ({
     routes: [],
     selected: 0,
@@ -100,6 +101,10 @@ function createChannel(): Channel {
   // Última posición conocida: al recalcular (p. ej. por salirte de la ruta) se
   // parte de donde estás ahora, no de donde se pidió la ruta anterior.
   let latestOrigin: GeoPoint | null = null;
+  // Destino y paradas de la ruta por calles que se muestra ahora. Se guarda
+  // aparte de `requested` porque retry() lo borra antes de pedir de nuevo: al
+  // recalcular tras un desvío sin red se perdía la ruta guardada (MAPA-28).
+  let shown: { destination: GeoPoint; stops: GeoPoint[] } | null = null;
   let pendingTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingController: AbortController | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -146,7 +151,7 @@ function createChannel(): Channel {
 
     cancelPending();
     // Destino de la ruta que hay ahora (para conservarla si falla la red).
-    const keptDestination = previous && sameStops(previous.stops, stops) ? previous.destination : null;
+    const keptDestination = shown && sameStops(shown.stops, stops) ? shown.destination : null;
     requested = { origin, destination, stops, at: Date.now() };
 
     const controller = new AbortController();
@@ -184,6 +189,7 @@ function createChannel(): Channel {
         }
         // Al recalcular se vuelve a la más rápida desde la posición actual.
         store.setState({ routes, selected: 0, isLoading: false, error: null, keptOffline: false });
+        shown = routes[0]?.source === 'fallback' ? null : { destination, stops };
         // Línea directa (sin motor de rutas): se sigue intentando la ruta por calles.
         if (routes[0]?.source === 'fallback') scheduleRetry(15_000);
       } catch (error) {
@@ -196,6 +202,7 @@ function createChannel(): Channel {
           scheduleRetry(8_000);
           return;
         }
+        shown = null;
         store.setState({
           keptOffline: false,
           routes: [],
@@ -224,6 +231,7 @@ function createChannel(): Channel {
     clear: () => {
       cancelPending();
       requested = null;
+      shown = null;
       store.setState({ routes: [], selected: 0, isLoading: false, error: null });
     },
     select: (index) => {
