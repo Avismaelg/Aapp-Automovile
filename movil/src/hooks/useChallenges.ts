@@ -58,6 +58,8 @@ type ParticipantRow = {
   finish_rank: number | null;
   last_progress_at?: string | null;
   arrival_verified?: boolean | null;
+  eta_s?: number | null;
+  eta_at?: string | null;
 };
 
 type VehicleRow = {
@@ -272,6 +274,8 @@ export function useChallenges() {
               elapsedSeconds: participant.elapsed_s,
               finishRank: participant.finish_rank,
               arrivalVerified: participant.arrival_verified ?? null,
+              etaS: participant.eta_s ?? null,
+              etaAt: participant.eta_at ?? null,
               lastProgressAt: participant.last_progress_at ?? null,
               isMe: participant.user_id === account.id,
               isHost: participant.user_id === challenge.host_id,
@@ -576,6 +580,7 @@ export async function reportChallengeProgress(
   progressPct: number,
   arrived: boolean,
   position?: { latitude: number; longitude: number; accuracy: number | null },
+  etaS?: number | null,
 ): Promise<number | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('report_challenge_progress', {
@@ -585,6 +590,7 @@ export async function reportChallengeProgress(
     p_lat: position?.latitude ?? null,
     p_lng: position?.longitude ?? null,
     p_accuracy_m: position?.accuracy ?? null,
+    p_eta_s: etaS ?? null,
   });
   if (error) throw new Error(error.message);
   return typeof data === 'number' ? data : null;

@@ -191,14 +191,46 @@ export function challengeProgress(start: Point, end: Point, current: Point) {
   return { pct: Math.round(pct * 10) / 10, arrived, leftM: left };
 }
 
-// Cada cuánto informar del avance: cada 5 s, o al momento si llegas.
+// Cada cuánto informar del avance: cada 5 s si avanzaste, cada 15 s aunque no
+// (en un tapón el % no cambia pero el tiempo de llegada sí), o al momento si
+// llegas.
 export function shouldReportProgress(
   last: { pct: number; at: number } | null,
   next: { pct: number; at: number; arrived: boolean },
 ) {
   if (next.arrived) return true;
   if (!last) return true;
-  return next.at - last.at >= 5_000 && next.pct - last.pct >= 0.5;
+  const elapsed = next.at - last.at;
+  return (elapsed >= 5_000 && next.pct - last.pct >= 0.5) || elapsed >= 15_000;
+}
+
+// RETO-05: segundos que te faltan para llegar. Si navegas hacia la meta vale
+// el tiempo de la ruta con tráfico; si no, una estimación: la distancia en
+// línea recta × 1,3 (las calles no van rectas) a tu velocidad, nunca menos de
+// 25 km/h (parado en un semáforo no te quedas para siempre).
+export const ETA_MIN_SPEED_KMH = 25;
+export function challengeEtaS(leftM: number, speedKmh: number | null, routeEtaS: number | null) {
+  if (routeEtaS != null && Number.isFinite(routeEtaS) && routeEtaS >= 0) return Math.round(routeEtaS);
+  const kmh = Math.max(ETA_MIN_SPEED_KMH, speedKmh ?? 0);
+  return Math.round((leftM * 1.3) / (kmh / 3.6));
+}
+
+// Clasificación de un reto: los que llegaron por su puesto; los que siguen,
+// por el tiempo que les falta (si es reciente: ETA_FRESH_MS, como en el
+// convoy) y si no, por el avance.
+export function compareRacers(
+  a: { finishRank: number | null; etaS?: number | null; etaAt?: string | null; progressPct: number },
+  b: { finishRank: number | null; etaS?: number | null; etaAt?: string | null; progressPct: number },
+  now: number,
+) {
+  if (a.finishRank && b.finishRank) return a.finishRank - b.finishRank;
+  if (a.finishRank) return -1;
+  if (b.finishRank) return 1;
+  const fresh = (racer: typeof a) =>
+    racer.etaS != null && racer.etaAt != null && now - Date.parse(racer.etaAt) <= ETA_FRESH_MS;
+  if (fresh(a) && fresh(b)) return (a.etaS as number) - (b.etaS as number);
+  if (fresh(a) !== fresh(b)) return fresh(a) ? -1 : 1;
+  return b.progressPct - a.progressPct;
 }
 
 export function placeLabel(rank: number) {

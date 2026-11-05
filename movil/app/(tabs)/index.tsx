@@ -339,10 +339,6 @@ export default function NavigationScreen() {
   // de demo ni la simulada).
   // Reto por llegada en curso: avance y puesto automáticos.
   const { racing: racingChallenge } = useChallenges();
-  useChallengeRace(
-    live.location,
-    !isDemo && live.isLive && live.location.source === "gps",
-  );
   useLiveShare(live.location, {
     partyId: party && !isDemo ? party.id : null,
     hasFriends: friendCount > 0,
@@ -491,6 +487,26 @@ export default function NavigationScreen() {
     route.route && remainingRouteM != null && route.route.distanceM > 0
       ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
       : null;
+
+  // RETO-05: navegando hacia la meta de un reto, su tiempo con tráfico es tu
+  // ETA en la clasificación.
+  const destinationLat = destination?.latitude ?? null;
+  const destinationLng = destination?.longitude ?? null;
+  const remainingS = isNavigating && streetRoute && remainingTimeMs != null ? Math.round(remainingTimeMs / 1000) : null;
+  const challengeNavigation = useMemo(
+    () => ({
+      destination:
+        destinationLat != null && destinationLng != null ? { latitude: destinationLat, longitude: destinationLng } : null,
+      // En pasos de 15 s: no hace falta reinformar por cada segundo.
+      remainingS: remainingS == null ? null : Math.round(remainingS / 15) * 15,
+    }),
+    [destinationLat, destinationLng, remainingS],
+  );
+  useChallengeRace(
+    live.location,
+    !isDemo && live.isLive && live.location.source === "gps",
+    challengeNavigation,
+  );
 
   // CONV-04: tu ETA y lo que te queda hasta la meta común viajan con tu
   // posición (también con la pantalla bloqueada). Solo si vas hacia la meta.

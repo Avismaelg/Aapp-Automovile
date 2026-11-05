@@ -5,6 +5,7 @@ import type {
   Friend,
   VehicleKind,
 } from '@/src/types/models';
+import { compareRacers, ETA_FRESH_MS } from '@/src/lib/convoy';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
 import { t } from '@/src/i18n';
 
@@ -33,6 +34,9 @@ export type RealChallengeParticipant = {
   elapsedSeconds: number;
   finishRank: number | null;
   arrivalVerified?: boolean | null;
+  // RETO-05: segundos que le faltan y cuándo se informó.
+  etaS?: number | null;
+  etaAt?: string | null;
   isMe: boolean;
   isHost: boolean;
   // RETO-07: último avance recibido (para «sin conexión»).
@@ -114,8 +118,7 @@ export function realChallengeToChallenge(
         if (a.status === 'accepted') return -1;
         if (b.status === 'accepted') return 1;
       }
-      if (a.finishRank && b.finishRank) return a.finishRank - b.finishRank;
-      return b.progressPct - a.progressPct;
+      return compareRacers(a, b, now);
     })
     .map((participant) => ({
       id: participant.userId,
@@ -125,7 +128,10 @@ export function realChallengeToChallenge(
       vehicleKind: participant.vehicleKind,
       vehicle: participant.vehicleLabel,
       progress: Math.round(participant.progressPct),
-      etaMin: Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
+      etaMin:
+        participant.etaS != null && participant.etaAt != null && now - Date.parse(participant.etaAt) <= ETA_FRESH_MS
+          ? Math.max(1, Math.round(participant.etaS / 60))
+          : Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
       isMe: participant.isMe,
       rank: participant.finishRank ?? undefined,
       arrivalVerified: participant.arrivalVerified ?? null,
