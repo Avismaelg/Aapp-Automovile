@@ -305,3 +305,6 @@
 =Cuenta eliminada|Account deleted
 =Tu cuenta y tus datos ya se borraron. Algunas fotos tardarán un poco más: se borran solas en los próximos borrados del servidor.|Your account and data are deleted. A few photos will take a little longer: the server removes them on its next cleanups.
 =No encontramos una ruta por carretera ahora mismo. Lo reintentamos solo; también puedes pulsar Reintentar.|We could not find a road route right now. We will retry automatically; you can also tap Retry.
+=Recalculando…|Recalculating…
+=Sin conexión: vuelve a la ruta guardada|Offline: get back on the saved route
+=Sin conexión: sigues con la ruta guardada|Offline: following the saved route

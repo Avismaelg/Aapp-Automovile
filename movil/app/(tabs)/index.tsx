@@ -39,6 +39,7 @@ import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
 import { useStoppedFor } from "@/src/hooks/useStoppedFor";
+import { useIsOnline } from "@/src/hooks/useIsOnline";
 import { ARRIVE_STOPPED_MS, arrivedAtDestination } from "@/src/lib/arrival";
 import { VoicePTT } from "@/src/components/party/VoicePTT";
 import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
@@ -145,6 +146,7 @@ export default function NavigationScreen() {
   const live = useLiveLocation();
   const { party, isDemo } = useActiveParty({ poll: true });
   const mapNow = useNow();
+  const online = useIsOnline();
   const { vehicles } = useGarageVehicles();
   const {
     members: realFriends,
@@ -1141,6 +1143,7 @@ export default function NavigationScreen() {
               following={thenInstruction}
               offRoute={offRoute}
               hasRoute={Boolean(routeLine)}
+              offline={route.keptOffline || !online}
               arrivalLabel={arrivalLabel}
               remainingTimeLabel={formatRouteTime(
                 remainingTimeMs ?? route.route?.timeMs ?? 0,

@@ -19,7 +19,23 @@ type RouteState = {
   selected: number;
   isLoading: boolean;
   error: string | null;
+  // MAPA-28: el recálculo falló (sin conexión) y se sigue con la ruta que ya
+  // había hacia el mismo destino.
+  keptOffline: boolean;
 };
+
+// MAPA-28: ¿se puede seguir con la ruta que ya hay? Solo si es por calles y va
+// al mismo destino (y con las mismas paradas): un destino nuevo sin conexión
+// no tiene ruta guardada.
+export function keepRouteWhenOffline(
+  current: WorldMapRoute[],
+  previousDestination: GeoPoint | null,
+  destination: GeoPoint,
+) {
+  const kept = current[0];
+  if (!kept || kept.source === 'fallback' || !previousDestination) return false;
+  return distanceMeters(previousDestination, destination) < 30;
+}
 
 const NO_STOPS: GeoPoint[] = [];
 
@@ -77,6 +93,7 @@ function createChannel(): Channel {
     selected: 0,
     isLoading: false,
     error: null,
+    keptOffline: false,
   }));
 
   let requested: { origin: GeoPoint; destination: GeoPoint; stops: GeoPoint[]; at: number } | null = null;
@@ -128,6 +145,8 @@ function createChannel(): Channel {
     if (unchanged) return;
 
     cancelPending();
+    // Destino de la ruta que hay ahora (para conservarla si falla la red).
+    const keptDestination = previous && sameStops(previous.stops, stops) ? previous.destination : null;
     requested = { origin, destination, stops, at: Date.now() };
 
     const controller = new AbortController();
@@ -156,8 +175,15 @@ function createChannel(): Channel {
         if (controller.signal.aborted) return;
         if (giveUpTimer) clearTimeout(giveUpTimer);
         giveUpTimer = null;
+        // Sin red, la cadena acaba en la línea directa: con una ruta por calles
+        // al mismo destino se sigue con ella en vez de perder la guía.
+        if (routes[0]?.source === 'fallback' && keepRouteWhenOffline(store.getState().routes, keptDestination, destination)) {
+          store.setState({ isLoading: false, error: null, keptOffline: true });
+          scheduleRetry(15_000);
+          return;
+        }
         // Al recalcular se vuelve a la más rápida desde la posición actual.
-        store.setState({ routes, selected: 0, isLoading: false, error: null });
+        store.setState({ routes, selected: 0, isLoading: false, error: null, keptOffline: false });
         // Línea directa (sin motor de rutas): se sigue intentando la ruta por calles.
         if (routes[0]?.source === 'fallback') scheduleRetry(15_000);
       } catch (error) {
@@ -165,7 +191,13 @@ function createChannel(): Channel {
         if (giveUpTimer) clearTimeout(giveUpTimer);
         giveUpTimer = null;
         const offline = isNetworkError(error);
+        if (offline && keepRouteWhenOffline(store.getState().routes, keptDestination, destination)) {
+          store.setState({ isLoading: false, error: null, keptOffline: true });
+          scheduleRetry(8_000);
+          return;
+        }
         store.setState({
+          keptOffline: false,
           routes: [],
           selected: 0,
           isLoading: false,
@@ -232,7 +264,7 @@ export function useGraphHopperRoute({
   const originLongitude = origin.longitude;
   const destinationLatitude = destination.latitude;
   const destinationLongitude = destination.longitude;
-  const { routes, selected, isLoading, error } = channel.store();
+  const { routes, selected, isLoading, error, keptOffline } = channel.store();
   // Clave estable para el efecto (las paradas llegan como array nuevo).
   const stopsKey = stops.map((stop) => `${stop.latitude},${stop.longitude}`).join(';');
   const route = routes[selected] ?? null;
@@ -263,6 +295,7 @@ export function useGraphHopperRoute({
     select: channel.select,
     isLoading,
     error,
+    keptOffline,
     configured: isGraphHopperConfigured,
     source: route?.source ?? 'fallback',
     retry: channel.retry,
