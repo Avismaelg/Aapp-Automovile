@@ -17,7 +17,7 @@ Pruebas nuevas:
 |---|---|
 | `rls-hardening.test.ts` (19) | Estado final de políticas, permisos por columna y funciones tras todas las migraciones: P0-1…P0-5, voz, borrado. **9 de 10** de las primeras fallan sin las migraciones nuevas (comprobado) |
 | `db-permissions.test.ts` (4) | Uso del esquema `private` y ejecución de sus funciones |
-| `location-consent-states.test.ts` (2) | Compartir con amigos desactivado por defecto; política coherente |
+| `location-consent-states.test.ts` (2) | Compartir con amigos activado por defecto (un «no» o el modo fantasma lo apagan); política coherente |
 | `segment-stats.test.ts` (3) | Estadísticas por tramo sin velocidades |
 | `route-fallback.test.ts` (4) | Sin ruta real no hay guía; sin OSRM público; cancelar no inventa ruta |
 | `trip-close.test.ts` (3) | El viaje se cierra parado sin posiciones nuevas; picos de velocidad del GPS |
