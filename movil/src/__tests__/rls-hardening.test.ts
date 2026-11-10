@@ -273,6 +273,10 @@ describe('fase 2 · auditoría de seguridad', () => {
     }
   });
 
+  it('generate_username solo la usa el alta, no la API', () => {
+    expect(allSql).toContain('revoke all on function public.generate_username() from public, anon, authenticated');
+  });
+
   it('nadie se hace owner/admin de un club ni entra en uno privado', () => {
     const insert = finalPolicies().get('club_members.club_members_insert') ?? '';
     expect(insert).toContain("role = 'member'");
