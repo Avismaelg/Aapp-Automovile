@@ -289,10 +289,16 @@ describe('fase 10 · páginas web de las tiendas', () => {
   it('la página de borrado existe y solo lleva la clave pública anon', () => {
     const page = fs.readFileSync(path.join(site, 'borrar-cuenta', 'index.html'), 'utf8');
     expect(page).toContain("functions.invoke('delete-account'");
-    const keys = page.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
-    expect(keys.length).toBe(1);
-    const claims = JSON.parse(Buffer.from((keys[0] ?? '').split('.')[1] ?? '', 'base64url').toString('utf8'));
-    expect(claims.role).toBe('anon');
+    // Nunca una clave secreta (formato nuevo).
+    expect(page).not.toMatch(/sb_secret_/);
+    const jwts = page.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
+    const publishable = page.match(/sb_publishable_[A-Za-z0-9_-]+/g) ?? [];
+    // Una sola clave: la anon (JWT, formato antiguo) o la publishable (nuevo).
+    expect(jwts.length + publishable.length).toBe(1);
+    for (const jwt of jwts) {
+      const claims = JSON.parse(Buffer.from(jwt.split('.')[1] ?? '', 'base64url').toString('utf8'));
+      expect(claims.role).toBe('anon');
+    }
   });
 
   it('la política de privacidad pública dice lo mismo que la app', () => {

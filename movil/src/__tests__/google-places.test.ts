@@ -73,8 +73,12 @@ describe('MAPA-02: búsqueda con Google Places', () => {
     );
     expect(cap).toContain('if v_global > greatest(1, p_global_limit) then return false');
     expect(fn).toContain('p_global_limit: GLOBAL_DAILY_LIMIT');
-    const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
-    expect(env).not.toMatch(/GOOGLE/i);
+    // .env no está en git (en CI no existe): se revisa cuando lo hay, y el
+    // ejemplo versionado siempre.
+    for (const name of ['.env', '.env.example']) {
+      const file = path.join(root, name);
+      if (fs.existsSync(file)) expect(fs.readFileSync(file, 'utf8')).not.toMatch(/GOOGLE/i);
+    }
   });
 });
 
