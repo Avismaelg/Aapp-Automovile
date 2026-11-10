@@ -237,8 +237,56 @@ describe('P0-5 · retos', () => {
     expect(report).toContain('p_lat double precision default null');
     expect(report).toContain("raise exception 'not_at_finish'");
     expect(report).toContain('arrival_verified = v_verified');
+    // Fase 2 · 2.2: con meta, sin posición o en un tiempo imposible no se gana.
+    expect(report).toContain("raise exception 'position_required'");
+    expect(report).toContain("raise exception 'impossible_time'");
+    expect(report).not.toMatch(/if p_lat is not null and p_lng is not null and v_challenge\.end_lat/);
     // La versión de 3 argumentos (que confiaba en p_arrived) ya no existe.
     expect(allSql).toContain('drop function if exists private.report_challenge_progress(uuid, numeric, boolean)');
+  });
+});
+
+describe('fase 2 · auditoría de seguridad', () => {
+  const functionsDir = path.join(__dirname, '..', '..', 'supabase', 'functions');
+  const app = path.join(__dirname, '..', '..', 'app');
+
+  it('nadie averigua qué correos tienen cuenta', () => {
+    expect(allSql).toContain('revoke all on function public.email_registered(text) from public, anon, authenticated');
+    expect(allSql).toContain('revoke all on function private.email_registered(text) from public, anon, authenticated');
+    const signUp = fs.readFileSync(path.join(app, '(auth)', 'sign-up.tsx'), 'utf8');
+    expect(signUp).not.toContain('isEmailRegistered');
+    expect(signUp).not.toContain('email_registered');
+  });
+
+  it('los topes de Google los fija el servidor y el cupo propio va antes que el total', () => {
+    for (const [name, userCap, globalCap] of [
+      ['bump_place_search', 300, 300],
+      ['bump_route_quota', 60, 150],
+    ] as const) {
+      const body = functionBody(name);
+      expect(body).toContain(`v_user_cap constant integer := ${userCap}`);
+      expect(body).toContain(`v_global_cap constant integer := ${globalCap}`);
+      expect(body).not.toMatch(/p_(global_)?limit\)/);
+      expect(body.indexOf('if v_count > v_user_cap then return false')).toBeLessThan(
+        body.indexOf(name === 'bump_place_search' ? 'place_search_global (day' : 'values (v_day, v_global'),
+      );
+    }
+  });
+
+  it('nadie se hace owner/admin de un club ni entra en uno privado', () => {
+    const insert = finalPolicies().get('club_members.club_members_insert') ?? '';
+    expect(insert).toContain("role = 'member'");
+    expect(insert).toContain("c.privacy = 'public'");
+    expect(insert).toContain('c.owner_id = (select auth.uid())');
+  });
+
+  it('el secreto de los avisos se compara en tiempo constante', () => {
+    for (const name of ['push', 'livekit-revoke']) {
+      const source = fs.readFileSync(path.join(functionsDir, name, 'index.ts'), 'utf8');
+      expect(source).toContain("crypto.subtle.digest('SHA-256'");
+      expect(source).toContain('diff |= a[i] ^ b[i]');
+      expect(source).not.toMatch(/x-push-secret'\) !==/);
+    }
   });
 });
 
@@ -255,7 +303,7 @@ describe('fase 5 · voz', () => {
   it('salir o ser expulsado echa de la sala de voz al momento', () => {
     expect(allSql).toContain('create trigger party_members_voice_revoke');
     const revoke = fs.readFileSync(path.join(functionsDir, 'livekit-revoke', 'index.ts'), 'utf8');
-    expect(revoke).toContain("request.headers.get('x-push-secret') !== secret");
+    expect(revoke).toContain("validSecret(Deno.env.get('PUSH_WEBHOOK_SECRET'), request.headers.get('x-push-secret'))");
     expect(revoke).toContain('removeParticipant');
   });
 });

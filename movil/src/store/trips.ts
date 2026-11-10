@@ -151,6 +151,13 @@ function tripReach(trip: Trip) {
 // pendientes, más antiguos, se descartaran como repetidos.
 let liveBlocked = true;
 
+// Una sola recogida de puntos de fondo a la vez (la piden el arranque, volver
+// a primer plano y un temporizador). Dos a la vez leían los mismos lotes antes
+// de borrarlos y procesaban los puntos dos veces. Quien llama mientras tanto
+// espera a la misma, y se repite si pidió otra (pudo llegar un lote nuevo).
+let ingestRun: Promise<void> | null = null;
+let ingestAgain = false;
+
 // Solo para tests: el estado de detección vive fuera del store.
 export function resetTripDetection() {
   lastMovingAt = 0;
@@ -158,6 +165,8 @@ export function resetTripDetection() {
   fastSamples = 0;
   pendingStart = null;
   liveBlocked = false;
+  ingestRun = null;
+  ingestAgain = false;
 }
 
 // El viaje activo se guarda solo (pocos KB) cada 12 s; el archivo completo
@@ -358,12 +367,26 @@ export const useTrips = create<TripsState>((set, get) => ({
     }
   },
 
-  ingestBackground: async () => {
-    const points = await drainBackgroundPoints();
-    const { recordPoint } = get();
-    for (const point of points) recordPoint({ ...point, source: "background" });
-    liveBlocked = false;
-    if (points.length > 0) await persistAll();
+  ingestBackground: () => {
+    if (ingestRun) {
+      ingestAgain = true;
+      return ingestRun;
+    }
+    ingestRun = (async () => {
+      try {
+        do {
+          ingestAgain = false;
+          const points = await drainBackgroundPoints();
+          const { recordPoint } = get();
+          for (const point of points) recordPoint({ ...point, source: "background" });
+          if (points.length > 0) await persistAll();
+        } while (ingestAgain);
+      } finally {
+        liveBlocked = false;
+        ingestRun = null;
+      }
+    })();
+    return ingestRun;
   },
 
   blockLive: () => {

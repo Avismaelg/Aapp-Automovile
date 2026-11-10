@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
@@ -16,6 +16,7 @@ import { profileColor } from '@/src/lib/profile-db';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useLivePoll } from '@/src/hooks/useLivePoll';
+import { useNow } from '@/src/hooks/useNow';
 
 export type MapFriend = WorldMapMember & { username: string; updatedAt?: number };
 
@@ -26,7 +27,9 @@ export function useFriendsOnMap() {
   const me = useCurrentUser();
   const account = useAuth((state) => state.account);
   const { friends, isDemo } = useFriends();
-  const [now, setNow] = useState(() => Date.now());
+  // «En gris» pasados 2 min: basta con revisarlo cada 30 s (antes cada
+  // consulta, cada 5 s, renovaba la hora y rehacía la lista entera).
+  const now = useNow(30_000);
 
   const friendIds = useMemo(
     () => friends.map((friend) => friend.profile.id).sort(),
@@ -75,7 +78,6 @@ export function useFriendsOnMap() {
           at: row.last_seen_at,
         })),
       ];
-      setNow(Date.now());
       return latestFriendPositions(sources, Date.now());
     },
   });

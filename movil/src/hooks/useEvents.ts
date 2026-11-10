@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { isDemoMode } from '@/src/lib/demo';
 import { eventId, type AppEvent, type EventRoute } from '@/src/lib/events';
@@ -95,25 +95,33 @@ export function useEvents() {
   // Reintenta publicar los eventos que quedaron pendientes (por ejemplo, antes
   // de aplicar la migración o sin conexión). Si la tabla no existe, se detiene
   // hasta el siguiente cambio local.
+  const syncingRef = useRef(false);
   useEffect(() => {
-    if (demo || !supabase || !account) return;
-    const pending = localEvents.filter((event) => event.pendingSync);
-    if (pending.length === 0) return;
-
-    let cancelled = false;
+    if (demo || !supabase || !account || syncingRef.current) return;
+    if (!localEvents.some((event) => event.pendingSync)) return;
+    const client = supabase;
+    const hostId = account.id;
+    syncingRef.current = true;
     void (async () => {
-      for (const event of pending) {
-        const { error } = await supabase!.from('events').insert(insertPayload(event, account.id));
-        if (cancelled) return;
-        if (error) return;
-        markSynced(event.id);
+      try {
+        // Se lee la lista viva: markSynced la cambia mientras se sube. Antes
+        // ese cambio reiniciaba el efecto a media subida, el siguiente evento
+        // se subía dos veces y quedaba pendiente para siempre.
+        for (;;) {
+          const event = useLocalEvents.getState().events.find((item) => item.pendingSync);
+          if (!event) break;
+          const { error } = await client.from('events').insert(insertPayload(event, hostId));
+          // 23505: ya estaba en el servidor (se subió y no llegó a marcarse).
+          if (error && error.code !== '23505') return;
+          markSynced(event.id);
+        }
+        void queryClient.invalidateQueries({ queryKey: ['events'] });
+      } catch {
+        // Sin conexión: se reintenta con el siguiente cambio local.
+      } finally {
+        syncingRef.current = false;
       }
-      void queryClient.invalidateQueries({ queryKey: ['events'] });
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [account, demo, localEvents, markSynced, queryClient]);
 
   const events = useMemo(() => {

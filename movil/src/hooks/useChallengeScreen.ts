@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Share } from 'react-native';
 
 import { activeChallenge, challengeRoutes, recentChallenges } from '@/src/data/mock';
@@ -15,6 +15,7 @@ import {
   useStartChallenge,
 } from '@/src/hooks/useChallenges';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 import { useCreatePost } from '@/src/hooks/useFeed';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { emptyChallenge, realChallengeToChallenge, type ChallengeFriend } from '@/src/lib/challenge-db';
@@ -84,6 +85,10 @@ export function useChallengeScreen() {
   const [matching, setMatching] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Reloj del reto en curso: cada segundo, solo con la pantalla de Retos a la
+  // vista (las pestañas siguen montadas aunque estés en otra).
+  const clockTick = useLivePoll(1_000);
+  const matchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const route = challengeRoutes.find((item) => item.id === selectedRouteId) ?? challengeRoutes[1];
   const filteredFriends = useMemo(
@@ -158,10 +163,15 @@ export function useChallengeScreen() {
   }, [isDemo, localActive.status]);
 
   useEffect(() => {
-    if (isDemo || realActive?.status !== 'live') return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    if (isDemo || realActive?.status !== 'live' || !clockTick) return;
+    const timer = setInterval(() => setNow(Date.now()), clockTick);
     return () => clearInterval(timer);
-  }, [isDemo, realActive?.id, realActive?.status]);
+  }, [isDemo, realActive?.id, realActive?.status, clockTick]);
+
+  // El emparejamiento a medias no actualiza una pantalla ya cerrada.
+  useEffect(() => () => {
+    if (matchTimerRef.current) clearTimeout(matchTimerRef.current);
+  }, []);
 
   const chooseCategory = (next: ChallengeCategory) => {
     setCategory(next);
@@ -184,7 +194,9 @@ export function useChallengeScreen() {
     setMatching(true);
     setMatchedFriend(null);
     setSentTo(null);
-    setTimeout(() => {
+    if (matchTimerRef.current) clearTimeout(matchTimerRef.current);
+    matchTimerRef.current = setTimeout(() => {
+      matchTimerRef.current = null;
       const online = filteredFriends.filter((friend) => friend.online);
       const pool = online.length ? online : filteredFriends;
       const pick = pool[Math.floor(Math.random() * pool.length)];

@@ -130,6 +130,26 @@ describe('registro automático de rutas', () => {
     expect(keys.some((key) => key.includes('bg-points'))).toBe(false);
   });
 
+  it('dos recogidas a la vez leen los lotes de fondo una sola vez', async () => {
+    const start = Date.now();
+    await saveBackgroundBatch(
+      Array.from({ length: 6 }, (_, index) => ({
+        latitude: north(index),
+        longitude: LNG,
+        speedKmh: 30,
+        at: start + index * 15_000,
+      })),
+    );
+    const multiGet = jest.mocked(AsyncStorage.multiGet);
+    multiGet.mockClear();
+
+    const { ingestBackground } = useTrips.getState();
+    await Promise.all([ingestBackground(), ingestBackground()]);
+
+    expect(multiGet).toHaveBeenCalledTimes(1);
+    expect(useTrips.getState().active?.startedAt).toBe(start);
+  });
+
   it('al volver de segundo plano no pierde los puntos pendientes por un fix en vivo', async () => {
     const start = Date.now() - 20 * 60_000;
     const background = Array.from({ length: 6 }, (_, index) => ({

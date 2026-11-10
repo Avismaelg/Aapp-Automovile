@@ -1,18 +1,11 @@
 import { displaySpeed, formatDistance, speedUnit, t } from "@/src/i18n";
+import { haversineMeters as metersBetween } from "@/src/lib/geo";
 // Reglas del convoy en tiempo real y de los retos por llegada. Sin React ni
 // Supabase: las usan los hooks, el simulador y las pruebas.
 
 export type Point = { latitude: number; longitude: number };
 
-export function metersBetween(a: Point, b: Point) {
-  const rad = Math.PI / 180;
-  const dLat = (b.latitude - a.latitude) * rad;
-  const dLng = (b.longitude - a.longitude) * rad;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+export { metersBetween };
 
 // ---------------------------------------------------------------------------
 // Posición en vivo

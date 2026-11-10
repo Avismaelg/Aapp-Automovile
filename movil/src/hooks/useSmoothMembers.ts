@@ -8,6 +8,17 @@ const FRAME_MS = 80;
 // Con muchísimos pilotos (prueba de carga) no se anima: se pinta tal cual.
 const MAX_ANIMATED = 60;
 
+// ¿Alguien cambió de sitio (o entró/salió)? Lo demás (hablando, en gris…) no
+// se anima: lo pinta el render sin necesidad de fotogramas.
+export function membersMoved(previous: WorldMapMember[], next: WorldMapMember[]) {
+  if (previous.length !== next.length) return true;
+  const before = new Map(previous.map((member) => [member.id, member]));
+  return next.some((member) => {
+    const old = before.get(member.id);
+    return !old || old.latitude !== member.latitude || old.longitude !== member.longitude;
+  });
+}
+
 // Las posiciones de la party llegan cada ~3 s. En vez de saltar de golpe,
 // cada punto se desliza hasta su nueva posición.
 export function useSmoothMembers(members: WorldMapMember[]): WorldMapMember[] {
@@ -19,7 +30,9 @@ export function useSmoothMembers(members: WorldMapMember[]): WorldMapMember[] {
   const animate = members.length <= MAX_ANIMATED;
 
   useEffect(() => {
-    if (!animate) {
+    // El sondeo trae un array nuevo cada 5 s aunque nadie se mueva: sin esto
+    // eran 15 fotogramas del mapa interpolando entre puntos idénticos.
+    if (!animate || !membersMoved(shownRef.current, members)) {
       shownRef.current = members;
       return;
     }

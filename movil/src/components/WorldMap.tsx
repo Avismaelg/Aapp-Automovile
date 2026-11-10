@@ -295,6 +295,8 @@ function cornersOf(points: [number, number][]) {
 function useLocationPermission() {
   const [granted, setGranted] = useState(false);
   useEffect(() => {
+    // Concedido: ya no hay nada que vigilar (antes el intervalo seguía para siempre).
+    if (granted) return;
     let active = true;
     const check = () =>
       Location.getForegroundPermissionsAsync()
@@ -303,9 +305,7 @@ function useLocationPermission() {
         })
         .catch(() => {});
     void check();
-    const timer = setInterval(() => {
-      if (!granted) void check();
-    }, 5_000);
+    const timer = setInterval(() => void check(), 5_000);
     return () => {
       active = false;
       clearInterval(timer);

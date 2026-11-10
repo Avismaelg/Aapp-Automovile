@@ -30,6 +30,9 @@ export function setConvoyProgress(next: Omit<Progress, 'at'> | null) {
 let lastParty: LiveFix | null = null;
 let lastFriends: { lat: number; lng: number; at: number } | null = null;
 let busy = false;
+// Posición que llegó mientras se subía otra: se sube al terminar (la última
+// gana). Antes se descartaba, y podía ser justo la de la llegada.
+let pendingFix: LiveFix | null = null;
 
 async function getConfig(): Promise<Config> {
   if (config) return config;
@@ -80,72 +83,85 @@ function progressColumns(seenAt: string) {
 
 export async function pushLivePosition(fix: LiveFix) {
   const client = supabase;
-  if (!client || busy) return;
-  const { accountId, partyId, friends } = await getConfig();
-  if (!accountId) return;
-  const toParty = Boolean(partyId) && shouldPushLive(lastParty, fix);
-  const friendFix = { lat: fix.latitude, lng: fix.longitude, at: fix.at };
-  const toFriends = friends && shouldPushFriendLocation(lastFriends, friendFix);
-  if (!toParty && !toFriends) return;
-
+  if (!client) return;
+  if (busy) {
+    pendingFix = fix;
+    return;
+  }
   busy = true;
-  const seenAt = new Date(fix.at).toISOString();
   try {
-    // Con la pantalla bloqueada no corre la renovación automática de la
-    // sesión: caducaba a la hora y las posiciones dejaban de subirse (los
-    // demás te veían congelado). getSession la renueva si hace falta.
-    await client.auth.getSession();
-    const writes: PromiseLike<unknown>[] = [];
-    if (toParty && partyId) {
-      lastParty = fix;
-      const progressUpdate = progressColumns(seenAt);
-      const failed = () => {
-        lastParty = null;
-        if ('arrived_at' in progressUpdate) arrivedSent = false;
-      };
-      writes.push(
-        client
-          .from('party_members')
-          .update({
-            last_lat: fix.latitude,
-            last_lng: fix.longitude,
-            last_speed_kmh: fix.speedKmh != null ? Math.round(fix.speedKmh * 10) / 10 : null,
-            last_heading: fix.heading != null ? Math.round(fix.heading) % 360 : null,
-            last_seen_at: seenAt,
-            ...progressUpdate,
-          })
-          .eq('party_id', partyId)
-          .eq('user_id', accountId)
-          .then(({ error }) => {
-            if (error) failed();
-          }, failed),
-      );
-    }
-    if (toFriends) {
-      lastFriends = friendFix;
-      writes.push(
-        client
-          .from('friend_locations')
-          .upsert({
-            user_id: accountId,
-            lat: fix.latitude,
-            lng: fix.longitude,
-            heading: fix.heading,
-            speed_kmh: fix.speedKmh,
-            updated_at: seenAt,
-          })
-          .then(({ error }) => {
-            if (error) lastFriends = null;
-          }),
-      );
-    }
-    await Promise.all(writes);
+    await upload(client, fix);
   } catch {
     // Sin conexión: la siguiente posición lo reintenta.
     lastParty = null;
     lastFriends = null;
   } finally {
     busy = false;
+    const next = pendingFix;
+    pendingFix = null;
+    if (next) void pushLivePosition(next);
   }
 }
 
+async function upload(client: NonNullable<typeof supabase>, fix: LiveFix) {
+  const { accountId, partyId, friends } = await getConfig();
+  if (!accountId) return;
+  // La llegada a la meta no espera al ritmo normal: parado apenas te mueves y
+  // tardaría hasta 30 s en subirse.
+  const pendingArrival = Boolean(progress?.arrived && !arrivedSent);
+  const toParty = Boolean(partyId) && (pendingArrival || shouldPushLive(lastParty, fix));
+  const friendFix = { lat: fix.latitude, lng: fix.longitude, at: fix.at };
+  const toFriends = friends && shouldPushFriendLocation(lastFriends, friendFix);
+  if (!toParty && !toFriends) return;
+
+  const seenAt = new Date(fix.at).toISOString();
+  // Con la pantalla bloqueada no corre la renovación automática de la
+  // sesión: caducaba a la hora y las posiciones dejaban de subirse (los
+  // demás te veían congelado). getSession la renueva si hace falta.
+  await client.auth.getSession();
+  const writes: PromiseLike<unknown>[] = [];
+  if (toParty && partyId) {
+    lastParty = fix;
+    const progressUpdate = progressColumns(seenAt);
+    const failed = () => {
+      lastParty = null;
+      if ('arrived_at' in progressUpdate) arrivedSent = false;
+    };
+    writes.push(
+      client
+        .from('party_members')
+        .update({
+          last_lat: fix.latitude,
+          last_lng: fix.longitude,
+          last_speed_kmh: fix.speedKmh != null ? Math.round(fix.speedKmh * 10) / 10 : null,
+          last_heading: fix.heading != null ? Math.round(fix.heading) % 360 : null,
+          last_seen_at: seenAt,
+          ...progressUpdate,
+        })
+        .eq('party_id', partyId)
+        .eq('user_id', accountId)
+        .then(({ error }) => {
+          if (error) failed();
+        }, failed),
+    );
+  }
+  if (toFriends) {
+    lastFriends = friendFix;
+    writes.push(
+      client
+        .from('friend_locations')
+        .upsert({
+          user_id: accountId,
+          lat: fix.latitude,
+          lng: fix.longitude,
+          heading: fix.heading,
+          speed_kmh: fix.speedKmh,
+          updated_at: seenAt,
+        })
+        .then(({ error }) => {
+          if (error) lastFriends = null;
+        }),
+    );
+  }
+  await Promise.all(writes);
+}

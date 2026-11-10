@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { partyMembers } from '@/src/data/mock';
 import { recommendedSpeeds, resampleAhead } from '@/src/lib/driving-line';
+import { haversineTupleMeters as metersBetween } from '@/src/lib/geo';
 import type { MotionHint } from '@/src/lib/parking-logic';
 import { useParking, type ParkingSpot } from '@/src/store/parking';
 import { matchesSubscription, partySubscriptions } from '@/src/lib/realtime-routing';
@@ -94,14 +95,6 @@ const WALK_KMH = 5;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 const toDeg = (rad: number) => (rad * 180) / Math.PI;
-
-function metersBetween(a: LatLng, b: LatLng) {
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
 
 function bearingDeg(a: LatLng, b: LatLng) {
   const y = Math.sin(toRad(b[1] - a[1])) * Math.cos(toRad(b[0]));

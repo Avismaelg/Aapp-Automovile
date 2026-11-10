@@ -70,15 +70,22 @@ function functionExecute() {
 // Funciones private.x que se ejecutan con los permisos del usuario: las que
 // llaman las políticas RLS y los envoltorios public.* «security invoker».
 function privateCalledByUsers() {
-  const called = new Set<string>();
+  const fromPolicies = new Set<string>();
+  // Por envoltorio: si una migración posterior lo borra, ya no cuenta.
+  const fromWrappers = new Map<string, Set<string>>();
   for (const { sql } of statements) {
+    // Clave nombre/nº de argumentos: borrar una sobrecarga vieja no borra la nueva.
+    const key = (name: string, args: string) => `${name}/${args.trim() ? args.split(',').length : 0}`;
+    const dropped = sql.match(/^drop function if exists public\.([a-z_]+)\(([^)]*)\)/);
+    if (dropped) fromWrappers.delete(key(dropped[1], dropped[2]));
+    const wrapper = sql.match(/^create (?:or replace )?function public\.([a-z_]+)\(([^)]*)\)/);
     const fromPolicy = /^create policy /.test(sql);
-    const fromInvokerWrapper =
-      /^create (?:or replace )?function public\./.test(sql) && /security invoker/.test(sql);
-    if (!fromPolicy && !fromInvokerWrapper) continue;
-    for (const match of sql.matchAll(/(private\.[a-z_]+)\(/g)) called.add(match[1]);
+    if (!fromPolicy && !(wrapper && /security invoker/.test(sql))) continue;
+    const calls = [...sql.matchAll(/(private\.[a-z_]+)\(/g)].map((match) => match[1]);
+    if (fromPolicy) calls.forEach((name) => fromPolicies.add(name));
+    else if (wrapper) fromWrappers.set(key(wrapper[1], wrapper[2]), new Set(calls));
   }
-  return called;
+  return new Set([...fromPolicies, ...[...fromWrappers.values()].flatMap((calls) => [...calls])]);
 }
 
 describe('permisos de la base de datos tras todas las migraciones', () => {

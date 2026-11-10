@@ -5,6 +5,7 @@ import {
   mapProfileRow,
   PROFILE_COLUMNS,
   type ProfileRow,
+  fallbackProfile,
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
@@ -30,21 +31,6 @@ type CommentRow = {
   body: string;
   created_at: string;
 };
-
-function fallbackProfile(id: string): UserProfile {
-  return {
-    id,
-    username: 'piloto',
-    displayName: t('Piloto'),
-    bio: '',
-    city: '',
-    countryCode: 'DO',
-    avatarUrl: null,
-    privacy: 'public',
-    qrSlug: `piloto-${id.slice(0, 6)}`,
-    createdAt: new Date().toISOString(),
-  };
-}
 
 export function useComments(postId: string | undefined) {
   const queryClient = useQueryClient();

@@ -46,8 +46,9 @@ const CONVOY_OPTIONS: Location.LocationTaskOptions = {
   deferredUpdatesInterval: 0,
 };
 
-// Compartiendo solo con amigos: casi en vivo (cada 5 s si te mueves) pero
-// con algo menos de precisión que el convoy para gastar menos batería.
+// Compartiendo solo con amigos: casi en vivo (cada 5 s) mientras conduces,
+// con algo menos de precisión que el convoy para gastar menos batería. Parado
+// no hay servicio de primer plano (ver syncLiveService) y Android las agrupa.
 const FRIENDS_OPTIONS: Location.LocationTaskOptions = {
   ...UPDATE_OPTIONS,
   timeInterval: 5_000,
@@ -85,8 +86,8 @@ function updateDriving(speedKmh: number | null, at: number) {
 }
 
 let convoyMode = false;
-// Compartes tu posición con amigos: ritmo casi en vivo (si no, con la
-// pantalla bloqueada te veían en lotes de 30 s).
+// Compartes tu posición con amigos: ritmo casi en vivo al conducir (si no,
+// con la pantalla bloqueada te veían en lotes de 30 s).
 let friendsMode = false;
 const currentOptions = () =>
   convoyMode ? CONVOY_OPTIONS : friendsMode ? FRIENDS_OPTIONS : UPDATE_OPTIONS;
@@ -114,16 +115,22 @@ export async function setConvoyMode(enabled: boolean, friends = false) {
   }
 }
 
-// En una party o compartiendo con amigos, el servicio de primer plano sigue
-// activo aunque no conduzcas, con la app en segundo plano o cerrada: sin él,
-// Android entrega la ubicación unas pocas veces por hora y los demás te ven
-// congelado. Solo si el registro en segundo plano está activo (sin él no hay
-// ubicaciones que subir). Debe llamarse con la app en primer plano.
+// En una party el servicio de primer plano sigue activo aunque no conduzcas,
+// con la app en segundo plano o cerrada: sin él, Android entrega la ubicación
+// unas pocas veces por hora y el convoy te ve congelado. Solo si el registro
+// en segundo plano está activo (sin él no hay ubicaciones que subir). Debe
+// llamarse con la app en primer plano.
+//
+// Compartiendo solo con amigos NO hay servicio fijo: con él, quien tiene un
+// amigo llevaba el GPS encendido las 24 h (también durmiendo en casa). Al
+// moverte en un vehículo lo enciende el sensor de actividad (MotionReceiver)
+// o el respaldo por GPS (updateDriving), y entonces llega a ritmo completo;
+// parado, Android agrupa las ubicaciones y casi no gasta.
 function syncLiveService(updatesRunning: boolean) {
   if (updatesRunning && convoyMode) startDriving('convoy');
   else stopDriving('convoy');
-  if (updatesRunning && friendsMode) startDriving('friends');
-  else stopDriving('friends');
+  // Apaga también el de versiones anteriores, que lo dejaban siempre puesto.
+  stopDriving('friends');
 }
 
 // m/s del GPS → km/h (null si no la da o es basura).

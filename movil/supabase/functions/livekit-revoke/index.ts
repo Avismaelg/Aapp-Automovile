@@ -13,10 +13,25 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Compara el secreto en tiempo constante: los dos se reducen a SHA-256 (32
+// bytes siempre) y se comparan byte a byte sin salir antes, así el tiempo de
+// respuesta no revela cuántos caracteres acertó quien prueba.
+async function validSecret(expected: string | undefined, received: string | null): Promise<boolean> {
+  if (!expected || received == null) return false;
+  const encoder = new TextEncoder();
+  const [a, b] = await Promise.all(
+    [expected, received].map(async (value) => new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))),
+  );
+  let diff = 0;
+  for (let i = 0; i < 32; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-  const secret = Deno.env.get('PUSH_WEBHOOK_SECRET');
-  if (!secret || request.headers.get('x-push-secret') !== secret) return json({ error: 'forbidden' }, 403);
+  if (!(await validSecret(Deno.env.get('PUSH_WEBHOOK_SECRET'), request.headers.get('x-push-secret')))) {
+    return json({ error: 'forbidden' }, 403);
+  }
 
   const url = Deno.env.get('LIVEKIT_URL')?.trim().replace(/[./\s]+$/, '');
   const key = Deno.env.get('LIVEKIT_API_KEY')?.trim();

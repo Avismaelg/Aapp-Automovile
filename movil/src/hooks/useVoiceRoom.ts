@@ -16,6 +16,7 @@ import { startDriving, stopDriving } from '@/modules/motion';
 import { ensureMicrophone as ensureMicrophonePermission } from '@/src/lib/microphone';
 import { supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
+import { extractFunctionError } from '@/src/lib/alerts';
 
 // Estados visibles (fase 5 del prompt de producción): conectando, conectado,
 // reconectando, sin conexión (se reintenta solo) y error.
@@ -144,17 +145,7 @@ export function useVoiceRoom({
         const { data, error: functionError } = response;
 
         if (functionError) {
-          let message = functionError.message;
-          const context = (functionError as { context?: Response }).context;
-          if (context) {
-            try {
-              const payload = (await context.clone().json()) as { error?: string };
-              if (payload.error) message = payload.error;
-            } catch {
-              // Usamos el mensaje original si el cuerpo no es JSON.
-            }
-          }
-          throw new Error(message);
+          throw new Error((await extractFunctionError(functionError)).message);
         }
 
         const payload = (data ?? {}) as VoiceTokenResponse;

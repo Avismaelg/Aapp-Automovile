@@ -5,6 +5,7 @@ import {
   fetchStreetRoutes,
   isGraphHopperConfigured,
 } from '@/src/lib/graphhopper';
+import { haversineMeters } from '@/src/lib/geo';
 import type { WorldMapRoute } from '@/src/lib/map-html';
 import { t } from '@/src/i18n';
 
@@ -34,7 +35,7 @@ export function keepRouteWhenOffline(
 ) {
   const kept = current[0];
   if (!kept || kept.source === 'fallback' || !previousDestination) return false;
-  return distanceMeters(previousDestination, destination) < 30;
+  return haversineMeters(previousDestination, destination) < 30;
 }
 
 const NO_STOPS: GeoPoint[] = [];
@@ -42,19 +43,6 @@ const NO_STOPS: GeoPoint[] = [];
 // Si el cálculo se alarga más que esto, se deja de mostrar «Calculando» y se
 // puede reintentar (nunca se queda colgado).
 const ROUTE_GIVE_UP_MS = 15_000;
-
-function distanceMeters(a: GeoPoint, b: GeoPoint) {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLon = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 function samePoint(a: GeoPoint, b: GeoPoint) {
   return Math.abs(a.latitude - b.latitude) < 0.00001 && Math.abs(a.longitude - b.longitude) < 0.00001;
@@ -145,7 +133,7 @@ export function createChannel(): Channel {
       previous !== null &&
       samePoint(previous.destination, destination) &&
       sameStops(previous.stops, stops) &&
-      distanceMeters(previous.origin, origin) < 250 &&
+      haversineMeters(previous.origin, origin) < 250 &&
       Date.now() - previous.at < 120_000;
     if (unchanged) return;
 

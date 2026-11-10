@@ -1,8 +1,8 @@
 import { normalizeNickname } from '@/src/lib/signup-validation';
 import { supabase } from '@/src/lib/supabase';
 
-// REG-02 / REG-03: comprobaciones en vivo contra el servidor. Si el servidor
-// aún no tiene la función (migración sin aplicar) o no hay red, devuelven
+// REG-02: comprobación en vivo contra el servidor. Si el servidor
+// aún no tiene la función (migración sin aplicar) o no hay red, devuelve
 // null («no se sabe») y el alta lo comprueba igualmente al final.
 
 export async function isNicknameAvailable(nickname: string): Promise<boolean | null> {
@@ -14,9 +14,3 @@ export async function isNicknameAvailable(nickname: string): Promise<boolean | n
   return data;
 }
 
-export async function isEmailRegistered(email: string): Promise<boolean | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase.rpc('email_registered', { p_email: email.trim().toLowerCase() });
-  if (error || typeof data !== 'boolean') return null;
-  return data;
-}

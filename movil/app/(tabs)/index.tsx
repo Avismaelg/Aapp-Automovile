@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
-import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -35,15 +34,14 @@ import { MapControls } from "@/src/components/navigation/MapControls";
 import { NavigationHud } from "@/src/components/navigation/NavigationHud";
 import { SpeedHud } from "@/src/components/navigation/SpeedHud";
 import { AppText, Avatar } from "@/src/components/ui";
+import { useActiveNavigation } from "@/src/hooks/useActiveNavigation";
+import { useConvoySync } from "@/src/hooks/useConvoySync";
 import { useCurrentUser } from "@/src/hooks/useCurrentUser";
 import { useFriendsOnMap } from "@/src/hooks/useFriendsOnMap";
 import { useNow } from "@/src/hooks/useNow";
-import { useStoppedFor } from "@/src/hooks/useStoppedFor";
 import { useIsOnline } from "@/src/hooks/useIsOnline";
-import { ARRIVE_STOPPED_MS, arrivedAtDestination } from "@/src/lib/arrival";
 import { VoicePTT } from "@/src/components/party/VoicePTT";
 import { usePublicProfileVehicles } from "@/src/hooks/useProfile";
-import { setConvoyProgress } from "@/src/lib/live-share";
 import { useLiveShare } from "@/src/hooks/useLiveShare";
 import { useChallengeRace } from "@/src/hooks/useChallengeRace";
 import { useInviteToParty } from "@/src/hooks/usePartyInvites";
@@ -53,8 +51,6 @@ import { useFollow } from "@/src/store/follow";
 import { useChallengeDraft } from "@/src/store/challenge-draft";
 import { confirmResponsibleDriving } from "@/src/hooks/useChallengeScreen";
 import type { ChallengeCategory } from "@/src/types/models";
-import { reachedNextStop } from "@/src/lib/stops";
-import { markAlertsSeen } from "@/src/lib/background-alerts";
 import { useGarageVehicles } from "@/src/hooks/useGarage";
 import { useGraphHopperRoute } from "@/src/hooks/useGraphHopperRoute";
 import {
@@ -67,19 +63,14 @@ import {
   distanceToSpotMeters,
 } from "@/src/hooks/useParkingDetector";
 import { useRoadInfo } from "@/src/hooks/useRoadInfo";
-import { useActiveParty, useSetPartyDestination } from "@/src/hooks/useParty";
+import { useActiveParty } from "@/src/hooks/useParty";
 import { ConvoyDestinationCard } from "@/src/components/navigation/ConvoyDestinationCard";
 import {
-  convoyDestinationAction,
   followDestination,
   followStatus,
-  destinationKey as convoyDestinationKey,
   isMemberLive,
   isMemberOnMap,
-  reachedConvoyGoal,
   LIVE_SHARE_MAX_ACCURACY_M,
-  sameDestination,
-  shouldShareMyDestination,
 } from "@/src/lib/convoy";
 import { useChallenges, useCreateChallenge } from "@/src/hooks/useChallenges";
 import { useTripRecorder } from "@/src/hooks/useTripRecorder";
@@ -94,15 +85,11 @@ import {
   useSimulator,
 } from "@/src/lib/simulator";
 import { haversineMeters } from "@/src/lib/geo";
-import { fasterRouteSaving } from "@/src/lib/route-geometry";
-import { fetchStreetRoutes, formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
+import { formatRouteDistance, formatRouteTime } from "@/src/lib/graphhopper";
 import type { WorldMapAlternative, WorldMapMember } from "@/src/lib/map-html";
 import {
-  cumulativeDistances,
   followingInstruction,
   nextInstruction,
-  routeProgress,
-  snappedPosition,
 } from "@/src/lib/route-instructions";
 import { uniqueRecents, useChosenDestination } from "@/src/store/destination";
 import { useParking } from "@/src/store/parking";
@@ -112,19 +99,11 @@ import {
   NIGHT_CHROME,
 } from "@/src/components/navigation/glass";
 import { colors, radius, spacing } from "@/src/theme";
-import { displaySpeed, formatDistance, getLocale, speechLanguage, speedUnit, t } from "@/src/i18n";
+import { displaySpeed, formatDistance, getLocale, speedUnit, t } from "@/src/i18n";
 
 // La intro (galaxia → globo → tu calle) solo al abrir la app, no cada vez que
 // se vuelve a esta pestaña.
 let introPlayed = false;
-// MAPA-12: cada cuánto se busca una ruta más rápida navegando.
-const FASTER_ROUTE_EVERY_MS = 3 * 60_000;
-
-// MAPA-16: desvío y recálculo automático.
-const OFF_ROUTE_M = 40;
-const OFF_ROUTE_HOLD_MS = 5_000;
-const REROUTE_EVERY_MS = 8_000;
-
 const INTRO_PLAN = {
   earthAtMs: EARTH_START_MS,
   earthMs: EARTH_MS,
@@ -283,7 +262,6 @@ export default function NavigationScreen() {
   const [recordingNow, setRecordingNow] = useState(() => Date.now());
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [northUp, setNorthUp] = useState(false);
-  const lastRerouteAtRef = useRef(0);
 
   const chosenDestination = useChosenDestination((state) => state.destination);
   const clearChosenDestination = useChosenDestination(
@@ -423,56 +401,32 @@ export default function NavigationScreen() {
     [route.routes, fastestTimeMs],
   );
 
-  // Progreso sobre la ruta y próxima maniobra, como Waze. Se recalcula solo
-  // cuando cambia la posición, no en cada actualización de rumbo.
-  const latitude = live.location.latitude;
-  const longitude = live.location.longitude;
-  const routeCumulative = useMemo(
-    () => (route.route ? cumulativeDistances(route.route.coordinates) : []),
-    [route.route],
-  );
-  const progressState = useMemo(
-    () =>
-      route.route
-        ? routeProgress(route.route.coordinates, routeCumulative, {
-            latitude,
-            longitude,
-          })
-        : null,
-    [route.route, routeCumulative, latitude, longitude],
-  );
-  const progressM = progressState?.progressM ?? null;
-  const routeDistanceFromPathM = progressState?.distanceM ?? null;
-  // MAPA-06: navegando, el coche va pegado a la calle de la ruta. Solo para
-  // dibujar: avance, fuera de ruta y llegada usan tu posición real.
-  const snapped =
-    isNavigating && destination && streetRoute ? snappedPosition(live.location, progressState) : null;
-  const snappedLat = snapped?.latitude ?? null;
-  const snappedLng = snapped?.longitude ?? null;
-  const mapLocation = useMemo(
-    () =>
-      snappedLat != null && snappedLng != null
-        ? { ...live.location, latitude: snappedLat, longitude: snappedLng }
-        : live.location,
-    [live.location, snappedLat, snappedLng],
-  );
-  // MAPA-16: fuera de la ruta = a más de 40 m durante 5 s (un salto suelto
-  // del GPS no cuenta).
-  const awayFromRoute = Boolean(
-    route.route &&
-    routeDistanceFromPathM != null &&
-    routeDistanceFromPathM > OFF_ROUTE_M,
-  );
-  const [offRouteHeld, setOffRouteHeld] = useState(false);
-  useEffect(() => {
-    if (!awayFromRoute) return;
-    const timer = setTimeout(() => setOffRouteHeld(true), OFF_ROUTE_HOLD_MS);
-    return () => {
-      clearTimeout(timer);
-      setOffRouteHeld(false);
-    };
-  }, [awayFromRoute]);
-  const offRoute = awayFromRoute && offRouteHeld;
+  const beginNavigation = useCallback(() => {
+    setFollowing(true);
+    setRecenterToken((value) => value + 1);
+    startNavigation();
+  }, [startNavigation]);
+
+  // Navegación en curso (avance, desvíos, paradas, llegada, ruta más rápida)
+  // y destino del convoy en los dos sentidos: ver los dos hooks.
+  const {
+    progressState,
+    progressM,
+    mapLocation,
+    offRoute,
+    remainingRouteM,
+    remainingTimeMs,
+    stopNotice,
+    arrivedLabel,
+    dismissArrived,
+  } = useActiveNavigation({
+    route,
+    location: live.location,
+    destination,
+    isNavigating,
+    stops,
+    voiceMuted,
+  });
   const upcoming = useMemo(
     () => nextInstruction(route.route?.instructions, progressM),
     [route.route, progressM],
@@ -481,14 +435,24 @@ export default function NavigationScreen() {
     () => followingInstruction(route.route?.instructions, upcoming),
     [route.route, upcoming],
   );
-  const remainingRouteM =
-    route.route && progressM != null
-      ? Math.max(0, route.route.distanceM - progressM)
-      : null;
-  const remainingTimeMs =
-    route.route && remainingRouteM != null && route.route.distanceM > 0
-      ? route.route.timeMs * (remainingRouteM / route.route.distanceM)
-      : null;
+  const {
+    convoyNotice,
+    setterName,
+    offerConvoyDestination,
+    followConvoyDestination,
+    dismissConvoyDestination,
+  } = useConvoySync({
+    party,
+    isDemo,
+    meId: me.id,
+    location: live.location,
+    destination,
+    partyDestination,
+    isNavigating,
+    remainingRouteM,
+    remainingTimeMs,
+    beginNavigation,
+  });
 
   // RETO-05: navegando hacia la meta de un reto, su tiempo con tráfico es tu
   // ETA en la clasificación.
@@ -509,24 +473,6 @@ export default function NavigationScreen() {
     !isDemo && live.isLive && live.location.source === "gps",
     challengeNavigation,
   );
-
-  // CONV-04: tu ETA y lo que te queda hasta la meta común viajan con tu
-  // posición (también con la pantalla bloqueada). Solo si vas hacia la meta.
-  const headingToConvoyGoal =
-    Boolean(party) && !isDemo && isNavigating && Boolean(destination) && sameDestination(destination, partyDestination);
-  const convoyArrived =
-    headingToConvoyGoal && reachedConvoyGoal(live.location, partyDestination, remainingRouteM);
-  useEffect(() => {
-    if (!headingToConvoyGoal || remainingRouteM == null || remainingTimeMs == null) {
-      setConvoyProgress(null);
-      return;
-    }
-    setConvoyProgress({
-      etaS: remainingTimeMs / 1000,
-      remainingM: remainingRouteM,
-      arrived: convoyArrived,
-    });
-  }, [headingToConvoyGoal, remainingRouteM, remainingTimeMs, convoyArrived]);
 
   // Calle actual: la del tramo de la ruta o, sin ruta, la que reporta OSM.
   const currentStreet = useMemo(() => {
@@ -799,76 +745,8 @@ export default function NavigationScreen() {
     speedKmh: live.location.speedKmh ?? null,
   });
 
-  // Parada alcanzada: se quita de la lista y la ruta sigue a la próxima.
-  const [stopNotice, setStopNotice] = useState<string | null>(null);
-  // Distancia de la próxima parada a la ruta (la ruta pasa por la calle más
-  // cercana, no por la parada exacta).
-  const nextStopOffRoadM = useMemo(() => {
-    const next = stops[0];
-    if (!next || !route.route || routeCumulative.length < 2) return 0;
-    return routeProgress(route.route.coordinates, routeCumulative, next)?.distanceM ?? 0;
-  }, [stops, route.route, routeCumulative]);
-  const atNextStop = navigating && reachedNextStop(live.location, stops, nextStopOffRoadM);
-  useEffect(() => {
-    if (!atNextStop) return;
-    const label = useChosenDestination.getState().stops[0]?.label;
-    const timer = setTimeout(() => {
-      removeStop(0);
-      if (!label) return;
-      setStopNotice(label);
-      if (!voiceMuted) Speech.speak(t("Parada: {0}", label), { language: speechLanguage() });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [atNextStop, removeStop, voiceMuted]);
-  useEffect(() => {
-    if (!stopNotice) return;
-    const timer = setTimeout(() => setStopNotice(null), 6_000);
-    return () => clearTimeout(timer);
-  }, [stopNotice]);
   const addStopHere = () =>
     router.push({ pathname: "/destino", params: { mode: "stop" } } as Href);
-
-  // Llegada: se termina la navegación sola y se avisa, como Waze. Antes solo
-  // contaba a menos de 40 m del punto exacto: aparcando a 60–100 m (un
-  // parqueo, el otro lado de la calle) nunca decía «Has llegado» (tableta,
-  // 2026-11-04). Ver arrivedAtDestination.
-  const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
-  const destinationDistanceM = destination
-    ? haversineMeters(live.location, destination)
-    : null;
-  const stoppedNear = useStoppedFor(live.location.speedKmh, ARRIVE_STOPPED_MS);
-  const arrived =
-    navigating &&
-    destination != null &&
-    arrivedAtDestination({
-      distanceM: destinationDistanceM,
-      remainingRouteM,
-      offRouteM: routeDistanceFromPathM,
-      stopped: stoppedNear,
-    });
-  useEffect(() => {
-    if (!arrived || !destination) return;
-    const label = destination.label;
-    // Fuera del cuerpo del efecto: terminar la ruta re-renderiza la pantalla.
-    const timer = setTimeout(() => {
-      setArrivedLabel(label);
-      useChosenDestination.getState().stopNavigation();
-      clearChosenDestination();
-      // La guía por voz se calla al terminar la ruta: el aviso va después.
-      if (!voiceMuted) {
-        setTimeout(
-          () => Speech.speak(t('Has llegado a {0}', label), { language: speechLanguage() }),
-          600,
-        );
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [arrived, destination, voiceMuted, clearChosenDestination]);
-  useEffect(() => {
-    if (!arrivedLabel) return;
-    const timer = setTimeout(() => setArrivedLabel(null), 8_000);
-    return () => clearTimeout(timer);
-  }, [arrivedLabel]);
 
   // Simulación de ruta: en cuanto llega una ruta nueva, el coche la recorre.
   // La que ya había al empezar a esperar (de otro destino o la de antes de un
@@ -890,182 +768,6 @@ export default function NavigationScreen() {
       return;
     driveRoute(route.route.coordinates);
   }, [sim.phase, navigating, route.route, retryRoute]);
-
-  // En una party, el destino que eliges se comparte con el convoy (salvo ir
-  // a por tu coche, que es solo tuyo).
-  const setPartyDestination = useSetPartyDestination();
-  const shareDestinationWithConvoy = setPartyDestination.mutate;
-  const beginNavigation = useCallback(() => {
-    setFollowing(true);
-    setRecenterToken((value) => value + 1);
-    startNavigation();
-  }, [startNavigation]);
-
-  // Cada destino nuevo que eliges navegando se comparte con el convoy, venga
-  // de donde venga (antes solo el primero, al pulsar Ir en el mapa). Al abrir
-  // la app se toma el destino actual como ya compartido: así un destino viejo
-  // no pisa el que haya puesto otro piloto mientras tanto.
-  const sharedKeyRef = useRef<string | null | undefined>(undefined);
-  // CONV-02: solo el anfitrión o un copiloto cambian el destino del convoy.
-  const canSetConvoyDestination =
-    Boolean(party?.isHost) || party?.members.find((member) => member.isMe)?.role === 'sweeper';
-  const partyIdForShare = party && !isDemo && canSetConvoyDestination ? party.id : null;
-  useEffect(() => {
-    if (!partyIdForShare) {
-      sharedKeyRef.current = undefined;
-      return;
-    }
-    if (sharedKeyRef.current === undefined) {
-      sharedKeyRef.current = isNavigating ? convoyDestinationKey(destination) : null;
-      return;
-    }
-    const decision = shouldShareMyDestination({
-      previousKey: sharedKeyRef.current,
-      mine: destination,
-      party: partyDestination,
-      navigating: isNavigating,
-      personal: Boolean(destination?.personal),
-    });
-    sharedKeyRef.current = decision.key;
-    if (decision.share && destination) {
-      shareDestinationWithConvoy({
-        partyId: partyIdForShare,
-        label: destination.label,
-        lat: destination.latitude,
-        lng: destination.longitude,
-      });
-    }
-  }, [partyIdForShare, isNavigating, destination, partyDestination, shareDestinationWithConvoy]);
-
-  // Otro piloto fijó o cambió el destino. Si ibas siguiendo el convoy,
-  // cambias solo (con un aviso); si no, «Ir con el convoy» con un toque.
-  const [dismissedConvoyAt, setDismissedConvoyAt] = useState<string | null>(null);
-  const [convoyNotice, setConvoyNotice] = useState<{ name: string; label: string } | null>(null);
-  const followedKeyRef = useRef<string | null>(null);
-  const handledAtRef = useRef<string | null>(null);
-  const convoyDestinationSetter = party?.members.find(
-    (member) => member.userId === partyDestination?.setBy,
-  );
-  const setterName = convoyDestinationSetter?.profile.displayName ?? t('Un piloto');
-
-  // Recuerda el destino del convoy que vas siguiendo.
-  useEffect(() => {
-    if (isNavigating && partyDestination && sameDestination(destination, partyDestination)) {
-      followedKeyRef.current = convoyDestinationKey(destination);
-      handledAtRef.current = partyDestination.setAt;
-    }
-  }, [isNavigating, destination, partyDestination]);
-
-  // En pantalla: sin saber si lo ibas siguiendo, como mucho «ofrecer»; si lo
-  // seguías, el efecto de abajo te cambia al momento y la oferta desaparece.
-  const convoyAction = isDemo
-    ? "none"
-    : convoyDestinationAction({
-        me: me.id,
-        party: partyDestination,
-        mine: destination,
-        navigating: isNavigating,
-        handledAt: dismissedConvoyAt,
-        followedKey: null,
-      });
-
-  useEffect(() => {
-    if (isDemo || !partyDestination) return;
-    const action = convoyDestinationAction({
-      me: me.id,
-      party: partyDestination,
-      mine: destination,
-      navigating: isNavigating,
-      handledAt: handledAtRef.current,
-      followedKey: followedKeyRef.current,
-    });
-    if (action !== "follow") return;
-    handledAtRef.current = partyDestination.setAt;
-    useChosenDestination.getState().setDestination({
-      latitude: partyDestination.latitude,
-      longitude: partyDestination.longitude,
-      label: partyDestination.label,
-    });
-    const notice = { name: setterName.split(" ")[0], label: partyDestination.label };
-    const show = setTimeout(() => setConvoyNotice(notice), 0);
-    const hide = setTimeout(() => setConvoyNotice(null), 7_000);
-    return () => {
-      clearTimeout(show);
-      clearTimeout(hide);
-    };
-  }, [isDemo, me.id, partyDestination, destination, isNavigating, setterName]);
-
-  const offerConvoyDestination = convoyAction === "offer" && partyDestination != null;
-  // Lo que ya ves en pantalla no te llega luego como notificación.
-  const partyIdForAlerts = party?.id;
-  const destinationSetAt = partyDestination?.setAt;
-  useEffect(() => {
-    if (partyIdForAlerts && destinationSetAt) {
-      void markAlertsSeen([`destination:${partyIdForAlerts}:${destinationSetAt}`]);
-    }
-  }, [partyIdForAlerts, destinationSetAt]);
-  const followConvoyDestination = () => {
-    if (!partyDestination) return;
-    useChosenDestination.getState().setDestination({
-      latitude: partyDestination.latitude,
-      longitude: partyDestination.longitude,
-      label: partyDestination.label,
-    });
-    setDismissedConvoyAt(partyDestination.setAt);
-    setFollowing(true);
-    setRecenterToken((value) => value + 1);
-    startNavigation();
-  };
-
-  // MAPA-12 (como Waze): navegando, cada 3 min se busca una ruta más rápida
-  // por el tráfico desde donde estás. Si ahorra de verdad (2 min y un 8 %),
-  // se cambia sola y se avisa por voz.
-  const fasterCheckRef = useRef({ remainingS: 0, origin: live.location, destination, stops });
-  useEffect(() => {
-    fasterCheckRef.current = {
-      remainingS: (remainingTimeMs ?? 0) / 1000,
-      origin: live.location,
-      destination,
-      stops,
-    };
-  }, [remainingTimeMs, live.location, destination, stops]);
-  const adoptRoutes = route.adopt;
-  useEffect(() => {
-    if (!navigating) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    const timer = setInterval(() => {
-      const { remainingS, origin, destination: goal, stops: waypoints } = fasterCheckRef.current;
-      if (!goal || remainingS < 300) return;
-      void fetchStreetRoutes({ origin, destination: goal, stops: waypoints, signal: controller.signal })
-        .then((candidates) => {
-          const best = candidates[0];
-          if (cancelled || !best || best.source === 'fallback') return;
-          const saving = fasterRouteSaving(remainingS, best.timeMs / 1000);
-          if (saving == null) return;
-          adoptRoutes(candidates);
-          if (!voiceMuted) {
-            Speech.speak(t('Encontré una ruta más rápida: ahorras {0} minutos.', Math.round(saving / 60)), {
-              language: speechLanguage(),
-            });
-          }
-        })
-        .catch(() => undefined);
-    }, FASTER_ROUTE_EVERY_MS);
-    return () => {
-      cancelled = true;
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [navigating, adoptRoutes, voiceMuted]);
-
-  useEffect(() => {
-    if (!navigating || !offRoute || route.isLoading) return;
-    const now = Date.now();
-    if (now - lastRerouteAtRef.current < REROUTE_EVERY_MS) return;
-    lastRerouteAtRef.current = now;
-    retryRoute();
-  }, [navigating, offRoute, retryRoute, route.isLoading]);
 
   const [bottomHeight, setBottomHeight] = useState(0);
 
@@ -1241,7 +943,7 @@ export default function NavigationScreen() {
                   changed
                   compact
                   onFollow={followConvoyDestination}
-                  onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
+                  onDismiss={() => dismissConvoyDestination(partyDestination.setAt)}
                 />
               ) : null}
             </View>
@@ -1393,7 +1095,7 @@ export default function NavigationScreen() {
                     {t('Has llegado a')}{' '}{arrivedLabel}
                   </AppText>
                   <Pressable
-                    onPress={() => setArrivedLabel(null)}
+                    onPress={dismissArrived}
                     hitSlop={8}
                     accessibilityLabel={t('Cerrar aviso')}
                   >
@@ -1611,7 +1313,7 @@ export default function NavigationScreen() {
                     label={partyDestination.label}
                     changed={isNavigating}
                     onFollow={followConvoyDestination}
-                    onDismiss={() => setDismissedConvoyAt(partyDestination.setAt)}
+                    onDismiss={() => dismissConvoyDestination(partyDestination.setAt)}
                   />
                 ) : null}
 

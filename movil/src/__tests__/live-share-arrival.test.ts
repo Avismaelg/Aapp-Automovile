@@ -57,4 +57,29 @@ describe('CONV-06: llegada al convoy', () => {
     expect(mockUpdates[1]).toHaveProperty('arrived_at');
     expect(mockUpdates[2]).not.toHaveProperty('arrived_at');
   });
+
+  it('la llegada se sube al momento, sin esperar al ritmo normal de posiciones', async () => {
+    await setLiveShareConfig({ partyId: 'party-2' });
+    setConvoyProgress({ etaS: 120, remainingM: 900, arrived: false });
+    await pushLivePosition(fix(1_000, 18.48));
+
+    // Medio segundo después y sin moverte: el ritmo normal no subiría nada.
+    setConvoyProgress({ etaS: 0, remainingM: 0, arrived: true });
+    await pushLivePosition(fix(1_500, 18.48));
+
+    expect(mockUpdates).toHaveLength(2);
+    expect(mockUpdates[1]).toHaveProperty('arrived_at');
+  });
+
+  it('una posición que llega mientras se sube otra no se pierde', async () => {
+    await setLiveShareConfig({ partyId: 'party-3' });
+    setConvoyProgress(null);
+
+    const first = pushLivePosition(fix(1_000, 18.48));
+    const second = pushLivePosition(fix(60_000, 18.49));
+    await Promise.all([first, second]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockUpdates.map((update) => update.last_lat)).toEqual([18.48, 18.49]);
+  });
 });

@@ -16,6 +16,7 @@ import {
   PROFILE_COLUMNS,
   profileColor,
   type ProfileRow,
+  fallbackProfile,
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { filterString, partySubscriptions } from '@/src/lib/realtime-routing';
@@ -106,21 +107,6 @@ type PartyMemberRow = {
   arrived_at?: string | null;
 };
 
-function fallbackProfile(id: string): UserProfile {
-  return {
-    id,
-    username: 'piloto',
-    displayName: t('Piloto'),
-    bio: '',
-    city: '',
-    countryCode: 'DO',
-    avatarUrl: null,
-    privacy: 'public',
-    qrSlug: `piloto-${id.slice(0, 6)}`,
-    createdAt: new Date().toISOString(),
-  };
-}
-
 const MEMBER_COLUMNS =
   'party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, ' +
   'voice_channel_slug, eta_s, remaining_m, progress_at, arrived_at';
@@ -202,6 +188,45 @@ async function leaveActiveParties(accountId: string) {
     .update({ left_at: new Date().toISOString(), last_lat: null, last_lng: null })
     .eq('user_id', accountId)
     .is('left_at', null);
+}
+
+// Crea una party con su anfitrión (te saca antes de la que tuvieras). Si no
+// se puede apuntar al anfitrión, la party se borra: no queda una vacía.
+export async function createPartyRecord(
+  accountId: string,
+  input: { name: string; destinationLabel?: string | null; destinationLat?: number | null; destinationLng?: number | null },
+) {
+  if (!supabase) throw new Error(t('Supabase no está configurado.'));
+  await leaveActiveParties(accountId);
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('parties')
+    .insert({
+      host_id: accountId,
+      name: input.name.trim(),
+      status: 'live',
+      starts_at: now,
+      destination_label: input.destinationLabel || null,
+      destination_lat: input.destinationLat ?? null,
+      destination_lng: input.destinationLng ?? null,
+      max_members: PARTY_FREE_MEMBERS,
+      is_private: true,
+    })
+    .select('id, invite_code')
+    .single();
+  if (error) throw new Error(t('No pudimos crear la party. Inténtalo de nuevo.'));
+
+  const { error: memberError } = await supabase.from('party_members').insert({
+    party_id: data.id,
+    user_id: accountId,
+    role: 'host',
+    last_seen_at: now,
+  });
+  if (memberError) {
+    await supabase.from('parties').delete().eq('id', data.id);
+    throw new Error(t('No pudimos unirte como anfitrión de la party.'));
+  }
+  return { id: data.id as string, code: data.invite_code as string };
 }
 
 // `poll`: solo la pantalla siempre montada (Inicio) relee cada 15 s; si lo
@@ -372,39 +397,7 @@ export function useCreateParty() {
       if (demo) throw new Error(t('Las parties reales requieren una cuenta conectada.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para crear una party.'));
 
-      await leaveActiveParties(account.id);
-
-      const { data, error } = await supabase
-        .from('parties')
-        .insert({
-          host_id: account.id,
-          name: input.name.trim(),
-          status: 'live',
-          starts_at: new Date().toISOString(),
-          destination_label: input.destinationLabel || null,
-          destination_lat: input.destinationLat ?? null,
-          destination_lng: input.destinationLng ?? null,
-          max_members: PARTY_FREE_MEMBERS,
-          is_private: true,
-        })
-        .select('id, invite_code')
-        .single();
-
-      if (error) throw new Error(t('No pudimos crear la party. Inténtalo de nuevo.'));
-
-      const { error: memberError } = await supabase.from('party_members').insert({
-        party_id: data.id,
-        user_id: account.id,
-        role: 'host',
-        last_seen_at: new Date().toISOString(),
-      });
-
-      if (memberError) {
-        await supabase.from('parties').delete().eq('id', data.id);
-        throw new Error(t('No pudimos unirte como anfitrión de la party.'));
-      }
-
-      return { id: data.id as string, code: data.invite_code as string };
+      return createPartyRecord(account.id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['party'] });

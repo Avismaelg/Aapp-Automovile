@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { extractFunctionError } from '@/src/lib/alerts';
 
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
@@ -20,17 +21,7 @@ export function useDeleteAccount() {
       });
 
       if (error) {
-        let message = error.message;
-        const context = (error as { context?: Response }).context;
-        if (context) {
-          try {
-            const payload = (await context.clone().json()) as { error?: string };
-            if (payload.error) message = payload.error;
-          } catch {
-            // Usamos el mensaje original si el cuerpo no es JSON.
-          }
-        }
-        throw new Error(message);
+        throw new Error((await extractFunctionError(error)).message);
       }
 
       if (!data?.ok) {

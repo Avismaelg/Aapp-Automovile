@@ -10,6 +10,20 @@ import { Platform } from 'react-native';
 
 const CHUNK_SIZE = 1800;
 
+// supabase-js renueva la sesión sin cerrojo: dos escrituras a la vez se
+// intercalaban (una borraba los trozos que la otra estaba escribiendo) y la
+// sesión quedaba rota, cerrando la sesión del usuario. Todas las operaciones
+// van en fila.
+let queue: Promise<unknown> = Promise.resolve();
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  const result = queue.then(fn, fn);
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 // SecureStore solo acepta claves con letras, números, «.», «-» y «_».
 function safeKey(key: string) {
   return key.replace(/[^A-Za-z0-9._-]/g, '_');
@@ -51,25 +65,31 @@ async function writeSecure(key: string, value: string) {
 }
 
 export const secureSessionStorage = {
-  async getItem(key: string) {
+  getItem(key: string) {
     if (Platform.OS === 'web') return AsyncStorage.getItem(key);
-    const stored = await readSecure(key);
-    if (stored != null) return stored;
-    // Sesiones guardadas por versiones anteriores en AsyncStorage: se mueven al
-    // almacenamiento seguro y se borran, sin cerrar la sesión del usuario.
-    const legacy = await AsyncStorage.getItem(key);
-    if (legacy == null) return null;
-    await writeSecure(key, legacy);
-    await AsyncStorage.removeItem(key);
-    return legacy;
+    return serialize(() => readOrMigrate(key));
   },
-  async setItem(key: string, value: string) {
+  setItem(key: string, value: string) {
     if (Platform.OS === 'web') return AsyncStorage.setItem(key, value);
-    await writeSecure(key, value);
+    return serialize(() => writeSecure(key, value));
   },
-  async removeItem(key: string) {
+  removeItem(key: string) {
     if (Platform.OS === 'web') return AsyncStorage.removeItem(key);
-    await removeSecure(key);
-    await AsyncStorage.removeItem(key);
+    return serialize(async () => {
+      await removeSecure(key);
+      await AsyncStorage.removeItem(key);
+    });
   },
 };
+
+async function readOrMigrate(key: string) {
+  const stored = await readSecure(key);
+  if (stored != null) return stored;
+  // Sesiones guardadas por versiones anteriores en AsyncStorage: se mueven al
+  // almacenamiento seguro y se borran, sin cerrar la sesión del usuario.
+  const legacy = await AsyncStorage.getItem(key);
+  if (legacy == null) return null;
+  await writeSecure(key, legacy);
+  await AsyncStorage.removeItem(key);
+  return legacy;
+}

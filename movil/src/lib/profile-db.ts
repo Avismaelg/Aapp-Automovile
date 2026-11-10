@@ -45,6 +45,23 @@ export function mapProfileRow(row: ProfileRow): UserProfile {
   };
 }
 
+// Perfil de relleno cuando el de un piloto no se pudo leer (bloqueado,
+// borrado o sin red): la fila sigue saliendo con un nombre genérico.
+export function fallbackProfile(id: string): UserProfile {
+  return {
+    id,
+    username: 'piloto',
+    displayName: t('Piloto'),
+    bio: '',
+    city: '',
+    countryCode: 'DO',
+    avatarUrl: null,
+    privacy: 'public',
+    qrSlug: `piloto-${id.slice(0, 6)}`,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export function privacyLabel(privacy: ProfilePrivacy) {
   switch (privacy) {
     case 'private':

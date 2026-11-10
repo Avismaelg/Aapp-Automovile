@@ -54,6 +54,14 @@ describe('SW-01 / RNF-08: sesión en almacenamiento seguro', () => {
     expect(await secureSessionStorage.getItem(KEY)).toBe(SESSION);
   });
 
+  it('dos escrituras a la vez no dejan la sesión rota', async () => {
+    // Una larga (varios trozos) y enseguida una corta: sin fila, los trozos de
+    // una se mezclaban con el contador de la otra.
+    const long = JSON.stringify({ access_token: 'b'.repeat(7000), refresh_token: 's'.repeat(500) });
+    await Promise.all([secureSessionStorage.setItem(KEY, long), secureSessionStorage.setItem(KEY, SESSION)]);
+    expect(await secureSessionStorage.getItem(KEY)).toBe(SESSION);
+  });
+
   it('al cerrar sesión no queda nada', async () => {
     await secureSessionStorage.setItem(KEY, SESSION);
     await secureSessionStorage.setItem(KEY, 'corta');

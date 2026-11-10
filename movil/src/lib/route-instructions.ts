@@ -1,5 +1,6 @@
 import type { RouteInstruction, RouteInstructionIcon } from '@/src/lib/map-html';
 import { formatManeuverDistance, t } from '@/src/i18n';
+import { haversineMeters, haversineTupleMeters } from '@/src/lib/geo';
 
 type LatLng = [number, number];
 
@@ -27,29 +28,13 @@ export function snappedPosition(
   return progress.snapped;
 }
 
-function haversineMeters(a: LatLng, b: LatLng) {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-export function metersBetween(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-) {
-  return haversineMeters([a.latitude, a.longitude], [b.latitude, b.longitude]);
-}
+export { haversineMeters as metersBetween };
 
 // Distancia acumulada desde el inicio de la ruta hasta cada punto.
 export function cumulativeDistances(points: LatLng[]) {
   const cumulative: number[] = new Array(points.length).fill(0);
   for (let index = 1; index < points.length; index += 1) {
-    cumulative[index] = cumulative[index - 1] + haversineMeters(points[index - 1], points[index]);
+    cumulative[index] = cumulative[index - 1] + haversineTupleMeters(points[index - 1], points[index]);
   }
   return cumulative;
 }

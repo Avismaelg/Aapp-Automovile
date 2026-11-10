@@ -35,6 +35,8 @@ type DestinationState = {
   removeStop: (index: number) => void;
   startNavigation: () => void;
   stopNavigation: () => void;
+  // Al cerrar sesión: Casa, Trabajo y recientes son de esa cuenta.
+  resetAll: () => void;
 };
 
 // El mismo sitio escrito distinto («Maximo Gomez» / «Máximo Gómez») o el
@@ -101,6 +103,7 @@ export const useChosenDestination = create<DestinationState>()(
         set((state) => ({ stops: state.stops.filter((_, i) => i !== index) })),
       startNavigation: () => set({ isNavigating: true }),
       stopNavigation: () => set({ isNavigating: false }),
+      resetAll: () => set({ destination: null, favorites: {}, stops: [], recents: [], isNavigating: false }),
     }),
     {
       name: 'caravana.destination.v1',

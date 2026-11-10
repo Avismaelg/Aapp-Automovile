@@ -47,15 +47,9 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   if (!supabase) throw new Error('supabase_not_configured');
   const { data, error } = await supabase.functions.invoke('places', { body });
   if (error) {
-    const context = (error as { context?: Response }).context;
-    let message = error.message;
-    try {
-      const payload = context ? ((await context.clone().json()) as { error?: string }) : null;
-      if (payload?.error) message = payload.error;
-    } catch {
-      // Sin cuerpo JSON: vale el mensaje original.
-    }
-    if (shouldPauseGoogle(context?.status, message)) pausedUntil = Date.now() + PAUSE_MS;
+    const { extractFunctionError } = await import('@/src/lib/alerts');
+    const { message, status } = await extractFunctionError(error);
+    if (shouldPauseGoogle(status, message)) pausedUntil = Date.now() + PAUSE_MS;
     throw new Error(message);
   }
   return data as T;

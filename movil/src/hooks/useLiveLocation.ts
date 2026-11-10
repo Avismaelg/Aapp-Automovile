@@ -1,11 +1,13 @@
 import * as Location from 'expo-location';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
 import { askLocationConsent } from '@/src/lib/location-consent';
 import { nextSpeed, type SpeedState } from '@/src/lib/speed-filter';
 import { setUnitsFromPosition, t } from '@/src/i18n';
+import { useChosenDestination } from '@/src/store/destination';
 
 export type LiveLocation = {
   latitude: number;
@@ -158,6 +160,29 @@ function handleWatchError(id: number) {
   fallBackToDemo('error', t('No pudimos leer el GPS · usando ubicación de demo'));
 }
 
+// Brújula: permite girar el mapa aunque estemos parados o caminando.
+async function watchCompass(id: number) {
+  try {
+    const heading = await Location.watchHeadingAsync(
+      (update) => {
+        if (id !== session) return;
+        const value = update.trueHeading >= 0 ? update.trueHeading : update.magHeading;
+        applyCompassHeading(value);
+      },
+      () => {
+        // Sin brújula en este dispositivo: seguimos con el rumbo del GPS.
+      },
+    );
+    if (id !== session) {
+      heading.remove();
+      return;
+    }
+    activeHeading = heading;
+  } catch {
+    // La brújula es opcional.
+  }
+}
+
 async function beginSession(id: number) {
   try {
     // Pedir el permiso abre (y cierra) una pantalla del sistema aunque ya esté
@@ -207,39 +232,22 @@ async function beginSession(id: number) {
       return;
     }
     activeWatch = subscription;
-
-    // Brújula: permite girar el mapa aunque estemos parados o caminando.
-    try {
-      const heading = await Location.watchHeadingAsync(
-        (update) => {
-          if (id !== session) return;
-          const value = update.trueHeading >= 0 ? update.trueHeading : update.magHeading;
-          applyCompassHeading(value);
-        },
-        () => {
-          // Sin brújula en este dispositivo: seguimos con el rumbo del GPS.
-        },
-      );
-      if (id !== session) {
-        heading.remove();
-        return;
-      }
-      activeHeading = heading;
-    } catch {
-      // La brújula es opcional.
-    }
+    await watchCompass(id);
   } catch {
     if (id !== session) return;
     fallBackToDemo('error', t('GPS no disponible · usando ubicación de demo'));
   }
 }
 
-function startSession(message?: string) {
+// quiet: al volver de segundo plano no se muestra «Solicitando permiso…»; se
+// sigue viendo la última posición hasta que llega la nueva.
+function startSession(message?: string, quiet = false) {
   session += 1;
   const id = session;
   sessionStartedAt = Date.now();
+  pausedInBackground = false;
   clearFallbackTimer();
-  if (!isSimulating()) {
+  if (!quiet && !isSimulating()) {
     useLiveLocationState.setState({ status: 'locating', message: message || LOCATING_MESSAGE });
   }
 
@@ -258,12 +266,56 @@ function startSession(message?: string) {
 
 function stopSession() {
   session += 1;
+  pausedInBackground = false;
   clearFallbackTimer();
   activeWatch?.remove();
   activeWatch = null;
   activeHeading?.remove();
   activeHeading = null;
 }
+
+// Con la app en segundo plano el GPS a 1 Hz y la brújula no los ve nadie (las
+// posiciones de fondo llegan por la tarea de tracking.ts): se apagan y se
+// encienden al volver. Navegando, el GPS sigue (la voz da las indicaciones
+// con la pantalla bloqueada); la brújula no, que solo sirve en pantalla.
+let pausedInBackground = false;
+
+function pauseForBackground() {
+  if (subscribers === 0 || (!activeWatch && !activeHeading)) return;
+  if (useChosenDestination.getState().isNavigating && activeWatch) {
+    activeHeading?.remove();
+    activeHeading = null;
+  } else {
+    stopSession();
+  }
+  pausedInBackground = true;
+}
+
+function resumeFromBackground() {
+  if (!pausedInBackground) return;
+  pausedInBackground = false;
+  if (subscribers === 0) return;
+  if (activeWatch) {
+    if (!activeHeading) void watchCompass(session);
+  } else {
+    startSession(undefined, true);
+  }
+}
+
+// Solo «background»: «inactive» (iOS) salta también con el aviso de permisos
+// o al bajar el centro de control, y cortar ahí reiniciaría el GPS sin motivo.
+AppState.addEventListener('change', (state) => {
+  if (state === 'background') pauseForBackground();
+  else if (state === 'active') resumeFromBackground();
+});
+
+// Si la ruta termina con la app en segundo plano, el GPS ya no hace falta.
+useChosenDestination.subscribe((state, previous) => {
+  if (previous.isNavigating && !state.isNavigating && AppState.currentState === 'background' && activeWatch) {
+    stopSession();
+    pausedInBackground = true;
+  }
+});
 
 function acquireLocation() {
   subscribers += 1;

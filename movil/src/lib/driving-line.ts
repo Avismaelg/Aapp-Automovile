@@ -4,6 +4,7 @@
 // llegar a la curva ya a esa velocidad.
 
 import { displaySpeed } from '@/src/i18n';
+import { haversineTupleMeters as metersBetween } from '@/src/lib/geo';
 
 type LatLng = [number, number];
 
@@ -30,16 +31,7 @@ const CURVE_FADE_SAMPLES = 4;
 // Tramos a menos de 80 m se unen en una sola curva.
 const CURVE_MERGE_SAMPLES = 8;
 
-const EARTH_M = 6371000;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
-
-function metersBetween(a: LatLng, b: LatLng) {
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_M * Math.asin(Math.min(1, Math.sqrt(h)));
-}
 
 function bearing(a: LatLng, b: LatLng) {
   const y = Math.sin(toRad(b[1] - a[1])) * Math.cos(toRad(b[0]));

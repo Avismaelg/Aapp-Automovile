@@ -178,16 +178,6 @@ export const OWN_CAR_RADIUS_M = 400;
 const ENTER_FIX_MAX_ACCURACY_M = 150;
 const DRIVE_MATCH_MS = 15 * 60_000;
 
-function metersBetween(a: GeoPoint, b: GeoPoint) {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
 // ¿Ese «subir a un vehículo» fue subir a tu coche?
 // - Con aparcamiento guardado: si la subida fue junto al coche (por la
 //   ubicación del aviso o por dónde empezó el viaje grabado).
@@ -209,8 +199,8 @@ export function enteredOwnCar(
     Math.abs(enter.at - (enter.fixAt ?? Infinity)) <= FIX_MAX_AGE_MS
       ? { latitude: enter.latitude, longitude: enter.longitude }
       : null;
-  if (enterFix) return metersBetween(enterFix, spot) <= OWN_CAR_RADIUS_M;
-  return near.some((drive) => drive.start != null && metersBetween(drive.start, spot) <= OWN_CAR_RADIUS_M);
+  if (enterFix) return haversineMeters(enterFix, spot) <= OWN_CAR_RADIUS_M;
+  return near.some((drive) => drive.start != null && haversineMeters(drive.start, spot) <= OWN_CAR_RADIUS_M);
 }
 
 export type SpotReconcile =

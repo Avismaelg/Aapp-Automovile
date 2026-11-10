@@ -15,7 +15,7 @@ import {
   PROFILE_COLUMNS,
   profileColor,
   type ProfileRow,
-  type UserProfile,
+  fallbackProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
 import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription';
@@ -71,21 +71,6 @@ type VehicleRow = {
   is_primary: boolean;
   created_at: string;
 };
-
-function fallbackProfile(id: string): UserProfile {
-  return {
-    id,
-    username: 'piloto',
-    displayName: t('Piloto'),
-    bio: '',
-    city: '',
-    countryCode: 'DO',
-    avatarUrl: null,
-    privacy: 'public',
-    qrSlug: `piloto-${id.slice(0, 6)}`,
-    createdAt: new Date().toISOString(),
-  };
-}
 
 export function useChallengeFriends() {
   const friendData = useFriends();

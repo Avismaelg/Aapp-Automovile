@@ -7,6 +7,10 @@ import { currentUser } from '@/src/data/mock';
 import { isProductionBuild, isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
 import { PASSWORD_MIN } from '@/src/lib/signup-validation';
+import { unregisterPushToken } from '@/src/lib/push';
+import { useChosenDestination } from '@/src/store/destination';
+import { useFollow } from '@/src/store/follow';
+import { useParking } from '@/src/store/parking';
 
 const DEMO_KEY = 'caravana.auth.demo-mode';
 
@@ -232,7 +236,14 @@ function applyAccount(account: Account) {
 async function endSession(scope: 'global' | 'local') {
   useAuth.setState({ busy: true });
   await AsyncStorage.setItem(DEMO_KEY, '0');
+  // El token se borra con la sesión aún abierta (después la RLS ya no deja).
+  // Tras borrar la cuenta (local) el servidor ya lo borró con ella.
+  if (scope === 'global') await unregisterPushToken().catch(() => undefined);
   if (supabase) await supabase.auth.signOut({ scope }).catch(() => undefined);
+  // Lo guardado en el teléfono de esa cuenta no lo hereda la siguiente.
+  useFollow.getState().stop();
+  useChosenDestination.getState().resetAll();
+  useParking.getState().clearSpot();
   useAuth.setState({ status: 'unauthenticated', account: null, busy: false, error: null });
 }
 

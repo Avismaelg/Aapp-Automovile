@@ -32,6 +32,13 @@ export function useChallengeRace(
   const title = racing?.title ?? t('Reto');
   const goal = racing?.toLabel ?? '';
 
+  // La posición cambia cada segundo: el efecto de abajo la lee de aquí para no
+  // reiniciarse (y cancelarse a medias) con cada señal del GPS.
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+
   // Punto de salida: donde estabas al empezar (se guarda por si cierras la app).
   useEffect(() => {
     if (!challengeId || !enabled) return;
@@ -41,7 +48,7 @@ export function useChallengeRace(
       const saved = await AsyncStorage.getItem(START_KEY(challengeId)).catch(() => null);
       const point: Point = saved
         ? (JSON.parse(saved) as Point)
-        : { latitude: location.latitude, longitude: location.longitude };
+        : { latitude: locationRef.current.latitude, longitude: locationRef.current.longitude };
       if (!saved) await AsyncStorage.setItem(START_KEY(challengeId), JSON.stringify(point)).catch(() => {});
       if (!cancelled) {
         lastRef.current = null;
@@ -51,7 +58,7 @@ export function useChallengeRace(
     return () => {
       cancelled = true;
     };
-  }, [challengeId, enabled, location, start?.id]);
+  }, [challengeId, enabled, start?.id]);
 
   useEffect(() => {
     if (!enabled || !challengeId || endLat == null || endLng == null) return;

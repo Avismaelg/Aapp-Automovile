@@ -143,9 +143,95 @@ do $$ declare v_ok boolean; v_msg text; v_count integer; begin
   insert into rls_results values ('P0-4 leer velocidades ajenas', v_ok, v_msg);
 end $$;
 
+-- Fase 2 · 2.2: B «llega» a la meta de un reto sin posición, lejos de ella o
+-- en un tiempo imposible. Reto 1: empezó hace 1 h (10 km). Reto 2: hace 10 s.
+insert into public.challenges (id, host_id, title, from_label, to_label, status, starts_at, distance_m, end_lat, end_lng)
+values
+  ('00000000-0000-4000-e000-00000000000a', '00000000-0000-4000-a000-00000000000a', 'RLS 1', 'A', 'B', 'live', now() - interval '1 hour', 10000, 18.48, -69.93),
+  ('00000000-0000-4000-e000-00000000000b', '00000000-0000-4000-a000-00000000000a', 'RLS 2', 'A', 'B', 'live', now() - interval '10 seconds', 10000, 18.48, -69.93)
+on conflict (id) do nothing;
+insert into public.challenge_participants (challenge_id, user_id, status)
+values ('00000000-0000-4000-e000-00000000000a', '00000000-0000-4000-a000-00000000000b', 'accepted'),
+       ('00000000-0000-4000-e000-00000000000b', '00000000-0000-4000-a000-00000000000b', 'accepted')
+on conflict do nothing;
+
+do $$ declare v_ok boolean; v_msg text; begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.report_challenge_progress('00000000-0000-4000-e000-00000000000a', 100, true);
+    v_ok := false; v_msg := 'ganó sin posición';
+  exception when others then v_ok := sqlerrm = 'position_required'; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.2 llegar a la meta sin posición', v_ok, v_msg);
+
+  execute 'set local role authenticated';
+  begin
+    perform public.report_challenge_progress('00000000-0000-4000-e000-00000000000a', 100, true, 18.60, -69.93, 5);
+    v_ok := false; v_msg := 'ganó lejos de la meta';
+  exception when others then v_ok := sqlerrm = 'not_at_finish'; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.2 llegar lejos de la meta', v_ok, v_msg);
+
+  execute 'set local role authenticated';
+  begin
+    perform public.report_challenge_progress('00000000-0000-4000-e000-00000000000b', 100, true, 18.48, -69.93, 5);
+    v_ok := false; v_msg := 'ganó 10 km en 10 s';
+  exception when others then v_ok := sqlerrm = 'impossible_time'; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.2 llegar en un tiempo imposible', v_ok, v_msg);
+
+  execute 'set local role authenticated';
+  begin
+    v_ok := public.report_challenge_progress('00000000-0000-4000-e000-00000000000a', 100, true, 18.48, -69.93, 5) = 1;
+    v_msg := 'puesto 1';
+  exception when others then v_ok := false; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.2 la llegada legítima sí cuenta', v_ok, v_msg);
+end $$;
+
+-- Fase 2 · 2.4: B se mete de owner en un club público de A y de miembro en
+-- uno privado; como miembro en el público sí puede.
+insert into public.clubs (id, owner_id, name, slug, privacy)
+values ('00000000-0000-4000-f000-00000000000a', '00000000-0000-4000-a000-00000000000a', 'RLS público', 'rls-test-publico', 'public'),
+       ('00000000-0000-4000-f000-00000000000b', '00000000-0000-4000-a000-00000000000a', 'RLS privado', 'rls-test-privado', 'private')
+on conflict (id) do nothing;
+
+do $$ declare v_ok boolean; v_msg text; begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.club_members (club_id, user_id, role)
+    values ('00000000-0000-4000-f000-00000000000a', '00000000-0000-4000-a000-00000000000b', 'owner');
+    v_ok := false; v_msg := 'se hizo owner';
+  exception when others then v_ok := true; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.4 hacerse owner de un club ajeno', v_ok, v_msg);
+
+  execute 'set local role authenticated';
+  begin
+    insert into public.club_members (club_id, user_id, role)
+    values ('00000000-0000-4000-f000-00000000000b', '00000000-0000-4000-a000-00000000000b', 'member');
+    v_ok := false; v_msg := 'entró en el privado';
+  exception when others then v_ok := true; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.4 entrar en un club privado', v_ok, v_msg);
+
+  execute 'set local role authenticated';
+  begin
+    insert into public.club_members (club_id, user_id, role)
+    values ('00000000-0000-4000-f000-00000000000a', '00000000-0000-4000-a000-00000000000b', 'member');
+    v_ok := true; v_msg := 'entró';
+  exception when others then v_ok := false; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('2.4 unirse a un club público sí se puede', v_ok, v_msg);
+end $$;
+
 -- Limpieza: borrar los usuarios arrastra perfiles, vehículos, convoy y demás.
 delete from public.speed_records where user_id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b', '00000000-0000-4000-a000-00000000000c');
 delete from public.parties where id = '00000000-0000-4000-c000-00000000000a';
+delete from public.challenges where id in ('00000000-0000-4000-e000-00000000000a', '00000000-0000-4000-e000-00000000000b');
+delete from public.clubs where id in ('00000000-0000-4000-f000-00000000000a', '00000000-0000-4000-f000-00000000000b');
 delete from auth.users where id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b', '00000000-0000-4000-a000-00000000000c');
 
 select check_name, ok, detail from rls_results order by check_name;

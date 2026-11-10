@@ -6,7 +6,6 @@ import {
   defaultPartyName,
   INVITE_FRESH_MS,
   inviteErrorMessage,
-  PARTY_FREE_MEMBERS,
   type SentInvite,
 } from '@/src/lib/party-invites';
 import { mapProfileRow, PROFILE_COLUMNS, type ProfileRow, type UserProfile } from '@/src/lib/profile-db';
@@ -15,6 +14,7 @@ import { useAuth } from '@/src/store/auth';
 import { uniqueTopic } from '@/src/lib/shared-subscription';
 import { t } from '@/src/i18n';
 import { useLivePoll } from '@/src/hooks/useLivePoll';
+import { createPartyRecord } from '@/src/hooks/useParty';
 
 export type IncomingPartyInvite = {
   id: string;
@@ -138,44 +138,6 @@ export function useSentPartyInvites(partyId: string | undefined) {
   return query.data ?? [];
 }
 
-// Crea tu party si no tienes ninguna. Entrar en una nueva te saca de la
-// anterior (solo hay una party activa a la vez).
-async function createQuickParty(accountId: string, name: string) {
-  if (!supabase) throw new Error(t('Supabase no está configurado.'));
-  const now = new Date().toISOString();
-  await supabase
-    .from('party_members')
-    .update({ left_at: now, last_lat: null, last_lng: null })
-    .eq('user_id', accountId)
-    .is('left_at', null);
-
-  const { data, error } = await supabase
-    .from('parties')
-    .insert({
-      host_id: accountId,
-      name,
-      status: 'live',
-      starts_at: now,
-      max_members: PARTY_FREE_MEMBERS,
-      is_private: true,
-    })
-    .select('id, invite_code')
-    .single();
-  if (error) throw new Error(t('No pudimos crear la party. Inténtalo de nuevo.'));
-
-  const { error: memberError } = await supabase.from('party_members').insert({
-    party_id: data.id,
-    user_id: accountId,
-    role: 'host',
-    last_seen_at: now,
-  });
-  if (memberError) {
-    await supabase.from('parties').delete().eq('id', data.id);
-    throw new Error(t('No pudimos unirte como anfitrión de la party.'));
-  }
-  return { id: data.id as string, code: data.invite_code as string };
-}
-
 // Invitar con un toque. Si aún no tienes party, la crea («Convoy de Ana»).
 export function useInviteToParty() {
   const queryClient = useQueryClient();
@@ -194,7 +156,7 @@ export function useInviteToParty() {
     }) => {
       if (demo) throw new Error(t('Las invitaciones reales requieren una cuenta conectada.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para invitar.'));
-      const targetParty = partyId ?? (await createQuickParty(account.id, defaultPartyName(myName))).id;
+      const targetParty = partyId ?? (await createPartyRecord(account.id, { name: defaultPartyName(myName) })).id;
 
       const results = await Promise.all(
         userIds.map((userId) =>

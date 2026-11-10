@@ -8,7 +8,7 @@ import { AppText, Button, Card, Input, Pill } from '@/src/components/ui';
 import { suggestMakes, suggestModels } from '@/src/data/vehicle-makes';
 import { pickVehiclePhoto, takeVehiclePhoto } from '@/src/hooks/useGarage';
 import { errorMessage } from '@/src/lib/alerts';
-import { isEmailRegistered, isNicknameAvailable } from '@/src/lib/signup-checks';
+import { isNicknameAvailable } from '@/src/lib/signup-checks';
 import {
   confirmError,
   emailError,
@@ -60,7 +60,7 @@ export default function SignUpScreen() {
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [nickState, setNickState] = useState<Availability>('idle');
-  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [resent, setResent] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -117,17 +117,12 @@ export default function SignUpScreen() {
     };
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
-    // REG-03: correo ya registrado → se avisa antes de seguir.
-    setCheckingEmail(true);
-    const [registered, available] = await Promise.all([
-      isEmailRegistered(draft.email),
-      nickState === 'free' ? Promise.resolve(true) : isNicknameAvailable(nickname),
-    ]);
-    setCheckingEmail(false);
-    if (registered) {
-      setErrors({ email: t('Ese correo ya tiene una cuenta. Inicia sesión.') });
-      return;
-    }
+    // REG-03: el correo ya registrado lo detecta el alta al final (paso 3) y
+    // devuelve aquí con el error en el campo; preguntarlo antes permitía a
+    // cualquiera averiguar qué correos tienen cuenta.
+    setChecking(true);
+    const available = nickState === 'free' ? true : await isNicknameAvailable(nickname);
+    setChecking(false);
     if (available === false) {
       setNickState('taken');
       setErrors({ nickname: t('Ese apodo ya está en uso.') });
@@ -390,7 +385,7 @@ export default function SignUpScreen() {
             label={t('Siguiente')}
             icon="arrow-forward"
             size="lg"
-            loading={checkingEmail}
+            loading={checking}
             onPress={() => void nextFromStep1()}
           />
           <Button
