@@ -24,6 +24,6 @@ movil/supabase/.temp/
 Thumbs.db
 
 # Herramientas locales (agentes / Claude Code)
-.agents/
-.claude/
-skills-lock.json
+/.agents/
+/.claude/
+/skills-lock.json
