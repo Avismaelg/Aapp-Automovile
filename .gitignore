@@ -22,3 +22,8 @@ movil/supabase/.temp/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Herramientas locales (agentes / Claude Code)
+.agents/
+.claude/
+skills-lock.json
