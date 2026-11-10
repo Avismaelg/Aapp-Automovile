@@ -308,3 +308,4 @@
 =Recalculando…|Recalculating…
 =Sin conexión: vuelve a la ruta guardada|Offline: get back on the saved route
 =Sin conexión: sigues con la ruta guardada|Offline: following the saved route
+=El anfitrión te sacó de esta party.|The host removed you from this party.

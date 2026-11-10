@@ -419,7 +419,7 @@ export default function PartyScreen() {
     if (!party) return;
     const perform = async () => {
       try {
-        await leaveParty.mutateAsync({ partyId: party.id, isHost: party.isHost });
+        await leaveParty.mutateAsync({ partyId: party.id });
         router.replace('/');
       } catch (error) {
         showError(t('No pudimos salir'), error);

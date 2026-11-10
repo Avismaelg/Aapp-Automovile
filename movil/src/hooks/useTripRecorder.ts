@@ -39,7 +39,6 @@ export function useTripRecorder(
     speedKmh?: number | null;
     accuracy?: number | null;
   },
-  vehicleName?: string,
   // test: viaje del simulador (no cuenta en totales ni récords).
   options?: { walking?: boolean; test?: boolean },
 ) {

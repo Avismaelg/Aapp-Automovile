@@ -394,7 +394,7 @@ export default function NavigationScreen() {
   // Los viajes simulados no se graban, salvo en la prueba de grabación
   // (quedan marcados como prueba y se borran al parar).
   const simRecords = useSimulator((state) => state.recordTrips);
-  const { active: activeTrip } = useTripRecorder(live.location, vehicleName, {
+  const { active: activeTrip } = useTripRecorder(live.location, {
     walking: walking || (simulating && !simRecords),
     test: simulating,
   });
@@ -1039,8 +1039,9 @@ export default function NavigationScreen() {
       if (!goal || remainingS < 300) return;
       void fetchStreetRoutes({ origin, destination: goal, stops: waypoints, signal: controller.signal })
         .then((candidates) => {
-          if (cancelled || candidates[0]?.source === 'fallback') return;
-          const saving = fasterRouteSaving(remainingS, candidates[0].timeMs / 1000);
+          const best = candidates[0];
+          if (cancelled || !best || best.source === 'fallback') return;
+          const saving = fasterRouteSaving(remainingS, best.timeMs / 1000);
           if (saving == null) return;
           adoptRoutes(candidates);
           if (!voiceMuted) {

@@ -39,6 +39,13 @@ async function ensureMicrophone() {
   return ensureMicrophonePermission();
 }
 
+// CONV-15: deja de oír (o vuelve a oír) a todos los de la sala.
+function setRemoteAudio(room: Room, muted: boolean) {
+  room.remoteParticipants.forEach((participant) => {
+    participant.audioTrackPublications.forEach((publication) => publication.setSubscribed(!muted));
+  });
+}
+
 type VoiceTokenResponse = {
   token?: string;
   url?: string;
@@ -58,6 +65,7 @@ export function useVoiceRoom({
   const roomRef = useRef<Room | null>(null);
   // CONV-14: manos libres (micrófono abierto) y CONV-15: silenciar a todos.
   const [handsFree, setHandsFreeState] = useState(false);
+  const handsFreeRef = useRef(false);
   const [mutedAll, setMutedAll] = useState(false);
   const mutedAllRef = useRef(false);
   const [status, setStatus] = useState<VoiceStatus>('idle');
@@ -94,6 +102,18 @@ export function useVoiceRoom({
       audioChain = audioChain.then(() => session.stopAudioSession().catch(() => {}));
     };
   }, [enabled, partyId]);
+
+  // Manos libres sobrevive a cambiar de canal o reconectar, nunca a apagar la
+  // voz: al volver a activarla el micrófono no debe abrirse solo.
+  const voiceOn = Boolean(enabled && partyId);
+  const [wasVoiceOn, setWasVoiceOn] = useState(voiceOn);
+  if (wasVoiceOn !== voiceOn) {
+    setWasVoiceOn(voiceOn);
+    if (!voiceOn) setHandsFreeState(false);
+  }
+  useEffect(() => {
+    if (!voiceOn) handsFreeRef.current = false;
+  }, [voiceOn]);
 
   useEffect(() => {
     const client = supabase;
@@ -144,7 +164,8 @@ export function useVoiceRoom({
             t('LiveKit no está configurado. Despliega la función livekit-token y sus secretos.'),
           );
         }
-        // El token vale 2 h: se reutiliza al reconectar o volver a este canal.
+        // El token dura 15 min en el servidor: se reutiliza al reconectar o al
+        // volver a este canal (TOKEN_REUSE_MS).
         tokenCache.set(cacheKey, { payload, at: cached && fresh ? cached.at : Date.now() });
 
         if (!active) return;
@@ -221,8 +242,14 @@ export function useVoiceRoom({
           return;
         }
 
-        // El micrófono permanece cerrado hasta que se pulse PTT.
-        await room.localParticipant.setMicrophoneEnabled(false);
+        // Al conectar (también tras reconectar o cambiar de canal) se respetan
+        // «silenciar a todos» y manos libres; si no, el micrófono permanece
+        // cerrado hasta que se pulse PTT. Antes la sala nueva abría con todo
+        // por defecto mientras la pantalla seguía mostrando lo elegido.
+        if (mutedAllRef.current) setRemoteAudio(room, true);
+        const openMic = handsFreeRef.current && (await ensureMicrophone());
+        await room.localParticipant.setMicrophoneEnabled(openMic);
+        setTalkingState(openMic);
         updateParticipants();
         setStatus('connected');
         // CONV-15: la voz sigue con la pantalla bloqueada (servicio en primer
@@ -272,8 +299,6 @@ export function useVoiceRoom({
     };
   }, [channelSlug, enabled, partyId]);
 
-
-
   const setTalking = useCallback(async (next: boolean) => {
     const room = roomRef.current;
     if (!room) return;
@@ -296,6 +321,7 @@ export function useVoiceRoom({
 
   const setHandsFree = useCallback(
     async (next: boolean) => {
+      handsFreeRef.current = next;
       setHandsFreeState(next);
       await setTalking(next);
     },
@@ -305,24 +331,20 @@ export function useVoiceRoom({
   const setMuteAll = useCallback((next: boolean) => {
     mutedAllRef.current = next;
     setMutedAll(next);
-    const room = roomRef.current;
-    if (!room) return;
-    room.remoteParticipants.forEach((participant) => {
-      participant.audioTrackPublications.forEach((publication) => publication.setSubscribed(!next));
-    });
+    if (roomRef.current) setRemoteAudio(roomRef.current, next);
   }, []);
 
   return {
-    handsFree: enabled && partyId ? handsFree : false,
+    handsFree: voiceOn && handsFree,
     setHandsFree,
     mutedAll,
     setMuteAll,
-    status: enabled && partyId ? status : 'idle',
-    micDenied: enabled && partyId ? micDenied : false,
-    error: enabled && partyId ? error : null,
-    talking: enabled && partyId ? talking : false,
-    activeSpeakerIds: enabled && partyId ? activeSpeakerIds : [],
-    participantCount: enabled && partyId ? participantCount : 0,
+    status: voiceOn ? status : 'idle',
+    micDenied: voiceOn && micDenied,
+    error: voiceOn ? error : null,
+    talking: voiceOn && talking,
+    activeSpeakerIds: voiceOn ? activeSpeakerIds : [],
+    participantCount: voiceOn ? participantCount : 0,
     setTalking,
   };
 }

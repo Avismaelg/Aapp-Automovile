@@ -126,6 +126,11 @@ function syncLiveService(updatesRunning: boolean) {
   else stopDriving('friends');
 }
 
+// m/s del GPS → km/h (null si no la da o es basura).
+function kmh(mps: number | null) {
+  return mps != null && Number.isFinite(mps) && mps >= 0 ? mps * 3.6 : null;
+}
+
 function toBackgroundPoint(location: Location.LocationObject): BackgroundPoint | null {
   const { latitude, longitude, speed, accuracy } = location.coords;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
@@ -133,7 +138,7 @@ function toBackgroundPoint(location: Location.LocationObject): BackgroundPoint |
   return {
     latitude,
     longitude,
-    speedKmh: speed != null && Number.isFinite(speed) && speed >= 0 ? speed * 3.6 : null,
+    speedKmh: kmh(speed),
     at: location.timestamp,
   };
 }
@@ -152,17 +157,14 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(TASK_NAME)) {
       // La más reciente va a la party y a los amigos (con la pantalla
       // bloqueada también).
       const latest = data.locations[data.locations.length - 1];
-      if (latest) {
-        const speed = latest.coords.speed;
-        updateDriving(speed != null && speed >= 0 ? speed * 3.6 : null, latest.timestamp);
-      }
+      if (latest) updateDriving(kmh(latest.coords.speed), latest.timestamp);
       if (latest && (latest.coords.accuracy ?? 0) <= MAX_ACCURACY_M) {
         const { latitude, longitude, speed, heading } = latest.coords;
         void pushLivePosition({
           latitude,
           longitude,
           at: latest.timestamp,
-          speedKmh: speed != null && speed >= 0 ? speed * 3.6 : null,
+          speedKmh: kmh(speed),
           heading: heading != null && heading >= 0 ? heading : null,
         });
       }

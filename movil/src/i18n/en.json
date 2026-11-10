@@ -394,6 +394,7 @@
   "El QR solo contiene una URL pública. No incluye tu teléfono ni tu ubicación.": "The QR only contains a public URL. It doesn't include your phone or your location.",
   "El anfitrión del reto es quien puede iniciar la salida.": "The challenge host is the one who can start.",
   "El anfitrión es quien puede cerrar el reto.": "The host is the one who can close the challenge.",
+  "El anfitrión te sacó de esta party.": "The host removed you from this party.",
   "El anfitrión ya puede iniciar la salida. Te avisaremos cuando el reto esté en vivo.": "The host can now start. We'll let you know when the challenge is live.",
   "El archivo elegido no es una imagen.": "The chosen file isn't an image.",
   "El chat está libre": "The chat is open",

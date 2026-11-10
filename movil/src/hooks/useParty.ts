@@ -121,28 +121,28 @@ function fallbackProfile(id: string): UserProfile {
   };
 }
 
-const BASE_MEMBER_COLUMNS =
-  'party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, voice_channel_slug';
-const MEMBER_COLUMNS = `${BASE_MEMBER_COLUMNS}, eta_s, remaining_m, progress_at, arrived_at`;
+const MEMBER_COLUMNS =
+  'party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, ' +
+  'voice_channel_slug, eta_s, remaining_m, progress_at, arrived_at';
+
+// Traduce los errores con nombre que lanzan las funciones del servidor.
+function rpcError(error: { message: string }, messages: Record<string, string>, fallback: string) {
+  const code = Object.keys(messages).find((key) => error.message.includes(key));
+  return new Error(code ? messages[code] : fallback);
+}
 
 async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView> {
   if (!supabase) throw new Error(t('Supabase no está configurado.'));
 
-  const selectMembers = (columns: string) =>
-    supabase!
-      .from('party_members')
-      .select(columns)
-      .eq('party_id', party.id)
-      .is('left_at', null)
-      .returns<PartyMemberRow[]>();
-  let { data: memberRows, error } = await selectMembers(MEMBER_COLUMNS);
-  // Servidor sin la migración del progreso del convoy: columnas de antes.
-  if (error && /eta_s|remaining_m|progress_at|arrived_at/.test(error.message)) {
-    ({ data: memberRows, error } = await selectMembers(BASE_MEMBER_COLUMNS));
-  }
+  const { data: memberRows, error } = await supabase
+    .from('party_members')
+    .select(MEMBER_COLUMNS)
+    .eq('party_id', party.id)
+    .is('left_at', null)
+    .returns<PartyMemberRow[]>();
 
   if (error) throw new Error(error.message);
-  const members = (memberRows ?? []) as PartyMemberRow[];
+  const members = memberRows ?? [];
   const userIds = members.map((member) => member.user_id);
 
   const { data: profileRows, error: profileError } = userIds.length
@@ -195,15 +195,13 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
   };
 }
 
-async function leaveOtherParties(accountId: string, keepPartyId: string | null) {
-  if (!supabase) return;
-  let query = supabase
-    .from('party_members')
+// Solo una party activa a la vez: crear una nueva te saca de la anterior.
+async function leaveActiveParties(accountId: string) {
+  await supabase
+    ?.from('party_members')
     .update({ left_at: new Date().toISOString(), last_lat: null, last_lng: null })
     .eq('user_id', accountId)
     .is('left_at', null);
-  if (keepPartyId) query = query.neq('party_id', keepPartyId);
-  await query;
 }
 
 // `poll`: solo la pantalla siempre montada (Inicio) relee cada 15 s; si lo
@@ -374,8 +372,7 @@ export function useCreateParty() {
       if (demo) throw new Error(t('Las parties reales requieren una cuenta conectada.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para crear una party.'));
 
-      // Solo una party activa a la vez: crear una nueva te saca de la anterior.
-      await leaveOtherParties(account.id, null);
+      await leaveActiveParties(account.id);
 
       const { data, error } = await supabase
         .from('parties')
@@ -430,17 +427,19 @@ export function useJoinParty() {
       });
 
       if (error) {
-        if (error.message.includes('party_not_found')) {
-          throw new Error(t('No encontramos una party con ese código.'));
-        }
-        if (error.message.includes('party_full')) {
-          throw new Error(t('La party está llena.'));
-        }
-        throw new Error(t('No pudimos unirnos a la party. Revisa el código.'));
+        throw rpcError(
+          error,
+          {
+            party_not_found: t('No encontramos una party con ese código.'),
+            party_full: t('La party está llena.'),
+            kicked: t('El anfitrión te sacó de esta party.'),
+          },
+          t('No pudimos unirnos a la party. Revisa el código.'),
+        );
       }
 
+      // El servidor ya te saca de la party anterior (solo una activa a la vez).
       const party = Array.isArray(data) ? data[0] : data;
-      if (party?.id) await leaveOtherParties(account.id, party.id as string);
       return { id: party?.id as string, code: party?.invite_code as string };
     },
     onSuccess: () => {
@@ -455,35 +454,14 @@ export function useLeaveParty() {
   const demo = isDemoMode(account?.mode);
 
   return useMutation({
-    mutationFn: async ({ partyId, isHost }: { partyId: string; isHost: boolean }) => {
+    mutationFn: async ({ partyId }: { partyId: string }) => {
       if (demo) throw new Error(t('Salir de una party real requiere una cuenta.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para salir de la party.'));
 
       // El servidor pasa el mando al siguiente miembro si sale el anfitrión
       // (la party solo termina si no queda nadie).
-      const { error: rpcError } = await supabase.rpc('leave_party', { p_party_id: partyId });
-      if (!rpcError) return;
-      if (!/leave_party|function|schema cache/i.test(rpcError.message)) {
-        throw new Error(t('No pudimos salir de la party.'));
-      }
-
-      // Servidor sin la migración nueva: salir como antes.
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('party_members')
-        .update({ left_at: now, last_lat: null, last_lng: null })
-        .eq('party_id', partyId)
-        .eq('user_id', account.id);
-
+      const { error } = await supabase.rpc('leave_party', { p_party_id: partyId });
       if (error) throw new Error(t('No pudimos salir de la party.'));
-
-      if (isHost) {
-        await supabase
-          .from('parties')
-          .update({ status: 'ended', ends_at: now })
-          .eq('id', partyId)
-          .eq('host_id', account.id);
-      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['party'] });
@@ -549,16 +527,15 @@ export function useSetPartyDestination() {
       });
 
       if (error) {
-        if (error.message.includes('not_a_member')) {
-          throw new Error(t('No perteneces a esta party.'));
-        }
-        if (error.message.includes('party_not_found')) {
-          throw new Error(t('La party ya no existe.'));
-        }
-        if (error.message.includes('not_allowed')) {
-          throw new Error(t('Solo el anfitrión o un copiloto pueden cambiar el destino.'));
-        }
-        throw new Error(t('No pudimos actualizar el destino de la caravana.'));
+        throw rpcError(
+          error,
+          {
+            not_a_member: t('No perteneces a esta party.'),
+            party_not_found: t('La party ya no existe.'),
+            not_allowed: t('Solo el anfitrión o un copiloto pueden cambiar el destino.'),
+          },
+          t('No pudimos actualizar el destino de la caravana.'),
+        );
       }
     },
     onSuccess: () => {
@@ -695,8 +672,11 @@ export function usePartyHostActions() {
     if (!supabase) throw new Error(t('Supabase no está configurado.'));
     const { error } = await supabase.rpc(fn, args);
     if (error) {
-      if (error.message.includes('not_host')) throw new Error(t('Solo el anfitrión puede hacerlo.'));
-      throw new Error(t('No pudimos completar la acción. Inténtalo de nuevo.'));
+      throw rpcError(
+        error,
+        { not_host: t('Solo el anfitrión puede hacerlo.') },
+        t('No pudimos completar la acción. Inténtalo de nuevo.'),
+      );
     }
   };
   const kick = useMutation({

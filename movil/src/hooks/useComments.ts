@@ -155,7 +155,7 @@ export function useDeleteComment() {
   const demo = isDemoMode(account?.mode);
 
   return useMutation({
-    mutationFn: async ({ id, postId }: { id: string; postId: string }) => {
+    mutationFn: async ({ id }: { id: string; postId: string }) => {
       if (demo) throw new Error(t('Los comentarios reales requieren una cuenta.'));
       if (!supabase || !account) throw new Error(t('Inicia sesión para borrar comentarios.'));
 

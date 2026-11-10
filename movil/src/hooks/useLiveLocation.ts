@@ -132,7 +132,7 @@ function applyCompassHeading(value: number) {
   }
 
   const now = Date.now();
-    if (now - lastHeadingAt < 1_400) return;
+  if (now - lastHeadingAt < 1_400) return;
   lastHeadingAt = now;
   useLiveLocationState.setState({
     location: { ...current.location, heading: value },
@@ -290,9 +290,8 @@ export function refreshStaleLocation(maxAgeMs = 20_000) {
   // Una sesión recién arrancada aún no ha tenido tiempo de dar posición:
   // reiniciarla otra vez entraría en bucle (cada reinicio pausa la app).
   if (Date.now() - sessionStartedAt < 15_000) return;
-  const noFixForAWhile = lastFixAt === 0 && Date.now() - sessionStartedAt > 15_000;
-  const staleFix = lastFixAt > 0 && Date.now() - lastFixAt > maxAgeMs;
-  if (!noFixForAWhile && !staleFix) return;
+  // Pasados esos 15 s, sin ninguna posición o con una vieja se reinicia.
+  if (lastFixAt > 0 && Date.now() - lastFixAt <= maxAgeMs) return;
   stopSession();
   startSession(t('Actualizando tu ubicación…'));
 }

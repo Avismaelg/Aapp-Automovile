@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { currentUser } from '@/src/data/mock';
 import { isProductionBuild, isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { t } from '@/src/i18n';
+import { PASSWORD_MIN } from '@/src/lib/signup-validation';
 
 const DEMO_KEY = 'caravana.auth.demo-mode';
 
@@ -195,7 +196,7 @@ function friendlyAuthError(message: string) {
     return t('Ese correo ya tiene una cuenta. Inicia sesión.');
   }
   if (normalized.includes('password')) {
-    return t('La contraseña no cumple los requisitos del proyecto (mínimo 6 caracteres).');
+    return t('Usa al menos {0} caracteres.', PASSWORD_MIN);
   }
   if (normalized.includes('rate limit') || normalized.includes('too many')) {
     return t('Demasiados intentos. Espera un momento y vuelve a probar.');
@@ -209,6 +210,30 @@ function friendlyAuthError(message: string) {
 
 function missingConfigMessage() {
   return t('Supabase no está configurado. Añade EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY para activar las cuentas reales.');
+}
+
+// Error de una acción: lo muestra y lo devuelve.
+function fail(message: string): AuthResult {
+  useAuth.setState({ busy: false, error: message });
+  return { ok: false, message };
+}
+
+// El perfil llega después de la sesión: no debe resucitar la cuenta si
+// entretanto se cerró sesión o entró otra.
+function applyAccount(account: Account) {
+  useAuth.setState((state) => (state.account?.id === account.id ? { account } : state));
+}
+
+// «global» cierra la sesión también en el servidor; «local», solo en este
+// teléfono (tras borrar la cuenta el servidor responde 403 y supabase-js lo
+// ignora). En los dos casos supabase-js borra la sesión del almacenamiento
+// seguro. Antes signOutLocal borraba claves de AsyncStorage, donde ya no está
+// la sesión, y la cuenta borrada «volvía» al abrir la app.
+async function endSession(scope: 'global' | 'local') {
+  useAuth.setState({ busy: true });
+  await AsyncStorage.setItem(DEMO_KEY, '0');
+  if (supabase) await supabase.auth.signOut({ scope }).catch(() => undefined);
+  useAuth.setState({ status: 'unauthenticated', account: null, busy: false, error: null });
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -263,8 +288,7 @@ export const useAuth = create<AuthState>((set) => ({
           await AsyncStorage.setItem(DEMO_KEY, '0');
         }
         set({ status: 'authenticated', account: fallbackAccount(data.session.user) });
-        const account = await loadAccount(data.session.user);
-        set({ account });
+        applyAccount(await loadAccount(data.session.user));
       } else if (storedDemo === '1') {
         set({ status: 'authenticated', account: DEMO_ACCOUNT });
       } else {
@@ -295,7 +319,7 @@ export const useAuth = create<AuthState>((set) => ({
             account: fallbackAccount(session.user),
             busy: false,
           });
-          void loadAccount(session.user).then((account) => set({ account }));
+          void loadAccount(session.user).then(applyAccount);
         }
       });
       unsubscribeAuth = () => listener.subscription.unsubscribe();
@@ -309,11 +333,7 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   signIn: async (email, password) => {
-    if (!supabase) {
-      const message = missingConfigMessage();
-      set({ error: message });
-      return { ok: false, message };
-    }
+    if (!supabase) return fail(missingConfigMessage());
 
     set({ busy: true, error: null });
 
@@ -323,34 +343,20 @@ export const useAuth = create<AuthState>((set) => ({
         password,
       });
 
-      if (error) {
-        const message = friendlyAuthError(error.message);
-        set({ busy: false, error: message });
-        return { ok: false, message };
-      }
+      if (error) return fail(friendlyAuthError(error.message));
 
-      if (!data.user) {
-        const message = t('No recibimos tu cuenta. Inténtalo de nuevo.');
-        set({ busy: false, error: message });
-        return { ok: false, message };
-      }
+      if (!data.user) return fail(t('No recibimos tu cuenta. Inténtalo de nuevo.'));
 
       const account = await loadAccount(data.user);
       set({ status: 'authenticated', account, busy: false, error: null });
       return { ok: true };
     } catch {
-      const message = t('No pudimos conectar con Supabase. Revisa tu conexión.');
-      set({ busy: false, error: message });
-      return { ok: false, message };
+      return fail(t('No pudimos conectar con Supabase. Revisa tu conexión.'));
     }
   },
 
   signUp: async ({ displayName, username, email, password, firstName, lastName, vehicle }) => {
-    if (!supabase) {
-      const message = missingConfigMessage();
-      set({ error: message });
-      return { ok: false, message };
-    }
+    if (!supabase) return fail(missingConfigMessage());
 
     set({ busy: true, error: null });
 
@@ -370,18 +376,12 @@ export const useAuth = create<AuthState>((set) => ({
         },
       });
 
-      if (error) {
-        const message = friendlyAuthError(error.message);
-        set({ busy: false, error: message });
-        return { ok: false, message };
-      }
+      if (error) return fail(friendlyAuthError(error.message));
 
       // Con confirmación de correo, Supabase no da error si el correo ya
       // existe (para no revelarlo): devuelve un usuario sin identidades.
       if (data.user && data.user.identities?.length === 0) {
-        const message = t('Ese correo ya tiene una cuenta. Inicia sesión.');
-        set({ busy: false, error: message });
-        return { ok: false, message };
+        return fail(t('Ese correo ya tiene una cuenta. Inicia sesión.'));
       }
 
       if (data.session?.user) {
@@ -398,9 +398,7 @@ export const useAuth = create<AuthState>((set) => ({
           t('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.'),
       };
     } catch {
-      const message = t('No pudimos crear la cuenta. Revisa tu conexión.');
-      set({ busy: false, error: message });
-      return { ok: false, message };
+      return fail(t('No pudimos crear la cuenta. Revisa tu conexión.'));
     }
   },
 
@@ -430,50 +428,9 @@ export const useAuth = create<AuthState>((set) => ({
     });
   },
 
-  signOut: async () => {
-    set({ busy: true });
-    await AsyncStorage.setItem(DEMO_KEY, '0');
-
-    if (supabase) {
-      await supabase.auth.signOut().catch(() => undefined);
-    }
-
-    set({
-      status: 'unauthenticated',
-      account: null,
-      busy: false,
-      error: null,
-    });
-  },
-
-  signOutLocal: async () => {
-    set({ busy: true });
-    await AsyncStorage.setItem(DEMO_KEY, '0');
-
-    if (supabase) {
-      // La cuenta ya fue borrada: no llamamos /logout (daría 403).
-      // Solo limpiamos la sesión persistida y el refresco automático.
-      supabase.auth.stopAutoRefresh();
-      try {
-        const keys = await AsyncStorage.getAllKeys();
-        const authKeys = keys.filter(
-          (key) => key.startsWith('sb-') && key.endsWith('-auth-token'),
-        );
-        if (authKeys.length > 0) {
-          await AsyncStorage.multiRemove(authKeys);
-        }
-      } catch {
-        // El estado local igualmente queda cerrado.
-      }
-    }
-
-    set({
-      status: 'unauthenticated',
-      account: null,
-      busy: false,
-      error: null,
-    });
-  },
+  signOut: () => endSession('global'),
+  // Tras borrar la cuenta: el servidor ya no la conoce.
+  signOutLocal: () => endSession('local'),
 
   syncAccount: (partial) =>
     set((state) =>

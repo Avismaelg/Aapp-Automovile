@@ -69,6 +69,8 @@ function progressColumns(seenAt: string) {
     remaining_m: Math.max(0, Math.round(progress.remainingM)),
     progress_at: seenAt,
   };
+  // La llegada se manda una vez; si la subida falla, se vuelve a mandar con la
+  // siguiente posición (ver pushLivePosition).
   if (progress.arrived && !arrivedSent) {
     columns.arrived_at = seenAt;
     arrivedSent = true;
@@ -96,6 +98,11 @@ export async function pushLivePosition(fix: LiveFix) {
     const writes: PromiseLike<unknown>[] = [];
     if (toParty && partyId) {
       lastParty = fix;
+      const progressUpdate = progressColumns(seenAt);
+      const failed = () => {
+        lastParty = null;
+        if ('arrived_at' in progressUpdate) arrivedSent = false;
+      };
       writes.push(
         client
           .from('party_members')
@@ -105,13 +112,13 @@ export async function pushLivePosition(fix: LiveFix) {
             last_speed_kmh: fix.speedKmh != null ? Math.round(fix.speedKmh * 10) / 10 : null,
             last_heading: fix.heading != null ? Math.round(fix.heading) % 360 : null,
             last_seen_at: seenAt,
-            ...progressColumns(seenAt),
+            ...progressUpdate,
           })
           .eq('party_id', partyId)
           .eq('user_id', accountId)
           .then(({ error }) => {
-            if (error) lastParty = null;
-          }),
+            if (error) failed();
+          }, failed),
       );
     }
     if (toFriends) {

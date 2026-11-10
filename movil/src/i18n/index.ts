@@ -93,7 +93,7 @@ export function setLanguageForTests(next: Language) {
 export function t(text: string, ...args: (string | number | null | undefined)[]) {
   const translated = language === 'es' ? text : DICTIONARIES[language][text] ?? text;
   if (args.length === 0) return translated;
-  return translated.replace(/\{(\d+)\}/g, (match, index: string) => {
+  return translated.replace(/\{(\d+)\}/g, (_match, index: string) => {
     const value = args[Number(index)];
     return value == null ? '' : String(value);
   });
@@ -124,10 +124,6 @@ let miles = MILES;
 export function setUnitsFromPosition(latitude: number, longitude: number) {
   const inDominicanRepublic = latitude > 17.3 && latitude < 20.1 && longitude > -72.1 && longitude < -68.2;
   miles = inDominicanRepublic ? false : MILES;
-}
-
-export function usesMiles() {
-  return miles;
 }
 
 // Solo para las pruebas.
