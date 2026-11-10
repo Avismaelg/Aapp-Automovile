@@ -65,7 +65,7 @@ do $$ declare v_ok boolean; v_msg text; v_rows integer; begin
 end $$;
 
 -- P0-1c: A expulsa a B; B intenta volver (con update y con el código).
-do $$ declare v_ok boolean; v_msg text; begin
+do $$ declare v_ok boolean; v_msg text; v_rows integer; begin
   perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
   execute 'set local role authenticated';
   perform public.kick_party_member('00000000-0000-4000-c000-00000000000a', '00000000-0000-4000-a000-00000000000b');
@@ -75,7 +75,9 @@ do $$ declare v_ok boolean; v_msg text; begin
   begin
     update public.party_members set left_at = null
      where party_id = '00000000-0000-4000-c000-00000000000a' and user_id = '00000000-0000-4000-a000-00000000000b';
-    v_ok := false; v_msg := 'volvió con update';
+    -- Tras la expulsión la RLS ya no le deja ver su fila: 0 filas = resistió.
+    get diagnostics v_rows = row_count;
+    v_ok := v_rows = 0; v_msg := v_rows || ' filas con update';
   exception when others then v_ok := true; v_msg := sqlerrm; end;
   if v_ok then
     begin
