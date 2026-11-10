@@ -33,7 +33,7 @@ probado de forma estática, pero falta aplicarlo y probarlo de verdad.
 - [ ] Declaración de **ubicación en segundo plano** con vídeo (convoy y amigos con la app cerrada).
 - [ ] Declaración de **servicios en primer plano**: `location` y `microphone` (voz con la pantalla bloqueada).
 - [ ] Formulario de **seguridad de los datos**: ubicación precisa, audio (no se graba), id del dispositivo (avisos), informes de fallos (Crashlytics), fotos.
-- [ ] **URL web para pedir el borrado de la cuenta** (Play la exige además del botón en la app). Hoy no existe.
+- [x] **URL web para pedir el borrado de la cuenta**: `infra/invite-page/borrar-cuenta/` (se publica en GitHub Pages al mergear a `main`; falta confirmar la URL pública).
 - [ ] Política de privacidad en una URL HTTPS estable y revisada legalmente.
 - [ ] `eas build -p android --profile production` (AAB) y prueba interna.
 
