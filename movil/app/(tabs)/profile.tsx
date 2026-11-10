@@ -23,13 +23,14 @@ import { shareDiagnostic } from '@/src/lib/diagnostics';
 import { privacyLabel, profileColor } from '@/src/lib/profile-db';
 import { profileUrl } from '@/src/lib/qr';
 import { startTracking, stopTracking } from '@/src/lib/tracking';
+import { unregisterPushToken } from '@/src/lib/push';
 import { useAuth } from '@/src/store/auth';
 import { useSession } from '@/src/store/session';
 import { useSharing } from '@/src/store/sharing';
 import { useTrips } from '@/src/store/trips';
 import { colors, radius, spacing } from '@/src/theme';
 import { restartApp } from '@/modules/motion';
-import { SHARE_OUTSIDE_PARTY } from '@/src/lib/party-invites';
+import { SHARE_OUTSIDE_PARTY, sharesWithFriends } from '@/src/lib/party-invites';
 import {
   distanceUnit,
   getCurrency,
@@ -107,6 +108,8 @@ export default function ProfileScreen() {
   };
 
   const leaveSession = async () => {
+    // Antes de cerrar la sesión (después ya no se puede borrar el token).
+    await unregisterPushToken();
     await signOut();
   };
 
@@ -328,7 +331,7 @@ export default function ProfileScreen() {
             divider
             right={
               <Switch
-                value={shareWithFriends === true}
+                value={sharesWithFriends(shareWithFriends)}
                 onValueChange={setShareWithFriends}
                 trackColor={{ false: colors.surfaceHigh, true: colors.green }}
                 thumbColor={colors.white}

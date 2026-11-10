@@ -12,6 +12,14 @@ export const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 // regla original de RNF-10 (solo dentro de la party).
 export const SHARE_OUTSIDE_PARTY = true;
 
+// Tres estados de la ubicación (docs/SEGURIDAD-Y-PRIVACIDAD.md):
+// privada · en el convoy (mientras estás en uno) · con amigos. Decisión de
+// producto (2026-11-04): con amigos está ACTIVADO por defecto; el aviso de la
+// primera vez lo explica y «Ahora no» o el modo fantasma lo desactivan.
+export function sharesWithFriends(choice: boolean | null | undefined) {
+  return SHARE_OUTSIDE_PARTY && choice !== false;
+}
+
 // RNF-05: miembros por party. 5 en el plan gratuito (el del MVP); 10 es el
 // máximo que admite la base de datos.
 export const PARTY_FREE_MEMBERS = 5;
@@ -25,6 +33,8 @@ export const INVITE_FRESH_MS = 2 * 60 * 1000;
 export const FRIEND_LOCATION_TTL_MS = 12 * 60 * 60 * 1000;
 // Por debajo de esto se considera «en vivo».
 export const FRIEND_LIVE_MS = 2 * 60 * 1000;
+export const FRIEND_MOVING_PUSH_MS = 5_000;
+export const FRIEND_IDLE_PUSH_MS = 60_000;
 
 export type InviteState = 'member' | 'invited' | 'invite';
 
@@ -131,22 +141,23 @@ export function lastSeenLabel(updatedAt: number | undefined, now: number) {
   return t('Hace {0} h', hours);
 }
 
-// Cuándo volver a subir tu posición para tus amigos: cada 15 s si te mueves
-// (más de 25 m) y al menos cada 2 min aunque estés quieto (para seguir
-// apareciendo «en vivo»).
+// Cuándo volver a subir tu posición para tus amigos: cada 5 s si te mueves
+// (más de 15 m) y al menos cada minuto aunque estés quieto (para seguir
+// apareciendo «en vivo»). Antes era cada 15 s / 2 min y en su mapa ibas a
+// saltos, muy por detrás de tu posición real.
 export function shouldPushFriendLocation(
   last: { lat: number; lng: number; at: number } | null,
   next: { lat: number; lng: number; at: number },
 ) {
   if (!last) return true;
   const elapsed = next.at - last.at;
-  if (elapsed >= 2 * 60_000) return true;
-  if (elapsed < 15_000) return false;
+  if (elapsed >= FRIEND_IDLE_PUSH_MS) return true;
+  if (elapsed < FRIEND_MOVING_PUSH_MS) return false;
   const meters = Math.hypot(
     (next.lat - last.lat) * 111_320,
     (next.lng - last.lng) * 111_320 * Math.cos((next.lat * Math.PI) / 180),
   );
-  return meters > 25;
+  return meters > 15;
 }
 
 // Errores del servidor → mensajes para el usuario.

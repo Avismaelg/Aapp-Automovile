@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import type { Vehicle } from '@/src/types/models';
 import { isDemoMode } from '@/src/lib/demo';
-import { mapVehicleRow, type VehicleOwner, type VehicleRow } from '@/src/lib/vehicle-db';
+import { mapVehicleRow, VEHICLE_COLUMNS, type VehicleOwner, type VehicleRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
@@ -38,7 +38,7 @@ export function usePublicVehicle(slug?: string) {
 
       const { data: row, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .eq('qr_slug', slug)
         .maybeSingle<VehicleRow>();
 

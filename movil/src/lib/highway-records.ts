@@ -1,13 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { isDemoMode } from '@/src/lib/demo';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
-import type { Trip } from '@/src/store/trips';
-import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
-import { countsAsRecord } from '@/src/lib/record-rules';
-
-export { countsAsRecord };
 
 export type HighwaySegment = {
   id: string;
@@ -18,18 +12,6 @@ export type HighwaySegment = {
   polyline: [number, number][];
 };
 
-export type SpeedRecord = {
-  id: string;
-  segmentId: string;
-  userId: string;
-  userName: string;
-  vehicleName: string | null;
-  maxSpeedKmh: number;
-  recordedAt: string;
-};
-
-const CORRIDOR_METERS = 160;
-const MIN_RECORD_KMH = 60;
 
 // Copia local de los tramos para poder mostrar la lista sin conexión.
 export const DEFAULT_HIGHWAY_SEGMENTS: HighwaySegment[] = [
@@ -126,116 +108,4 @@ export function useHighwaySegments() {
   };
 }
 
-export function useSpeedRecords() {
-  const account = useAuth((state) => state.account);
-  const demo = isDemoMode(account?.mode);
-
-  const query = useQuery({
-    queryKey: ['speed-records'],
-    enabled: !demo,
-    queryFn: async (): Promise<SpeedRecord[]> => {
-      if (!supabase) return [];
-      const { data, error } = await supabase
-        .from('speed_records')
-        .select('id, segment_id, user_id, user_name, vehicle_name, max_speed_kmh, recorded_at')
-        .order('max_speed_kmh', { ascending: false })
-        .limit(300);
-      if (error) throw new Error(error.message);
-      return ((data ?? []) as {
-        id: string;
-        segment_id: string;
-        user_id: string;
-        user_name: string;
-        vehicle_name: string | null;
-        max_speed_kmh: number | string;
-        recorded_at: string;
-      }[]).map((row) => ({
-        id: row.id,
-        segmentId: row.segment_id,
-        userId: row.user_id,
-        userName: row.user_name,
-        vehicleName: row.vehicle_name,
-        maxSpeedKmh: Number(row.max_speed_kmh),
-        recordedAt: row.recorded_at,
-      }));
-    },
-  });
-
-  return {
-    records: demo ? [] : query.data ?? [],
-    isLoading: demo ? false : query.isLoading,
-    isDemo: demo,
-    refetch: query.refetch,
-  };
-}
-
-function pointToPolylineMeters(
-  point: { latitude: number; longitude: number },
-  polyline: [number, number][],
-) {
-  if (polyline.length < 2) return Infinity;
-  const latRad = (point.latitude * Math.PI) / 180;
-  let best = Infinity;
-  for (let index = 1; index < polyline.length; index += 1) {
-    const [aLat, aLng] = polyline[index - 1];
-    const [bLat, bLng] = polyline[index];
-    const ax = (aLng - point.longitude) * 111320 * Math.cos(latRad);
-    const ay = (aLat - point.latitude) * 111320;
-    const bx = (bLng - point.longitude) * 111320 * Math.cos(latRad);
-    const by = (bLat - point.latitude) * 111320;
-    const dx = bx - ax;
-    const dy = by - ay;
-    const length2 = dx * dx + dy * dy;
-    const t = length2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length2)) : 0;
-    const px = ax + dx * t;
-    const py = ay + dy * t;
-    best = Math.min(best, Math.hypot(px, py));
-  }
-  return best;
-}
-
-// Velocidad máxima del viaje dentro del corredor del tramo.
-export function maxSpeedNearSegment(trip: Trip, polyline: [number, number][]): number | null {
-  let best: number | null = null;
-  for (const point of trip.points) {
-    if (point.speedKmh == null || point.speedKmh < MIN_RECORD_KMH) continue;
-    if (pointToPolylineMeters(point, polyline) > CORRIDOR_METERS) continue;
-    best = best == null ? point.speedKmh : Math.max(best, point.speedKmh);
-  }
-  return best;
-}
-
-// Envía los récords del viaje a Supabase. Devuelve true si ya no queda nada
-// pendiente (incluye viajes sin tramos o en modo demo).
-export async function submitTripSpeedRecords(
-  trip: Trip,
-  vehicleName?: string,
-): Promise<boolean> {
-  const account = useAuth.getState().account;
-  if (!account || account.mode === 'demo' || !supabase) return true;
-
-  const { data, error } = await supabase
-    .from('highway_segments')
-    .select('id, polyline, speed_limit_kmh');
-  if (error || !data) return false;
-
-  const rows = [];
-  for (const segment of data as { id: string; polyline: [number, number][]; speed_limit_kmh: number }[]) {
-    const maxSpeed = maxSpeedNearSegment(trip, segment.polyline ?? []);
-    // R-06 / OTR-02: una pasada por encima del límite nunca cuenta como récord.
-    if (!countsAsRecord(maxSpeed, segment.speed_limit_kmh)) continue;
-    rows.push({
-      segment_id: segment.id,
-      user_id: account.id,
-      user_name: account.displayName,
-      vehicle_name: vehicleName ?? null,
-      max_speed_kmh: Math.round(maxSpeed * 10) / 10,
-      distance_m: Math.round(trip.distanceM),
-      recorded_at: new Date(trip.endedAt ?? Date.now()).toISOString(),
-    });
-  }
-
-  if (rows.length === 0) return true;
-  const { error: insertError } = await supabase.from('speed_records').insert(rows);
-  return !insertError;
-}
+export { segmentStats, type SegmentStats } from '@/src/lib/segment-stats';

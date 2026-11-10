@@ -40,7 +40,7 @@ describe('seguir a un piloto del convoy', () => {
     const seen = new Date(now - 3_000).toISOString();
     expect(followStatus(me, { latitude: 18.4704, longitude: -69.93 }, seen, now)).toBe('a tu lado');
     expect(followStatus(me, { latitude: 18.475, longitude: -69.93 }, seen, now)).toBe('a 560 m');
-    expect(followStatus(me, { latitude: 18.49, longitude: -69.93 }, seen, now)).toBe('a 2,2 km');
+    expect(followStatus(me, { latitude: 18.49, longitude: -69.93 }, seen, now)).toBe('a 2.2 km');
     expect(followStatus(me, { latitude: 18.49, longitude: -69.93 }, new Date(now - 300_000).toISOString(), now)).toBe('sin señal');
   });
 });

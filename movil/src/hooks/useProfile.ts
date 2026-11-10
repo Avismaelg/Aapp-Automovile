@@ -11,11 +11,12 @@ import {
   type UserProfile,
 } from '@/src/lib/profile-db';
 import { isDemoMode } from '@/src/lib/demo';
-import { mapVehicleRow, type VehicleRow } from '@/src/lib/vehicle-db';
+import { mapVehicleRow, VEHICLE_COLUMNS, type VehicleRow } from '@/src/lib/vehicle-db';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useDemoProfile } from '@/src/store/demoProfile';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export function useMyProfile() {
   const account = useAuth((state) => state.account);
@@ -27,9 +28,11 @@ export function useMyProfile() {
     if (demo) void hydrateDemo();
   }, [demo, hydrateDemo]);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['my-profile', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<UserProfile | null> => {
       if (!account || !supabase) return null;
       const { data, error } = await supabase
@@ -173,9 +176,11 @@ export function usePublicProfile(username?: string) {
     if (demo) void hydrateDemo();
   }, [demo, hydrateDemo]);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['public-profile', handle, demo ? 'demo' : 'supabase'],
     enabled: Boolean(handle) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<UserProfile | null> => {
       if (!handle || !supabase) return null;
       const { data, error } = await supabase
@@ -228,7 +233,7 @@ export function usePublicProfileVehicles(profileId?: string) {
       if (!profileId || !supabase) return [];
       const { data, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .eq('owner_id', profileId)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true });

@@ -12,6 +12,7 @@ import { uniqueTopic } from '@/src/lib/shared-subscription';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type FeedPostKind = 'drive' | 'photo' | 'party' | 'achievement' | 'text';
 export type FeedVisibility = 'public' | 'friends' | 'private';
@@ -44,9 +45,11 @@ export function useFeed() {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['feed', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<FeedPost[]> => {
       if (!account || !supabase) return [];
 

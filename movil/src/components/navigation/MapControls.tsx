@@ -11,11 +11,16 @@ export function MapControls({
   following,
   onToggleNorth,
   onRecenter,
+  ghost,
+  onToggleGhost,
 }: {
   northUp: boolean;
   following: boolean;
   onToggleNorth: () => void;
   onRecenter: () => void;
+  // MAPA-20: modo fantasma (tus amigos no te ven). undefined = sin botón.
+  ghost?: boolean;
+  onToggleGhost?: () => void;
 }) {
   const chrome = useMapChrome();
   return (
@@ -31,6 +36,17 @@ export function MapControls({
           {t('N')}
         </AppText>
       </Pressable>
+      {ghost !== undefined && onToggleGhost ? (
+        <Pressable
+          style={[styles.roundControl, chrome.surface, ghost && styles.ghost]}
+          onPress={onToggleGhost}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: ghost }}
+          accessibilityLabel={ghost ? t('Modo fantasma activado: tus amigos no te ven') : t('Activar modo fantasma')}
+        >
+          <Ionicons name={ghost ? 'eye-off' : 'eye-outline'} size={20} color={ghost ? colors.white : chrome.text} />
+        </Pressable>
+      ) : null}
       {!following ? (
         <Pressable
           style={[styles.recenter, chrome.surface]}
@@ -61,6 +77,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   active: { backgroundColor: colors.accent, borderColor: colors.accent },
+  ghost: { backgroundColor: '#5c5c66', borderColor: '#5c5c66' },
   modeText: { fontSize: 8, marginTop: -2 },
   recenter: {
     flexDirection: 'row',

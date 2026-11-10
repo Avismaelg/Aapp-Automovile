@@ -9,6 +9,7 @@ import {
   demoVehicleId,
   mapVehicleRow,
   vehicleInsertPayload,
+  VEHICLE_COLUMNS,
   type NewVehicleInput,
   type VehicleRow,
 } from '@/src/lib/vehicle-db';
@@ -17,6 +18,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth, type Account } from '@/src/store/auth';
 import { useDemoGarage } from '@/src/store/demoGarage';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TOO_LARGE = t('La foto es demasiado grande. Usa una imagen de 8 MB o menos.');
@@ -60,15 +62,17 @@ export function useGarageVehicles() {
     if (demo) void hydrateDemo();
   }, [demo, hydrateDemo]);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['garage', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async () => {
       if (!account || !supabase) return [];
 
       const { data, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .eq('owner_id', account.id)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true });
@@ -122,6 +126,29 @@ export async function pickVehiclePhoto(): Promise<VehiclePhotoSelection | null> 
   if (result.canceled || result.assets.length === 0) return null;
   const asset = result.assets[0];
   if (asset.type !== 'image') throw new Error(t('El archivo elegido no es una imagen.'));
+  if (asset.fileSize != null && asset.fileSize > MAX_PHOTO_BYTES) {
+    throw new Error(PHOTO_TOO_LARGE);
+  }
+  return {
+    uri: asset.uri,
+    mimeType: asset.mimeType?.startsWith('image/') ? asset.mimeType : 'image/jpeg',
+  };
+}
+
+// REG-06: la misma foto desde la cámara (recorte 4:3 y compresión).
+export async function takeVehiclePhoto(): Promise<VehiclePhotoSelection | null> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error(t('Necesitamos permiso para usar la cámara.'));
+  }
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 0.7,
+  });
+  if (result.canceled || result.assets.length === 0) return null;
+  const asset = result.assets[0];
   if (asset.fileSize != null && asset.fileSize > MAX_PHOTO_BYTES) {
     throw new Error(PHOTO_TOO_LARGE);
   }
@@ -216,7 +243,7 @@ export function useCreateVehicle() {
       const { data, error } = await supabase
         .from('vehicles')
         .insert(vehicleInsertPayload(account.id, input))
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));
@@ -260,7 +287,7 @@ export function useUpdateVehicle() {
         .update(updates)
         .eq('id', vehicleId)
         .eq('owner_id', account.id)
-        .select('*')
+        .select(VEHICLE_COLUMNS)
         .single();
 
       if (error) throw new Error(friendlyGarageError(error.message));

@@ -39,6 +39,9 @@ export function useDeleteAccount() {
 
       queryClient.clear();
       await signOutLocal();
+      // P1-4: la cuenta ya no existe, pero quizá queden archivos por borrar
+      // (el servidor los reintenta solo).
+      return { storage: (data.storage as 'complete' | 'partial' | undefined) ?? 'complete' };
     },
   });
 }

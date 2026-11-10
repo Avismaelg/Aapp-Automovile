@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { Vehicle, VehicleKind } from '@/src/types/models';
 import { colors } from '@/src/theme';
-import { t } from '@/src/i18n';
+import { formatDecimal, t } from '@/src/i18n';
 
 export const vehicleKindMeta: Record<
   VehicleKind,
@@ -56,7 +56,7 @@ export function isElectric(vehicle: Pick<Vehicle, 'kind'>) {
 }
 
 export function vehicleEfficiency(vehicle: Vehicle) {
-  return `${vehicle.efficiency.toFixed(1).replace('.', ',')} ${vehicleKindMeta[vehicle.kind].efficiencyLabel}`;
+  return `${formatDecimal(vehicle.efficiency, 1)} ${vehicleKindMeta[vehicle.kind].efficiencyLabel}`;
 }
 
 export function vehicleFuelLabel(vehicle: Vehicle) {

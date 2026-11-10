@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -35,6 +36,8 @@ type Props = {
   following: RouteInstruction | null;
   offRoute: boolean;
   hasRoute: boolean;
+  // MAPA-28: sin conexión se sigue con la ruta guardada (no se puede recalcular).
+  offline?: boolean;
   arrivalLabel: string | null;
   remainingTimeLabel: string;
   remainingDistanceLabel: string;
@@ -56,6 +59,8 @@ type Props = {
   onClose: () => void;
   // RF-15: acceso directo a la party (mapa, chat y PTT) y al reto en curso.
   onOpenParty?: () => void;
+  // CONV-14: botón de hablar al convoy (va junto al de Party).
+  voiceButton?: ReactNode;
   onOpenChallenge?: () => void;
 };
 
@@ -66,6 +71,7 @@ export function NavigationHud({
   following,
   offRoute,
   hasRoute,
+  offline = false,
   arrivalLabel,
   remainingTimeLabel,
   remainingDistanceLabel,
@@ -84,12 +90,14 @@ export function NavigationHud({
   onAddStop,
   onClose,
   onOpenParty,
+  voiceButton,
   onOpenChallenge,
 }: Props) {
   const speedNow = Number(speedLabel);
   const overLimit = limitKmh != null && Number.isFinite(speedNow) && speedNow > displaySpeed(limitKmh + 5);
   const curveUrgent = curve != null && Number.isFinite(speedNow) && speedNow > displaySpeed(curve.speedKmh + 15);
-  const recalculating = offRoute || !hasRoute;
+  // Sin conexión no se puede recalcular: se sigue guiando por la ruta guardada.
+  const recalculating = !hasRoute || (offRoute && !offline);
   const chrome = useMapChrome();
   const panel = { backgroundColor: chrome.bg, borderColor: chrome.border, borderWidth: 1 };
 
@@ -102,7 +110,7 @@ export function NavigationHud({
               <Ionicons name="sync" size={30} color={chrome.onAccent} />
             </View>
             <AppText variant="h2" color={chrome.text} style={styles.flex}>
-              {offRoute ? 'Recalculando…' : t('Calculando ruta…')}
+              {offRoute ? t('Recalculando…') : t('Calculando ruta…')}
             </AppText>
           </View>
         ) : (
@@ -124,6 +132,16 @@ export function NavigationHud({
             </View>
           </View>
         )}
+        {offline && hasRoute ? (
+          <View style={[styles.thenRow, { backgroundColor: chrome.chip }]}>
+            <Ionicons name="cloud-offline-outline" size={16} color={chrome.text} />
+            <AppText variant="caption" color={chrome.text}>
+              {offRoute
+                ? t('Sin conexión: vuelve a la ruta guardada')
+                : t('Sin conexión: sigues con la ruta guardada')}
+            </AppText>
+          </View>
+        ) : null}
         {following && !recalculating ? (
           <View style={[styles.thenRow, { backgroundColor: chrome.chip }]}>
             <AppText variant="caption" color={chrome.muted}>
@@ -173,6 +191,7 @@ export function NavigationHud({
             <Ionicons name="flag" size={20} color={chrome.accent} />
           </Pressable>
         ) : null}
+        {voiceButton}
         {onOpenParty ? (
           <Pressable
             style={[styles.roundButton, panel]}

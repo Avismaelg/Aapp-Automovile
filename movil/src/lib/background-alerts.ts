@@ -16,11 +16,14 @@ const CHECK_EVERY_MS = 60_000;
 const SEEN_KEY = 'caravana-alerts-seen';
 const MAX_SEEN = 150;
 const CHANNEL = 'convoy';
+export const ALERTS_CHANNEL = CHANNEL;
 
 let lastCheck = 0;
 let running = false;
 
-export type PendingAlert = { id: string; title: string; body: string; url: string };
+// tag: la misma etiqueta que usa el aviso push de Firebase para ese suceso
+// (función «push»): si llegan los dos, Android muestra uno solo.
+export type PendingAlert = { id: string; title: string; body: string; url: string; tag?: string };
 
 type InviteRow = { id: string; party_name: string; inviter_id: string; created_at: string };
 type ChallengeInviteRow = { challenge_id: string; status: string };
@@ -113,14 +116,17 @@ async function collect(accountId: string): Promise<PendingAlert[]> {
   for (const row of inviteRows) {
     alerts.push({
       id: `invite:${row.id}:${row.created_at}`,
+      tag: `party-invite-${row.id}`,
       title: t('{0} te invita a su convoy', who.get(row.inviter_id) ?? t('Un amigo')),
       body: t('{0} · Toca para unirte', row.party_name),
-      url: '/(tabs)/party',
+      // Al mapa: ahí sale la invitación para unirte (y sigues en el mapa).
+      url: '/',
     });
   }
   for (const row of challengeRows) {
     alerts.push({
       id: `challenge:${row.id}`,
+      tag: `challenge-${row.id}`,
       title: t('{0} te reta', who.get(row.host_id) ?? t('Un piloto')),
       body: t('Llegar primero a {0}', row.to_label),
       url: '/(tabs)/challenges',
@@ -162,6 +168,7 @@ export async function checkBackgroundAlerts(now = Date.now()) {
     await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(seen));
     for (const alert of show) {
       await Notifications.scheduleNotificationAsync({
+        ...(alert.tag ? { identifier: alert.tag } : {}),
         content: { title: alert.title, body: alert.body, data: { url: alert.url } },
         trigger: Platform.OS === 'android' ? { channelId: CHANNEL } : null,
       });

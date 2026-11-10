@@ -1,8 +1,9 @@
 import { DOMINICAN_PLACES, type KnownPlace } from '@/src/data/do-places';
 import { haversineMeters } from '@/src/lib/geo';
 import { fetchWithTimeout } from '@/src/lib/network';
-import { getLanguage, t } from '@/src/i18n';
+import { formatDistance, getLanguage, t } from '@/src/i18n';
 import { NOMINATIM_URL, PHOTON_URL } from '@/src/lib/providers';
+import { googleAutocomplete, googleNearby, googlePlaceLocation, type GooglePlace } from '@/src/lib/google-places';
 
 export type SearchPlace = {
   id: string;
@@ -15,6 +16,9 @@ export type SearchPlace = {
   // escrito (0–1).
   importance?: number;
   match?: number;
+  // Resultado de Google: las coordenadas se piden al elegirlo
+  // (resolvePlace), latitude/longitude valen NaN hasta entonces.
+  placeId?: string;
 };
 
 type LatLng = { latitude: number; longitude: number };
@@ -278,8 +282,8 @@ function parsePhoton(
   features: PhotonFeature[],
   query: string,
   near: LatLng | null,
-): SearchPlace[] {
-  const results: SearchPlace[] = [];
+): (SearchPlace & { street?: string })[] {
+  const results: (SearchPlace & { street?: string })[] = [];
   for (const feature of features) {
     const coordinates = feature.geometry?.coordinates;
     if (!Array.isArray(coordinates) || coordinates.length !== 2) continue;
@@ -311,6 +315,7 @@ function parsePhoton(
       longitude,
       name: label,
       detail: name ? detail : '',
+      street: properties.street,
       distanceM,
       importance:
         photonImportance(properties.osm_key, properties.osm_value) +
@@ -443,10 +448,12 @@ async function nominatim(
   });
 }
 
-// Si Photon falla, se deja de preguntarle 2 min y se va directo al respaldo
-// (antes cada búsqueda esperaba sus 15 s de tiempo agotado).
-const PHOTON_PAUSE_MS = 2 * 60_000;
+// Si Photon falla dos veces seguidas (sin red o nos limita), se deja de
+// preguntarle 20 s y se va al respaldo. Antes eran 2 min tras un solo fallo:
+// con mala cobertura la búsqueda se quedaba sin comercios.
+const PHOTON_PAUSE_MS = 20_000;
 let photonDownUntil = 0;
+let photonFailures = 0;
 
 async function photon(params: URLSearchParams, signal: AbortSignal) {
   if (Date.now() < photonDownUntil) throw new Error(t('Photon en pausa.'));
@@ -454,14 +461,42 @@ async function photon(params: URLSearchParams, signal: AbortSignal) {
     const response = await fetchWithTimeout(
       `${PHOTON_URL}/api/?${params.toString()}`,
       { signal },
-      5_000,
+      6_000,
     );
+    if (response.status === 429) throw new Error('rate_limited');
     const data = (await response.json()) as { features?: PhotonFeature[] };
+    photonFailures = 0;
     return data.features ?? [];
   } catch (error) {
-    if (!signal.aborted) photonDownUntil = Date.now() + PHOTON_PAUSE_MS;
+    if (!signal.aborted) {
+      photonFailures += 1;
+      if (photonFailures >= 2) photonDownUntil = Date.now() + PHOTON_PAUSE_MS;
+    }
     throw error;
   }
+}
+
+// «Shell Av. Independencia», «Banco Popular Churchill»: una marca en una
+// calle. Se separa la marca de la calle para buscar la marca y quedarse con
+// las sucursales de esa calle.
+const STREET_WORDS = new Set(['avenida', 'calle', 'autopista', 'carretera', 'prolongacion', 'av', 'c']);
+
+export function splitBrandStreet(query: string): { brand: string; street: string } | null {
+  const words = expandAbbreviations(normalizeText(query)).split(' ').filter(Boolean);
+  const at = words.findIndex((word, index) => index > 0 && STREET_WORDS.has(word));
+  if (at <= 0 || at >= words.length - 1) return null;
+  const brand = words.slice(0, at).join(' ');
+  const street = words.slice(at + 1).join(' ');
+  return brand.length >= 2 && street.length >= 3 ? { brand, street } : null;
+}
+
+// Sucursales de la marca cuya calle (no la provincia ni la ciudad) es esa,
+// de la más cercana a la más lejana.
+export function branchesOnStreet(places: (SearchPlace & { street?: string })[], street: string) {
+  const target = normalizeText(street);
+  return places
+    .filter((place) => place.street && expandAbbreviations(normalizeText(place.street)).includes(target))
+    .sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
 }
 
 // Búsqueda de lugares, todo a la vez: el listado de RD (instantáneo), Photon
@@ -472,6 +507,33 @@ async function photon(params: URLSearchParams, signal: AbortSignal) {
 const CACHE_TTL_MS = 10 * 60_000;
 const CACHE_SIZE = 40;
 const cache = new Map<string, { at: number; places: SearchPlace[] }>();
+
+// Google primero (la misma fuente que Waze, mucho más completa en RD). Los
+// lugares del listado de RD que coinciden casi exactos van delante; el resto
+// de Google mantiene su orden.
+export function mergeGoogleResults(google: GooglePlace[], known: SearchPlace[], limit = 10): SearchPlace[] {
+  const exact = known.filter((place) => (place.match ?? 0) >= 0.95);
+  const seen = new Set(exact.map((place) => normalizeText(place.name)));
+  const fromGoogle = google
+    .filter((place) => place.name && !seen.has(normalizeText(place.name)))
+    .map<SearchPlace>((place) => ({
+      id: `google:${place.placeId}`,
+      placeId: place.placeId,
+      latitude: Number.NaN,
+      longitude: Number.NaN,
+      name: place.name,
+      detail: place.detail,
+      distanceM: place.distanceM,
+    }));
+  return [...exact, ...fromGoogle].slice(0, limit);
+}
+
+// Coordenadas de un resultado (los de Google se piden al elegirlos).
+export async function resolvePlace(place: SearchPlace): Promise<SearchPlace> {
+  if (!place.placeId) return place;
+  const location = await googlePlaceLocation(place.placeId);
+  return { ...place, latitude: location.latitude, longitude: location.longitude };
+}
 
 export async function searchPlaces(
   query: string,
@@ -485,6 +547,20 @@ export async function searchPlaces(
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.places;
   const known = searchKnownPlaces(q, near);
 
+  try {
+    const google = await googleAutocomplete(q, near);
+    if (signal.aborted) throw new Error('aborted');
+    if (google.length > 0) {
+      const places = mergeGoogleResults(google, known);
+      if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+      cache.set(cacheKey, { at: Date.now(), places });
+      return places;
+    }
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // Sin Google (no desplegado, sin clave, tope del día o sin red): Photon.
+  }
+
   const nearby = new URLSearchParams({ q, limit: '15' });
   if (near) {
     nearby.set('lat', near.latitude.toFixed(5));
@@ -495,12 +571,35 @@ export async function searchPlaces(
   }
   const country = new URLSearchParams({ q, limit: '10', bbox: DO_BBOX });
 
+  const brandStreet = splitBrandStreet(q);
+  // Hay cientos de sucursales en el país: se piden las más cercanas a ti.
+  const brandSearch = brandStreet
+    ? new URLSearchParams({ q: brandStreet.brand, limit: '50', bbox: DO_BBOX })
+    : null;
+  if (brandSearch && near) {
+    brandSearch.set('lat', near.latitude.toFixed(5));
+    brandSearch.set('lon', near.longitude.toFixed(5));
+    brandSearch.set('zoom', '12');
+    brandSearch.set('location_bias_scale', '0.1');
+  }
   const settled = await Promise.allSettled([
     photon(nearby, signal).then((features) => parsePhoton(features, q, near)),
     photon(country, signal).then((features) => parsePhoton(features, q, near)),
     mapbox(q, near, signal),
   ]);
   const remote = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  if (brandStreet && brandSearch) {
+    try {
+      const branches = branchesOnStreet(
+        parsePhoton(await photon(brandSearch, signal), brandStreet.brand, near),
+        brandStreet.street,
+      );
+      // La sucursal en esa calle es justo lo buscado: va arriba.
+      remote.unshift(...branches.map((place) => ({ ...place, match: 1, importance: 1.2 })));
+    } catch {
+      // Sin la búsqueda de la marca valen los demás resultados.
+    }
+  }
   // Photon sin respuesta (las dos consultas): se pregunta a Nominatim.
   if (settled[0].status === 'rejected' && settled[1].status === 'rejected') {
     try {
@@ -531,11 +630,20 @@ export async function searchPlaces(
 // lugar (osm_tag) con las marcas habituales de RD.
 export const STOP_CATEGORIES = {
   // Las marcas más comunes primero: casi siempre bastan las dos primeras.
-  fuel: { tags: ['amenity:fuel'], terms: ['shell', 'texaco', 'sunix', 'isla'] },
-  food: { tags: ['amenity:fast_food', 'amenity:restaurant'], terms: ['restaurante', 'pollo', 'pizza'] },
-  pharmacy: { tags: ['amenity:pharmacy'], terms: ['farmacia', 'carol', 'gbc'] },
-  atm: { tags: ['amenity:atm', 'amenity:bank'], terms: ['banreservas', 'popular', 'bhd'] },
-  supermarket: { tags: ['shop:supermarket'], terms: ['supermercado', 'jumbo', 'nacional', 'bravo'] },
+  // google: tipos de Google Places para la búsqueda por cercanía.
+  fuel: { tags: ['amenity:fuel'], terms: ['shell', 'texaco', 'sunix', 'isla'], google: ['gas_station'] },
+  food: {
+    tags: ['amenity:fast_food', 'amenity:restaurant'],
+    terms: ['restaurante', 'pollo', 'pizza'],
+    google: ['restaurant', 'fast_food_restaurant'],
+  },
+  pharmacy: { tags: ['amenity:pharmacy'], terms: ['farmacia', 'carol', 'gbc'], google: ['pharmacy'] },
+  atm: { tags: ['amenity:atm', 'amenity:bank'], terms: ['banreservas', 'popular', 'bhd'], google: ['atm', 'bank'] },
+  supermarket: {
+    tags: ['shop:supermarket'],
+    terms: ['supermercado', 'jumbo', 'nacional', 'bravo'],
+    google: ['supermarket', 'grocery_store'],
+  },
 } as const;
 
 export type StopCategory = keyof typeof STOP_CATEGORIES;
@@ -551,6 +659,28 @@ export async function searchCategory(
   const cacheKey = `cat:${category}@${near.latitude.toFixed(2)},${near.longitude.toFixed(2)}`;
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.places;
+
+  // Google primero: todas las de ese tipo cerca de ti, por distancia real.
+  try {
+    const nearby = await googleNearby([...STOP_CATEGORIES[category].google], near);
+    if (signal.aborted) throw new Error('aborted');
+    if (nearby.length > 0) {
+      const places = nearby.map<SearchPlace>((place) => ({
+        id: `google:${place.placeId}`,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        name: place.name,
+        detail: place.detail,
+        distanceM: haversineMeters(near, place),
+      }));
+      if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+      cache.set(cacheKey, { at: Date.now(), places });
+      return places;
+    }
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // Sin Google (o pasado el tope del día): OpenStreetMap.
+  }
 
   const { tags, terms } = STOP_CATEGORIES[category];
   const queries = terms.map((term) => {
@@ -619,6 +749,5 @@ export async function searchCategory(
 
 export function formatSearchDistance(meters: number | null) {
   if (meters == null || !Number.isFinite(meters)) return null;
-  if (meters < 1000) return t('a {0} m', Math.round(meters));
-  return t('a {0} km', (meters / 1000).toFixed(1).replace('.', ','));
+  return t('a {0}', formatDistance(meters));
 }

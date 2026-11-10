@@ -23,6 +23,7 @@ import { acquireSubscription, uniqueTopic } from '@/src/lib/shared-subscription'
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type PartyRole = 'host' | 'member' | 'sweeper';
 
@@ -42,6 +43,11 @@ export type PartyMemberView = {
   isMuted: boolean;
   isMe: boolean;
   voiceChannelSlug: PartyVoiceChannelSlug;
+  // CONV-04…06: ETA y distancia a la meta común publicadas por el miembro.
+  etaS: number | null;
+  remainingM: number | null;
+  progressAt: string | null;
+  arrivedAt: string | null;
 };
 
 export type PartyView = {
@@ -94,6 +100,10 @@ type PartyMemberRow = {
   is_muted: boolean;
   voice_channel_slug: PartyVoiceChannelSlug;
   left_at?: string | null;
+  eta_s?: number | null;
+  remaining_m?: number | null;
+  progress_at?: string | null;
+  arrived_at?: string | null;
 };
 
 function fallbackProfile(id: string): UserProfile {
@@ -111,14 +121,25 @@ function fallbackProfile(id: string): UserProfile {
   };
 }
 
+const BASE_MEMBER_COLUMNS =
+  'party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, voice_channel_slug';
+const MEMBER_COLUMNS = `${BASE_MEMBER_COLUMNS}, eta_s, remaining_m, progress_at, arrived_at`;
+
 async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView> {
   if (!supabase) throw new Error(t('Supabase no está configurado.'));
 
-  const { data: memberRows, error } = await supabase
-    .from('party_members')
-    .select('party_id, user_id, role, last_lat, last_lng, last_seen_at, last_speed_kmh, last_heading, is_muted, voice_channel_slug')
-    .eq('party_id', party.id)
-    .is('left_at', null);
+  const selectMembers = (columns: string) =>
+    supabase!
+      .from('party_members')
+      .select(columns)
+      .eq('party_id', party.id)
+      .is('left_at', null)
+      .returns<PartyMemberRow[]>();
+  let { data: memberRows, error } = await selectMembers(MEMBER_COLUMNS);
+  // Servidor sin la migración del progreso del convoy: columnas de antes.
+  if (error && /eta_s|remaining_m|progress_at|arrived_at/.test(error.message)) {
+    ({ data: memberRows, error } = await selectMembers(BASE_MEMBER_COLUMNS));
+  }
 
   if (error) throw new Error(error.message);
   const members = (memberRows ?? []) as PartyMemberRow[];
@@ -165,6 +186,10 @@ async function fetchParty(party: PartyRow, accountId: string): Promise<PartyView
         isMuted: member.is_muted,
         isMe: member.user_id === accountId,
         voiceChannelSlug: member.voice_channel_slug,
+        etaS: member.eta_s ?? null,
+        remainingM: member.remaining_m ?? null,
+        progressAt: member.progress_at ?? null,
+        arrivedAt: member.arrived_at ?? null,
       };
     }),
   };
@@ -189,12 +214,13 @@ export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
   const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
     // Respaldo del tiempo real: si se corta (cobertura, segundo plano), el
-    // destino y las posiciones llegan igual como mucho en 15 s.
-    refetchInterval: (current) => (poll && current.state.data ? 15_000 : false),
+    // destino y las posiciones llegan igual como mucho en 5 s (SYNC-03).
+    refetchInterval: (current) => (current.state.data ? livePoll : false),
     queryFn: async (): Promise<PartyView | null> => {
       if (!account || !supabase) return null;
 
@@ -213,6 +239,8 @@ export function useActiveParty({ poll = false }: { poll?: boolean } = {}) {
         .select('*')
         .in('id', partyIds)
         .in('status', ['scheduled', 'live'])
+        // Una party dura 24 h; el servidor la borra poco después.
+        .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -527,6 +555,9 @@ export function useSetPartyDestination() {
         if (error.message.includes('party_not_found')) {
           throw new Error(t('La party ya no existe.'));
         }
+        if (error.message.includes('not_allowed')) {
+          throw new Error(t('Solo el anfitrión o un copiloto pueden cambiar el destino.'));
+        }
         throw new Error(t('No pudimos actualizar el destino de la caravana.'));
       }
     },
@@ -559,9 +590,11 @@ export function usePartyMessages(partyId: string | undefined) {
   const demo = isDemoMode(account?.mode);
   const channelId = useId().replace(/:/g, '');
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['party-messages', partyId ?? 'none', demo ? 'demo' : 'supabase'],
     enabled: Boolean(partyId) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<PartyMessageView[]> => {
       if (!partyId || !account || !supabase) return [];
 
@@ -652,4 +685,33 @@ export function useSendPartyMessage() {
       });
     },
   });
+}
+
+// CONV-08: acciones del anfitrión (las comprueba el servidor).
+export function usePartyHostActions() {
+  const queryClient = useQueryClient();
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['party'] });
+  const call = async (fn: string, args: Record<string, unknown>) => {
+    if (!supabase) throw new Error(t('Supabase no está configurado.'));
+    const { error } = await supabase.rpc(fn, args);
+    if (error) {
+      if (error.message.includes('not_host')) throw new Error(t('Solo el anfitrión puede hacerlo.'));
+      throw new Error(t('No pudimos completar la acción. Inténtalo de nuevo.'));
+    }
+  };
+  const kick = useMutation({
+    mutationFn: ({ partyId, userId }: { partyId: string; userId: string }) =>
+      call('kick_party_member', { p_party_id: partyId, p_user_id: userId }),
+    onSuccess: refresh,
+  });
+  const setRole = useMutation({
+    mutationFn: ({ partyId, userId, role }: { partyId: string; userId: string; role: 'member' | 'sweeper' }) =>
+      call('set_party_member_role', { p_party_id: partyId, p_user_id: userId, p_role: role }),
+    onSuccess: refresh,
+  });
+  const endForAll = useMutation({
+    mutationFn: ({ partyId }: { partyId: string }) => call('end_party', { p_party_id: partyId }),
+    onSuccess: refresh,
+  });
+  return { kick, setRole, endForAll };
 }

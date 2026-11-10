@@ -14,6 +14,7 @@ import Mapbox, {
   ShapeSource,
   SymbolLayer,
   UserTrackingMode,
+  VectorSource,
 } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +59,7 @@ import {
   nextInstruction,
   routeProgress,
 } from "@/src/lib/route-instructions";
+import { trafficGradient } from "@/src/lib/route-traffic";
 import { colors } from "@/src/theme";
 import { formatDistance, t } from "@/src/i18n";
 
@@ -150,6 +152,20 @@ const TRAFFIC_COLOR: unknown = [
   "#991b1b",
   "rgba(0,0,0,0)",
 ];
+
+// Tráfico propio sobre todas las calles (no solo puentes y túneles, que era lo
+// único que coloreaba el estilo y se veía como una rayita): la carretera
+// entera en naranja / rojo / granate según el atasco, como en Google Maps.
+const TRAFFIC_TILES = "mapbox://mapbox.mapbox-traffic-v1";
+const TRAFFIC_FILTER: unknown = ["in", ["get", "congestion"], ["literal", ["moderate", "heavy", "severe"]]];
+const TRAFFIC_WIDTH: unknown = [
+  "interpolate", ["exponential", 1.5], ["zoom"],
+  10, 1.5,
+  13, 3.5,
+  16, 8,
+  19, 18,
+];
+const TRAFFIC_OPACITY: unknown = ["interpolate", ["linear"], ["zoom"], 9, 0.55, 13, 0.9];
 
 // Coche 3D como indicador de posición (Android): tamaño fijo en pantalla
 // (~45 pt de largo) y giro para que el morro apunte hacia la marcha.
@@ -436,6 +452,8 @@ export const WorldMap = memo(function WorldMap({
         : EMPTY,
     [route],
   );
+  // Ruta pintada por tráfico (naranja / rojo donde hay retención).
+  const routeGradient = useMemo(() => trafficGradient(route?.traffic, "#3d9bff"), [route]);
   const routeLength = cumulative ? cumulative[cumulative.length - 1] : 0;
   // En pasos de 0,1 % para no tocar el estilo con cada metro.
   const traveled =
@@ -779,6 +797,25 @@ export const WorldMap = memo(function WorldMap({
           />
         ) : null}
 
+        {usingMapbox ? (
+          <VectorSource id="caravana-traffic" url={TRAFFIC_TILES}>
+            <LineLayer
+              id="caravana-traffic-line"
+              sourceLayerID="traffic"
+              belowLayerID={belowLayerID}
+              filter={TRAFFIC_FILTER as never}
+              style={{
+                lineCap: "round",
+                lineJoin: "round",
+                lineColor: TRAFFIC_COLOR as string,
+                lineWidth: TRAFFIC_WIDTH as number,
+                lineOpacity: TRAFFIC_OPACITY as number,
+                lineEmissiveStrength: 1,
+              }}
+            />
+          </VectorSource>
+        ) : null}
+
         <ShapeSource
           id="caravana-alternatives"
           shape={alternativesData}
@@ -835,6 +872,7 @@ export const WorldMap = memo(function WorldMap({
               lineCap: "round",
               lineJoin: "round",
               lineColor: "#3d9bff",
+              ...(routeGradient ? { lineGradient: routeGradient as string } : null),
               lineBorderColor: "#1458b8",
               lineBorderWidth: 2.5,
               // Que la luz de noche del mapa no la apague.
@@ -1218,6 +1256,7 @@ const MembersSource = memo(function MembersSource({
           initials: initials(member.name),
           name: member.name.split(" ")[0],
           talking: Boolean(member.isTalking),
+          stale: Boolean(member.stale),
         },
         geometry: {
           type: "Point",
@@ -1276,7 +1315,13 @@ const MembersSource = memo(function MembersSource({
         id="caravana-member-dots"
         filter={["!", ["has", "point_count"]]}
         style={{
-          circleColor: ["to-color", ["get", "color"]],
+          circleColor: [
+            "case",
+            ["==", ["get", "stale"], true],
+            "#5c5c66",
+            ["to-color", ["get", "color"]],
+          ],
+          circleOpacity: ["case", ["==", ["get", "stale"], true], 0.75, 1],
           circleRadius: 14,
           circleStrokeColor: [
             "case",

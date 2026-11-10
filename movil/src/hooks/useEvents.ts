@@ -7,6 +7,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useLocalEvents } from '@/src/store/events';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 type EventRow = {
   id: string;
@@ -71,9 +72,11 @@ export function useEvents() {
   const markSynced = useLocalEvents((state) => state.markSynced);
   const queryClient = useQueryClient();
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['events'],
     enabled: !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<AppEvent[]> => {
       if (!supabase) return [];
       const { data, error } = await supabase

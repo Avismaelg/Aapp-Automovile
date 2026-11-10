@@ -9,8 +9,10 @@ import {
   BarlowCondensed_700Bold,
   BarlowCondensed_800ExtraBold,
 } from '@expo-google-fonts/barlow-condensed';
-import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import NetInfo from '@react-native-community/netinfo';
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, type Href } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -21,17 +23,25 @@ import { AppState, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from '@/src/components/AppErrorBoundary';
+import { installCrashlytics, setCrashlyticsUser } from '@/src/lib/crashlytics';
 import { installErrorLogging } from '@/src/lib/error-log';
 // Además de sincronizar el tracking, carga src/lib/tracking.ts al arrancar:
 // la tarea de ubicación en segundo plano tiene que estar definida siempre.
+import { ConnectionBanner } from '@/src/components/ConnectionBanner';
+import { SignupFollowUp } from '@/src/components/SignupFollowUp';
+import { ConvoyArrivals } from '@/src/components/party/ConvoyArrivals';
+import { VoiceHost } from '@/src/components/party/VoiceHost';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
+import { setLiveShareConfig } from '@/src/lib/live-share';
+import { setConvoyMode } from '@/src/lib/tracking';
 import { installWebAlert } from '@/src/lib/web-alert';
 import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
 
 SplashScreen.preventAutoHideAsync();
 installErrorLogging();
+installCrashlytics();
 // La app va en vertical; solo el modo conducción y la navegación giran
 // (useFreeOrientation). app.json deja «default» para que iOS lo permita.
 if (Platform.OS !== 'web') {
@@ -41,7 +51,13 @@ installWebAlert();
 
 // Al volver a la app se recargan los datos viejos (amigos, party, perfil,
 // actividad). Antes había que cerrarla y abrirla para verlos al día.
+// SYNC-04: lo mismo al recuperar la conexión (NetInfo → onlineManager).
 if (Platform.OS !== 'web') {
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => {
+      setOnline(state.isConnected !== false && state.isInternetReachable !== false);
+    }),
+  );
   focusManager.setEventListener((setFocused) => {
     const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
     return () => subscription.remove();
@@ -94,7 +110,23 @@ export default function RootLayout() {
   const ready = authStatus !== 'loading' && (loaded || Boolean(error));
   const isAuthenticated = authStatus === 'authenticated';
   useBackgroundTracking(isAuthenticated);
+  // Con la app abierta la pantalla no se apaga sola (vas conduciendo con el
+  // mapa delante). En segundo plano el sistema vuelve a su bloqueo normal.
+  useKeepAwake();
   useAlertTaps(isAuthenticated);
+
+  // Al cerrar sesión deja de compartirse tu posición (y se apaga el servicio
+  // que la mantenía activa en segundo plano).
+  const signedOut = authStatus === 'unauthenticated';
+  const accountId = useAuth((state) => state.account?.id ?? null);
+  useEffect(() => {
+    setCrashlyticsUser(accountId);
+  }, [accountId]);
+  useEffect(() => {
+    if (!signedOut) return;
+    void setLiveShareConfig({ accountId: null, partyId: null, friends: false });
+    void setConvoyMode(false, false);
+  }, [signedOut]);
 
   useEffect(() => {
     if (error) void SplashScreen.hideAsync();
@@ -181,6 +213,10 @@ export default function RootLayout() {
           </Stack.Protected>
             </Stack>
             {isAuthenticated ? <PartyInviteBanner /> : null}
+            {isAuthenticated ? <SignupFollowUp /> : null}
+            {isAuthenticated ? <ConvoyArrivals /> : null}
+            {isAuthenticated ? <VoiceHost /> : null}
+            <ConnectionBanner />
           </AppErrorBoundary>
       </SafeAreaProvider>
     </QueryClientProvider>

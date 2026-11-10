@@ -4,6 +4,8 @@
   <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+  <!-- Voz del convoy con la pantalla bloqueada (servicio de tipo micrófono). -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
   <application>
     <receiver
@@ -12,6 +14,6 @@
     <service
       android:name="expo.modules.motion.DrivingService"
       android:exported="false"
-      android:foregroundServiceType="location" />
+      android:foregroundServiceType="location|microphone" />
   </application>
 </manifest>

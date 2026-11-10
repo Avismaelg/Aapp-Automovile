@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, IconButton } from '@/src/components/ui';
@@ -11,11 +11,16 @@ import {
   rankPlaces,
   searchCategory,
   searchKnownPlaces,
+  resolvePlace,
   searchPlaces,
   type SearchPlace,
   type StopCategory,
 } from '@/src/lib/place-search';
-import { useChosenDestination, type ChosenDestination } from '@/src/store/destination';
+import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { errorMessage } from '@/src/lib/alerts';
+import { haversineMeters } from '@/src/lib/geo';
+import { useChallengeDraft } from '@/src/store/challenge-draft';
+import { uniqueRecents, useChosenDestination, type ChosenDestination, type FavoriteKind } from '@/src/store/destination';
 import { colors, fonts, radius, spacing } from '@/src/theme';
 import { t } from '@/src/i18n';
 
@@ -31,10 +36,16 @@ export default function DestinationScreen() {
   const live = useLiveLocation();
   const setDestination = useChosenDestination((state) => state.setDestination);
   const startNavigation = useChosenDestination((state) => state.startNavigation);
-  const recents = useChosenDestination((state) => state.recents);
+  const storedRecents = useChosenDestination((state) => state.recents);
+  const recents = useMemo(() => uniqueRecents(storedRecents), [storedRecents]);
+  const favorites = useChosenDestination((state) => state.favorites);
+  const setFavorite = useChosenDestination((state) => state.setFavorite);
   const params = useLocalSearchParams<{ lat?: string; lng?: string; label?: string; mode?: string }>();
   // «Añadir parada»: lo que elijas se mete en la ruta en vez de cambiar el destino.
   const isStop = params.mode === 'stop';
+  // RETO-01: elegir la meta de un reto (lo crea al elegirla).
+  const isChallengeGoal = params.mode === 'challenge';
+  const createChallenge = useCreateChallenge();
   const addStop = useChosenDestination((state) => state.addStop);
 
   const [query, setQuery] = useState('');
@@ -119,6 +130,33 @@ export default function DestinationScreen() {
   }, [query, category]);
 
   const choose = (place: ChosenDestination) => {
+    if (isChallengeGoal) {
+      const draft = useChallengeDraft.getState().draft;
+      if (!draft) {
+        router.back();
+        return;
+      }
+      void createChallenge
+        .mutateAsync({
+          ...draft,
+          mode: 'instant',
+          waitForRivals: true,
+          fromLabel: t('Mi ubicación'),
+          toLabel: place.label,
+          endLat: place.latitude,
+          endLng: place.longitude,
+          distanceKm: haversineMeters(liveLocationRef.current, place) / 1000,
+          rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
+        })
+        .then(() => {
+          useChallengeDraft.getState().clear();
+          Alert.alert(t('Reto enviado'), t('Cuando acepten, da la salida desde la pestaña Retos.'));
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
+        })
+        .catch((error: unknown) => setSearchError(errorMessage(error, t('No pudimos crear el reto.'))));
+      return;
+    }
     if (isStop) {
       addStop(
         { latitude: place.latitude, longitude: place.longitude, label: place.label },
@@ -133,6 +171,63 @@ export default function DestinationScreen() {
   };
 
   const selectRecent = (place: ChosenDestination) => choose(place);
+
+  // MAPA-03: mantener pulsado un resultado lo guarda como Casa o Trabajo.
+  const offerFavorite = (place: SearchPlace | ChosenDestination) => {
+    const save = async (kind: FavoriteKind) => {
+      try {
+        const resolved = 'name' in place ? await resolvePlace(place) : place;
+        setFavorite(kind, {
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
+          label: 'name' in resolved ? resolved.name : resolved.label,
+        });
+      } catch {
+        setSearchError(t('No pudimos guardar ese lugar. Prueba otra vez.'));
+      }
+    };
+    Alert.alert(t('Guardar lugar'), 'name' in place ? place.name : place.label, [
+      { text: t('Cancelar'), style: 'cancel' },
+      { text: t('Como Trabajo'), onPress: () => void save('work') },
+      { text: t('Como Casa'), onPress: () => void save('home') },
+    ]);
+  };
+
+  const openFavorite = (kind: FavoriteKind) => {
+    const place = favorites[kind];
+    if (place) {
+      setDestination(place);
+      router.replace('/');
+      return;
+    }
+    Alert.alert(
+      kind === 'home' ? t('Guarda tu casa') : t('Guarda tu trabajo'),
+      t('Búscalo y mantén pulsado el resultado para guardarlo.'),
+    );
+  };
+
+  const favoriteRows = (['home', 'work'] as const).map((kind) => (
+    <Pressable
+      key={kind}
+      onPress={() => openFavorite(kind)}
+      onLongPress={() => favorites[kind] && setFavorite(kind, null)}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={kind === 'home' ? t('Casa') : t('Trabajo')}
+    >
+      <View style={styles.rowIcon}>
+        <Ionicons name={kind === 'home' ? 'home-outline' : 'briefcase-outline'} size={18} color={colors.accent} />
+      </View>
+      <View style={styles.rowText}>
+        <AppText variant="bodyStrong" numberOfLines={1}>
+          {kind === 'home' ? t('Casa') : t('Trabajo')}
+        </AppText>
+        <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+          {favorites[kind]?.label ?? t('Toca para saber cómo guardarlo')}
+        </AppText>
+      </View>
+    </Pressable>
+  ));
 
   // Atajo de parada: todas las de ese tipo cerca de ti, por cercanía.
   const searchShortcut = async (shortcut: StopCategory, label: string) => {
@@ -155,8 +250,14 @@ export default function DestinationScreen() {
     }
   };
 
-  const selectPlace = (place: SearchPlace) =>
-    choose({ latitude: place.latitude, longitude: place.longitude, label: place.name });
+  const selectPlace = async (place: SearchPlace) => {
+    try {
+      const resolved = await resolvePlace(place);
+      choose({ latitude: resolved.latitude, longitude: resolved.longitude, label: resolved.name });
+    } catch {
+      setSearchError(t('No pudimos abrir ese lugar. Prueba otra vez.'));
+    }
+  };
 
   if (isSharedRoute) {
     return (
@@ -196,7 +297,7 @@ export default function DestinationScreen() {
     );
   }
 
-  const showRecents = !hasQuery && recents.length > 0;
+  const showRecents = !hasQuery && !isChallengeGoal;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -249,13 +350,19 @@ export default function DestinationScreen() {
           keyExtractor={(item, index) => `${item.label}-${index}`}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <AppText variant="label" color={colors.muted} style={styles.sectionTitle}>
-              {t('RECIENTES')}
-            </AppText>
+            <>
+              {!isStop ? favoriteRows : null}
+              {recents.length > 0 ? (
+                <AppText variant="label" color={colors.muted} style={styles.sectionTitle}>
+                  {t('RECIENTES')}
+                </AppText>
+              ) : null}
+            </>
           }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => selectRecent(item)}
+              onLongPress={() => offerFavorite(item)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={t('Ir a {0}', item.label)}
@@ -295,7 +402,8 @@ export default function DestinationScreen() {
           }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => selectPlace(item)}
+              onPress={() => void selectPlace(item)}
+              onLongPress={() => offerFavorite(item)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={t('Ir a {0}', item.name)}
@@ -322,7 +430,9 @@ export default function DestinationScreen() {
       )}
 
       <AppText variant="caption" color={colors.dim} style={styles.footer}>
-        {t('© OpenStreetMap')}
+        {visibleResults.some((item) => item.id.startsWith('google:'))
+          ? t('Resultados de Google')
+          : t('© OpenStreetMap')}
       </AppText>
     </SafeAreaView>
   );

@@ -266,3 +266,184 @@ Verificación (02/11/2026):
   - migraciones `20261102060000` y `20261102061000` aplicadas desde el SQL Editor (el bucket `avatars` existe);
   - secretos de LiveKit configurados.
   - Pendiente: volver a desplegar `delete-account` con la CLI y probar el PTT con dos teléfonos.
+
+
+---
+
+## Enmienda 1.1 — Alta prioridad (auditoría, 2026-11-02)
+
+Fase 1: auditoría sin cambios de código. Estado: ✅ cumple con evidencia · 🟡 parcial · ❌ no existe · ⛔ bloqueado (necesita una decisión o un paso del dueño).
+Base: rama `refactor/gps-auditoria` @ `8fc353f`.
+
+### Decisiones de interpretación
+- **I-01** «Apodo» = `@usuario`. El pedido dice de 3 a 20 caracteres con `.`; hoy son de 3 a 24 sin `.`. Se adopta la regla nueva y los usuarios existentes que no la cumplan se conservan (sin renombrarlos a la fuerza).
+- **I-02** Amigos en el mapa (MAPA-20) contra CONV-09 / RNF-10: se aplican las dos. Con amigos, solo si el usuario lo activa y con modo fantasma. Dentro del convoy, solo mientras es miembro. Ya está anotado como D-04.
+- **I-03** «Cada 5 s» (SYNC-03): tiempo real primero y sondeo de 5 s solo en las pantallas enfocadas con datos que cambian. En segundo plano no se sondea (RNF-06).
+- **I-04** Voz «manos libres» (CONV-14): micrófono abierto con detección de voz, desactivado por defecto y activable desde el panel de voz.
+- **I-05** Escribir con el coche en marcha (CONV-12): bloqueado por encima de 10 km/h, salvo que el usuario confirme que es pasajero (versión segura más cercana; Waze hace lo mismo).
+
+### 1. Registro con vehículo
+| ID | Estado | Evidencia / qué falta |
+|---|---|---|
+| REG-01 | ❌ | `app/(auth)/sign-up.tsx` es una sola pantalla con Nombre, Usuario, Correo y Contraseña. Faltan **Apellido**, el campo «Apodo» con ese nombre y el paso 1 separado. |
+| REG-02 | 🟡 | Patrón `^[a-z0-9_]{3,24}$` (`sign-up.tsx:21`) y `unique` en la BD (`init_caravana.sql:110`). No hay comprobación en vivo de disponibilidad, ni `.`, ni límite de 20. La unicidad ya es sin mayúsculas porque todo se pasa a minúsculas. |
+| REG-03 | 🟡 | Valida el formato (`sign-up.tsx:22,59`). Que el correo ya exista solo se sabe al enviar, por el error de Supabase. No hay comprobación previa ni vuelta al paso 1. |
+| REG-04 | 🟡 | Mínimo 8, confirmación y mostrar/ocultar (`sign-up.tsx:62-66`). No exige letra y número ni tiene medidor de fortaleza. |
+| REG-05 | ❌ | El registro no pide vehículo. `app/vehicle/new.tsx` existe aparte (garaje), con tipos y marcas; hay que verificar el rango de año y el autocompletado. |
+| REG-06 | 🟡 | `expo-image-picker` está y el bucket `vehicles` existe (migración `…061000`). No está en el registro; falta comprobar el recorte 4:3, la compresión y el reintento sin perder el vehículo. |
+| REG-07 | ❌ | El trigger `handle_new_user` crea el perfil (`init_caravana.sql:143`), pero sin `first_name` ni `last_name` y sin vehículo. Falta una RPC transaccional para perfil y vehículo principal (slug y QR). |
+| REG-08 | ❌ | No hay borrador local del registro. |
+| REG-09 | 🟡 | Teclado y autocompletado correctos por campo. Faltan el indicador 1/3, los pasos y el foco automático con «Siguiente». |
+| REG-10 | ✅ | Errores junto a cada campo (`sign-up.tsx` `error={errors.*}`). |
+| REG-11 | 🟡 | Pantalla «Revisa tu correo» (`sign-up.tsx:95`). Falta el botón **Reenviar**. |
+| REG-12 | 🟡 | El modo demo funciona. Falta el aviso a usuarios antiguos sin vehículo. |
+| REG-13 | ❌ | No hay pruebas de validadores del registro. |
+
+### 2. Mapa y navegación
+| ID | Estado | Evidencia / qué falta |
+|---|---|---|
+| MAPA-01 | 🟡 | Mapbox con el estilo de navegación oscuro, edificios (`WorldMap.tsx:86`) y modo de día automático (`useMapTheme`, `daylight.ts`). Falta verificar el cambio 2D/3D y el acento naranja en la ruta. |
+| MAPA-02 | ⛔ | Photon/OSM más una lista local (`place-search.ts`, `do-places.ts`, 137 lugares). Benchmark: **≈55-75 % de acierto** (abajo). No llega al 95 % → **propuesta de proveedor, decisión tuya**. |
+| MAPA-03 | 🟡 | Abreviaturas, sin tildes y con faltas (`place-search.ts`), orden por cercanía y recientes (`app/destino.tsx:34`). Faltan **favoritos Casa y Trabajo** y medir el debounce. |
+| MAPA-04 | ✅ | Capas de tráfico de Mapbox navigation (`WorldMap.tsx:123-140`): solo se pintan las retenciones. |
+| MAPA-05 | 🟡 | Primer plano con watch de 1 s (`useLiveLocation.ts`). Segundo plano con DrivingService (FGS) al conducir o en convoy. Falta forzar el FGS **durante una navegación** aunque no se detecte vehículo. iOS sin verificar. |
+| MAPA-06 | 🟡 | El puck nativo de Mapbox se anima solo y los amigos se suavizan (`useSmoothMembers`, `interpolatePoint`). **No hay ajuste a la calle (snap-to-road).** Filtro de precisión: 50 m al grabar y 100 m al compartir; el pedido dice 30 m. |
+| MAPA-07 | ✅ | `src/lib/nav-camera.ts` usa una curva velocidad→zoom y se acerca a menos de 250 m del giro. |
+| MAPA-08 | ✅ | Rumbo arriba con inclinación, y brújula cuando vas parado (`useLiveLocation.ts` `applyCompassHeading`). Botón de norte arriba (`MapControls.tsx:24`). |
+| MAPA-09 | ✅ | Arrastrar suspende el seguimiento y aparece «Recentrar» (`MapControls.tsx:37`, `index.tsx` `handleFollowChange`). |
+| MAPA-10 | 🟡 | Capas nativas de rnmapbox. `index.tsx` tiene 1.600 líneas y se re-renderiza en cada lectura de GPS. Hay que medirlo con el profiler en el dispositivo. |
+| MAPA-11 | ⛔ | Batería: medirla exige un viaje real de 1 h. Lo hago contigo (guion de la sección 5). |
+| MAPA-12 | 🟡 | La cadena GraphHopper→OSRM→línea directa existe (`graphhopper.ts`), pero **GraphHopper no está configurado** (`.env` vacío), así que se usa el **OSRM público de demostración**, sin tráfico y con límite de uso. → **Propuesta de motor, decisión tuya.** |
+| MAPA-13 | ✅ | Hasta 3 alternativas antes de salir (`graphhopper.ts:194`, `index.tsx:674,960`). |
+| MAPA-14 | ✅ | HUD con la maniobra, la siguiente, la calle, ETA, hora de llegada y distancia (`NavigationHud.tsx`, `index.tsx:386-420`). |
+| MAPA-15 | 🟡 | Voz en español con avisos a 800 m (solo en vías rápidas), 300 m y en el giro, y botón de silenciar (`useVoiceGuidance.ts:12`, `index.tsx:231`). Pedido: 500 m, 200 m y «ahora». |
+| MAPA-16 | 🟡 | Recalcula solo, pero el umbral es **80 m** (`index.tsx:406`) y espera 15 s entre recálculos (`index.tsx:913`). Pedido: 40 m sostenidos y ≤ 3 s. |
+| MAPA-17 | ✅ | Lo recorrido se oculta (`WorldMap.tsx:430`) y aparece «Has llegado» con fin automático (`index.tsx`). |
+| MAPA-18 | ✅ | Paradas en ruta sin perder el destino (`src/lib/stops.ts`, `index.tsx:717`). |
+| MAPA-19 | 🟡 | Amigos en el mapa (`useFriendsOnMap.ts`), pero **por sondeo cada 15 s**, no en tiempo real. Sin rumbo ni estado en marcha/parado en el marcador. |
+| MAPA-20 | 🟡 | Opt-in con aviso único e interruptor en Perfil, y RLS solo para amigos (`…friend_locations.sql:30-35`). Falta el **modo fantasma en un toque desde el mapa**, la elección de amigos y actualizar la política de privacidad. |
+| MAPA-21 | 🟡 | «Visto hace X» (`lastSeenLabel`) y se ocultan por TTL. Falta pintarlos en gris. |
+| MAPA-22 | 🟡 | `FriendSheet.tsx` tiene Invitar, Retar, Ver perfil y Seguir. **Seguir solo aparece si es del convoy.** Faltan @apodo, vehículo principal y distancia. |
+| MAPA-23 | 🟡 | Seguir existe para miembros del convoy (`useFollow`, la ruta va hacia él cada 150 m). Falta para amigos fuera del convoy y mostrar la ETA hasta él. |
+| MAPA-24 | 🟡 | Invitar o crear el convoy con un toque (`index.tsx:567`, `usePartyInvites`), con banner en la app y aviso en segundo plano por sondeo local. **No hay push real** (FCM/APNs) con la app cerrada del todo. |
+| MAPA-25 | 🟡 | Agrupación de rnmapbox (`WorldMap.tsx:1234`). Sin prueba de rendimiento con 50 amigos. |
+| MAPA-26 | 🟡 | Usa la última posición conocida (`useLiveLocation.ts` `getLastKnownPositionAsync`). Sin medir los 2 s. |
+| MAPA-27 | 🟡 | Sin permiso: Santo Domingo y un aviso (`DEMO_LOCATION`). **No hay botón a Ajustes** (`Linking.openSettings` no se usa). |
+| MAPA-28 | ❌ | Sin detección de conexión (no hay NetInfo), ni aviso, ni recuperación automática al volver la red. |
+
+### 2.F Benchmark de búsqueda (proveedor actual, desde el PC, sesgo en Santo Domingo)
+| Búsqueda | Primer resultado | ¿Correcto? |
+|---|---|---|
+| Agora Mall | Agora Mall, India | ❌ |
+| Blue Mall | Blue Mall, SD | ✅ |
+| Sambil Santo Domingo | Plaza Lama Sambil | 🟡 cerca |
+| Megacentro | Megacentro, SDE | ✅ |
+| Plaza de la Bandera | Plaza de la Bandera, SDO | ✅ |
+| Av. Máximo Gómez esq. 27 de Febrero | Av. 27 de Febrero (no el cruce) | ❌ |
+| Av. Abraham Lincoln esq. Sarasota | Av. Abraham Lincoln (no el cruce) | ❌ |
+| Estadio Quisqueya | Estadio Quisqueya | ✅ |
+| Aeropuerto Las Américas | AILA, Boca Chica | ✅ |
+| Hospital Plaza de la Salud | Hospital General Plaza de la Salud | ✅ |
+| Farmacia Carol Naco | Farmacia Carol (sucursal sin verificar) | 🟡 |
+| Supermercado Nacional Churchill | **Bravo** Churchill | ❌ |
+| Jumbo Luperón | Jumbo Luperón | ✅ |
+| Shell Av. Independencia | Shell (sucursal sin verificar) | 🟡 |
+| Texaco Av. Tiradentes | Texaco en SDE | ❌ |
+| Banco Popular Av. Winston Churchill | Banco Popular (sucursal sin verificar) | 🟡 |
+| Monumento de Santiago | Monumento a los Héroes de la Restauración | ✅ |
+| PUCMM Santiago | PUCMM | ✅ |
+| Calle El Conde | Calle El Conde | ✅ |
+| Malecón de Santo Domingo | Malecón | ✅ |
+
+Resultado: **11/20 exactos (55 %), 15/20 contando los parciales (75 %)**. Los cruces con «esq.» y las sucursales de cadenas son los puntos débiles. Hace falta comparar en el teléfono contra Waze y medir las 10 rutas reales: lo hacemos juntos (guion de la sección 5). La app suma una lista local que puede corregir algún caso (por ejemplo «Sambil»).
+
+### 3. Convoy / Party
+| ID | Estado | Evidencia / qué falta |
+|---|---|---|
+| CONV-01 | 🟡 | Crear, código de 6, enlace, QR e invitar desde el mapa (`useParty.ts`, `qr.ts`, `scan.tsx`). El destino es opcional sin la opción «definir después». La página del enlace está ⛔ hasta que actives Pages. |
+| CONV-02 | 🟡 | Destino común con quién y cuándo lo fijó, y aviso (`set_party_destination`, `ConvoyDestinationCard`). **Cualquier miembro** puede cambiarlo; falta el permiso del host. Sin medir los ≤ 2 s. |
+| CONV-03 | ✅ | Cada miembro calcula su propia ruta desde su posición hasta el destino común, con toda la navegación (`followDestination`, `index.tsx`). |
+| CONV-04 | 🟡 | Posición, rumbo y velocidad cada 3 s, también en segundo plano (`live-share.ts`, `convoy.ts:21`). **No se publican la ETA ni la ruta.** Los demás miembros no ven las rutas de los otros. |
+| CONV-05 | 🟡 | Lista de miembros con estado (`memberLiveLabel`) y seguir. **No se ordena por ETA** ni muestra «llega en X min» ni la distancia restante. |
+| CONV-06 | ❌ | No hay aviso de llegada de miembros del convoy (solo en retos) ni resumen al cerrar. |
+| CONV-07 | 🟡 | Reconexión de Supabase Realtime, sondeo de 15 s y recarga al volver. Los miembros sin señal muestran «HACE X MIN». Desde hoy se ocultan del mapa a los 30 min (CONV-07 pide gris, no ocultar; se ajusta). |
+| CONV-08 | 🟡 | Límite de 5/10 en el servidor (`…060000_party_member_limit.sql`). Desde hoy el host pasa el mando al salir. **No hay expulsar** ni «terminar para todos». |
+| CONV-09 | ✅ | Solo con `partyId` activo y se borra al salir (`useParty.ts` `left_at`, `last_lat: null`). |
+| CONV-10 | 🟡 | Chat con RLS, historial de 120 mensajes y tiempo real (`usePartyMessages`). Faltan el **badge de no leídos** y el avatar en cada mensaje (por verificar). |
+| CONV-11 | ❌ | No hay envío optimista ni reintento. Tras reconectar se recarga entero. |
+| CONV-12 | ❌ | No hay mensajes rápidos ni bloqueo de escritura en marcha. |
+| CONV-13 | 🟡 | La Edge Function `livekit-token` verifica que seas miembro (`functions/livekit-token/index.ts`). ⛔ **LiveKit rechaza la clave (401)**: hay que volver a poner el secret. Falta revisar la caducidad (TTL) del token. |
+| CONV-14 | 🟡 | PTT con 3 canales (`PTTButton.tsx`, `useVoiceRoom.ts`). Desde hoy se pide el micrófono. **No hay manos libres** ni vibración (por verificar). |
+| CONV-15 | 🟡 | Indicador de quién habla (`activeSpeakerIds`). Faltan silenciar a un miembro y el audio general, bajar la voz de navegación cuando alguien habla, y verificar el audio con la pantalla bloqueada. |
+| CONV-16 | ⛔ | La latencia y la reconexión de la sala no se pueden medir hasta arreglar el 401. El aviso claro sin LiveKit existe (`useVoiceRoom.ts`). |
+
+### 4. Retos
+| ID | Estado | Evidencia / qué falta |
+|---|---|---|
+| RETO-01 | 🟡 | Retar desde el convoy (`party.tsx:262-291`), pero **la meta es el destino del convoy**. Falta elegir un destino independiente. |
+| RETO-02 | ✅ | «Retar» en la ficha del amigo (`FriendSheet.tsx`) y en la lista del convoy (`party.tsx:345`). |
+| RETO-03 | 🟡 | Aceptar y rechazar (`useChallenges.ts:463-470`, `challenge/[code].tsx`). Falta elegir categoría y punto de salida. El aviso con la app cerrada es por sondeo local, sin push. |
+| RETO-04 | 🟡 | El host inicia (`useChallenges.ts:494`). **No hay cuenta atrás.** Falta verificar la ruta propia de cada participante y la vuelta a la ruta del convoy. |
+| RETO-05 | 🟡 | Llegada verificada en el servidor con puesto atómico (`report_challenge_progress`, `convoy_live.sql`). Hay clasificación por avance (%), no por ETA. Hay que verificar el radio de llegada (`ARRIVE_RADIUS_M`). |
+| RETO-06 | ✅ | «Reto por llegada… respetando las leyes» (`party.tsx:274`) y `countsAsRecord` sin velocidad (`record-rules.ts`, prueba `srs-backend.test.ts`). Falta que haya que **aceptar el aviso antes de cada reto**. |
+| RETO-07 | ❌ | No existen los estados «abandonó» y «sin conexión». |
+| RETO-08 | 🟡 | Resultado e historial en `challenges.tsx`. Falta publicar en el feed. |
+
+### 4-bis. Actualización automática
+| ID | Estado | Evidencia / qué falta |
+|---|---|---|
+| SYNC-01 | 🟡 | Desde hoy (`8fc353f`) los datos se recargan al volver a la app (`focusManager`) y se renueva la sesión. Hay pantallas sin tiempo real ni sondeo: amigos y solicitudes, garaje, perfil. |
+| SYNC-02 | 🟡 | Tiempo real en party, chat, retos, invitaciones, feed y comentarios. **Faltan amistades y posiciones de amigos.** |
+| SYNC-03 | ❌ | El sondeo es de 15 s en tres consultas; no hay de 5 s. |
+| SYNC-04 | 🟡 | `AppState` y `focusManager` ✅ (hoy). **No hay `onlineManager` ni NetInfo.** Los canales se resuscriben con supabase-js; no se ha verificado tras caducar la sesión. |
+| SYNC-05 | ❌ | No hay pull-to-refresh (`RefreshControl` no se usa en ningún sitio). |
+| SYNC-06 | 🟡 | TanStack conserva los datos al refrescar. Falta verificarlo pantalla por pantalla. |
+| SYNC-07 | 🟡 | El sondeo se pausa en segundo plano y se usa `acquireSubscription`. Sin pruebas de fugas de canales. |
+| SYNC-08 | ⛔ | `expo-updates` no está instalado. Necesita cuenta EAS → paso tuyo (`eas login`). |
+| SYNC-09 | ❌ | No hay indicador de conexión ni «actualizado hace X s». |
+| SYNC-10 | ❌ | No hay pruebas de la configuración de consultas ni de la limpieza de suscripciones. |
+
+### Resumen
+| Módulo | ✅ | 🟡 | ❌ | ⛔ |
+|---|---|---|---|---|
+| Registro (13) | 1 | 7 | 5 | 0 |
+| Mapa (28) | 8 | 17 | 1 | 2 |
+| Convoy (16) | 2 | 10 | 3 | 1 |
+| Retos (8) | 2 | 5 | 1 | 0 |
+| Sync (10) | 0 | 5 | 4 | 1 |
+| **Total (75)** | **13** | **44** | **14** | **4** |
+
+
+### Avance de la fase 3 (2026-11-03)
+
+Hecho en código y con prueba Jest. Falta la prueba en dispositivos (guion de la sección 5).
+
+| Área | Criterios | Commit | Pruebas |
+|---|---|---|---|
+| Búsqueda y rutas | MAPA-02 (Google Places por Edge Function `places`, con tope de 300 al día; ⛔ falta tu `GOOGLE_MAPS_API_KEY`), MAPA-12 (Mapbox `driving-traffic`, luego GraphHopper, OSRM y línea directa) | `15cddf7` | `google-places.test.ts`, `route-stops.test.ts` |
+| Actualización automática | SYNC-01…05, SYNC-07, SYNC-09 (sondeo de 5 s en la pantalla visible, `focusManager` y `onlineManager` con NetInfo, deslizar para recargar, aviso de conexión). SYNC-08 ⛔: necesita una cuenta EAS. | `765b9f4` | `sync-refresh.test.ts` |
+| Registro | REG-01…REG-13 (3 pasos; apodo en vivo; aviso de correo ya registrado; fortaleza de la contraseña; vehículo obligatorio creado en el trigger del alta; foto opcional subida al tener sesión; borrador sin contraseña; reenviar el correo; aviso a cuentas sin vehículo) | `ab8de97` | `signup.test.ts` |
+| Navegación | MAPA-15 (500 m, 200 m y «ahora»), MAPA-16 (40 m durante 5 s), MAPA-20 (modo fantasma), MAPA-21 (en gris), MAPA-22/23 (ficha completa; seguir a cualquier amigo), MAPA-27 (Ajustes) | `8ae7703` | `convoy-five.test.ts` |
+| Convoy | CONV-02, CONV-04…CONV-08, CONV-10…CONV-12, CONV-14, CONV-15 | `e346b44` | `convoy-amendment.test.ts` |
+| Retos | RETO-01, RETO-03, RETO-04, RETO-06…RETO-08 | `1457938` | `challenge-amendment.test.ts` |
+
+**Sigue pendiente:**
+- **Sin hacer o a medias:** MAPA-06 (ajuste a la calle), MAPA-10/11/25/26 (rendimiento y batería, que se miden en el dispositivo), MAPA-24 (push con la app cerrada, que necesita FCM), MAPA-28 (aviso sin conexión dentro del mapa) y RETO-05 (clasificación por ETA real: hoy es por avance).
+- **Depende de pasos tuyos:** CONV-13/16 (voz bloqueada hasta corregir el secret de LiveKit), SYNC-08 (cuenta EAS) y el benchmark contra Waze (2.F) en el teléfono.
+
+### Avance (2026-11-04)
+
+Probado en el teléfono (SM-G996U1) salvo donde se indica.
+
+| Área | Criterios | Estado |
+|---|---|---|
+| Tráfico | MAPA-04 (capa propia sobre todas las calles, no solo puentes y túneles), MAPA-12 (ruta pintada por tramos con el tráfico de Google `TRAFFIC_ON_POLYLINE` y la congestión de Mapbox) | Hecho; función `routes` desplegada |
+| Avisos | MAPA-24 (FCM con la app cerrada: invitación a convoy, reto y solicitud de amistad; Edge Function `push` llamada por triggers con `pg_net`) | Hecho en Android y probado. iOS ⛔: falta la clave APNs (Apple Developer) |
+| Fallos | Firebase Crashlytics (cierres nativos y de JS, y lo que guarda `error-log`) | Hecho |
+| Voz | CONV-13…16 (sala global en `VoiceHost`, botón en el mapa, conexión en 0,9 s, segundo plano con servicio de tipo micrófono) | Hecho |
+| Amigos | MAPA-19 (cada 5 s al moverte, también en segundo plano y con la app cerrada; compartir por defecto, modo fantasma para ocultarte) | Hecho |
+| Convoy y retos | Convoys borrados y retos cancelados a las 24 h (`purge_expired_parties` cada 15 min con pg_cron) | Hecho |
+| Permisos | Todos al entrar (ubicación «siempre», micrófono, notificaciones, actividad, batería); pantalla siempre encendida con la app abierta | Hecho |
+| Auditoría | `db-permissions.test.ts`: reproduce grants y revokes de todas las migraciones y falla si se quita a los usuarios el uso de `private` (fallo real del 2026-11-04, corregido en `20261104110000_restore_private_usage.sql`) | Hecho |
+
+**Sigue pendiente:** RETO-05 (clasificación por ETA), MAPA-28 (aviso sin conexión en el mapa), MAPA-06 (ajuste a la calle), MAPA-10/11/25/26 (medir en viaje real), SYNC-08 (EAS), la app de iOS y la publicación en las tiendas.

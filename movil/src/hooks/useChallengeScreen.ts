@@ -9,11 +9,13 @@ import {
   useChallengeFriends,
   useChallenges,
   useCreateChallenge,
+  useAbandonChallenge,
   useFinishChallenge,
   useRespondChallenge,
   useStartChallenge,
 } from '@/src/hooks/useChallenges';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { useCreatePost } from '@/src/hooks/useFeed';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
 import { emptyChallenge, realChallengeToChallenge, type ChallengeFriend } from '@/src/lib/challenge-db';
 import { formatClock, timeAgo } from '@/src/lib/format';
@@ -35,6 +37,21 @@ export type ChallengeMode = 'instant' | 'scheduled';
 
 // Estado, datos derivados y acciones de la pantalla de retos (demo y real).
 // La pantalla solo pinta lo que devuelve.
+// RETO-06: aviso de conducción responsable antes de cada reto.
+export function confirmResponsibleDriving(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      t('Conducción responsable'),
+      t('Gana quien llegue primero respetando las leyes de tránsito. Caravana no mide ni premia la velocidad. ¿Lo aceptas?'),
+      [
+        { text: t('Cancelar'), style: 'cancel', onPress: () => resolve(false) },
+        { text: t('Acepto'), onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
+
 export function useChallengeScreen() {
   const router = useRouter();
   const me = useCurrentUser();
@@ -55,6 +72,8 @@ export function useChallengeScreen() {
   const respondChallenge = useRespondChallenge();
   const startRealChallenge = useStartChallenge();
   const finishRealChallenge = useFinishChallenge();
+  const abandonRealChallenge = useAbandonChallenge();
+  const createPost = useCreatePost();
   const [localActive, setLocalActive] = useState<Challenge>(activeChallenge);
   const [selectedRouteId, setSelectedRouteId] = useState(challengeRoutes[1].id);
   const [category, setCategory] = useState<ChallengeCategory>('mixed');
@@ -499,8 +518,10 @@ export function useChallengeScreen() {
     );
   };
 
+  // RETO-06: aceptar exige confirmar la conducción responsable.
   const respondToChallenge = async (accept: boolean) => {
     if (!realActive) return;
+    if (accept && !(await confirmResponsibleDriving())) return;
     try {
       await respondChallenge.mutateAsync({ challengeId: realActive.id, accept });
       Alert.alert(
@@ -545,7 +566,49 @@ export function useChallengeScreen() {
         };
       });
 
+  // RETO-07: abandonar (el reto sigue para los demás).
+  const abandonChallenge = () => {
+    if (!realActive) return;
+    Alert.alert(t('¿Abandonar el reto?'), t('Quedarás como «abandonó» y el reto sigue para los demás.'), [
+      { text: t('Seguir'), style: 'cancel' },
+      {
+        text: t('Abandonar'),
+        style: 'destructive',
+        onPress: () =>
+          void abandonRealChallenge
+            .mutateAsync(realActive.id)
+            .catch((error) => showError(t('No pudimos abandonar'), error)),
+      },
+    ]);
+  };
+
+  // RETO-08: el resultado al feed (orden de llegada, sin velocidades).
+  const publishResult = async () => {
+    if (!realActive) return;
+    const podium = [...realActive.participants]
+      .filter((participant) => participant.finishRank != null)
+      .sort((a, b) => (a.finishRank as number) - (b.finishRank as number))
+      .map((participant) => `${participant.finishRank}. ${participant.profile.displayName}`);
+    try {
+      await createPost.mutateAsync({
+        caption: [
+          t('🏁 Reto por llegada: {0}', realActive.title),
+          t('Meta: {0}', realActive.toLabel),
+          ...podium,
+        ].join('\n'),
+        visibility: 'friends',
+      });
+      Alert.alert(t('Publicado'), t('Tus amigos verán el resultado en el feed.'));
+    } catch (error) {
+      showError(t('No pudimos publicar'), error);
+    }
+  };
+
   return {
+    abandonChallenge,
+    abandonPending: abandonRealChallenge.isPending,
+    publishResult,
+    publishPending: createPost.isPending,
     active,
     activeHostReady,
     activeIsHost,

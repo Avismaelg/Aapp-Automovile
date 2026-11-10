@@ -7,7 +7,25 @@ export type RouteProgress = {
   progressM: number;
   nearestIndex: number;
   distanceM: number;
+  // Tu posición proyectada sobre la ruta (para pegar el coche a la calle).
+  snapped: { latitude: number; longitude: number };
 };
+
+// MAPA-06: navegando y cerca de la ruta, el coche se dibuja sobre la calle de
+// la ruta y no donde lo pone un GPS impreciso (en la tableta «se volaba
+// calles»: saltaba entre cuadras). Más lejos de SNAP_MAX_M es que de verdad
+// te saliste: se dibuja tu posición real y entra el «fuera de ruta».
+export const SNAP_MAX_M = 30;
+
+export function snappedPosition(
+  position: { latitude: number; longitude: number; accuracy?: number | null },
+  progress: RouteProgress | null,
+) {
+  if (!progress || progress.distanceM > SNAP_MAX_M) return null;
+  // Con un GPS muy malo tampoco se sabe si sigues en esa calle.
+  if (position.accuracy != null && position.accuracy > 60) return null;
+  return progress.snapped;
+}
 
 function haversineMeters(a: LatLng, b: LatLng) {
   const R = 6371000;
@@ -72,10 +90,16 @@ export function routeProgress(
     }
   }
   const segment = (cumulative[nearestIndex + 1] ?? 0) - (cumulative[nearestIndex] ?? 0);
+  const from = points[nearestIndex];
+  const to = points[nearestIndex + 1] ?? from;
   return {
     progressM: (cumulative[nearestIndex] ?? 0) + along * segment,
     nearestIndex,
     distanceM: Math.sqrt(best),
+    snapped: {
+      latitude: from[0] + (to[0] - from[0]) * along,
+      longitude: from[1] + (to[1] - from[1]) * along,
+    },
   };
 }
 
@@ -254,7 +278,24 @@ function spokenDistance(meters: number) {
   return unit ? `${value} ${words[unit] ?? unit}` : value;
 }
 
+// Abreviaturas de las calles como se dicen («C. Mercedes» → «calle Mercedes»).
+const SPOKEN_ABBREVIATIONS: [RegExp, string][] = [
+  [/\bAv(?:da)?\.\s*/g, 'avenida '],
+  [/\bAutop\.\s*/g, 'autopista '],
+  [/\bCarr\.\s*/g, 'carretera '],
+  [/\bC\/\s*/g, 'calle '],
+  [/(^|[\s(])C\.\s+/g, '$1calle '],
+  [/\bProl\.\s*/g, 'prolongación '],
+  [/\bEsq\.\s*/gi, 'esquina '],
+  [/\bDr\.\s*/g, 'doctor '],
+];
+
+export function speakableStreet(text: string) {
+  return SPOKEN_ABBREVIATIONS.reduce((out, [pattern, word]) => out.replace(pattern, word), text);
+}
+
 export function spokenInstruction(text: string, remainingM: number) {
-  if (remainingM <= 60) return text;
-  return t('En {0}, {1}{2}', spokenDistance(remainingM), text.charAt(0).toLowerCase(), text.slice(1));
+  const spoken = speakableStreet(text);
+  if (remainingM <= 60) return spoken;
+  return t('En {0}, {1}{2}', spokenDistance(remainingM), spoken.charAt(0).toLowerCase(), spoken.slice(1));
 }

@@ -34,10 +34,10 @@ function walk(dir: string, out: string[] = []) {
 describe('SRS — backend y secretos', () => {
   it('RNF-07 / R-02: todas las tablas creadas tienen RLS activado', () => {
     const tables = new Set(
-      [...allSql.matchAll(/create table (?:if not exists )?(?:public\.)?([a-z_]+)/g)].map((m) => m[1]),
+      [...allSql.matchAll(/create table (?:if not exists )?(?:public\.)?((?:private\.)?[a-z_]+)/g)].map((m) => m[1]),
     );
     const withRls = new Set(
-      [...allSql.matchAll(/alter table (?:if exists )?(?:public\.)?([a-z_]+) enable row level security/g)].map(
+      [...allSql.matchAll(/alter table (?:if exists )?(?:public\.)?((?:private\.)?[a-z_]+) enable row level security/g)].map(
         (m) => m[1],
       ),
     );
@@ -78,7 +78,8 @@ describe('SRS — eliminación de cuenta (RF-03, UI-06, RNF-12)', () => {
   it('borra el usuario de Auth antes que cualquier archivo e incluye todos los buckets', () => {
     const source = fs.readFileSync(path.join(root, 'supabase', 'functions', 'delete-account', 'index.ts'), 'utf8');
     const deleteUserAt = source.indexOf('auth.admin.deleteUser');
-    const firstRemoveAt = source.indexOf('.remove(');
+    // El borrado de archivos vive en removeAll(): su primera llamada va tras deleteUser.
+    const firstRemoveAt = source.indexOf('await removeAll(');
     expect(deleteUserAt).toBeGreaterThan(0);
     expect(firstRemoveAt).toBeGreaterThan(deleteUserAt);
     for (const bucket of ['posts', 'vehicles', 'avatars', 'receipts']) expect(source).toContain(`'${bucket}'`);

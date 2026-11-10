@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 import en from '@/src/i18n/en.json';
 import {
   displaySpeed,
+  shortMonths,
   displayToKm,
   formatKmValue,
   kmToDisplay,
@@ -80,5 +81,14 @@ describe('idiomas', () => {
     expect(spokenInstruction(t('Gira a la derecha{0}', t(' por {0}', 'Main St')), 300)).toBe(
       'In 1000 feet, turn right onto Main St',
     );
+  });
+});
+
+describe('meses cortos', () => {
+  it('cada índice da su mes (noviembre no sale como octubre)', () => {
+    const months = shortMonths();
+    expect(months).toHaveLength(12);
+    expect(months[10]?.toLowerCase()).toMatch(/^nov/);
+    expect(months[0]?.toLowerCase()).toMatch(/^(ene|jan)/);
   });
 });

@@ -27,7 +27,8 @@ export default function JoinPartyScreen() {
     setError(null);
     try {
       await joinParty.mutateAsync(inviteCode);
-      router.replace('/(tabs)/party');
+      // Al unirte vas al mapa (ahí ves al convoy y hablas con él).
+      router.replace('/');
     } catch (joinError) {
       setError(
         errorMessage(joinError, t('No pudimos unirnos a la party.')),
@@ -123,7 +124,7 @@ export default function JoinPartyScreen() {
           icon="radio"
           loading={joinParty.isPending}
           onPress={() => {
-            if (isDemo) router.replace('/(tabs)/party');
+            if (isDemo) router.replace('/');
             else void join();
           }}
           style={{ marginTop: spacing.xl }}

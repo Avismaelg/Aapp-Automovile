@@ -117,6 +117,15 @@ const MILES =
   device.measurementSystem === 'uk' ||
   (device.regionCode != null && MILE_REGIONS.has(device.regionCode));
 let miles = MILES;
+
+// Las unidades siguen a la carretera, no al teléfono: muchos móviles en RD
+// vienen con región de EE. UU. y marcaban mph con señales en km/h. Dentro de
+// la República Dominicana siempre km/h.
+export function setUnitsFromPosition(latitude: number, longitude: number) {
+  const inDominicanRepublic = latitude > 17.3 && latitude < 20.1 && longitude > -72.1 && longitude < -68.2;
+  miles = inDominicanRepublic ? false : MILES;
+}
+
 export function usesMiles() {
   return miles;
 }
@@ -206,7 +215,10 @@ export function speechLanguage() {
 export function shortMonths() {
   return Array.from({ length: 12 }, (_, month) => {
     try {
-      return new Date(2000, month, 1).toLocaleDateString(getLocale(), { month: 'short' }).replace('.', '');
+      // Día 15 a mediodía: con el día 1 a medianoche, una zona horaria del
+      // formateador una hora por detrás daba el mes anterior («4 oct» el 4 de
+      // noviembre en la tableta).
+      return new Date(2000, month, 15, 12).toLocaleDateString(getLocale(), { month: 'short' }).replace('.', '');
     } catch {
       return String(month + 1);
     }

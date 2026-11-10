@@ -1,5 +1,13 @@
 # Voz real con LiveKit y 3 canales por party
 
+> **Actualización 2026-11-04:** la sala vive en `src/components/party/VoiceHost.tsx`
+> (montado en la raíz mientras hay convoy) y su estado en `src/store/voice.ts`:
+> el botón de hablar está en el mapa y en Party, se oye con el mapa abierto y con
+> la pantalla bloqueada (servicio de primer plano de tipo micrófono). Token
+> reutilizado 90 min, sesión de audio abierta una vez por convoy y tiempos de
+> conexión cortos (6 s por intento): conecta en < 1 s. Secretos de LiveKit ya
+> configurados.
+
 El PTT de Caravana usa **LiveKit** para audio en tiempo real. Cada party tiene
 tres canales de voz fijos:
 

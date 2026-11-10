@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -80,10 +79,10 @@ export default function TripsScreen() {
       <View style={styles.topBar}>
         <IconButton icon="chevron-back" size={40} onPress={() => router.back()} />
         <IconButton
-          icon="trophy-outline"
+          icon="navigate-outline"
           size={40}
           onPress={() => router.push('/records' as never)}
-          accessibilityLabel={t('Récords')}
+          accessibilityLabel={t('Tus autopistas')}
         />
       </View>
       <ScreenHeader
@@ -149,9 +148,6 @@ export default function TripsScreen() {
                 <View style={styles.tripTitleRow}>
                   <AppText variant="bodyStrong">{formatDate(trip.startedAt)}</AppText>
                   {trip.test ? <Pill label={t('Prueba')} /> : null}
-                  {trip.recordsSubmitted ? (
-                    <Ionicons name="trophy-outline" size={13} color={colors.muted} />
-                  ) : null}
                 </View>
                 <AppText variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
                   {formatDuration((trip.endedAt ?? trip.startedAt) - trip.startedAt)}{' '}{t('· media')}{' '}

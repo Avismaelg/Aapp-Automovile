@@ -23,6 +23,10 @@ import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useFriends } from '@/src/hooks/useFriends';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
+
+// RETO-04: cuenta atrás antes de la salida.
+export const CHALLENGE_COUNTDOWN_S = 5;
 
 type ChallengeRow = {
   id: string;
@@ -52,6 +56,10 @@ type ParticipantRow = {
   progress_pct: number | string;
   elapsed_s: number;
   finish_rank: number | null;
+  last_progress_at?: string | null;
+  arrival_verified?: boolean | null;
+  eta_s?: number | null;
+  eta_at?: string | null;
 };
 
 type VehicleRow = {
@@ -143,14 +151,19 @@ export function useChallengeFriends() {
   };
 }
 
+const CHALLENGE_TTL_MS = 24 * 3_600_000;
+const UNFINISHED = new Set<string>(['pending', 'accepted', 'live']);
+
 export function useChallenges() {
   const queryClient = useQueryClient();
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['challenges', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<RealChallenge[]> => {
       if (!account || !supabase) return [];
 
@@ -224,7 +237,12 @@ export function useChallenges() {
           hostId: challenge.host_id,
           title: challenge.title,
           category: challenge.category,
-          status: challenge.status,
+          // Un reto sin terminar a las 24 h ya no sigue «en vivo» (el servidor
+          // lo cancela; aquí se muestra así aunque aún no haya pasado).
+          status:
+            UNFINISHED.has(challenge.status) && Date.now() - Date.parse(challenge.created_at) > CHALLENGE_TTL_MS
+              ? 'cancelled'
+              : challenge.status,
           mode: challenge.mode,
           fromLabel: challenge.from_label,
           toLabel: challenge.to_label,
@@ -255,6 +273,10 @@ export function useChallenges() {
               progressPct: Number(participant.progress_pct),
               elapsedSeconds: participant.elapsed_s,
               finishRank: participant.finish_rank,
+              arrivalVerified: participant.arrival_verified ?? null,
+              etaS: participant.eta_s ?? null,
+              etaAt: participant.eta_at ?? null,
+              lastProgressAt: participant.last_progress_at ?? null,
               isMe: participant.user_id === account.id,
               isHost: participant.user_id === challenge.host_id,
             };
@@ -364,6 +386,8 @@ export type CreateChallengeInput = {
   rules: string;
   hostVehicleId?: string;
   hostVehicleKind: VehicleKind;
+  // RETO-03/04: los rivales aceptan y luego el anfitrión da la salida.
+  waitForRivals?: boolean;
   // Meta del reto por llegada.
   endLat?: number;
   endLng?: number;
@@ -397,12 +421,12 @@ export function useCreateChallenge() {
           host_id: account.id,
           title: input.title,
           category: input.category,
-          status: input.mode === 'instant' ? 'live' : 'pending',
+          status: input.mode === 'instant' && !input.waitForRivals ? 'live' : 'pending',
           mode: input.mode,
           from_label: input.fromLabel,
           to_label: input.toLabel,
           distance_m: Math.round(input.distanceKm * 1000),
-          starts_at: input.mode === 'instant' ? new Date().toISOString() : null,
+          starts_at: input.mode === 'instant' && !input.waitForRivals ? new Date().toISOString() : null,
           rules: input.rules,
           end_lat: input.endLat ?? null,
           end_lng: input.endLng ?? null,
@@ -491,11 +515,26 @@ export function useStartChallenge() {
 
       const { error } = await supabase
         .from('challenges')
-        .update({ status: 'live', starts_at: new Date().toISOString() })
+        .update({ status: 'live', starts_at: new Date(Date.now() + CHALLENGE_COUNTDOWN_S * 1000).toISOString() })
         .eq('id', challengeId)
         .eq('host_id', account.id);
 
       if (error) throw new Error(t('No pudimos iniciar el reto.'));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['challenges'] });
+    },
+  });
+}
+
+// RETO-07: abandonar el reto (sigue para los demás).
+export function useAbandonChallenge() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (challengeId: string) => {
+      if (!supabase) throw new Error(t('Inicia sesión para abandonar el reto.'));
+      const { error } = await supabase.rpc('abandon_challenge', { p_challenge_id: challengeId });
+      if (error) throw new Error(t('No pudimos abandonar el reto.'));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['challenges'] });
@@ -534,17 +573,24 @@ export function useFinishChallenge() {
   });
 }
 
-// Avance en un reto por llegada. Devuelve tu puesto al llegar.
+// Avance en un reto por llegada. Devuelve tu puesto al llegar. La posición
+// viaja con la llegada: el servidor la comprueba contra la meta (P0-5).
 export async function reportChallengeProgress(
   challengeId: string,
   progressPct: number,
   arrived: boolean,
+  position?: { latitude: number; longitude: number; accuracy: number | null },
+  etaS?: number | null,
 ): Promise<number | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('report_challenge_progress', {
     p_challenge_id: challengeId,
     p_progress: progressPct,
     p_arrived: arrived,
+    p_lat: position?.latitude ?? null,
+    p_lng: position?.longitude ?? null,
+    p_accuracy_m: position?.accuracy ?? null,
+    p_eta_s: etaS ?? null,
   });
   if (error) throw new Error(error.message);
   return typeof data === 'number' ? data : null;

@@ -24,3 +24,18 @@ jobs:
       - run: npx expo-doctor
       - run: npm test -- --coverage
       - run: npx expo export --platform web
+
+  # Tipos de las Edge Functions (Deno). Se copian fuera de movil/: con su
+  # package.json, Deno buscaría las dependencias npm en node_modules.
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: deno check
+        run: |
+          cp -r movil/supabase/functions "$RUNNER_TEMP/functions"
+          cd "$RUNNER_TEMP/functions"
+          for f in */index.ts; do echo "== $f"; deno check "$f"; done

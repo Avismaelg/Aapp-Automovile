@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -55,7 +56,13 @@ export default function DeleteAccountScreen() {
     }
 
     try {
-      await deleteAccount.mutateAsync();
+      const result = await deleteAccount.mutateAsync();
+      if (result.storage === 'partial') {
+        Alert.alert(
+          t('Cuenta eliminada'),
+          t('Tu cuenta y tus datos ya se borraron. Algunas fotos tardarán un poco más: se borran solas en los próximos borrados del servidor.'),
+        );
+      }
       router.replace('/welcome');
     } catch (deleteError) {
       setError(

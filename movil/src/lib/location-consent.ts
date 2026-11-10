@@ -40,7 +40,7 @@ export function askLocationConsent(): Promise<boolean> {
     Alert.alert(
       t('Tu ubicación en Caravana'),
       t(
-        'Usamos tu ubicación para mostrarte en el mapa, guiarte, registrar tus viajes y, solo dentro de una party activa, compartir tu posición con sus miembros. No la vendemos ni la publicamos en tu perfil.',
+        'Usamos tu ubicación para mostrarte en el mapa, guiarte, registrar tus viajes y compartir tu posición con tu party y con los amigos que elijas, también con la app en segundo plano. No la vendemos ni la publicamos en tu perfil.',
       ),
       [
         {

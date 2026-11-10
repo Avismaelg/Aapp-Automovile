@@ -12,6 +12,10 @@ export type MemberPatch = {
   last_heading?: number | string | null;
   is_muted?: boolean;
   voice_channel_slug?: string;
+  eta_s?: number | null;
+  remaining_m?: number | null;
+  progress_at?: string | null;
+  arrived_at?: string | null;
 };
 
 type PatchableMember = {
@@ -23,6 +27,10 @@ type PatchableMember = {
   heading?: number | null;
   isMuted: boolean;
   voiceChannelSlug: string;
+  etaS?: number | null;
+  remainingM?: number | null;
+  progressAt?: string | null;
+  arrivedAt?: string | null;
 };
 
 // ¿Este cambio altera quién está en la party? Salir se guarda como UPDATE
@@ -72,6 +80,10 @@ export function applyMemberPatches<T extends PatchableMember>(
       isMuted: row.is_muted !== undefined ? row.is_muted : member.isMuted,
       voiceChannelSlug:
         row.voice_channel_slug !== undefined ? row.voice_channel_slug : member.voiceChannelSlug,
+      etaS: row.eta_s !== undefined ? row.eta_s : member.etaS,
+      remainingM: row.remaining_m !== undefined ? row.remaining_m : member.remainingM,
+      progressAt: row.progress_at !== undefined ? row.progress_at : member.progressAt,
+      arrivedAt: row.arrived_at !== undefined ? row.arrived_at : member.arrivedAt,
     };
   });
   return changed ? next : members;

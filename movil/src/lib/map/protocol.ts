@@ -1,5 +1,7 @@
 // Tipos y mensajes que intercambian la app y el mapa dentro del WebView.
 
+import type { TrafficSpan } from '@/src/lib/route-traffic';
+
 export type WorldMapMember = {
   id: string;
   name: string;
@@ -8,6 +10,8 @@ export type WorldMapMember = {
   longitude: number;
   isTalking?: boolean;
   battery?: number;
+  // MAPA-21 / CONV-07: sin noticias recientes → en gris («visto hace X»).
+  stale?: boolean;
 };
 
 export type WorldMapDestination = {
@@ -50,8 +54,10 @@ export type WorldMapRoute = {
   coordinates: [number, number][];
   distanceM: number;
   timeMs: number;
-  source: 'graphhopper' | 'osrm' | 'fallback';
+  source: 'google' | 'mapbox' | 'graphhopper' | 'osrm' | 'fallback';
   instructions?: RouteInstruction[];
+  // Retenciones a lo largo de la ruta (fracciones 0…1), si el proveedor las da.
+  traffic?: TrafficSpan[];
 };
 
 // Ruta alternativa que se pinta en gris; index es su posición en la lista.

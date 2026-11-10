@@ -25,16 +25,27 @@ import { WorldMap } from '@/src/components/WorldMap';
 import { AppText, Button, IconButton, Pill, Screen } from '@/src/components/ui';
 import { activeParty, partyMembers } from '@/src/data/mock';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { useActiveParty, useLeaveParty, useSetVoiceChannel } from '@/src/hooks/useParty';
+import {
+  useActiveParty,
+  useLeaveParty,
+  usePartyHostActions,
+  usePartyMessages,
+  useSetVoiceChannel,
+} from '@/src/hooks/useParty';
+import { unreadCount } from '@/src/lib/party-chat';
+import { useChatRead } from '@/src/store/chat-read';
 import { showError } from '@/src/lib/alerts';
 import { useChosenDestination } from '@/src/store/destination';
 import { useCreateChallenge } from '@/src/hooks/useChallenges';
+import { confirmResponsibleDriving } from '@/src/hooks/useChallengeScreen';
+import { useChallengeDraft } from '@/src/store/challenge-draft';
+import type { ChallengeCategory } from '@/src/types/models';
 import { useGarageVehicles } from '@/src/hooks/useGarage';
-import { useVoiceRoom } from '@/src/hooks/useVoiceRoom';
+import { useConvoyVoice } from '@/src/store/voice';
 import { useGraphHopperRoute } from '@/src/hooks/useGraphHopperRoute';
 import { useLiveLocation } from '@/src/hooks/useLiveLocation';
 import { useNow } from '@/src/hooks/useNow';
-import { isMemberOnMap, MEMBER_STALE_MS } from '@/src/lib/convoy';
+import { isMemberOnMap, MEMBER_STALE_MS, sortByArrival } from '@/src/lib/convoy';
 import { useSimulator } from '@/src/lib/simulator';
 import { useFollow } from '@/src/store/follow';
 import { formatRouteDistance, formatRouteTime } from '@/src/lib/graphhopper';
@@ -57,17 +68,18 @@ export default function PartyScreen() {
   const simParty = useSimulator((state) => state.party) && !party;
   const isDemo = demoAccount || simParty;
   const leaveParty = useLeaveParty();
+  const hostActions = usePartyHostActions();
+  // CONV-10: mensajes sin leer del chat.
+  const { messages: chatMessages } = usePartyMessages(isDemo ? undefined : party?.id);
+  const lastRead = useChatRead((state) => (party ? state.lastRead[party.id] : undefined));
+  const unread = unreadCount(chatMessages, lastRead);
   const mapNow = useNow();
   const setVoiceChannel = useSetVoiceChannel();
   const [talking, setTalking] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState<PartyVoiceChannelSlug | null>(null);
-  const myMember = party?.members.find((member) => member.isMe);
-  const voiceChannel = selectedChannel ?? myMember?.voiceChannelSlug ?? 'convoy';
-  const voice = useVoiceRoom({
-    partyId: party?.id,
-    channelSlug: voiceChannel,
-    enabled: Boolean(party) && !isDemo,
-  });
+  // La voz vive en VoiceHost (raíz de la app): la misma sala que el botón
+  // de hablar del mapa. Todos empiezan en «Convoy».
+  const voice = useConvoyVoice();
+  const voiceChannel = voice.channel;
   // En demo el convoy "empezó" hace activeParty.elapsedSeconds.
   const [demoStartedAt] = useState(() => Date.now() - activeParty.elapsedSeconds * 1000);
   const [recenterToken, setRecenterToken] = useState(0);
@@ -92,7 +104,7 @@ export default function PartyScreen() {
         voiceChannelSlug: partyVoiceChannels[index % partyVoiceChannels.length].slug,
       }));
     }
-    return (party?.members ?? []).map((member) => ({
+    const list = (party?.members ?? []).map((member) => ({
       id: member.userId,
       name: member.profile.displayName,
       username: member.profile.username,
@@ -104,7 +116,14 @@ export default function PartyScreen() {
       lastSeenAt: member.lastSeenAt,
       speedKmh: member.speedKmh,
       voiceChannelSlug: member.voiceChannelSlug,
+      role: member.role,
+      etaS: member.etaS,
+      remainingM: member.remainingM,
+      progressAt: member.progressAt,
+      arrivedAt: member.arrivedAt,
     }));
+    // CONV-05: quien llega antes, primero.
+    return sortByArrival(list, mapNow);
   }, [
     currentUser.username,
     isDemo,
@@ -113,6 +132,7 @@ export default function PartyScreen() {
     party,
     voice.activeSpeakerIds,
     voice.talking,
+    mapNow,
   ]);
 
   const mapMembers = useMemo(
@@ -177,6 +197,8 @@ export default function PartyScreen() {
         label: t('Sin destino'),
       },
     enabled: Boolean(destination),
+    // Su propio cálculo: no pisa la ruta que estás navegando en Inicio.
+    channel: 'party',
   });
   const routeDistance = graphHopper.route
     ? formatRouteDistance(graphHopper.route.distanceM)
@@ -197,7 +219,9 @@ export default function PartyScreen() {
       ? t('Calculando ruta por calles…')
       : graphHopper.error
         ? t('No encontramos una calle transitable')
-        : graphHopper.source === 'graphhopper'
+        : graphHopper.source === 'mapbox' || graphHopper.source === 'google'
+          ? t('Con tráfico · {0} · {1}', routeDistance, routeDuration)
+          : graphHopper.source === 'graphhopper'
           ? t('GraphHopper · {0} · {1}', routeDistance, routeDuration)
           : graphHopper.source === 'osrm'
             ? t('Calles OSM · {0} · {1}', routeDistance, routeDuration)
@@ -214,7 +238,7 @@ export default function PartyScreen() {
 
   const switchChannel = async (slug: PartyVoiceChannelSlug) => {
     if (slug === voiceChannel) return;
-    setSelectedChannel(slug);
+    voice.setChannel(slug);
     if (isDemo || !party) return;
     try {
       await setVoiceChannel.mutateAsync({ partyId: party.id, channelSlug: slug });
@@ -262,45 +286,48 @@ export default function PartyScreen() {
       Alert.alert(t('Retos'), t('Todavía no hay pilotos a quienes retar.'));
       return;
     }
-    if (!destination) {
-      Alert.alert(
-        t('Elige la meta'),
-        t('Fija primero el destino del convoy (búscalo en el mapa y pulsa Ir): gana quien llegue primero ahí.'),
-      );
-      return;
-    }
-    Alert.alert(
-      title,
-      t('Reto por llegada: gana quien llegue primero a la meta del convoy, respetando las leyes.'),
-      [
+    const draft = {
+      title: title.replace('Reto a ', 'Reto: '),
+      category: (primaryVehicle?.kind ?? 'mixed') as ChallengeCategory,
+      hostVehicleId: primaryVehicle?.id,
+      hostVehicleKind: primaryVehicle?.kind ?? ('car' as const),
+      invitees,
+    };
+    // RETO-06: aviso de conducción responsable antes de cada reto.
+    void confirmResponsibleDriving().then((accepted) => {
+      if (!accepted) return;
+      // RETO-01: meta del convoy u otra elegida en el mapa.
+      const pickOther = () => {
+        useChallengeDraft.getState().start(draft);
+        router.push({ pathname: '/destino', params: { mode: 'challenge' } });
+      };
+      if (!destination) {
+        pickOther();
+        return;
+      }
+      Alert.alert(t('Meta del reto'), t('Gana quien llegue primero. ¿A dónde?'), [
         { text: t('Cancelar'), style: 'cancel' },
+        { text: t('Otra meta'), onPress: pickOther },
         {
-          text: t('Reto'),
-          style: 'destructive',
-          onPress: () => {
+          text: t('Meta del convoy'),
+          onPress: () =>
             void createChallenge
               .mutateAsync({
-                title: title.replace('Reto a ', 'Reto: '),
-                category: 'mixed',
+                ...draft,
                 mode: 'instant',
+                waitForRivals: true,
                 fromLabel: t('Salida del convoy'),
                 toLabel: destination.label,
                 endLat: destination.latitude,
                 endLng: destination.longitude,
                 distanceKm: (graphHopper.route?.distanceM ?? 0) / 1000,
                 rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
-                hostVehicleId: primaryVehicle?.id,
-                hostVehicleKind: primaryVehicle?.kind ?? 'car',
-                invitees,
               })
-              .then(() => Alert.alert(t('Reto enviado'), t('Verás la respuesta en la pestaña Retos.')))
-              .catch((error: unknown) =>
-                showError(t('Reto'), error, t('No pudimos crear el reto.')),
-              );
-          },
+              .then(() => Alert.alert(t('Reto enviado'), t('Cuando acepten, da la salida desde la pestaña Retos.')))
+              .catch((error: unknown) => showError(t('Reto'), error, t('No pudimos crear el reto.'))),
         },
-      ],
-    );
+      ]);
+    });
   };
 
   // Tocar a un piloto: seguirle (la ruta va a donde está y se mueve con él)
@@ -346,8 +373,42 @@ export default function PartyScreen() {
       ...(!isDemo && !simParty && member.username
         ? [{ text: t('Ver perfil'), onPress: () => router.push(`/u/${member.username}`) }]
         : []),
+      ...(party?.isHost && !isDemo && !member.isMe ? hostOptions(member) : []),
       { text: t('Cancelar'), style: 'cancel' as const },
     ]);
+  };
+
+  // CONV-08 / CONV-02: el anfitrión expulsa y nombra copilotos (pueden
+  // cambiar el destino del convoy).
+  const hostOptions = (member: DisplayMember) => {
+    if (!party) return [];
+    const first = member.name.split(' ')[0];
+    const copilot = member.role === 'sweeper';
+    return [
+      {
+        text: copilot ? t('Quitar copiloto a {0}', first) : t('Hacer copiloto a {0}', first),
+        onPress: () =>
+          void hostActions.setRole
+            .mutateAsync({ partyId: party.id, userId: member.id, role: copilot ? 'member' : 'sweeper' })
+            .catch((error) => showError(t('No pudimos cambiarlo'), error)),
+      },
+      {
+        text: t('Expulsar a {0}', first),
+        style: 'destructive' as const,
+        onPress: () =>
+          Alert.alert(t('¿Expulsar a {0}?', first), t('Saldrá del convoy y dejará de ver vuestra ubicación.'), [
+            { text: t('Cancelar'), style: 'cancel' },
+            {
+              text: t('Expulsar'),
+              style: 'destructive',
+              onPress: () =>
+                void hostActions.kick
+                  .mutateAsync({ partyId: party.id, userId: member.id })
+                  .catch((error) => showError(t('No pudimos expulsarle'), error)),
+            },
+          ]),
+      },
+    ];
   };
 
   const leave = async () => {
@@ -380,6 +441,19 @@ export default function PartyScreen() {
           : t('Dejarás de compartir tu ubicación y el chat.'),
       [
         { text: t('Cancelar'), style: 'cancel' },
+        ...(party.isHost && othersRemain
+          ? [
+              {
+                text: t('Terminar para todos'),
+                style: 'destructive' as const,
+                onPress: () =>
+                  void hostActions.endForAll
+                    .mutateAsync({ partyId: party.id })
+                    .then(() => router.replace('/'))
+                    .catch((error) => showError(t('No pudimos terminar el convoy'), error)),
+              },
+            ]
+          : []),
         { text: t('Salir'), style: 'destructive', onPress: () => void perform() },
       ],
     );
@@ -439,6 +513,7 @@ export default function PartyScreen() {
 
   const stopTalking = async () => {
     if (!isDemo) {
+      if (voice.handsFree) return;
       await voice.setTalking(false);
     } else {
       setTalking(false);
@@ -480,7 +555,7 @@ export default function PartyScreen() {
           destination={partyDestination}
           duration={routeDuration}
           routeStatus={routeStatus}
-          streetRouting={graphHopper.source === 'graphhopper'}
+          streetRouting={graphHopper.source !== 'osrm' && graphHopper.source !== 'fallback'}
           routeError={Boolean(graphHopper.error)}
           live={live}
         />
@@ -500,7 +575,7 @@ export default function PartyScreen() {
               </AppText>
               <View style={styles.metaDot} />
               <AppText variant="caption" color={colors.textSoft}>
-                {memberCount} {memberCount === 1 ? 'piloto' : 'pilotos'}
+                {memberCount === 1 ? t('1 piloto') : t('{0} pilotos', memberCount)}
               </AppText>
               {partyCode ? (
                 <>
@@ -553,7 +628,16 @@ export default function PartyScreen() {
 
         <View style={styles.bottomActions}>
           <Pressable style={styles.bottomAction} onPress={() => router.push('/party/chat')}>
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+            <View>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+              {unread > 0 ? (
+                <View style={styles.unreadBadge}>
+                  <AppText variant="label" color={colors.white} style={{ fontSize: 9 }}>
+                    {unread > 9 ? '9+' : String(unread)}
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
             <AppText variant="caption" color={colors.textSoft}>{t('Chat')}</AppText>
           </Pressable>
           <Pressable
@@ -621,6 +705,18 @@ export default function PartyScreen() {
 }
 
 const styles = StyleSheet.create({
+  unreadBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: { flex: 1, backgroundColor: colors.bg },
   state: {
     flex: 1,

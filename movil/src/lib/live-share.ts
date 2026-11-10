@@ -15,6 +15,18 @@ const KEY = 'caravana-live-share';
 type Config = { accountId: string | null; partyId: string | null; friends: boolean };
 
 let config: Config | null = null;
+
+// CONV-04: progreso hacia la meta común (la pantalla de navegación lo
+// actualiza; viaja con cada posición). null = no vas hacia la meta.
+type Progress = { etaS: number; remainingM: number; arrived: boolean; at: number };
+let progress: Progress | null = null;
+let arrivedSent = false;
+const PROGRESS_FRESH_MS = 60_000;
+
+export function setConvoyProgress(next: Omit<Progress, 'at'> | null) {
+  progress = next ? { ...next, at: Date.now() } : null;
+  if (!next || !next.arrived) arrivedSent = false;
+}
 let lastParty: LiveFix | null = null;
 let lastFriends: { lat: number; lng: number; at: number } | null = null;
 let busy = false;
@@ -50,6 +62,20 @@ export async function getLiveShareAccount() {
   return (await getConfig()).accountId;
 }
 
+function progressColumns(seenAt: string) {
+  if (!progress || Date.now() - progress.at > PROGRESS_FRESH_MS) return {};
+  const columns: Record<string, unknown> = {
+    eta_s: Math.max(0, Math.round(progress.etaS)),
+    remaining_m: Math.max(0, Math.round(progress.remainingM)),
+    progress_at: seenAt,
+  };
+  if (progress.arrived && !arrivedSent) {
+    columns.arrived_at = seenAt;
+    arrivedSent = true;
+  }
+  return columns;
+}
+
 export async function pushLivePosition(fix: LiveFix) {
   const client = supabase;
   if (!client || busy) return;
@@ -79,6 +105,7 @@ export async function pushLivePosition(fix: LiveFix) {
             last_speed_kmh: fix.speedKmh != null ? Math.round(fix.speedKmh * 10) / 10 : null,
             last_heading: fix.heading != null ? Math.round(fix.heading) % 360 : null,
             last_seen_at: seenAt,
+            ...progressColumns(seenAt),
           })
           .eq('party_id', partyId)
           .eq('user_id', accountId)

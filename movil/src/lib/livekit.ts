@@ -8,5 +8,5 @@ export function initializeLiveKit() {
   initialized = true;
 }
 
-export { AudioSession } from '@livekit/react-native';
-export { ConnectionState, Room, RoomEvent, Track } from 'livekit-client';
+export { AndroidAudioTypePresets, AudioSession } from '@livekit/react-native';
+export { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client';

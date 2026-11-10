@@ -6,6 +6,7 @@ import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { useFriends } from '@/src/hooks/useFriends';
 import type { WorldMapMember } from '@/src/lib/map-html';
 import {
+  FRIEND_LIVE_MS,
   latestFriendPositions,
   SHARE_OUTSIDE_PARTY,
   type FriendLocationRow,
@@ -14,6 +15,7 @@ import {
 import { profileColor } from '@/src/lib/profile-db';
 import { isSupabaseConfigured, supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 export type MapFriend = WorldMapMember & { username: string; updatedAt?: number };
 
@@ -31,10 +33,11 @@ export function useFriendsOnMap() {
     [friends],
   );
 
+  const livePoll = useLivePoll();
   const positionsQuery = useQuery({
     queryKey: ['friend-positions', friendIds.join(','), account?.id ?? 'guest'],
     enabled: !isDemo && isSupabaseConfigured && friendIds.length > 0,
-    refetchInterval: 15_000,
+    refetchInterval: livePoll,
     queryFn: async (): Promise<Map<string, PositionedFriend>> => {
       if (!supabase) return new Map();
       const [shared, party] = await Promise.all([
@@ -107,10 +110,11 @@ export function useFriendsOnMap() {
           longitude: position.longitude,
           updatedAt: position.updatedAt,
           isTalking: false,
+          stale: now - position.updatedAt > FRIEND_LIVE_MS,
         },
       ];
     });
-  }, [isDemo, me.username, friends, positionsQuery.data]);
+  }, [isDemo, me.username, friends, positionsQuery.data, now]);
 
   return {
     members,

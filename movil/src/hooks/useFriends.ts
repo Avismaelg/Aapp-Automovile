@@ -12,6 +12,7 @@ import {
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { t } from '@/src/i18n';
+import { useLivePoll } from '@/src/hooks/useLivePoll';
 
 function demoFriendProfile(friend: (typeof mockFriends)[number]): UserProfile {
   return {
@@ -42,9 +43,11 @@ export function useFriends() {
   const account = useAuth((state) => state.account);
   const demo = isDemoMode(account?.mode);
 
+  const livePoll = useLivePoll();
   const query = useQuery({
     queryKey: ['friendships', account?.id ?? 'guest', demo ? 'demo' : 'supabase'],
     enabled: Boolean(account) && !demo,
+    refetchInterval: livePoll,
     queryFn: async () => {
       if (!account || !supabase) {
         return { entries: [] as FriendEntry[] };

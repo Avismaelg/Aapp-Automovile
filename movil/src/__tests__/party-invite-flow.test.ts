@@ -254,11 +254,11 @@ describe('amigos en el mapa', () => {
         last = next;
       }
     }
-    // Una cada 15 s: 240 escrituras por hora en vez de 3.600.
-    expect(pushes).toBeLessThanOrEqual(241);
-    expect(pushes).toBeGreaterThanOrEqual(230);
+    // Una cada 5 s (casi en vivo): 720 escrituras por hora en vez de 3.600.
+    expect(pushes).toBeLessThanOrEqual(721);
+    expect(pushes).toBeGreaterThanOrEqual(700);
 
-    // Parado en casa una hora: una cada 2 min (sigue «en vivo» para los demás).
+    // Parado en casa una hora: una por minuto (sigue «en vivo» para los demás).
     last = null;
     pushes = 0;
     for (let s = 0; s < 3600; s += 1) {
@@ -268,6 +268,6 @@ describe('amigos en el mapa', () => {
         last = next;
       }
     }
-    expect(pushes).toBe(30);
+    expect(pushes).toBe(60);
   });
 });

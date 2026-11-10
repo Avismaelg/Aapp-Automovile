@@ -5,6 +5,7 @@ import type {
   Friend,
   VehicleKind,
 } from '@/src/types/models';
+import { compareRacers, ETA_FRESH_MS } from '@/src/lib/convoy';
 import { profileColor, type UserProfile } from '@/src/lib/profile-db';
 import { t } from '@/src/i18n';
 
@@ -15,7 +16,8 @@ export type ParticipantStatus =
   | 'accepted'
   | 'declined'
   | 'finished'
-  | 'cancelled';
+  | 'cancelled'
+  | 'abandoned';
 
 export type ChallengeFriend = Friend & {
   vehicleId?: string;
@@ -31,8 +33,14 @@ export type RealChallengeParticipant = {
   progressPct: number;
   elapsedSeconds: number;
   finishRank: number | null;
+  arrivalVerified?: boolean | null;
+  // RETO-05: segundos que le faltan y cuándo se informó.
+  etaS?: number | null;
+  etaAt?: string | null;
   isMe: boolean;
   isHost: boolean;
+  // RETO-07: último avance recibido (para «sin conexión»).
+  lastProgressAt?: string | null;
 };
 
 export type RealChallenge = {
@@ -56,6 +64,30 @@ export type RealChallenge = {
   myStatus: ParticipantStatus;
   isHost: boolean;
 };
+
+// RETO-07: sin avances en este tiempo durante el reto → «sin conexión».
+export const CHALLENGE_OFFLINE_MS = 2 * 60_000;
+
+// RETO-04: segundos que faltan para la salida (cuenta atrás); 0 si ya salió.
+export function countdownSeconds(startsAt: string | null, now: number) {
+  if (!startsAt) return 0;
+  const at = Date.parse(startsAt);
+  return Number.isFinite(at) && at > now ? Math.ceil((at - now) / 1000) : 0;
+}
+
+export function participantState(
+  challenge: Pick<RealChallenge, 'status' | 'startsAt'>,
+  participant: Pick<RealChallengeParticipant, 'status' | 'isMe' | 'lastProgressAt'>,
+  now: number,
+): 'racing' | 'finished' | 'abandoned' | 'offline' | 'waiting' {
+  if (participant.status === 'abandoned') return 'abandoned';
+  if (participant.status === 'finished') return 'finished';
+  if (challenge.status !== 'live' || participant.status !== 'accepted') return 'waiting';
+  if (participant.isMe) return 'racing';
+  const started = challenge.startsAt ? Date.parse(challenge.startsAt) : now;
+  const last = participant.lastProgressAt ? Date.parse(participant.lastProgressAt) : started;
+  return now - Math.max(last, started) > CHALLENGE_OFFLINE_MS ? 'offline' : 'racing';
+}
 
 export function normalizeChallengeStatus(
   status: RealChallenge['status'],
@@ -86,8 +118,7 @@ export function realChallengeToChallenge(
         if (a.status === 'accepted') return -1;
         if (b.status === 'accepted') return 1;
       }
-      if (a.finishRank && b.finishRank) return a.finishRank - b.finishRank;
-      return b.progressPct - a.progressPct;
+      return compareRacers(a, b, now);
     })
     .map((participant) => ({
       id: participant.userId,
@@ -97,9 +128,14 @@ export function realChallengeToChallenge(
       vehicleKind: participant.vehicleKind,
       vehicle: participant.vehicleLabel,
       progress: Math.round(participant.progressPct),
-      etaMin: Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
+      etaMin:
+        participant.etaS != null && participant.etaAt != null && now - Date.parse(participant.etaAt) <= ETA_FRESH_MS
+          ? Math.max(1, Math.round(participant.etaS / 60))
+          : Math.max(1, Math.round(distanceKm * (1 - participant.progressPct / 100))),
       isMe: participant.isMe,
       rank: participant.finishRank ?? undefined,
+      arrivalVerified: participant.arrivalVerified ?? null,
+      state: participantState(challenge, participant, now),
     }));
 
   return {
@@ -115,6 +151,7 @@ export function realChallengeToChallenge(
     elapsedSeconds,
     participants,
     note: challenge.rules ?? undefined,
+    startsAt: challenge.status === 'live' ? challenge.startsAt : null,
   };
 }
 

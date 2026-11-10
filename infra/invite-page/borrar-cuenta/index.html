@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eliminar tu cuenta de Caravana</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; background: #06080B; color: #F2F4F7;
+         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: min(420px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 56px; }
+  .label { color: #8A94A6; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  h1 { font-size: 24px; margin: 8px 0 12px; }
+  h2 { font-size: 16px; margin: 28px 0 8px; }
+  p, li { color: #B7C0CE; font-size: 14px; line-height: 1.55; }
+  ul { padding-left: 18px; }
+  label { display: block; color: #8A94A6; font-size: 13px; margin: 14px 0 6px; }
+  input { width: 100%; box-sizing: border-box; background: #11151B; color: #F2F4F7; border: 1px solid #252C36;
+          border-radius: 12px; padding: 13px 14px; font-size: 16px; }
+  button { display: block; width: 100%; border: 0; border-radius: 999px; padding: 15px; font-size: 16px;
+           font-weight: 700; margin-top: 20px; cursor: pointer; background: #E5484D; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { margin-top: 16px; font-size: 14px; line-height: 1.5; }
+  .ok { color: #9BE15D; } .err { color: #FF8A8A; }
+  a { color: #FF7A45; }
+</style>
+</head>
+<body>
+<main>
+  <div class="label">Caravana</div>
+  <h1>Eliminar tu cuenta</h1>
+  <p>Puedes eliminarla desde la app (<b>Perfil › Eliminar cuenta</b>) o aquí mismo, iniciando sesión.
+     Es definitivo y no se puede deshacer.</p>
+
+  <h2>Qué se borra</h2>
+  <ul>
+    <li>Tu cuenta, perfil, vehículos, matrículas, consumos y mantenimientos.</li>
+    <li>Amistades, convoys, mensajes, retos, publicaciones y comentarios.</li>
+    <li>Tus posiciones compartidas y los avisos de tu teléfono.</li>
+    <li>Tus fotos (perfil, vehículos, publicaciones y recibos). Si alguna no se puede borrar al momento,
+        se reintenta sola y no queda asociada a ninguna cuenta.</li>
+  </ul>
+  <p>Los viajes grabados solo existen en tu teléfono: se borran al desinstalar la app.</p>
+
+  <h2>Eliminar ahora</h2>
+  <form id="form">
+    <label for="email">Correo de tu cuenta</label>
+    <input id="email" type="email" autocomplete="email" required>
+    <label for="password">Contraseña</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <label for="confirm">Escribe ELIMINAR para confirmar</label>
+    <input id="confirm" autocomplete="off" required>
+    <button id="submit" type="submit">Eliminar mi cuenta</button>
+  </form>
+  <div id="msg" class="msg"></div>
+  <p>¿No recuerdas la contraseña o no puedes entrar? Escríbenos a
+     <a href="mailto:avismael.eg@gmail.com?subject=Eliminar%20mi%20cuenta">avismael.eg@gmail.com</a> desde el correo de la cuenta.</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Solo valores públicos (los mismos que lleva la app). El borrado lo hace la
+  // Edge Function delete-account con la sesión de quien inicia sesión aquí.
+  var client = supabase.createClient('https://ecmqmgpruxclmpnnpgzv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbXFtZ3BydXhjbG1wbm5wZ3p2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5ODIwMjgsImV4cCI6MjEwODU1ODAyOH0.ME_rx22IX2TGMPmWYzbRyMRsQq1HI4ntNJeaQHFfjX0', { auth: { persistSession: false } });
+  var form = document.getElementById('form');
+  var msg = document.getElementById('msg');
+  var submit = document.getElementById('submit');
+  function show(text, ok) { msg.textContent = text; msg.className = 'msg ' + (ok ? 'ok' : 'err'); }
+  form.onsubmit = async function (event) {
+    event.preventDefault();
+    if (document.getElementById('confirm').value.trim().toUpperCase() !== 'ELIMINAR') {
+      return show('Escribe ELIMINAR para confirmar.', false);
+    }
+    submit.disabled = true;
+    show('Comprobando…', true);
+    var login = await client.auth.signInWithPassword({
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value,
+    });
+    if (login.error) { submit.disabled = false; return show('Correo o contraseña incorrectos.', false); }
+    var result = await client.functions.invoke('delete-account', { body: {} });
+    if (result.error || !result.data || !result.data.ok) {
+      submit.disabled = false;
+      return show('No pudimos eliminar la cuenta. Inténtalo de nuevo en un momento.', false);
+    }
+    form.remove();
+    show(result.data.storage === 'partial'
+      ? 'Tu cuenta y tus datos se eliminaron. Algunas fotos tardarán un poco más: se borran solas.'
+      : 'Tu cuenta y todos tus datos se eliminaron.', true);
+  };
+</script>
+</body>
+</html>

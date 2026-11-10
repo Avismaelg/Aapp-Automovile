@@ -43,3 +43,7 @@ yarn-error.*
 
 # Compilación de módulos nativos locales
 modules/*/android/build/
+
+# Firebase: configuración del proyecto (se descarga de la consola; no va a git)
+google-services.json
+GoogleService-Info.plist

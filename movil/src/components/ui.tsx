@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ReactNode } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
+import { use, useState, type ReactNode, type Ref } from 'react';
 import {
   Platform,
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   type StyleProp,
+  type TextInputInstance,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
@@ -104,6 +107,19 @@ export function Screen({
   const content = (
     <View style={[styles.screenContent, contentStyle]}>{children}</View>
   );
+  // SYNC-05: deslizar hacia abajo recarga los datos de la pantalla (todas
+  // las consultas activas), en cualquier pantalla con scroll.
+  const queryClient = use(QueryClientContext);
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    if (!queryClient) return;
+    setRefreshing(true);
+    try {
+      await queryClient.refetchQueries({ type: 'active' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor }]} edges={['top']}>
@@ -113,6 +129,17 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            queryClient ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => void refresh()}
+                tintColor={colors.accent}
+                colors={[colors.accent]}
+                progressBackgroundColor={colors.surface}
+              />
+            ) : undefined
+          }
         >
           {content}
         </ScrollView>
@@ -473,6 +500,9 @@ export function Input({
   error,
   ...props
 }: TextInputProps & {
+  // React 19: la ref llega como prop y se pasa al TextInput (foco al
+  // siguiente campo con «Siguiente» en el teclado).
+  ref?: Ref<TextInputInstance>;
   label?: string;
   rightSlot?: ReactNode;
   style?: StyleProp<ViewStyle>;

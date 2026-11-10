@@ -13,8 +13,10 @@ import {
   type LiveFix,
   type PartyDestination,
   type Point,
+  isMemberLive,
   isMemberOnMap,
 } from '@/src/lib/convoy';
+import { stageFor } from '@/src/hooks/useVoiceGuidance';
 import { setMilesForTests } from '@/src/i18n';
 import { applyMemberPatches, queueMemberPatch, type MemberPatch } from '@/src/lib/party-patch';
 import { matchesSubscription, partySubscriptions } from '@/src/lib/realtime-routing';
@@ -394,5 +396,23 @@ describe('convoy de 5 pilotos con retos', () => {
     expect(isMemberOnMap(new Date(now - 5 * 60_000).toISOString(), now)).toBe(true);
     expect(isMemberOnMap(new Date(now - 31 * 60_000).toISOString(), now)).toBe(false);
     expect(isMemberOnMap(null, now)).toBe(false);
+  });
+});
+
+describe('MAPA-15 / MAPA-21: voz a 500 m, 200 m y «ahora»; pilotos sin señal en gris', () => {
+  it('avisa a 500 m, 200 m y en la maniobra', () => {
+    expect(stageFor(900, 40)).toBe(0);
+    expect(stageFor(480, 40)).toBe(1);
+    expect(stageFor(190, 40)).toBe(2);
+    expect(stageFor(30, 40)).toBe(3);
+    // En vía rápida el «ahora» se adelanta.
+    expect(stageFor(75, 90)).toBe(3);
+  });
+
+  it('en vivo hasta minuto y medio sin noticias; luego en gris', () => {
+    const now = Date.parse('2026-11-03T12:00:00Z');
+    expect(isMemberLive(new Date(now - 30_000).toISOString(), now)).toBe(true);
+    expect(isMemberLive(new Date(now - 120_000).toISOString(), now)).toBe(false);
+    expect(isMemberLive(null, now)).toBe(false);
   });
 });
