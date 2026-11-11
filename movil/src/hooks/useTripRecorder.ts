@@ -3,7 +3,8 @@ import { AppState } from 'react-native';
 
 import { getMotionEvents } from '@/modules/motion';
 import { motionActivityAt, motionBlocksStart } from '@/src/lib/parking-logic';
-import { setMotionGates, useTrips } from '@/src/store/trips';
+import { useAuth } from '@/src/store/auth';
+import { claimTripsFor, setMotionGates, useTrips } from '@/src/store/trips';
 import { useSession } from '@/src/store/session';
 
 // Con la app abierta el GPS en primer plano ya graba; los lotes de fondo se
@@ -52,9 +53,15 @@ export function useTripRecorder(
   const test = options?.test ?? false;
   const trackingEnabled = useSession((state) => state.trackingEnabled);
 
+  // Antes de cargar los viajes se comprueba de quién son (ver claimTripsFor).
+  const accountId = useAuth((state) => state.account?.id ?? null);
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    if (!accountId || accountId === 'demo') {
+      void hydrate();
+      return;
+    }
+    void claimTripsFor(accountId).then(hydrate);
+  }, [accountId, hydrate]);
 
   useEffect(() => {
     if (!hydrated) return;

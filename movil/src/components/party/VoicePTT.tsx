@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useRef } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui';
@@ -18,7 +18,12 @@ export function VoicePTT({ size = 58 }: { size?: number }) {
   const micDenied = useConvoyVoice((state) => state.micDenied);
   const othersTalking = useConvoyVoice((state) => state.activeSpeakerIds.length > 0 && !state.talking);
   const setTalking = useConvoyVoice((state) => state.setTalking);
-  const [pressed, setPressed] = useState(false);
+  // `pressed` en estado puede llegar tarde a onPressOut en un toque muy
+  // rápido; el ref guarda la pulsación real.
+  const pressedRef = useRef(false);
+  // Cada pulsación tiene su número: una respuesta vieja no puede apagar el
+  // botón de una pulsación nueva.
+  const pressSeqRef = useRef(0);
 
   const start = () => {
     if (status !== 'connected') {
@@ -38,13 +43,19 @@ export function VoicePTT({ size = 58 }: { size?: number }) {
       ]);
       return;
     }
-    setPressed(true);
+    const pressId = ++pressSeqRef.current;
+    pressedRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    void setTalking(true);
+    void setTalking(true).then((enabled) => {
+      // Si falló (permiso o conexión), suelta el botón aunque el toque siga.
+      if (!enabled && pressedRef.current && pressSeqRef.current === pressId) {
+        pressedRef.current = false;
+      }
+    });
   };
   const stop = () => {
-    if (!pressed) return;
-    setPressed(false);
+    if (!pressedRef.current) return;
+    pressedRef.current = false;
     Haptics.selectionAsync().catch(() => {});
     // Con manos libres el micrófono sigue abierto.
     if (!handsFree) void setTalking(false);

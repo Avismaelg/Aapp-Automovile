@@ -6,6 +6,7 @@ type SharingState = {
   // null = aún no se ha preguntado.
   shareWithFriends: boolean | null;
   setShareWithFriends: (value: boolean) => void;
+  reset: () => void;
 };
 
 // Si tus amigos ven tu posición en su mapa (fuera de una party). Se pregunta
@@ -15,6 +16,7 @@ export const useSharing = create<SharingState>()(
     (set) => ({
       shareWithFriends: null,
       setShareWithFriends: (value) => set({ shareWithFriends: value }),
+      reset: () => set({ shareWithFriends: null }),
     }),
     {
       name: 'caravana-sharing',

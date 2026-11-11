@@ -227,6 +227,136 @@ do $$ declare v_ok boolean; v_msg text; begin
   insert into rls_results values ('2.4 unirse a un club público sí se puede', v_ok, v_msg);
 end $$;
 
+-- Auditoría final · B2: A bloquea a B. B deja de ver lo público de A
+-- (publicaciones y vehículos) y no puede colgar una quedada en un club de A.
+insert into public.posts (id, user_id, visibility)
+values ('00000000-0000-4000-9000-00000000000a', '00000000-0000-4000-a000-00000000000a', 'public')
+on conflict (id) do nothing;
+insert into public.blocks (blocker_id, blocked_id)
+values ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b')
+on conflict do nothing;
+
+-- B3: quedada privada de A para comprobar que B no se apunta solo con el id.
+insert into public.meets (id, host_id, title, starts_at, privacy)
+values ('00000000-0000-4000-9000-00000000000c', '00000000-0000-4000-a000-00000000000a',
+        'Quedada privada de A', now() + interval '1 day', 'private')
+on conflict (id) do nothing;
+
+do $$ declare v_ok boolean; v_msg text; v_posts integer; v_vehicles integer; begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  select count(*) into v_posts from public.posts where user_id = '00000000-0000-4000-a000-00000000000a';
+  select count(*) into v_vehicles from public.vehicles where owner_id = '00000000-0000-4000-a000-00000000000a';
+  execute 'reset role';
+  insert into rls_results values ('B2 bloqueado no ve publicaciones ni vehículos', v_posts = 0 and v_vehicles = 0,
+    format('posts=%s vehicles=%s', v_posts, v_vehicles));
+
+  -- A sí sigue viendo lo suyo.
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  select count(*) into v_posts from public.posts where user_id = '00000000-0000-4000-a000-00000000000a';
+  execute 'reset role';
+  insert into rls_results values ('B2 el dueño sigue viendo lo suyo', v_posts = 1, format('posts=%s', v_posts));
+
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.meets (host_id, club_id, title, starts_at)
+    values ('00000000-0000-4000-a000-00000000000b', '00000000-0000-4000-f000-00000000000b', 'Quedada colada', now() + interval '1 day');
+    v_ok := false; v_msg := 'creó la quedada';
+  exception when others then v_ok := true; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('B2 quedada en un club ajeno', v_ok, v_msg);
+
+  -- B3: B no puede apuntarse a una quedada privada de A solo con el id.
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.meet_attendees (meet_id, user_id)
+    values ('00000000-0000-4000-9000-00000000000c', '00000000-0000-4000-a000-00000000000b');
+    v_ok := false; v_msg := 'se apuntó a la quedada privada';
+  exception when others then v_ok := true; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('B3 apuntarse a una quedada privada ajena', v_ok, v_msg);
+
+  -- El anfitrión sí puede apuntarse a la suya.
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.meet_attendees (meet_id, user_id)
+    values ('00000000-0000-4000-9000-00000000000c', '00000000-0000-4000-a000-00000000000a');
+    v_ok := true; v_msg := 'ok';
+  exception when others then v_ok := false; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('B3 el anfitrión sí se apunta a la suya', v_ok, v_msg);
+
+  -- A4: llegar con una posición que no es un número (B es quien participa).
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.report_challenge_progress('00000000-0000-4000-e000-00000000000b', 100, true, 'NaN'::double precision, -69.93, 5);
+    v_ok := false; v_msg := 'ganó con NaN';
+  exception when others then v_ok := sqlerrm = 'invalid_position'; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('A4 llegar con posición NaN', v_ok, v_msg);
+
+  -- B4: destino del convoy fuera de rango (A es el anfitrión).
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.set_party_destination('00000000-0000-4000-c000-00000000000a', 'Roto', 'NaN'::double precision, -69.93);
+    v_ok := false; v_msg := 'guardó NaN';
+  exception when others then v_ok := sqlerrm = 'invalid_position'; v_msg := sqlerrm; end;
+  execute 'reset role';
+  insert into rls_results values ('B4 destino del convoy con NaN', v_ok, v_msg);
+end $$;
+
+-- B5: un solo usuario no puede agotar el cupo global de Places. A hace 61
+-- llamadas: la 60 pasa y la 61 se corta. B todavía puede buscar.
+delete from public.place_search_usage
+ where day = (now() at time zone 'utc')::date
+   and user_id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b');
+delete from public.place_search_global where day = (now() at time zone 'utc')::date;
+
+do $$ declare
+  v_day date := (now() at time zone 'utc')::date;
+  v_i integer;
+  v_sixty boolean := false;
+  v_last boolean := true;
+  v_other boolean := false;
+  v_global integer;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000a","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  for v_i in 1..61 loop
+    select public.bump_place_search(60, 300) into v_last;
+    if v_i = 60 then v_sixty := v_last; end if;
+  end loop;
+  execute 'reset role';
+
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-00000000000b","role":"authenticated"}', true);
+  execute 'set local role authenticated';
+  select public.bump_place_search(60, 300) into v_other;
+  execute 'reset role';
+
+  select g.count into v_global from public.place_search_global g where g.day = v_day;
+  insert into rls_results values (
+    'B5 un usuario no agota el cupo global de Places',
+    v_sixty and not v_last and v_other and v_global = 61,
+    format('llamada 60=%s llamada 61=%s otro usuario=%s global=%s', v_sixty, v_last, v_other, v_global)
+  );
+end $$;
+
+delete from public.blocks where blocker_id = '00000000-0000-4000-a000-00000000000a';
+delete from public.meets where host_id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b')
+   or id = '00000000-0000-4000-9000-00000000000c';
+delete from public.posts where id = '00000000-0000-4000-9000-00000000000a';
+-- La prueba de B5 deja el contador de hoy limpio para no alterar el cupo real.
+delete from public.place_search_usage
+ where day = (now() at time zone 'utc')::date
+   and user_id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b');
+delete from public.place_search_global where day = (now() at time zone 'utc')::date;
+
 -- Limpieza: borrar los usuarios arrastra perfiles, vehículos, convoy y demás.
 delete from public.speed_records where user_id in ('00000000-0000-4000-a000-00000000000a', '00000000-0000-4000-a000-00000000000b', '00000000-0000-4000-a000-00000000000c');
 delete from public.parties where id = '00000000-0000-4000-c000-00000000000a';

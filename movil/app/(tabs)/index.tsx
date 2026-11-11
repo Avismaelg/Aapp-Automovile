@@ -66,6 +66,7 @@ import { useRoadInfo } from "@/src/hooks/useRoadInfo";
 import { useActiveParty } from "@/src/hooks/useParty";
 import { ConvoyDestinationCard } from "@/src/components/navigation/ConvoyDestinationCard";
 import {
+  challengeDistanceM,
   followDestination,
   followStatus,
   isMemberLive,
@@ -672,6 +673,15 @@ export default function NavigationScreen() {
     void confirmResponsibleDriving().then((accepted) => {
       if (!accepted) return;
       const goal = destination ?? partyDestination;
+      // La ruta calculada es hacia TU destino: si la meta es la del convoy (o
+      // aún no hay ruta) vale la línea recta. Con 0 km el servidor no podía
+      // comprobar que el tiempo de llegada fuera posible.
+      const distanceM = challengeDistanceM(
+        live.location,
+        goal,
+        route.route?.distanceM ?? null,
+        goal === destination,
+      );
       const pickOther = () => {
         useChallengeDraft.getState().start(draft);
         router.push({ pathname: "/destino", params: { mode: "challenge" } });
@@ -695,7 +705,7 @@ export default function NavigationScreen() {
                 toLabel: goal.label,
                 endLat: goal.latitude,
                 endLng: goal.longitude,
-                distanceKm: (route.route?.distanceM ?? 0) / 1000,
+                distanceKm: distanceM / 1000,
                 rules: t('Por llegada: gana quien llegue primero respetando las leyes.'),
               })
               .then(() =>

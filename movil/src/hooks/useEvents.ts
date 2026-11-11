@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { isDemoMode } from '@/src/lib/demo';
 import { eventId, type AppEvent, type EventRoute } from '@/src/lib/events';
+import { syncPendingEvents } from '@/src/lib/events-sync';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/store/auth';
 import { useLocalEvents } from '@/src/store/events';
@@ -104,17 +105,18 @@ export function useEvents() {
     syncingRef.current = true;
     void (async () => {
       try {
-        // Se lee la lista viva: markSynced la cambia mientras se sube. Antes
-        // ese cambio reiniciaba el efecto a media subida, el siguiente evento
-        // se subía dos veces y quedaba pendiente para siempre.
-        for (;;) {
-          const event = useLocalEvents.getState().events.find((item) => item.pendingSync);
-          if (!event) break;
-          const { error } = await client.from('events').insert(insertPayload(event, hostId));
-          // 23505: ya estaba en el servidor (se subió y no llegó a marcarse).
-          if (error && error.code !== '23505') return;
-          markSynced(event.id);
-        }
+        const completed = await syncPendingEvents({
+          getEvents: () => useLocalEvents.getState().events,
+          insert: async (event) => {
+            const { error } = await client.from('events').insert(insertPayload(event, hostId));
+            return { error };
+          },
+          markSynced,
+          isSameAccount: () => useAuth.getState().account?.id === hostId,
+        });
+        // Cambió la cuenta o falló la red: no se refresca la lista de otra
+        // cuenta ni se insiste hasta el próximo cambio local.
+        if (!completed) return;
         void queryClient.invalidateQueries({ queryKey: ['events'] });
       } catch {
         // Sin conexión: se reintenta con el siguiente cambio local.

@@ -79,18 +79,38 @@ class DrivingService : Service() {
     // segundo plano o cerrada para que te vean moverte en su mapa.
     const val REASON_FRIENDS = "friends"
 
-    // Tipos del servicio: ubicación siempre; micrófono solo con la voz activa
-    // y el permiso concedido (si no, Android cerraría la app).
+    private fun hasLocationPermission(context: Context): Boolean =
+      context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED ||
+        context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+
+    private fun hasMicPermission(context: Context): Boolean =
+      context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+        PackageManager.PERMISSION_GRANTED
+
+    // Tipos del servicio: ubicación y, con la voz activa, micrófono. Desde
+    // Android 14 cada tipo exige su permiso concedido: declararlo sin él lanza
+    // una excepción y Android cierra la app.
     fun serviceTypes(context: Context): Int {
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
-      var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-      val micGranted = context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
-        PackageManager.PERMISSION_GRANTED
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && REASON_VOICE in activeReasons(context) && micGranted) {
+      var types = 0
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE || hasLocationPermission(context)) {
+        types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && REASON_VOICE in activeReasons(context) &&
+        hasMicPermission(context)
+      ) {
         types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
       }
       return types
     }
+
+    // Android 14+: sin ningún tipo válido el servicio no puede arrancar. Hay
+    // que saberlo ANTES de startForegroundService: una vez pedido, si no llega
+    // a ponerse en primer plano Android cierra la app.
+    private fun canRunInForeground(context: Context): Boolean =
+      Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE || serviceTypes(context) != 0
 
     @Volatile
     var running = false
@@ -120,8 +140,13 @@ class DrivingService : Service() {
 
     @Synchronized
     fun start(context: Context, reason: String): Boolean {
-      val reasons = activeReasons(context) + reason
-      prefs(context).edit().putStringSet("reasons", reasons).apply()
+      val previous = activeReasons(context)
+      prefs(context).edit().putStringSet("reasons", previous + reason).apply()
+      if (!canRunInForeground(context)) {
+        // Sin permiso de ubicación (ni de micrófono para la voz): no arranca.
+        prefs(context).edit().putStringSet("reasons", previous).apply()
+        return false
+      }
       return try {
         val intent = Intent(context, DrivingService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
@@ -138,6 +163,10 @@ class DrivingService : Service() {
       val reasons = activeReasons(context) - reason
       prefs(context).edit().putStringSet("reasons", reasons).apply()
       if (reasons.isEmpty()) {
+        context.stopService(Intent(context, DrivingService::class.java))
+        running = false
+      } else if (running && !canRunInForeground(context)) {
+        // Lo que queda ya no tiene permiso para seguir en primer plano.
         context.stopService(Intent(context, DrivingService::class.java))
         running = false
       } else if (running) {

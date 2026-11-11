@@ -33,8 +33,8 @@ import { ConvoyArrivals } from '@/src/components/party/ConvoyArrivals';
 import { VoiceHost } from '@/src/components/party/VoiceHost';
 import { PartyInviteBanner } from '@/src/components/party/PartyInviteBanner';
 import { useBackgroundTracking } from '@/src/hooks/useBackgroundTracking';
-import { setLiveShareConfig } from '@/src/lib/live-share';
-import { setConvoyMode } from '@/src/lib/tracking';
+import { setConvoyProgress, setLiveShareConfig } from '@/src/lib/live-share';
+import { setConvoyMode, stopTracking } from '@/src/lib/tracking';
 import { installWebAlert } from '@/src/lib/web-alert';
 import { useAuth } from '@/src/store/auth';
 import { colors } from '@/src/theme';
@@ -125,7 +125,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (!signedOut) return;
     void setLiveShareConfig({ accountId: null, partyId: null, friends: false });
+    setConvoyProgress(null);
     void setConvoyMode(false, false);
+    // Sin sesión no se graban rutas: el GPS de fondo seguía encendido hasta
+    // cerrar la app. Al entrar lo reanuda useBackgroundTracking.
+    void stopTracking().catch(() => undefined);
   }, [signedOut]);
 
   useEffect(() => {

@@ -16,8 +16,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Consultas a Google por usuario y día (autocompletar + detalles).
-const DAILY_LIMIT = 300;
+// Consultas a Google por usuario y día (autocompletar + detalles). Debe ser
+// menor que el global: si no, un solo usuario puede dejar sin buscador a todos.
+const DAILY_LIMIT = 60;
 // Tope de gasto (US$1): consultas al día para toda la app. ~9.000 al mes,
 // dentro de lo gratuito de Google; pasado el tope, la app usa el buscador
 // gratuito hasta el día siguiente.
@@ -75,6 +76,32 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: 'Sesión inválida.' }, 401);
 
+  // B5: validar antes de gastar cupo. Una acción inválida o una búsqueda vacía
+  // no debe consumir una consulta de Google ni la cuota del usuario.
+  const action = body.action;
+  const language = body.language === 'en' ? 'en' : 'es';
+  const sessionToken = typeof body.sessionToken === 'string' ? body.sessionToken.slice(0, 64) : undefined;
+
+  let autocompleteQuery = '';
+  let nearbyTypes: string[] = [];
+  let placeId = '';
+  if (action === 'autocomplete') {
+    autocompleteQuery = (body.q ?? '').trim().slice(0, 120);
+    if (autocompleteQuery.length < 2) return json({ places: [] });
+  } else if (action === 'nearby') {
+    nearbyTypes = Array.isArray((body as { types?: unknown }).types)
+      ? ((body as { types: unknown[] }).types.filter((type) => typeof type === 'string' && /^[a-z_]{3,40}$/.test(type)) as string[]).slice(0, 5)
+      : [];
+    if (nearbyTypes.length === 0 || !Number.isFinite(body.lat) || !Number.isFinite(body.lng)) {
+      return json({ error: 'Búsqueda inválida.' }, 400);
+    }
+  } else if (action === 'details') {
+    placeId = (body.placeId ?? '').trim();
+    if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: 'Lugar inválido.' }, 400);
+  } else {
+    return json({ error: 'Acción inválida.' }, 400);
+  }
+
   const { data: allowed, error: limitError } = await supabase.rpc('bump_place_search', {
     p_limit: DAILY_LIMIT,
     p_global_limit: GLOBAL_DAILY_LIMIT,
@@ -82,12 +109,8 @@ Deno.serve(async (request) => {
   if (limitError) return json({ error: 'No pudimos comprobar tu cupo de búsquedas.' }, 500);
   if (allowed === false) return json({ error: 'daily_limit' }, 429);
 
-  const language = body.language === 'en' ? 'en' : 'es';
-  const sessionToken = typeof body.sessionToken === 'string' ? body.sessionToken.slice(0, 64) : undefined;
-
-  if (body.action === 'autocomplete') {
-    const q = (body.q ?? '').trim().slice(0, 120);
-    if (q.length < 2) return json({ places: [] });
+  if (action === 'autocomplete') {
+    const q = autocompleteQuery;
     const hasOrigin = Number.isFinite(body.lat) && Number.isFinite(body.lng);
     const payload: Record<string, unknown> = {
       input: q,
@@ -125,13 +148,8 @@ Deno.serve(async (request) => {
   }
 
   // Paradas por tipo cerca de ti (gasolinera, comida, farmacia…), por distancia.
-  if (body.action === 'nearby') {
-    const types = Array.isArray((body as { types?: unknown }).types)
-      ? ((body as { types: unknown[] }).types.filter((type) => typeof type === 'string' && /^[a-z_]{3,40}$/.test(type)) as string[]).slice(0, 5)
-      : [];
-    if (types.length === 0 || !Number.isFinite(body.lat) || !Number.isFinite(body.lng)) {
-      return json({ error: 'Búsqueda inválida.' }, 400);
-    }
+  if (action === 'nearby') {
+    const types = nearbyTypes;
     const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
       method: 'POST',
       headers: {
@@ -177,9 +195,7 @@ Deno.serve(async (request) => {
     });
   }
 
-  if (body.action === 'details') {
-    const placeId = (body.placeId ?? '').trim();
-    if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: 'Lugar inválido.' }, 400);
+  if (action === 'details') {
     const params = new URLSearchParams({ languageCode: language });
     if (sessionToken) params.set('sessionToken', sessionToken);
     const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}?${params}`, {

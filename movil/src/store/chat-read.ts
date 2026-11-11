@@ -6,6 +6,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 type ReadState = {
   lastRead: Record<string, number>;
   markRead: (partyId: string, messageId: number) => void;
+  reset: () => void;
 };
 
 export const useChatRead = create<ReadState>()(
@@ -18,6 +19,7 @@ export const useChatRead = create<ReadState>()(
             ? state
             : { lastRead: { ...state.lastRead, [partyId]: messageId } },
         ),
+      reset: () => set({ lastRead: {} }),
     }),
     { name: 'caravana.chat-read.v1', storage: createJSONStorage(() => AsyncStorage) },
   ),

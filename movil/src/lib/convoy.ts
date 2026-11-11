@@ -172,6 +172,23 @@ export function convoyDestinationAction({
 
 export const ARRIVE_RADIUS_M = 60;
 
+// Distancia que se declara al crear un reto con meta. La ruta calculada solo
+// sirve si la meta es tu destino personal; si es la del convoy, se usa la
+// línea recta. Nunca se declara menos que la línea recta: el servidor usa ese
+// dato para descartar tiempos de llegada imposibles.
+export function challengeDistanceM(
+  from: Point,
+  goal: Point | null,
+  routeDistanceM: number | null,
+  routeIsForGoal: boolean,
+) {
+  if (!goal) return 0;
+  const direct = metersBetween(from, goal);
+  if (direct === 0) return 0;
+  if (!routeIsForGoal || routeDistanceM == null || !Number.isFinite(routeDistanceM)) return direct;
+  return Math.max(routeDistanceM, direct);
+}
+
 // Avance en % desde donde empezaste hasta la meta. Si empezaste más cerca que
 // el radio de llegada, ya cuentas como llegado.
 export function challengeProgress(start: Point, end: Point, current: Point) {

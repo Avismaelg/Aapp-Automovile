@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 
+import { backgroundLocationAction } from '@/src/lib/background-location';
 import { isSimulating, useSimulator } from '@/src/lib/simulator';
 import { askLocationConsent } from '@/src/lib/location-consent';
 import { nextSpeed, type SpeedState } from '@/src/lib/speed-filter';
@@ -173,7 +174,9 @@ async function watchCompass(id: number) {
         // Sin brújula en este dispositivo: seguimos con el rumbo del GPS.
       },
     );
-    if (id !== session) {
+    // Si la app se fue a segundo plano mientras se abría la brújula, no se
+    // deja encendida: al volver, resumeFromBackground la abre otra vez.
+    if (id !== session || AppState.currentState === 'background') {
       heading.remove();
       return;
     }
@@ -188,10 +191,20 @@ async function beginSession(id: number) {
     // Pedir el permiso abre (y cierra) una pantalla del sistema aunque ya esté
     // concedido; eso pausa la app y dispara AppState. Solo se pide si falta.
     const current = await Location.getForegroundPermissionsAsync();
+    if (id !== session) return;
+    if (AppState.currentState === 'background' && !useChosenDestination.getState().isNavigating) {
+      pausedInBackground = true;
+      return;
+    }
     // OTR-01: antes del aviso del sistema, la app explica el uso y pide el
     // consentimiento; sin él se usa la posición de demostración.
     if (!current.granted && !(await askLocationConsent())) {
       if (id === session) fallBackToDemo('denied', t('Sin permiso de ubicación · usando ubicación de demo'));
+      return;
+    }
+    if (id !== session) return;
+    if (AppState.currentState === 'background' && !useChosenDestination.getState().isNavigating) {
+      pausedInBackground = true;
       return;
     }
     const permission = current.granted ? current : await Location.requestForegroundPermissionsAsync();
@@ -201,12 +214,23 @@ async function beginSession(id: number) {
       fallBackToDemo('denied', t('Permiso de ubicación denegado · usando ubicación de demo'));
       return;
     }
+    // B8: si la app se fue a segundo plano mientras se pedía el permiso, no se
+    // sigue arrancando el GPS sin navegación. Al volver, resumeFromBackground
+    // inicia una sesión limpia.
+    if (AppState.currentState === 'background' && !useChosenDestination.getState().isNavigating) {
+      pausedInBackground = true;
+      return;
+    }
 
     const lastKnown = await Location.getLastKnownPositionAsync({
       maxAge: 60_000,
       requiredAccuracy: 250,
     });
     if (id !== session) return;
+    if (AppState.currentState === 'background' && !useChosenDestination.getState().isNavigating) {
+      pausedInBackground = true;
+      return;
+    }
     if (lastKnown) {
       applyPosition(lastKnown);
     } else if (useLiveLocationState.getState().status !== 'live') {
@@ -232,6 +256,19 @@ async function beginSession(id: number) {
       return;
     }
     activeWatch = subscription;
+    // B8: la app pudo irse a segundo plano mientras se pedía el permiso o se
+    // abría el GPS. Sin navegación se corta esta sesión recién nacida; navegando
+    // se conserva el GPS pero no se enciende la brújula, que solo sirve en
+    // pantalla. Al volver, resumeFromBackground la enciende.
+    if (AppState.currentState === 'background') {
+      if (!useChosenDestination.getState().isNavigating) {
+        stopSession();
+        pausedInBackground = true;
+        return;
+      }
+      pausedInBackground = true;
+      return;
+    }
     await watchCompass(id);
   } catch {
     if (id !== session) return;
@@ -281,13 +318,21 @@ function stopSession() {
 let pausedInBackground = false;
 
 function pauseForBackground() {
-  if (subscribers === 0 || (!activeWatch && !activeHeading)) return;
-  if (useChosenDestination.getState().isNavigating && activeWatch) {
+  const action = backgroundLocationAction({
+    subscribers,
+    navigating: useChosenDestination.getState().isNavigating,
+    hasHandles: Boolean(activeWatch || activeHeading),
+    denied: useLiveLocationState.getState().status === 'denied',
+  });
+  if (action === 'none') return;
+  if (action === 'keep-gps') {
     activeHeading?.remove();
     activeHeading = null;
-  } else {
+  } else if (action === 'stop') {
     stopSession();
   }
+  // En 'pause' no se corta aquí: beginSession comprueba el fondo tras cada
+  // espera y no llega a abrir el GPS sin navegación. Antes se dejaba seguir.
   pausedInBackground = true;
 }
 
@@ -297,7 +342,10 @@ function resumeFromBackground() {
   if (subscribers === 0) return;
   if (activeWatch) {
     if (!activeHeading) void watchCompass(session);
-  } else {
+  } else if (useLiveLocationState.getState().status !== 'denied') {
+    // Con el permiso denegado no se reintenta solo al volver: el usuario puede
+    // concederlo desde Ajustes y usar «reintentar», pero no se le pregunta en
+    // cada cambio de pantalla.
     startSession(undefined, true);
   }
 }
@@ -339,13 +387,22 @@ export function retryLiveLocation() {
 export function refreshStaleLocation(maxAgeMs = 20_000) {
   // En simulación el GPS real se ignora: no hay nada que refrescar.
   if (subscribers === 0 || isSimulating()) return;
+  // Volviendo de segundo plano manda la reanudación (silenciosa); reiniciar
+  // aquí además arrancaba el GPS dos veces y enseñaba «Actualizando…».
+  if (pausedInBackground) {
+    resumeFromBackground();
+    return;
+  }
   // Una sesión recién arrancada aún no ha tenido tiempo de dar posición:
   // reiniciarla otra vez entraría en bucle (cada reinicio pausa la app).
   if (Date.now() - sessionStartedAt < 15_000) return;
   // Pasados esos 15 s, sin ninguna posición o con una vieja se reinicia.
   if (lastFixAt > 0 && Date.now() - lastFixAt <= maxAgeMs) return;
+  // Con posición en vivo se refresca sin pasar por «localizando»: ese paso
+  // cortaba un momento lo que depende de isLive (compartir posición, retos).
+  const wasLive = useLiveLocationState.getState().status === 'live';
   stopSession();
-  startSession(t('Actualizando tu ubicación…'));
+  startSession(t('Actualizando tu ubicación…'), wasLive);
 }
 
 export function useLiveLocation() {

@@ -260,12 +260,14 @@ describe('fase 2 · auditoría de seguridad', () => {
 
   it('los topes de Google los fija el servidor y el cupo propio va antes que el total', () => {
     for (const [name, userCap, globalCap] of [
-      ['bump_place_search', 300, 300],
+      ['bump_place_search', 60, 300],
       ['bump_route_quota', 60, 150],
     ] as const) {
       const body = functionBody(name);
       expect(body).toContain(`v_user_cap constant integer := ${userCap}`);
       expect(body).toContain(`v_global_cap constant integer := ${globalCap}`);
+      // B5: el cupo de un usuario nunca puede agotar el global.
+      expect(userCap).toBeLessThan(globalCap);
       expect(body).not.toMatch(/p_(global_)?limit\)/);
       expect(body.indexOf('if v_count > v_user_cap then return false')).toBeLessThan(
         body.indexOf(name === 'bump_place_search' ? 'place_search_global (day' : 'values (v_day, v_global'),
@@ -357,5 +359,63 @@ describe('fase 10 · páginas web de las tiendas', () => {
     const page = fs.readFileSync(path.join(site, 'privacidad', 'index.html'), 'utf8');
     expect(page).toContain('lo está por defecto');
     expect(page).toContain('../borrar-cuenta/');
+  });
+});
+
+describe('auditoría final · bloqueos, quedadas, destino y voz', () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261110120000_final_audit_hardening.sql'),
+    'utf8',
+  );
+
+  it('B2: un bloqueo corta la amistad y oculta publicaciones, rutas y vehículos', () => {
+    expect(sql).toMatch(/function private\.are_friends[\s\S]{0,200}select not private\.is_blocked\(a, b\) and exists/);
+    for (const name of ['can_view_drive', 'can_view_post']) {
+      expect(sql).toMatch(new RegExp(`function private\\.${name}[\\s\\S]{0,400}not private\\.is_blocked\\(viewer,`));
+    }
+    for (const policy of ['posts_select', 'vehicles_select']) {
+      expect(sql).toMatch(
+        new RegExp(`create policy ${policy}[\\s\\S]{0,200}not private\\.is_blocked\\(\\(select auth\\.uid\\(\\)\\),`),
+      );
+    }
+  });
+
+  it('B2: las quedadas de un club solo las crean sus miembros y solo se apunta quien la ve', () => {
+    for (const policy of ['meets_insert', 'meets_update']) {
+      expect(sql).toMatch(new RegExp(`create policy ${policy}[\\s\\S]{0,300}private\\.is_club_member\\(club_id\\)`));
+    }
+    expect(sql).toMatch(/create policy meet_attendees_insert[\s\S]{0,300}m\.id = meet_attendees\.meet_id/);
+  });
+
+  it('B4: el destino del convoy valida las coordenadas y sigue cerrado a anon', () => {
+    expect(sql).toContain("if abs(p_lat) > 90 or abs(p_lng) > 180 then raise exception 'invalid_position'; end if;");
+    expect(sql).toMatch(/revoke all on function private\.set_party_destination\([^)]*\) from public, anon;/);
+  });
+
+  it('B6: la voz también se corta al borrarse la fila del miembro', () => {
+    expect(sql).toContain("if tg_op = 'DELETE' then");
+    expect(sql).toContain('after update of left_at or delete on public.party_members');
+    expect(sql).toMatch(/revoke all on function private\.voice_revoke\(\) from public, anon, authenticated;/);
+  });
+
+  it('B5: el cupo por usuario no agota el global y se valida antes de gastarlo', () => {
+    const places = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'supabase', 'functions', 'places', 'index.ts'),
+      'utf8',
+    );
+    expect(places).toContain('const DAILY_LIMIT = 60;');
+    expect(places).toContain('const GLOBAL_DAILY_LIMIT = 300;');
+    const firstValidation = places.indexOf("if (action === 'autocomplete')");
+    const rpc = places.indexOf("rpc('bump_place_search'");
+    expect(firstValidation).toBeGreaterThan(0);
+    expect(firstValidation).toBeLessThan(rpc);
+    expect(places.indexOf("return json({ error: 'Acción inválida.' }, 400);")).toBeLessThan(rpc);
+  });
+
+  it('B7: reto desde el mapa con la distancia de la meta correcta', () => {
+    const screen = fs.readFileSync(path.join(__dirname, '..', '..', 'app', '(tabs)', 'index.tsx'), 'utf8');
+    expect(screen).toContain('const distanceM = challengeDistanceM(');
+    expect(screen).toContain('distanceKm: distanceM / 1000');
+    expect(screen).not.toContain('distanceKm: (route.route?.distanceM ?? 0) / 1000');
   });
 });

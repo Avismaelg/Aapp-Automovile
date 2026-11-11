@@ -10,7 +10,7 @@ import type { PartyVoiceChannelSlug } from '@/src/lib/party';
 export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'error';
 
 type VoiceActions = {
-  setTalking: (next: boolean) => Promise<void>;
+  setTalking: (next: boolean) => Promise<boolean>;
   setHandsFree: (next: boolean) => Promise<void>;
   setMuteAll: (next: boolean) => void;
 };
@@ -30,6 +30,7 @@ type VoiceState = VoiceActions & {
 };
 
 const noop = async () => {};
+const noopTalking = async () => false;
 
 export const useConvoyVoice = create<VoiceState>((set) => ({
   // Todos empiezan en «Convoy»: cambiar de canal es una elección de la sesión.
@@ -44,7 +45,7 @@ export const useConvoyVoice = create<VoiceState>((set) => ({
   micDenied: false,
   setChannel: (channel) => set({ channel }),
   // VoiceHost las sustituye por las de la sala conectada.
-  setTalking: noop,
+  setTalking: noopTalking,
   setHandsFree: noop,
   setMuteAll: () => {},
 }));

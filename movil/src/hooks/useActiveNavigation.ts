@@ -135,6 +135,15 @@ export function useActiveNavigation({
   // parqueo, el otro lado de la calle) nunca decía «Has llegado» (tableta,
   // 2026-11-04). Ver arrivedAtDestination.
   const [arrivedLabel, setArrivedLabel] = useState<string | null>(null);
+  // El aviso de voz sale 600 ms después de terminar la ruta: si la pantalla se
+  // desmonta antes (cerrar sesión), no debe hablar.
+  const arrivalSpeechRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (arrivalSpeechRef.current) clearTimeout(arrivalSpeechRef.current);
+    },
+    [],
+  );
   const destinationDistanceM = destination ? haversineMeters(location, destination) : null;
   const stoppedNear = useStoppedFor(location.speedKmh, ARRIVE_STOPPED_MS);
   const arrived =
@@ -156,7 +165,11 @@ export function useActiveNavigation({
       clearChosenDestination();
       // La guía por voz se calla al terminar la ruta: el aviso va después.
       if (!voiceMuted) {
-        setTimeout(() => Speech.speak(t('Has llegado a {0}', label), { language: speechLanguage() }), 600);
+        if (arrivalSpeechRef.current) clearTimeout(arrivalSpeechRef.current);
+        arrivalSpeechRef.current = setTimeout(() => {
+          arrivalSpeechRef.current = null;
+          Speech.speak(t('Has llegado a {0}', label), { language: speechLanguage() });
+        }, 600);
       }
     }, 0);
     return () => clearTimeout(timer);

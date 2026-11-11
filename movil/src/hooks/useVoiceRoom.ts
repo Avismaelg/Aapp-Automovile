@@ -64,9 +64,18 @@ export function useVoiceRoom({
   enabled: boolean;
 }) {
   const roomRef = useRef<Room | null>(null);
+  // Última intención del usuario sobre el micrófono. Si pulsa y suelta antes
+  // de que termine la petición de permiso, gana la última acción: antes podía
+  // quedarse el micro abierto después de un toque rápido.
+  const micWantedRef = useRef(false);
+  // Las órdenes de micrófono se aplican en fila, nunca a la vez.
+  const micQueueRef = useRef<Promise<void>>(Promise.resolve());
   // CONV-14: manos libres (micrófono abierto) y CONV-15: silenciar a todos.
   const [handsFree, setHandsFreeState] = useState(false);
   const handsFreeRef = useRef(false);
+  // Igual que el micrófono: si se enciende y se apaga mientras se pide el
+  // permiso, gana la última acción.
+  const handsFreeWantedRef = useRef(false);
   const [mutedAll, setMutedAll] = useState(false);
   const mutedAllRef = useRef(false);
   const [status, setStatus] = useState<VoiceStatus>('idle');
@@ -113,7 +122,11 @@ export function useVoiceRoom({
     if (!voiceOn) setHandsFreeState(false);
   }
   useEffect(() => {
-    if (!voiceOn) handsFreeRef.current = false;
+    if (!voiceOn) {
+      handsFreeRef.current = false;
+      handsFreeWantedRef.current = false;
+      micWantedRef.current = false;
+    }
   }, [voiceOn]);
 
   useEffect(() => {
@@ -239,6 +252,7 @@ export function useVoiceRoom({
         // por defecto mientras la pantalla seguía mostrando lo elegido.
         if (mutedAllRef.current) setRemoteAudio(room, true);
         const openMic = handsFreeRef.current && (await ensureMicrophone());
+        micWantedRef.current = openMic;
         await room.localParticipant.setMicrophoneEnabled(openMic);
         setTalkingState(openMic);
         updateParticipants();
@@ -248,7 +262,11 @@ export function useVoiceRoom({
         startDriving('voice');
         // Se pide ya, para que el primer PTT no se pierda en el aviso.
         void ensureMicrophone().then((granted) => {
-          if (active) setMicDenied(!granted);
+          if (!active) return;
+          if (granted) setMicDenied(false);
+          // Si mientras se pedía el permiso el usuario ya estaba hablando,
+          // no se marca como denegado por una respuesta vieja.
+          else if (!micWantedRef.current) setMicDenied(true);
         });
       } catch (connectError) {
         // Un token rechazado o caducado no se vuelve a usar.
@@ -281,6 +299,7 @@ export function useVoiceRoom({
     return () => {
       active = false;
       if (retryTimer) clearTimeout(retryTimer);
+      micWantedRef.current = false;
       setTalkingState(false);
       if (room) {
         room.disconnect();
@@ -290,31 +309,71 @@ export function useVoiceRoom({
     };
   }, [channelSlug, enabled, partyId]);
 
-  const setTalking = useCallback(async (next: boolean) => {
-    const room = roomRef.current;
-    if (!room) return;
-    if (next && !(await ensureMicrophone())) {
-      setError(t('Sin permiso de micrófono no puedes hablar. Actívalo en Ajustes › Apps › Caravana.'));
-      return;
+  const setTalking = useCallback(async (next: boolean): Promise<boolean> => {
+    // La intención más reciente manda. Si se pulsa y se suelta mientras se
+    // está pidiendo permiso, no se enciende el micro al resolverse el aviso.
+    micWantedRef.current = next;
+    const targetRoom = roomRef.current;
+    if (!targetRoom) {
+      if (!next) setTalkingState(false);
+      return !next;
     }
-    try {
-      await room.localParticipant.setMicrophoneEnabled(next);
-      setTalkingState(next);
-    } catch (micError) {
-      setTalkingState(false);
-      setError(
-        micError instanceof Error
-          ? micError.message
-          : t('No pudimos activar el micrófono.'),
-      );
-    }
+
+    const apply = async (): Promise<boolean> => {
+      if (micWantedRef.current !== next) return false;
+      if (next && !(await ensureMicrophone())) {
+        micWantedRef.current = false;
+        setMicDenied(true);
+        setTalkingState(false);
+        setError(
+          t('Sin permiso de micrófono no puedes hablar. Actívalo en Ajustes › Apps › Caravana.'),
+        );
+        return false;
+      }
+      if (roomRef.current !== targetRoom || micWantedRef.current !== next) return false;
+      try {
+        await targetRoom.localParticipant.setMicrophoneEnabled(next);
+        if (roomRef.current !== targetRoom || micWantedRef.current !== next) return false;
+        setTalkingState(next);
+        if (next) {
+          setMicDenied(false);
+          setError(null);
+        }
+        return true;
+      } catch (micError) {
+        if (micWantedRef.current !== next) return false;
+        micWantedRef.current = false;
+        setTalkingState(false);
+        setError(
+          micError instanceof Error
+            ? micError.message
+            : t('No pudimos activar el micrófono.'),
+        );
+        return false;
+      }
+    };
+
+    const run = micQueueRef.current.then(apply, apply);
+    micQueueRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }, []);
 
   const setHandsFree = useCallback(
     async (next: boolean) => {
-      handsFreeRef.current = next;
-      setHandsFreeState(next);
-      await setTalking(next);
+      handsFreeWantedRef.current = next;
+      if (!next) {
+        handsFreeRef.current = false;
+        setHandsFreeState(false);
+        await setTalking(false);
+        return;
+      }
+      const enabledMic = await setTalking(true);
+      if (!enabledMic || handsFreeWantedRef.current !== next) return;
+      handsFreeRef.current = true;
+      setHandsFreeState(true);
     },
     [setTalking],
   );

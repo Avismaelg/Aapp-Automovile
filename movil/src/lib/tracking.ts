@@ -217,9 +217,17 @@ export async function startTracking() {
   if (!hasPermission) {
     throw new Error(t('Necesitamos permiso de ubicación “Siempre” para registrar tus rutas.'));
   }
-  shareDrivingTexts();
-  setAutoDriving(true);
-  await ensureUpdatesRunning();
+  try {
+    shareDrivingTexts();
+    await ensureUpdatesRunning();
+    // B11: el servicio pudo no arrancar (permiso revocado, sistema sin
+    // ubicación…). Marcar autoDriving antes dejaba el aviso de conducción
+    // encendido sin que hubiera registro de ruta.
+    setAutoDriving(true);
+  } catch (error) {
+    setAutoDriving(false);
+    throw error;
+  }
 }
 
 export async function stopTracking() {
@@ -244,16 +252,21 @@ export type ResumeResult = 'running' | 'no-permission' | 'error';
 export async function resumeTracking(): Promise<ResumeResult> {
   if (Platform.OS === 'web') return 'error';
   try {
-    if (!(await hasTrackingPermissions())) return 'no-permission';
+    if (!(await hasTrackingPermissions())) {
+      setAutoDriving(false);
+      return 'no-permission';
+    }
     shareDrivingTexts();
-    setAutoDriving(true);
     if (await Location.hasStartedLocationUpdatesAsync(TASK_NAME)) {
       await Location.stopLocationUpdatesAsync(TASK_NAME);
     }
     await Location.startLocationUpdatesAsync(TASK_NAME, currentOptions());
+    // B11: igual que en startTracking, solo después de que el servicio arrancó.
+    setAutoDriving(true);
     syncLiveService(true);
     return 'running';
   } catch {
+    setAutoDriving(false);
     return 'error';
   }
 }

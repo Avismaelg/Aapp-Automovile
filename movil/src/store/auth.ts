@@ -8,9 +8,14 @@ import { isProductionBuild, isSupabaseConfigured, supabase } from '@/src/lib/sup
 import { t } from '@/src/i18n';
 import { PASSWORD_MIN } from '@/src/lib/signup-validation';
 import { unregisterPushToken } from '@/src/lib/push';
+import { useChatRead } from '@/src/store/chat-read';
 import { useChosenDestination } from '@/src/store/destination';
+import { useLocalEvents } from '@/src/store/events';
 import { useFollow } from '@/src/store/follow';
 import { useParking } from '@/src/store/parking';
+import { useSharing } from '@/src/store/sharing';
+import { useSignupDraft } from '@/src/store/signup-draft';
+import { useTrips } from '@/src/store/trips';
 
 const DEMO_KEY = 'caravana.auth.demo-mode';
 
@@ -244,6 +249,15 @@ async function endSession(scope: 'global' | 'local') {
   useFollow.getState().stop();
   useChosenDestination.getState().resetAll();
   useParking.getState().clearSpot();
+  useLocalEvents.getState().resetAll();
+  useSharing.getState().reset();
+  useChatRead.getState().reset();
+  useSignupDraft.getState().reset();
+  useSignupDraft.getState().setPendingPhoto(null);
+  // Los viajes solo están en el teléfono: al cerrar sesión se conservan para
+  // cuando vuelvas (otra cuenta no los hereda, ver claimTripsFor). Con la
+  // cuenta borrada se borran ya.
+  if (scope === 'local') await useTrips.getState().resetAll().catch(() => undefined);
   useAuth.setState({ status: 'unauthenticated', account: null, busy: false, error: null });
 }
 

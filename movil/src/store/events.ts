@@ -9,6 +9,7 @@ type LocalEventsState = {
   addEvent: (event: AppEvent) => void;
   removeEvent: (id: string) => void;
   markSynced: (id: string) => void;
+  resetAll: () => void;
 };
 
 const MAX_LOCAL_EVENTS = 50;
@@ -37,6 +38,8 @@ export const useLocalEvents = create<LocalEventsState>()(
             event.id === id ? { ...event, pendingSync: false } : event,
           ),
         })),
+
+      resetAll: () => set({ events: [] }),
     }),
     {
       name: 'caravana.events.v1',

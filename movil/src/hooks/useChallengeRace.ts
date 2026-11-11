@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 
 import { reportChallengeProgress, useChallenges } from '@/src/hooks/useChallenges';
 import type { LiveLocation } from '@/src/hooks/useLiveLocation';
+import { parseChallengeStart } from '@/src/lib/challenge-start';
 import { challengeEtaS, challengeProgress, placeLabel, shouldReportProgress, type Point } from '@/src/lib/convoy';
 import { haversineMeters } from '@/src/lib/geo';
 import { t } from '@/src/i18n';
@@ -46,10 +47,14 @@ export function useChallengeRace(
     let cancelled = false;
     void (async () => {
       const saved = await AsyncStorage.getItem(START_KEY(challengeId)).catch(() => null);
-      const point: Point = saved
-        ? (JSON.parse(saved) as Point)
-        : { latitude: locationRef.current.latitude, longitude: locationRef.current.longitude };
-      if (!saved) await AsyncStorage.setItem(START_KEY(challengeId), JSON.stringify(point)).catch(() => {});
+      const savedPoint = parseChallengeStart(saved);
+      const point: Point = savedPoint ?? {
+        latitude: locationRef.current.latitude,
+        longitude: locationRef.current.longitude,
+      };
+      // Sin dato o con un JSON inválido se guarda la posición actual; antes
+      // JSON.parse lanzaba dentro del efecto y el reto se quedaba sin salida.
+      if (!savedPoint) await AsyncStorage.setItem(START_KEY(challengeId), JSON.stringify(point)).catch(() => {});
       if (!cancelled) {
         lastRef.current = null;
         setStart({ id: challengeId, point });

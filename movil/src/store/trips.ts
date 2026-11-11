@@ -60,10 +60,13 @@ type TripsState = {
   removeTestTrips: () => Promise<void>;
   removeTrip: (tripId: string) => Promise<void>;
   markRecordsSubmitted: (tripId: string) => void;
+  // Borra todos los viajes del teléfono (cuenta borrada o cambio de cuenta).
+  resetAll: () => Promise<void>;
 };
 
 const ARCHIVE_KEY = "caravana.trips.v1";
 const ACTIVE_KEY = "caravana.active-trip.v1";
+const OWNER_KEY = "caravana.trips-owner.v1";
 const MAX_TRIPS = 30;
 const MAX_POINTS = 700;
 // Solo se graba al conducir: 15 km/h sostenidos en varias muestras. Así una
@@ -642,4 +645,35 @@ export const useTrips = create<TripsState>((set, get) => ({
     });
     void persistArchive();
   },
+
+  resetAll: async () => {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = null;
+    lastMovingAt = 0;
+    lastSampleAt = 0;
+    fastSamples = 0;
+    pendingStart = null;
+    set({ trips: [], totals: EMPTY_TOTALS, active: null });
+    await AsyncStorage.removeItem(ARCHIVE_KEY).catch(() => undefined);
+    await AsyncStorage.removeItem(ACTIVE_KEY).catch(() => undefined);
+    await AsyncStorage.removeItem(OWNER_KEY).catch(() => undefined);
+    // Los puntos de fondo aún sin recoger también eran de esa cuenta.
+    await drainBackgroundPoints().catch(() => undefined);
+  },
 }));
+
+// Los viajes solo viven en el teléfono. Cerrar sesión no los borra (al volver
+// a entrar siguen ahí), pero si entra OTRA cuenta no hereda las rutas de la
+// anterior. Sin dueño guardado (instalaciones anteriores) se quedan con quien
+// entra.
+export async function claimTripsFor(ownerId: string) {
+  let stored: string | null = null;
+  try {
+    stored = await AsyncStorage.getItem(OWNER_KEY);
+  } catch {
+    return;
+  }
+  if (stored === ownerId) return;
+  if (stored) await useTrips.getState().resetAll();
+  await AsyncStorage.setItem(OWNER_KEY, ownerId).catch(() => undefined);
+}
