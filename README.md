@@ -79,6 +79,23 @@ npm install
 npx expo start          # desarrollo (necesita development build: hay código nativo)
 ```
 
+**En otra PC** — el repositorio no trae tres archivos (están fuera de git a
+propósito); cópialos a mano desde la PC original a la misma ruta:
+
+- `movil/.env` (o créalo a partir de `movil/.env.example`)
+- `movil/google-services.json`
+- `movil/GoogleService-Info.plist`
+
+```bash
+git clone https://github.com/Avismaelg/Aapp-Automovile.git caravana
+cd caravana/movil
+npm install
+npx expo prebuild --platform android   # genera movil/android
+```
+
+El servidor (Supabase, LiveKit) no hay que montarlo de nuevo: ya está en la nube
+y la app apunta a él con las variables de `.env`.
+
 **APK de Android en local** (Windows, desde `movil/android`):
 
 ```powershell
@@ -94,7 +111,7 @@ compilar (`android/` e `ios/` se generan, no se editan a mano).
 ```bash
 npx tsc --noEmit
 npx eslint .
-npx jest                       # 50 suites, 330 pruebas
+npx jest                       # 59 suites, 390 pruebas
 node scripts/i18n-missing.js   # textos sin traducir al inglés
 ```
 
@@ -120,12 +137,12 @@ MapTiler. **Nunca** una `service_role` ni claves de Google, LiveKit o Firebase.
 | Secreto | Para |
 |---|---|
 | `GOOGLE_MAPS_API_KEY` | `places`, `routes` |
-| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | `livekit-token` |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (hoy guardados como `url`, `Apikey`, `secret`; las funciones aceptan ambos) | `livekit-token`, `livekit-revoke` |
 | `FIREBASE_SERVICE_ACCOUNT`, `PUSH_WEBHOOK_SECRET` | `push` (Android) |
 | `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` | `push` (iPhone) |
 
 Las migraciones están en `movil/supabase/migrations` (proyecto
-`ecmqmgpruxclmpnnpgzv`). La prueba `src/__tests__/db-permissions.test.ts` repasa
+`icagznmqialqaclcylza`). La prueba `src/__tests__/db-permissions.test.ts` repasa
 todas en orden y falla si alguna quita permisos que la app necesita.
 
 ---
