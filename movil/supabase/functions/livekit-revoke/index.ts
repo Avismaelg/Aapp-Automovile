@@ -33,9 +33,23 @@ Deno.serve(async (request) => {
     return json({ error: 'forbidden' }, 403);
   }
 
-  const url = Deno.env.get('LIVEKIT_URL')?.trim().replace(/[./\s]+$/, '');
-  const key = Deno.env.get('LIVEKIT_API_KEY')?.trim();
-  const apiSecret = Deno.env.get('LIVEKIT_API_SECRET')?.trim();
+  // Mismos nombres alternativos que livekit-token («URL», «API KEY», «API SECRET»).
+  // Si en el valor se pegó la línea entera («LIVEKIT_URL=wss://…»), se quita
+  // el «NOMBRE=» del principio y las comillas.
+  const secret = (...names: string[]) => {
+    for (const name of names) {
+      const value = Deno.env.get(name)
+        ?.trim()
+        .replace(/^LIVEKIT_[A-Z_]+\s*=\s*/, '')
+        .replace(/^["']|["']$/g, '')
+        .trim();
+      if (value) return value;
+    }
+    return undefined;
+  };
+  const url = secret('LIVEKIT_URL', 'url', 'URL')?.replace(/[./\s]+$/, '');
+  const key = secret('LIVEKIT_API_KEY', 'Apikey', 'API KEY');
+  const apiSecret = secret('LIVEKIT_API_SECRET', 'secret', 'API SECRET');
   if (!url || !key || !apiSecret) return json({ error: 'not_configured' }, 503);
 
   let body: { party_id?: string; user_id?: string; voice_room?: string };

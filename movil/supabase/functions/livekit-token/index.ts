@@ -34,9 +34,27 @@ Deno.serve(async (request) => {
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   // Los secretos se pegan a mano en el panel: se quitan espacios y el punto o
   // la barra final («wss://…livekit.cloud.» no conecta).
-  const livekitUrl = Deno.env.get('LIVEKIT_URL')?.trim().replace(/[./\s]+$/, '');
-  const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY')?.trim();
-  const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET')?.trim();
+  // También se aceptan los nombres cortos («URL», «API KEY», «API SECRET»):
+  // así se guardaron en el panel la primera vez. Si se pega la dirección
+  // https:// en vez de wss://, se convierte.
+  // Y si en el valor se pegó la línea entera («LIVEKIT_URL=wss://…»), se quita
+  // el «NOMBRE=» del principio y las comillas.
+  const secret = (...names: string[]) => {
+    for (const name of names) {
+      const value = Deno.env.get(name)
+        ?.trim()
+        .replace(/^LIVEKIT_[A-Z_]+\s*=\s*/, '')
+        .replace(/^["']|["']$/g, '')
+        .trim();
+      if (value) return value;
+    }
+    return undefined;
+  };
+  // Orden: el nombre oficial y, si no existe, los que hay guardados en el panel
+  // («url», «Apikey», «secret»).
+  const livekitUrl = secret('LIVEKIT_URL', 'url', 'URL')?.replace(/[./\s]+$/, '').replace(/^http/i, 'ws');
+  const livekitApiKey = secret('LIVEKIT_API_KEY', 'Apikey', 'API KEY');
+  const livekitApiSecret = secret('LIVEKIT_API_SECRET', 'secret', 'API SECRET');
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return json({ error: 'Supabase no está configurado en la función.' }, 500);
